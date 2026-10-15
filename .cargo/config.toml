@@ -1,0 +1,3 @@
+# Cap parallel rustc jobs so builds fit on ~4 GB machines. Override with CARGO_BUILD_JOBS.
+[build]
+jobs = 2
