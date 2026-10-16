@@ -144,3 +144,6 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .dir:hover { background: #1c1f26; }
 .dirs-pick { width: 100%; padding: 5px; border-top: 1px solid var(--line); color: var(--accent); }
 .dirs-error { padding: 5px 7px; color: var(--bad); white-space: pre-wrap; }
+
+.no-tauri { height: 100%; display: grid; place-content: center; padding: 24px; text-align: center; }
+.no-tauri code { color: var(--text); }
