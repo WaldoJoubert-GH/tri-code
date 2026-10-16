@@ -1,10 +1,11 @@
-// Per-project appearance: accent colour, background preset or uploaded image, and dim.
+// Per-project appearance: name, icon, accent colour, background preset or uploaded image, and dim.
 // The popover is anchored under the toolbar button, or beside a sidebar gear.
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { ACCENTS, Project, activeProject, projectById, setAppearance } from "./state";
+import { ACCENTS, Project, activeProject, projectById, renameProject, setAppearance, setIcon } from "./state";
+import { GLYPHS, IconFace, Logo, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
 import { flash } from "./ui";
 
 const tint = (a: string, p: number) => `color-mix(in srgb, ${a} ${p}%, transparent)`;
@@ -123,7 +124,22 @@ export function AppearancePopover() {
 
             return (
               <div class="pop" role="dialog" aria-label="Project appearance" ref={(el) => requestAnimationFrame(() => placePop(el, s.anchor))}>
-                <div class="ttl">{p.name} <span>appearance</span></div>
+                <div class="ttl">
+                  <input
+                    class="name"
+                    value={p.name}
+                    title="Rename project"
+                    aria-label="Project name"
+                    spellcheck={false}
+                    onChange={(e) => renameProject(p.id, e.currentTarget.value.trim() || p.path.split(/[\\/]/).filter(Boolean).pop() || p.name)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                      else if (e.key === "Escape") (e.currentTarget.value = p.name), e.currentTarget.blur();
+                    }}
+                  />
+                  <span>appearance</span>
+                </div>
+                <IconSection project={p} />
                 <h4>Accent</h4>
                 <div class="swatches">
                   <For each={ACCENTS}>
@@ -184,5 +200,116 @@ export function AppearancePopover() {
         </Show>
       )}
     </Show>
+  );
+}
+
+/** Icon: the automatic pick, another logo found in the project, an upload, a glyph or the letter. */
+function IconSection(props: { project: Project }) {
+  const p = () => props.project;
+  const [logos, setLogos] = createSignal<Logo[] | null>(null);
+  const [scanError, setScanError] = createSignal("");
+  const [tab, setTab] = createSignal<"project" | "glyph">(
+    props.project.icon?.kind === "glyph" || (props.project.icon?.kind === "letter" && !props.project.icon.auto) ? "glyph" : "project",
+  );
+  let fileEl: HTMLInputElement | undefined;
+
+  onMount(() => {
+    scanLogos(p()).then(setLogos, (e) => (setLogos([]), setScanError(String(e))));
+  });
+
+  const icon = () => p().icon;
+  const isAuto = () => icon() === undefined || (icon()?.kind !== "glyph" && !!(icon() as { auto?: boolean }).auto);
+  const summary = () => {
+    const i = icon();
+    if (!i) return { label: "Auto", sub: "looking for a logo…" };
+    if (i.kind === "glyph") return { label: "Glyph · override", sub: i.glyph };
+    if (i.kind === "letter") return i.auto ? { label: "Auto", sub: "no logo found, using the letter" } : { label: "Letter · override", sub: letterOf(p()) };
+    if (i.auto) return { label: "Auto", sub: i.file ?? "" };
+    return { label: i.file ? "Logo · override" : "Uploaded image · override", sub: i.file ?? "your image" };
+  };
+  const pickedLogo = (file: string) => icon()?.kind === "image" && (icon() as { file?: string }).file === file && !isAuto();
+  const uploaded = () => icon()?.kind === "image" && !(icon() as { file?: string }).file;
+
+  const onFile = (e: Event) => {
+    const input = e.currentTarget as HTMLInputElement;
+    const f = input.files?.[0];
+    input.value = "";
+    if (f) uploadIcon(p().id, f);
+  };
+
+  return (
+    <>
+      <h4 class="with-action">
+        Icon
+        <Show when={!isAuto()}>
+          <button type="button" title="Back to the logo found in the project" onClick={() => autoIcon(p().id, logos() ?? undefined)}>reset to auto</button>
+        </Show>
+      </h4>
+      <div class="icon-now">
+        <span class="tile" style={{ "--pa": p().accent }}><IconFace project={p()} /></span>
+        <span class="what"><b>{summary().label}</b><code>{summary().sub}</code></span>
+      </div>
+      <div class="icon-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab() === "project"} onClick={() => setTab("project")}>
+          From project{logos()?.length ? ` (${logos()!.length})` : ""}
+        </button>
+        <button type="button" role="tab" aria-selected={tab() === "glyph"} onClick={() => setTab("glyph")}>Glyph</button>
+      </div>
+      <Show when={tab() === "project"}>
+        <div class="logos">
+          <button type="button" aria-pressed={isAuto()} onClick={() => autoIcon(p().id, logos() ?? undefined)}>
+            <Show when={logos()?.[0]} fallback={<b>{letterOf(p())}</b>}>{(l) => <img src={l().data_url} alt="" />}</Show>
+            <code>Auto{logos() && !logos()!.length ? " (letter)" : ""}</code>
+            <span class="tag">default</span>
+          </button>
+          <For each={logos() ?? []}>
+            {(l) => (
+              <button type="button" aria-pressed={pickedLogo(l.file)} onClick={() => useLogo(p().id, l)}>
+                <img src={l.data_url} alt="" />
+                <code>{l.file}</code>
+              </button>
+            )}
+          </For>
+          <Show when={uploaded() && iconImages[p().id]}>
+            {(src) => (
+              <button type="button" aria-pressed="true">
+                <img src={src()} alt="" />
+                <code>your image</code>
+              </button>
+            )}
+          </Show>
+        </div>
+        <Show when={logos() === null}><div class="note">Looking for logos…</div></Show>
+        <Show when={logos()?.length === 0}><div class="note">{scanError() || `No logo files found in ${p().name}`}</div></Show>
+        <label class="upload" role="button" tabindex="0" onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), fileEl?.click())}>
+          Upload image…
+          <input ref={fileEl} type="file" accept="image/*" hidden onChange={onFile} />
+        </label>
+      </Show>
+      <Show when={tab() === "glyph"}>
+        <div class="glyphs">
+          <button
+            type="button"
+            class="letter"
+            title="Letter"
+            aria-pressed={icon()?.kind === "letter" && !isAuto()}
+            onClick={() => setIcon(p().id, { kind: "letter" })}
+          >
+            {letterOf(p())}
+          </button>
+          <For each={GLYPHS}>
+            {(g) => (
+              <button
+                type="button"
+                aria-pressed={icon()?.kind === "glyph" && (icon() as { glyph: string }).glyph === g}
+                onClick={() => setIcon(p().id, { kind: "glyph", glyph: g })}
+              >
+                {g}
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+    </>
   );
 }

@@ -10,6 +10,8 @@ import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
+import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
+import { loadIcons } from "./icons";
 import { installHotkeys } from "./hotkeys";
 import { installClipboardFallback } from "./clipboard";
 import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
@@ -46,6 +48,7 @@ export default function App() {
         })
         .catch((e) => console.error("bg_load failed:", e));
     }
+    loadIcons();
     setReady(true);
   });
   persistChanges(ready);
@@ -76,7 +79,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || favEditOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || favEditOpen() || openProjectOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -89,7 +92,7 @@ export default function App() {
       <Toolbar />
       <div class="stage">
         <div class="bg" style={backdrop()} />
-        <Show when={activeProject()} keyed fallback={<div class="empty">Add a project to get started.</div>}>
+        <Show when={activeProject()} keyed fallback={<div class="empty">Open a project (Alt+O) to get started.</div>}>
           {(p) => <Canvas project={p} />}
         </Show>
         <Show when={toast()}>
@@ -107,6 +110,7 @@ export default function App() {
       <TabMenu />
       <AppearancePopover />
       <FavPopover />
+      <OpenProjectDialog />
       <HelpOverlay />
     </div>
   );

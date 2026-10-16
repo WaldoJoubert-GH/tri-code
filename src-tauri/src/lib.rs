@@ -2,6 +2,7 @@ mod bg;
 mod browser;
 mod devfs;
 mod dirs;
+mod envs;
 mod fs;
 mod plane;
 mod pty;
@@ -44,6 +45,8 @@ pub fn run() {
             pty::pty_kill_all,
             pty::remote_kill_session,
             dirs::list_dirs,
+            envs::ssh_hosts,
+            envs::scan_logos,
             fs::list_files,
             fs::read_file,
             devfs::dev_read,
@@ -71,6 +74,9 @@ pub fn run() {
             bg::bg_save,
             bg::bg_load,
             bg::bg_delete,
+            bg::icon_save,
+            bg::icon_load,
+            bg::icon_delete,
             usage::claude_usage,
         ])
         .build(tauri::generate_context!())

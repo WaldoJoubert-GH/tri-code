@@ -11,6 +11,8 @@ pub struct DirList {
     pub path: String,
     /// Names of the visible subdirectories, sorted.
     pub dirs: Vec<String>,
+    /// The subset of `dirs` that are git repositories (contain `.git`).
+    pub repos: Vec<String>,
 }
 
 #[tauri::command]
@@ -33,16 +35,18 @@ fn list_local(path: &str) -> Result<DirList, String> {
         .filter(|n| !n.starts_with('.'))
         .collect();
     dirs.sort_by_key(|n| n.to_lowercase());
+    let repos = dirs.iter().filter(|n| dir.join(n).join(".git").exists()).cloned().collect();
     let path = dir.to_string_lossy();
     // canonicalize returns verbatim `\\?\C:\...` paths on Windows.
     let path = path.strip_prefix(r"\\?\").unwrap_or(&path).to_string();
-    Ok(DirList { path, dirs })
+    Ok(DirList { path, dirs, repos })
 }
 
-/// Remote script: print the resolved directory, then one subdirectory per line.
+/// Remote script: print the resolved directory, then one subdirectory per line,
+/// prefixed `g` for a git repository and `d` otherwise.
 fn remote_script(path: &str) -> String {
     let inner = format!(
-        "cd {} || exit 1; pwd; for d in */; do [ -d \"$d\" ] && printf '%s\\n' \"${{d%/}}\"; done; true",
+        "cd {} || exit 1; pwd; for d in */; do [ -d \"$d\" ] || continue; t=d; [ -e \"$d.git\" ] && t=g; printf '%s%s\\n' \"$t\" \"${{d%/}}\"; done; true",
         remote_path(path)
     );
     // `sh -c` so it works whatever the login shell is (bash, zsh, fish, ...).
@@ -53,9 +57,18 @@ fn list_remote(host: &str, path: &str) -> Result<DirList, String> {
     let text = remote::run(host, &remote_script(path))?;
     let mut lines = text.lines();
     let path = lines.next().unwrap_or("/").to_string();
-    let mut dirs: Vec<String> = lines.map(String::from).collect();
+    let mut dirs = Vec::new();
+    let mut repos = Vec::new();
+    for line in lines {
+        let (kind, name) = line.split_at(line.len().min(1));
+        if kind == "g" {
+            repos.push(name.to_string());
+        }
+        dirs.push(name.to_string());
+    }
     dirs.sort_by_key(|n| n.to_lowercase());
-    Ok(DirList { path, dirs })
+    repos.sort_by_key(|n| n.to_lowercase());
+    Ok(DirList { path, dirs, repos })
 }
 
 #[cfg(all(test, unix))]
@@ -67,11 +80,13 @@ mod tests {
         let root = std::env::temp_dir().join(format!("tri-dirs-{}", std::process::id()));
         std::fs::create_dir_all(root.join("b dir")).unwrap();
         std::fs::create_dir_all(root.join("A")).unwrap();
+        std::fs::create_dir_all(root.join("b dir/.git")).unwrap();
         std::fs::create_dir_all(root.join(".hidden")).unwrap();
         std::fs::write(root.join("file"), "").unwrap();
         let l = list_local(&format!("{}/A/..", root.display())).unwrap();
         std::fs::remove_dir_all(&root).ok();
         assert_eq!(l.dirs, ["A", "b dir"]);
+        assert_eq!(l.repos, ["b dir"]);
         assert_eq!(l.path, std::fs::canonicalize(std::env::temp_dir()).unwrap().join(root.file_name().unwrap()).to_string_lossy());
     }
 
@@ -79,6 +94,7 @@ mod tests {
     fn remote_script_runs_in_a_real_shell() {
         let root = std::env::temp_dir().join(format!("tri-rdirs-{}", std::process::id()));
         std::fs::create_dir_all(root.join("it's here")).unwrap();
+        std::fs::create_dir_all(root.join("repo/.git")).unwrap();
         std::fs::write(root.join("file"), "").unwrap();
         // ssh hands the command string to the remote login shell as-is.
         let out = std::process::Command::new("/bin/sh")
@@ -88,7 +104,8 @@ mod tests {
             .unwrap();
         std::fs::remove_dir_all(&root).ok();
         let text = String::from_utf8_lossy(&out.stdout);
-        assert_eq!(text.lines().nth(1), Some("it's here"), "{out:?}");
-        assert_eq!(text.lines().count(), 2, "{out:?}");
+        assert_eq!(text.lines().nth(1), Some("dit's here"), "{out:?}");
+        assert_eq!(text.lines().nth(2), Some("grepo"), "{out:?}");
+        assert_eq!(text.lines().count(), 3, "{out:?}");
     }
 }

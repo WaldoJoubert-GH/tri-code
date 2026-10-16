@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tri-code · projects prototype</title>
+<!--
+  PROTOTYPE — throwaway. Not imported by the app; open this file directly in a browser
+  (or visit /design/projects.html on the dev server).
+
+  Question: "How do I add an Environment (local / ssh) with a button, and how do we make
+  the folder picker simpler?" Today Sidebar.tsx <AddProject> is one form: a free-text
+  `host` input (datalist of known hosts), a path input with a `…` button that opens
+  <DirBrowser> (a `..` row, a dir list, "Use this folder"), and a name input. Hosts only
+  exist as a side-effect of projects; there is no way to add one on its own.
+
+  Three variants, A–C, switchable from the floating bar (← / → keys too).
+  URL keeps the choice: projects.html?variant=B (served) or projects.html#B (file://).
+  The filesystem is a mock (latency: local 120ms, ssh 450ms; host `nas` fails to connect).
+  The panel on the right prints the full state after every action.
+
+  OUTCOME (settled): variant B — the Open project dialog (environments left, Folder Picker
+  right, "New environment" in the same list), plus the shared pieces: the Project Icon with
+  its Appearance-panel override, and rename (double-click or the panel title). It shipped in
+  src/OpenProject.tsx, src/icons.tsx, Sidebar.tsx and Appearance.tsx, with
+  src-tauri/src/envs.rs (ssh_hosts, scan_logos) and icon_* in bg.rs. A and C were not picked;
+  F2 rename was dropped because plain F2 belongs to the terminal.
+
+  A  Inline   — environments are sidebar sections; `+` on a section header opens a
+                type-to-filter folder list right there. `+ Environment` at the bottom.
+  B  Dialog   — one "Open project" dialog: environments on the left (with `+ New`),
+                breadcrumb + folder list on the right, git repos marked, Open at the bottom.
+  C  Palette  — no browsing by default: one input (Alt+O) that fuzzy-matches git repos
+                found on each environment and recent folders; type `~/` or `/` to complete
+                a path instead. Environments are chips in the palette, `+ ssh` among them.
+
+  Project icon (all variants): on add, the folder is scanned for logo files (favicon.svg/ico,
+  logo.*, icon.png, src-tauri/icons/*, public/*, assets/*) and the first one becomes the icon,
+  the way T3 Code does it. The Appearance panel (◐ on the row, or click the icon) gets an
+  Icon section above Accent that overrides it: Auto (first logo found), any other logo
+  found in the project, a glyph, the plain letter, or an uploaded image. The rest of the
+  panel (Accent, Background, Dim) mirrors src/Appearance.tsx.
+
+  Rename: the panel title is the name field (Enter / blur saves, Esc reverts, empty = folder
+  name), and double-click a name in the sidebar or F2 on the active project renames in place.
+  Safe for terminals: sessionName() uses the project id, not the name.
+  Landing: Project gets `icon?: { kind: "logo", file } | { kind: "glyph", g } | { kind: "letter" }
+  | { kind: "image" }` (undefined = auto); an uploaded icon is stored like the background
+  image (icon_save / icon_delete next to bg_save in Rust).
+
+  Shared idea for "simpler folder picker", in every variant: one path field that is also
+  the browser — typing filters the current folder, Enter/→ on a match goes in, Backspace
+  on an empty segment goes up, clicking a breadcrumb jumps. The name is the folder name
+  (rename later), so the name input is gone.
+
+  How it would land (not built here):
+  - state.ts gets `environments: { id, kind: "local"|"ssh", name, dest }[]`, persisted in
+    state.json; Project.host keeps the ssh dest so terms.ts / files.ts are untouched.
+    Hosts are seeded from existing projects on load.
+  - "Test connection" = list_dirs(host, "~") already in the Rust side; ssh aliases come
+    from a new `ssh_hosts` command reading ~/.ssh/config (Host lines without wildcards).
+  - C additionally needs a `find_repos(host, root, depth)` command (find -name .git -maxdepth 4).
+-->
+<style>
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --violet: #7c4dbd; --scrim: rgba(30,34,44,.35); --shadow: rgba(30,34,44,.22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --violet: #bb9af7; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+    --accent: var(--accent-raw);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 var(--ui); overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; outline: none; min-width: 0; }
+input:focus { border-color: var(--accent); }
+kbd { font: 10.5px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; color: var(--muted); background: var(--bg); }
+
+/* ---- app shell ---- */
+.app { display: grid; height: 100%; grid-template-columns: 240px 1fr 300px; grid-template-rows: 34px 1fr; grid-template-areas: "side top state" "side canvas state"; }
+aside { grid-area: side; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 6px 70px; overflow-y: auto; position: relative; }
+.side-head { display: flex; align-items: center; justify-content: space-between; height: 26px; padding-left: 8px; }
+.side-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.side-head button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+.side-head button:hover { background: var(--hover); color: var(--text); }
+aside h2 { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.project { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.project:hover { background: var(--hover); }
+.project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
+.project .swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--pa); flex: none; }
+.project .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project .count { color: var(--muted); font-size: 11px; }
+.project.new { animation: pop 1.2s ease-out; }
+@keyframes pop { from { background: color-mix(in srgb, var(--accent) 35%, transparent); } }
+.sidebtn { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 2px; padding: 6px 8px; text-align: left; color: var(--muted); border-radius: 5px; }
+.sidebtn:hover { background: var(--hover); color: var(--text); }
+.sidebtn kbd { margin-left: auto; }
+.top { grid-area: top; display: flex; align-items: center; gap: 10px; background: var(--panel); border-bottom: 1px solid var(--line); padding: 0 12px; color: var(--muted); font-size: 12px; }
+.top b { color: var(--text); font-weight: 600; }
+.viewport { grid-area: canvas; background: var(--canvas); display: grid; place-items: center; color: var(--muted); position: relative; }
+.viewport .hint { max-width: 360px; text-align: center; line-height: 1.6; }
+
+/* ---- env header (shared look) ---- */
+.envh { display: flex; align-items: center; gap: 6px; margin: 12px 0 3px; padding: 0 4px 0 8px; height: 22px; }
+.envh .ttl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envh .dest { font: 10.5px var(--mono); color: var(--muted); opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.envh .tools { display: flex; gap: 1px; opacity: 0; }
+.envh:hover .tools, .envh.open .tools { opacity: 1; }
+.envh .tools button { width: 20px; height: 20px; border-radius: 4px; color: var(--muted); font-size: 13px; line-height: 1; }
+.envh .tools button:hover { background: var(--hover); color: var(--text); }
+.dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--ok); }
+.dot.off { background: var(--bad); }
+.dot.wait { background: var(--warn); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+.kind { font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; flex: none; }
+.emptyenv { padding: 3px 8px 3px 20px; color: var(--muted); font-size: 12px; font-style: italic; }
+
+/* ---- shared picker: path field = browser ---- */
+.picker { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); overflow: hidden; font-size: 12.5px; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0; padding: 5px 7px 0; font: 11.5px var(--mono); color: var(--muted); }
+.crumbs button { padding: 1px 2px; border-radius: 3px; color: var(--muted); }
+.crumbs button:hover { background: var(--hover); color: var(--text); }
+.crumbs button:last-child { color: var(--text); }
+.crumbs .sl { opacity: .5; }
+.picker .q { margin: 5px 6px; font: 12px var(--mono); }
+.list { overflow-y: auto; border-top: 1px solid var(--line); }
+.row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+.row:hover { background: var(--hover); }
+.row.sel { background: color-mix(in srgb, var(--accent) 18%, var(--bg)); }
+.row .ic { width: 14px; text-align: center; color: var(--muted); flex: none; }
+.row .nm { overflow: hidden; text-overflow: ellipsis; }
+.row .nm mark { background: none; color: var(--accent); font-weight: 600; }
+.row .git { font: 10px var(--mono); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent); border-radius: 3px; padding: 0 3px; }
+.row .use { margin-left: auto; opacity: 0; color: var(--accent); font-size: 11.5px; padding: 0 6px; border-radius: 3px; }
+.row:hover .use, .row.sel .use { opacity: 1; }
+.row .use:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.row .sub { margin-left: auto; color: var(--muted); font: 10.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+.note { padding: 6px 8px; color: var(--muted); font-size: 12px; }
+.note.err { color: var(--bad); }
+.pfoot { display: flex; align-items: center; gap: 6px; padding: 6px; border-top: 1px solid var(--line); }
+.pfoot .here { flex: 1; min-width: 0; font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.btn { padding: 4px 10px; border-radius: 4px; background: var(--raised); font-size: 12px; white-space: nowrap; }
+.btn:hover { background: var(--hover); }
+.btn.pri { background: var(--accent); color: var(--bg); }
+.btn.pri:hover { filter: brightness(1.08); }
+.btn[disabled] { opacity: .45; cursor: default; filter: none; }
+.keys { color: var(--muted); font-size: 11px; display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 8px 6px; }
+
+/* ---- shared env form ---- */
+.envform { display: flex; flex-direction: column; gap: 7px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.seg button { flex: 1; padding: 4px 8px; color: var(--muted); font-size: 12px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.seg button[disabled] { opacity: .45; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font: 11px var(--mono); padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.chip:hover { color: var(--text); border-color: var(--accent); }
+.chip.on { background: color-mix(in srgb, var(--accent) 20%, var(--bg)); color: var(--text); border-color: var(--accent); }
+.chip.used { opacity: .4; pointer-events: none; text-decoration: line-through; }
+.lbl { font-size: 11px; color: var(--muted); }
+.test { font: 11.5px var(--mono); padding: 5px 7px; border-radius: 4px; background: var(--panel); }
+.test.ok { color: var(--ok); } .test.bad { color: var(--bad); } .test.wait { color: var(--warn); }
+.frow { display: flex; gap: 6px; }
+.frow .btn { flex: 1; padding: 5px; }
+
+/* ---- A: inline in sidebar ---- */
+.a-pick { margin: 2px 0 8px; }
+.a-pick .list { max-height: 260px; }
+.a-env { margin: 10px 2px 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+
+/* ---- B: dialog ---- */
+.scrim { position: fixed; inset: 0; z-index: 50; background: var(--scrim); display: grid; place-items: center; }
+.dlg { width: min(760px, 92vw); height: min(500px, 82vh); display: grid; grid-template-columns: 200px 1fr; grid-template-rows: auto 1fr; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow); overflow: hidden; }
+.dlg header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.dlg header button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+.dlg header button:hover { background: var(--hover); color: var(--text); }
+.dlg nav { border-right: 1px solid var(--line); padding: 8px 6px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.dlg nav .mt { padding: 4px 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.envbtn { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 5px; text-align: left; }
+.envbtn:hover { background: var(--hover); }
+.envbtn[aria-pressed="true"] { background: var(--raised); }
+.envbtn .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envbtn.newenv { color: var(--accent); margin-top: 4px; }
+.dlg .pane { display: flex; flex-direction: column; min-height: 0; padding: 10px; gap: 8px; }
+.dlg .picker { flex: 1; min-height: 0; }
+.dlg .picker .list { flex: 1; }
+.dlg .envpane { padding: 16px; max-width: 420px; }
+.recent { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.recent .lbl { margin-right: 2px; }
+
+/* ---- C: palette ---- */
+.pal-wrap { position: fixed; inset: 0; z-index: 50; background: var(--scrim); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; }
+.pal { width: min(620px, 92vw); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow); overflow: hidden; }
+.pal .in { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.pal .in .envtag { font: 11.5px var(--mono); color: var(--accent); white-space: nowrap; }
+.pal .in input { flex: 1; border: 0; background: none; font-size: 15px; padding: 2px 0; }
+.pal .envs { display: flex; gap: 4px; padding: 7px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; align-items: center; }
+.pal .list { max-height: 330px; border-top: 0; }
+.pal .grp { padding: 7px 12px 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.pal .row { padding: 6px 12px; }
+.pal .foot { display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.pal .envform { padding: 12px; }
+
+/* ---- project icon ---- */
+.project .pico { width: 18px; height: 18px; border-radius: 4px; flex: none; display: grid; place-items: center; background: color-mix(in srgb, var(--pa) 22%, var(--raised)); color: var(--text); font: 600 11px var(--ui); overflow: hidden; cursor: pointer; padding: 0; }
+.project .pico:hover { box-shadow: 0 0 0 1.5px var(--pa); }
+.project .pico svg { width: 14px; height: 14px; }
+.project .pico.glyph { font-size: 12px; }
+.project .gear { opacity: 0; color: var(--muted); padding: 0 2px; font-size: 12px; }
+.project:hover .gear { opacity: 1; }
+.project .gear:hover { color: var(--text); }
+.project .pico img { width: 100%; height: 100%; object-fit: cover; }
+/* Appearance panel (mirrors src/styles.css .pop) */
+.pop { position: fixed; z-index: 60; width: 300px; padding: 14px; display: grid; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px -12px var(--shadow); }
+.pop .ttl { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.pop .ttl input { flex: 1; width: 0; margin-left: -6px; font-weight: 600; padding: 3px 6px; border-color: transparent; background: none; }
+.pop .ttl input:hover { border-color: var(--line); }
+.pop .ttl input:focus { border-color: var(--accent); background: var(--bg); }
+.project .rn { flex: 1; padding: 1px 5px; font-size: 13px; }
+.pop .ttl span { color: var(--muted); font-weight: 400; font-size: 12px; }
+.pop h4 { margin: 6px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; display: flex; justify-content: space-between; }
+.pop h4 span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.pop h4 button { color: var(--accent); font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.swatches button { width: 22px; height: 22px; border-radius: 5px; border: 2px solid transparent; outline: 1px solid var(--line); }
+.swatches button[aria-pressed="true"] { border-color: var(--panel); outline: 2px solid var(--text); }
+.bgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.bgs button { height: 40px; border-radius: 5px; border: 1px solid var(--line); font-size: 10px; display: flex; align-items: flex-end; padding: 3px 5px; }
+.bgs button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pop .row { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.pop input[type="range"] { flex: 1; accent-color: var(--accent); }
+.pop .val { font: 11px var(--mono); width: 34px; text-align: right; color: var(--text); }
+/* Icon section */
+.icocur { display: flex; align-items: center; gap: 10px; }
+.icocur .big { width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; background: color-mix(in srgb, var(--pa) 22%, var(--raised)); font: 600 18px var(--ui); overflow: hidden; flex: none; }
+.icocur .big svg { width: 28px; height: 28px; }
+.icocur .big img { width: 100%; height: 100%; object-fit: cover; }
+.icocur .what { flex: 1; min-width: 0; font-size: 12px; }
+.icocur .what b { display: block; font-weight: 600; }
+.icocur .what code { font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.icotabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
+.icotabs button { padding: 3px 8px; font-size: 12px; color: var(--muted); box-shadow: inset 0 -2px transparent; }
+.icotabs button[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.icogrid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+.icogrid button, .logos button { height: 28px; border-radius: 5px; display: grid; place-items: center; font-size: 14px; border: 1px solid transparent; }
+.icogrid button:hover, .logos button:hover { background: var(--hover); }
+.icogrid button[aria-pressed="true"], .logos button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+.logos { display: flex; flex-direction: column; gap: 2px; }
+.logos button { display: flex; align-items: center; gap: 8px; height: auto; padding: 4px 6px; text-align: left; }
+.logos button svg, .logos button img { width: 18px; height: 18px; flex: none; border-radius: 3px; }
+.logos button code { font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.logos button .tag { font-size: 10px; color: var(--muted); }
+.upl { display: flex; align-items: center; justify-content: center; height: 30px; border: 1px dashed var(--line); border-radius: 5px; color: var(--muted); font-size: 11.5px; cursor: pointer; }
+.upl:hover { color: var(--text); border-color: var(--accent); }
+.pop .none { color: var(--muted); font-size: 12px; font-style: italic; padding: 2px 0; }
+
+/* ---- state panel (rule 5: always show the state) ---- */
+.state { grid-area: state; border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+.state h3 { margin: 0; padding: 9px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.state pre { margin: 0; padding: 10px 12px; font: 11px/1.45 var(--mono); overflow: auto; flex: 1; white-space: pre-wrap; }
+.state .log { border-top: 1px solid var(--line); max-height: 34%; overflow: auto; padding: 6px 12px; font: 11px/1.5 var(--mono); color: var(--muted); }
+.state .log div:first-child { color: var(--accent); }
+
+/* ---- prototype switcher ---- */
+.proto-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 8px; background: #14161cf2; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px; box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); font: 12px/1.35 var(--ui); }
+.proto-bar .tag { font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; border: 1px solid #3a3f4d; border-radius: 999px; padding: 4px 7px; }
+.proto-bar button.arrow { width: 26px; height: 26px; border-radius: 7px; color: #cfd5e4; font-size: 15px; }
+.proto-bar button.arrow:hover, .proto-bar button.rst:hover { background: #262b36; color: #fff; }
+.proto-bar button.rst { height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid #3a3f4d; color: #cfd5e4; font-size: 11.5px; }
+.proto-bar .cur { min-width: 300px; }
+.proto-bar .cur b { font: 600 12px var(--mono); color: #fff; }
+.proto-bar .cur span { display: block; color: #9aa3b8; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="side"></aside>
+  <div class="top" id="top"></div>
+  <div class="viewport" id="vp"></div>
+  <div class="state"><h3>state</h3><pre id="state"></pre><div class="log" id="log"></div></div>
+</div>
+<div id="overlay"></div>
+<div class="proto-bar">
+  <span class="tag">prototype</span>
+  <button class="arrow" id="prev" title="Previous variant (←)">‹</button>
+  <div class="cur" id="cur"></div>
+  <button class="arrow" id="next" title="Next variant (→)">›</button>
+  <button class="rst" id="rst" title="Reset the mock state">reset</button>
+</div>
+
+<script>
+/* ================= mock world ================= */
+// A folder is { name: children } ; ".git" key marks a repo.
+const G = { ".git": {} };
+const FS = {
+  local: { home: "/home/waldo", tree: {
+    code: { "tri-code": { ...G, src: {}, design: {}, "src-tauri": {} }, "pi-todos": { ...G, src: {} }, "dev-hub": { ...G, plugins: {} },
+            sandbox: { "rust-play": { ...G }, "solid-demo": { ...G }, scratch: {} }, archive: { "old-site": { ...G }, "blog-2023": { ...G } } },
+    Documents: { invoices: {}, notes: {} }, Downloads: {}, Pictures: {}, ".config": { nvim: {}, git: {} }, ".ssh": {} } },
+  devbox: { home: "/home/ubuntu", tree: { srv: { api: { ...G, cmd: {}, internal: {} }, web: { ...G, app: {} }, infra: { ...G, terraform: {} } }, notes: {}, tmp: {} } },
+  pi: { home: "/home/pi", tree: { "home-assistant": { ...G, config: {} }, scripts: {}, backups: {} } },
+  "gpu-box": { home: "/home/waldo", tree: { models: { llama: {}, whisper: {} }, train: { ...G, runs: {} }, datasets: {} } },
+  "waldo@10.0.0.42": { home: "/root", tree: { app: { ...G }, logs: {} } },
+};
+/** Logo files a scan of the project folder would find (path relative to the project). */
+const svg = (body, vb = "0 0 24 24") => `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
+const LOGOS = {
+  "local:/home/waldo/code/tri-code": [
+    { file: "assets/logo.svg", svg: svg('<path d="M12 2 22 20H2z" fill="#7aa2f7"/><path d="M12 9 17 18H7z" fill="#1a1b26"/>') },
+    { file: "src-tauri/icons/icon.png", svg: svg('<rect x="2" y="2" width="20" height="20" rx="5" fill="#1a1b26"/><path d="M12 5 19 18H5z" fill="#7aa2f7"/>') },
+  ],
+  "local:/home/waldo/code/dev-hub": [{ file: "public/favicon.svg", svg: svg('<circle cx="12" cy="12" r="10" fill="#9ece6a"/><path d="M7 12h10M12 7v10" stroke="#16161e" stroke-width="2.6" stroke-linecap="round"/>') }],
+  "local:/home/waldo/code/pi-todos": [{ file: "logo.png", svg: svg('<rect x="2" y="2" width="20" height="20" rx="4" fill="#bb9af7"/><text x="12" y="17" font-size="14" text-anchor="middle" fill="#16161e" font-family="serif" font-weight="700">π</text>') }],
+  "local:/home/waldo/code/sandbox/solid-demo": [{ file: "public/favicon.ico", svg: svg('<path d="M3 8l9-5 9 5-9 5z" fill="#4f88c6"/><path d="M3 15l9-5 9 5-9 5z" fill="#2c4f7c"/>') }],
+  "devbox:/home/ubuntu/srv/web": [
+    { file: "public/favicon.ico", svg: svg('<rect x="2" y="2" width="20" height="20" rx="10" fill="#ff9e64"/><path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>') },
+    { file: "app/assets/brand/mark.svg", svg: svg('<path d="M4 18 12 4l8 14" fill="none" stroke="#ff9e64" stroke-width="3" stroke-linejoin="round"/>') },
+  ],
+  "pi:/home/pi/home-assistant": [{ file: "config/www/logo.png", svg: svg('<path d="M12 2 2 11h3v10h14V11h3z" fill="#41bdf5"/>') }],
+};
+const GLYPHS = ["◆", "●", "▲", "■", "★", "✦", "⬢", "◐", "⚡", "⚙", "⌘", "λ", "π", "∑", "♪", "☁", "☀", "☾", "✿", "♦", "♣", "⚑", "✎", "⌂"];
+/** scan_logos(host, path) — what the real command would return. */
+const scanLogos = (envId, path) => LOGOS[`${envId}:${path}`] ?? [];
+const SSH_CONFIG = ["devbox", "pi", "gpu-box", "nas"]; // Host lines in ~/.ssh/config
+const ACCENTS = ["#7aa2f7", "#9ece6a", "#e0af68", "#bb9af7", "#f7768e", "#7dcfff", "#ff9e64"];
+
+function fsOf(dest) { return FS[dest] ?? (dest === "nas" ? null : { home: "/home/user", tree: { projects: { demo: { ...G } } } }); }
+function norm(env, p) {
+  const fs = fsOf(env.dest); if (!fs) return p;
+  if (p === "~" || p.startsWith("~/")) p = fs.home + p.slice(1);
+  const out = [];
+  for (const s of p.split("/")) { if (!s || s === ".") continue; if (s === "..") out.pop(); else out.push(s); }
+  return "/" + out.join("/");
+}
+function tilde(env, p) { const h = fsOf(env.dest)?.home; return h && (p === h || p.startsWith(h + "/")) ? "~" + p.slice(h.length) : p; }
+function nodeAt(fs, abs) {
+  // The tree is rooted at home; everything above home has just the path down to it.
+  const parts = abs.split("/").filter(Boolean), hp = fs.home.split("/").filter(Boolean);
+  let n = {}, cur = n;
+  // Build a synthetic root containing the path to home.
+  const root = {}; let r = root; hp.forEach((s, i) => { r[s] = i === hp.length - 1 ? fs.tree : {}; r = r[s]; });
+  if (abs === "/") return { ...root, etc: {}, usr: {}, var: {}, tmp: {} };
+  n = root;
+  for (const s of parts) { if (!n || typeof n !== "object" || !(s in n)) return null; n = n[s]; }
+  return n;
+}
+/** list_dirs(host, path) with fake latency. */
+function listDirs(env, path) {
+  return new Promise((ok, fail) => setTimeout(() => {
+    const fs = fsOf(env.dest);
+    if (!fs) return fail(`ssh: connect to host ${env.dest} port 22: Connection timed out`);
+    const abs = norm(env, path), n = nodeAt(fs, abs);
+    if (!n) return fail(`${tilde(env, abs)}: No such directory`);
+    const dirs = Object.keys(n).filter((k) => k !== ".git").sort((a, b) => (a[0] === ".") - (b[0] === ".") || a.localeCompare(b));
+    ok({ path: abs, dirs: dirs.map((d) => ({ name: d, git: !!n[d][".git"] })), git: !!n[".git"] });
+  }, env.kind === "local" ? 120 : 450));
+}
+/** find_repos(host, ~, depth 4) — for variant C. */
+function findRepos(env) {
+  return new Promise((ok, fail) => setTimeout(() => {
+    const fs = fsOf(env.dest); if (!fs) return fail("unreachable");
+    const out = [];
+    const walk = (n, p, d) => { for (const k of Object.keys(n)) { if (k === ".git") continue; const q = p + "/" + k; if (n[k][".git"]) out.push(q); else if (d < 4) walk(n[k], q, d + 1); } };
+    walk(fs.tree, fs.home, 0); ok(out);
+  }, env.kind === "local" ? 200 : 600));
+}
+
+/* ================= app state ================= */
+let st;
+let uid = 0;
+function reset() {
+  st = {
+    v: st?.v ?? "A",
+    environments: [
+      { id: "local", kind: "local", name: "local", dest: "local", status: "ok" },
+      { id: "devbox", kind: "ssh", name: "devbox", dest: "devbox", status: "ok" },
+    ],
+    projects: [
+      { id: "p1", env: "local", name: "tri-code", path: "/home/waldo/code/tri-code", accent: ACCENTS[0], tabs: 3, icon: null, bg: "aurora", dim: 0 },
+      { id: "p2", env: "local", name: "pi-todos", path: "/home/waldo/code/pi-todos", accent: ACCENTS[1], tabs: 1, icon: { type: "glyph", g: "π" }, bg: "none", dim: 0 },
+      { id: "p3", env: "devbox", name: "api", path: "/home/ubuntu/srv/api", accent: ACCENTS[2], tabs: 2, icon: null, bg: "none", dim: 0 },
+    ],
+    recent: ["local:/home/waldo/code/dev-hub", "devbox:/home/ubuntu/srv/web"],
+    active: "p1",
+    ui: {},            // per-variant transient UI
+    justAdded: null,
+  };
+  logs.length = 0; log("reset");
+}
+const logs = [];
+function log(s) { logs.unshift(`${new Date().toLocaleTimeString([], { hour12: false })}  ${s}`); logs.length = Math.min(logs.length, 40); }
+const envById = (id) => st.environments.find((e) => e.id === id);
+
+function addProject(envId, path) {
+  const env = envById(envId);
+  const name = path.split("/").filter(Boolean).pop() || path;
+  const dupe = st.projects.find((p) => p.env === envId && p.path === path);
+  if (dupe) { st.active = dupe.id; log(`focus existing ${name}`); return; }
+  const logos = scanLogos(envId, path);
+  const p = { id: "p" + (++uid + 10), env: envId, name, path, accent: ACCENTS[st.projects.length % ACCENTS.length], tabs: 0, icon: null, bg: "none", dim: 0 };
+  st.projects.push(p);
+  log(logos.length ? `scan_logos → ${logos.length} found, auto icon = ${logos[0].file}` : "scan_logos → none, auto icon = letter"); st.active = p.id; st.justAdded = p.id;
+  st.recent = [`${envId}:${path}`, ...st.recent.filter((r) => r !== `${envId}:${path}`)].slice(0, 6);
+  log(`addProject(${env.name}, ${tilde(env, path)})`);
+}
+function addEnv(kind, dest, name) {
+  const id = kind === "local" ? "local" : dest;
+  if (envById(id)) { log(`env ${id} already exists`); return envById(id); }
+  const e = { id, kind, name: name || (kind === "local" ? "local" : dest), dest: kind === "local" ? "local" : dest, status: "ok" };
+  st.environments.push(e); log(`addEnvironment(${kind}, ${e.dest})`);
+  return e;
+}
+function removeEnv(id) {
+  const n = st.projects.filter((p) => p.env === id).length;
+  if (n && !confirm(`Remove environment "${id}" and its ${n} project(s)?`)) return;
+  st.environments = st.environments.filter((e) => e.id !== id);
+  st.projects = st.projects.filter((p) => p.env !== id);
+  log(`removeEnvironment(${id})`);
+}
+
+/* ================= shared pieces ================= */
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const hl = (name, q) => { if (!q) return esc(name); const i = name.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(name) : esc(name.slice(0, i)) + "<mark>" + esc(name.slice(i, i + q.length)) + "</mark>" + esc(name.slice(i + q.length)); };
+function fuzzy(s, q) { if (!q) return 1; s = s.toLowerCase(); q = q.toLowerCase(); let i = 0, score = 0; for (const c of s) { if (c === q[i]) { i++; score++; } if (i === q.length) break; } return i === q.length ? score + (s.includes(q) ? 10 : 0) : 0; }
+
+/**
+ * The simpler folder picker: one field is both path and filter.
+ *   type   → filters the current folder ("cod" matches code)
+ *   Enter  → go into the highlighted folder; Enter on empty filter = use current folder
+ *   ⌘/Ctrl+Enter → use the highlighted folder directly
+ *   Backspace on empty → up one level;  "~/x/y" or "/x" typed → jump there
+ */
+class Picker {
+  constructor(env, start, onUse, opts = {}) { this.env = env; this.onUse = onUse; this.opts = opts; this.q = ""; this.sel = 0; this.list = null; this.err = ""; this.loading = true; queueMicrotask(() => this.go(start ?? "~")); }
+  async go(path) {
+    this.loading = true; this.err = ""; this.q = ""; this.sel = 0; render();
+    try { this.list = await listDirs(this.env, path); this.env.status = "ok"; }
+    catch (e) { this.err = String(e); if (/Connection/.test(e)) this.env.status = "off"; }
+    this.loading = false; render(); focusQ();
+  }
+  shown() { const d = this.list?.dirs ?? []; const q = this.q; return q ? d.filter((x) => x.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)) : d.filter((x) => x.name[0] !== "."); }
+  into(name) { return this.list.path.replace(/\/$/, "") + "/" + name; }
+  key(e) {
+    const s = this.shown();
+    if (e.key === "ArrowDown") { this.sel = Math.min(this.sel + 1, s.length - 1); e.preventDefault(); render(); }
+    else if (e.key === "ArrowUp") { this.sel = Math.max(this.sel - 1, 0); e.preventDefault(); render(); }
+    else if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && s[this.sel]) { e.preventDefault(); this.onUse(this.into(s[this.sel].name)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (/^[~/]/.test(this.q)) this.go(this.q);
+      else if (this.q && s[this.sel]) this.go(this.into(s[this.sel].name));
+      else if (!this.q && this.list) this.onUse(this.list.path);
+    }
+    else if ((e.key === "ArrowRight" || e.key === "Tab") && s[this.sel] && !/^[~/]/.test(this.q)) { e.preventDefault(); this.go(this.into(s[this.sel].name)); }
+    else if (e.key === "Backspace" && !this.q && this.list) { e.preventDefault(); this.go(this.list.path + "/.."); }
+  }
+  input(v) { this.q = v; this.sel = 0; render(); }
+  html(id, max) {
+    const s = this.shown(), here = this.list?.path ?? "";
+    const parts = here.split("/").filter(Boolean);
+    const crumbs = `<div class="crumbs"><button data-pk="${id}" data-go="/">/</button>` + parts.map((p, i) =>
+      `<button data-pk="${id}" data-go="/${parts.slice(0, i + 1).join("/")}">${esc(p)}</button>${i < parts.length - 1 ? '<span class="sl">/</span>' : ""}`).join("") + `</div>`;
+    const rows = this.err ? `<div class="note err">${esc(this.err)}</div>`
+      : !this.list ? `<div class="note">Connecting to ${esc(this.env.dest)}…</div>`
+      : !s.length ? `<div class="note">${this.q ? `No folder matches “${esc(this.q)}”${/^[~/]/.test(this.q) ? " — Enter jumps to that path" : ""}` : "No subfolders"}</div>`
+      : s.map((d, i) => `<div class="row ${i === this.sel ? "sel" : ""}" data-pk="${id}" data-into="${esc(d.name)}"><span class="ic">▸</span><span class="nm">${hl(d.name, this.q)}</span>${d.git ? '<span class="git">git</span>' : ""}<button class="use" data-pk="${id}" data-use="${esc(d.name)}">open</button></div>`).join("");
+    return `<div class="picker" style="${this.loading ? "opacity:.7" : ""}">${crumbs}
+      ${this.opts.bare ? "" : `<input class="q" data-pk="${id}" placeholder="filter, or type ~/path" value="${esc(this.q)}" autocomplete="off" spellcheck="false">`}
+      <div class="list" style="${max ? `max-height:${max}px` : ""}">${rows}</div>
+      ${this.opts.foot === false ? "" : `<div class="pfoot"><span class="here" title="${esc(here)}"><bdi>${esc(tilde(this.env, here))}</bdi></span><button class="btn pri" data-pk="${id}" data-usehere ${this.list ? "" : "disabled"}>Open here</button></div>`}
+      ${this.opts.bare ? "" : `<div class="keys"><span><kbd>↵</kbd> in / open here</span><span><kbd>⌫</kbd> up</span><span><kbd>Ctrl ↵</kbd> open highlighted</span></div>`}</div>`;
+  }
+}
+const pickers = {};
+function focusQ() { requestAnimationFrame(() => { const q = document.querySelector("input.q"); if (q && document.activeElement?.tagName !== "INPUT") q.focus(); }); }
+
+/** Environment form, shared by all variants. Has its own test-connection step. */
+class EnvForm {
+  constructor(onDone, onCancel) { this.kind = envById("local") ? "ssh" : "local"; this.dest = ""; this.test = null; this.onDone = onDone; this.onCancel = onCancel; }
+  async runTest() {
+    const dest = this.kind === "local" ? "local" : this.dest.trim(); if (!dest) return;
+    this.test = { s: "wait", msg: `ssh ${dest} …` }; render();
+    try { const l = await listDirs({ kind: this.kind, dest }, "~"); this.test = { s: "ok", msg: `✓ connected · ${l.path} · ${l.dirs.length} folders` }; }
+    catch (e) { this.test = { s: "bad", msg: "✗ " + e }; }
+    render();
+  }
+  html(id) {
+    const hasLocal = !!envById("local");
+    return `<div class="envform">
+      <div class="seg"><button data-ef="${id}" data-kind="local" aria-pressed="${this.kind === "local"}" ${hasLocal ? 'disabled title="local is already added"' : ""}>⌂ Local</button><button data-ef="${id}" data-kind="ssh" aria-pressed="${this.kind === "ssh"}">⇄ SSH</button></div>
+      ${this.kind === "ssh" ? `
+        <span class="lbl">From ~/.ssh/config</span>
+        <div class="chips">${SSH_CONFIG.map((h) => `<button class="chip ${this.dest === h ? "on" : ""} ${envById(h) ? "used" : ""}" data-ef="${id}" data-host="${h}">${h}</button>`).join("")}</div>
+        <input data-ef="${id}" data-dest placeholder="or user@host[:port]" value="${esc(this.dest)}" spellcheck="false">
+      ` : `<span class="lbl">This machine. Projects run in local shells.</span>`}
+      ${this.test ? `<div class="test ${this.test.s}">${esc(this.test.msg)}</div>` : ""}
+      <div class="frow"><button class="btn" data-ef="${id}" data-cancel>Cancel</button><button class="btn pri" data-ef="${id}" data-add ${this.kind === "ssh" && !this.dest.trim() ? "disabled" : ""}>${this.test?.s === "ok" || this.kind === "local" ? "Add" : "Test & add"}</button></div>
+    </div>`;
+  }
+  async add() {
+    if (this.kind === "local") return this.onDone(addEnv("local"));
+    if (this.test?.s !== "ok") { await this.runTest(); if (this.test?.s !== "ok") return; }
+    this.onDone(addEnv("ssh", this.dest.trim()));
+  }
+}
+const forms = {};
+
+const BGS = { none: "None", aurora: "Aurora", blueprint: "Blueprint", rings: "Rings", dusk: "Dusk" };
+const bgCss = (k, a) => ({ none: "var(--canvas)", aurora: `radial-gradient(60% 80% at 12% 8%, color-mix(in srgb, ${a} 48%, transparent), transparent 70%), var(--canvas)`, blueprint: `linear-gradient(color-mix(in srgb, ${a} 13%, transparent) 1px, transparent 1px) 0 0 / 12px 12px, linear-gradient(90deg, color-mix(in srgb, ${a} 13%, transparent) 1px, transparent 1px) 0 0 / 12px 12px, var(--canvas)`, rings: `repeating-radial-gradient(circle at 78% 115%, transparent 0 8px, color-mix(in srgb, ${a} 30%, transparent) 8px 9px), var(--canvas)`, dusk: "linear-gradient(185deg, #1b1533, #2c1a3c 40%, #43202f 72%, #16100f)" }[k]);
+const iconImages = {}; // project id → data URL of an uploaded icon (Rust would store it like bg_save)
+/** What the icon resolves to: an override, else auto = first logo found, else the letter. */
+function resolveIcon(p) {
+  const logos = scanLogos(p.env, p.path), i = p.icon;
+  if (i?.type === "logo") { const l = logos.find((x) => x.file === i.file); if (l) return { kind: "logo", html: l.svg, label: "Logo", sub: l.file, auto: false }; }
+  if (i?.type === "glyph") return { kind: "glyph", html: esc(i.g), label: "Glyph", sub: i.g, auto: false };
+  if (i?.type === "letter") return { kind: "letter", html: esc(p.name[0].toUpperCase()), label: "Letter", sub: p.name[0].toUpperCase(), auto: false };
+  if (i?.type === "image" && iconImages[p.id]) return { kind: "image", html: `<img src="${iconImages[p.id]}" alt="">`, label: "Uploaded image", sub: "icon.png", auto: false };
+  if (logos.length) return { kind: "logo", html: logos[0].svg, label: "Auto", sub: logos[0].file, auto: true };
+  return { kind: "letter", html: esc(p.name[0].toUpperCase()), label: "Auto", sub: "no logo found, using the letter", auto: true };
+}
+function iconHtml(p) {
+  const r = resolveIcon(p);
+  return `<button class="pico ${r.kind === "glyph" ? "glyph" : ""}" data-app="${p.id}" title="Appearance">${r.html}</button>`;
+}
+/** The Appearance panel, with the new Icon section on top. */
+function appearancePop() {
+  const ap = st.ui.app; if (!ap) return "";
+  const p = st.projects.find((x) => x.id === ap.id); if (!p) return "";
+  const logos = scanLogos(p.env, p.path), i = p.icon, r = resolveIcon(p);
+  const tab = ap.tab ?? (i?.type === "glyph" || i?.type === "letter" ? "glyph" : "project");
+  const isLogo = (f) => i?.type === "logo" && i.file === f;
+  const projectTab = `<div class="logos">
+      <button aria-pressed="${!i}" data-setico="auto">${logos[0]?.svg ?? `<span style="width:18px;text-align:center;font-weight:600">${esc(p.name[0].toUpperCase())}</span>`}<code>Auto${logos.length ? "" : " (letter)"}</code><span class="tag">default</span></button>
+      ${logos.map((l) => `<button aria-pressed="${isLogo(l.file)}" data-setico="logo" data-v="${esc(l.file)}">${l.svg}<code>${esc(l.file)}</code></button>`).join("")}
+      ${iconImages[p.id] ? `<button aria-pressed="${i?.type === "image"}" data-setico="image"><img src="${iconImages[p.id]}" alt=""><code>uploaded image</code></button>` : ""}
+    </div>
+    ${logos.length ? "" : `<div class="none">No favicon / logo files found in ${esc(p.name)}</div>`}
+    <label class="upl">Upload image…<input type="file" accept="image/*" hidden data-upico="${p.id}"></label>`;
+  const glyphTab = `<div class="icogrid"><button aria-pressed="${i?.type === "letter"}" data-setico="letter" title="Letter" style="font-weight:600;font-size:12px">${esc(p.name[0].toUpperCase())}</button>${GLYPHS.map((g) => `<button aria-pressed="${i?.type === "glyph" && i.g === g}" data-setico="glyph" data-v="${g}">${g}</button>`).join("")}</div>`;
+  return `<div class="pop" data-stop style="--pa:${p.accent};left:${ap.x}px;top:${ap.y}px">
+    <div class="ttl"><input data-rename="${p.id}" value="${esc(p.name)}" title="Rename project" spellcheck="false" placeholder="${esc(p.path.split("/").pop())}"><span>appearance</span></div>
+    <h4>Icon ${r.auto ? "" : `<button data-setico="auto" title="Back to the detected logo">reset to auto</button>`}</h4>
+    <div class="icocur"><span class="big">${r.html}</span><span class="what"><b>${esc(r.label)}${r.auto ? "" : " · override"}</b><code>${esc(r.sub)}</code></span></div>
+    <div class="icotabs"><button aria-pressed="${tab === "project"}" data-icotab="project">From project${logos.length ? ` (${logos.length})` : ""}</button><button aria-pressed="${tab === "glyph"}" data-icotab="glyph">Glyph</button></div>
+    ${tab === "project" ? projectTab : glyphTab}
+    <h4>Accent</h4>
+    <div class="swatches">${ACCENTS.map((a) => `<button style="background:${a}" aria-pressed="${p.accent === a}" data-setacc="${a}"></button>`).join("")}</div>
+    <h4>Background</h4>
+    <div class="bgs">${Object.entries(BGS).map(([k, n]) => `<button style="background:${bgCss(k, p.accent)}" aria-pressed="${p.bg === k}" data-setbg="${k}">${n}</button>`).join("")}</div>
+    <div class="row">Dim <input type="range" min="0" max="85" step="5" value="${p.dim}" data-setdim="${p.id}"><span class="val">${p.dim}%</span></div>
+  </div>`;
+}
+function projRow(p) {
+  return `<div class="project ${st.active === p.id ? "active" : ""} ${st.justAdded === p.id ? "new" : ""}" style="--pa:${p.accent}" data-proj="${p.id}" title="${esc(p.path)}">${iconHtml(p)}${st.ui.rename === p.id ? `<input class="rn" data-rename="${p.id}" value="${esc(p.name)}" spellcheck="false" placeholder="${esc(p.path.split("/").pop())}">` : `<span class="name" data-rn="${p.id}" title="Double-click to rename">${esc(p.name)}</span>`}<span class="count">${p.tabs || ""}</span><button class="gear" data-app="${p.id}" title="Appearance">◐</button></div>`;
+}
+function envHead(e, tools, open) {
+  return `<div class="envh ${open ? "open" : ""}"><span class="dot ${e.status === "off" ? "off" : e.status === "wait" ? "wait" : ""}" title="${e.status === "off" ? "unreachable" : "reachable"}"></span><span class="ttl">${esc(e.name)}</span><span class="dest">${e.kind === "ssh" && e.dest !== e.name ? esc(e.dest) : ""}</span><span class="tools">${tools}</span></div>`;
+}
+
+/* ================= Variant A: inline ================= */
+function sideA() {
+  const u = st.ui;
+  let h = `<div class="side-head"><span>Projects</span><button title="Collapse">«</button></div>`;
+  for (const e of st.environments) {
+    const open = u.pickEnv === e.id;
+    h += envHead(e, `<button data-a-add="${e.id}" title="Add project on ${esc(e.name)}">+</button><button data-rmenv="${e.id}" title="Remove environment">×</button>`, open);
+    const ps = st.projects.filter((p) => p.env === e.id);
+    h += ps.map(projRow).join("") || (open ? "" : `<div class="emptyenv">no projects — <button data-a-add="${e.id}" style="color:var(--accent)">add one</button></div>`);
+    if (open) h += `<div class="a-pick">${pickers.a.html("a", 240)}</div>`;
+  }
+  if (u.envForm) h += `<div class="a-env"><div class="lbl" style="margin-bottom:6px;font-weight:600;color:var(--text)">New environment</div>${forms.a.html("a")}</div>`;
+  else h += `<button class="sidebtn" data-a-env style="margin-top:12px">＋ Environment</button>`;
+  return h;
+}
+const hintA = `Hover an environment header → <b>+</b> opens the folder list inline, under that environment.<br><b>＋ Environment</b> at the bottom of the sidebar.`;
+
+/* ================= Variant B: dialog ================= */
+function sideB() {
+  let h = `<div class="side-head"><span>Projects</span><button title="Collapse">«</button></div>`;
+  for (const e of st.environments) {
+    h += envHead(e, `<button data-b-open="${e.id}" title="Open project on ${esc(e.name)}">+</button>`);
+    h += st.projects.filter((p) => p.env === e.id).map(projRow).join("") || `<div class="emptyenv">no projects</div>`;
+  }
+  h += `<div style="margin-top:12px"><button class="sidebtn" data-b-open>＋ Open project <kbd>Alt O</kbd></button><button class="sidebtn" data-b-open data-b-newenv>⇄ Add environment</button></div>`;
+  return h;
+}
+function overlayB() {
+  const u = st.ui; if (!u.dlg) return "";
+  const newEnv = u.dlg.env === "+";
+  const env = envById(u.dlg.env);
+  const rec = st.recent.map((r) => { const [eid, ...rest] = r.split(":"); return { eid, path: rest.join(":") }; }).filter((r) => r.eid === u.dlg.env);
+  return `<div class="scrim" data-b-close><div class="dlg" data-stop>
+    <header><span>Open project</span><button data-b-close title="Close (Esc)">×</button></header>
+    <nav><div class="mt">Environments</div>
+      ${st.environments.map((e) => `<button class="envbtn" data-b-env="${e.id}" aria-pressed="${u.dlg.env === e.id}"><span class="dot ${e.status === "off" ? "off" : ""}"></span><span class="nm">${esc(e.name)}</span><span class="kind">${e.kind}</span></button>`).join("")}
+      <button class="envbtn newenv" data-b-env="+" aria-pressed="${newEnv}">＋ New environment</button>
+    </nav>
+    ${newEnv ? `<div class="pane envpane"><div style="font-weight:600;margin-bottom:10px">New environment</div>${forms.b.html("b")}</div>`
+      : `<div class="pane">${rec.length ? `<div class="recent"><span class="lbl">Recent</span>${rec.map((r) => `<button class="chip" data-b-recent="${esc(r.path)}">${esc(tilde(env, r.path))}</button>`).join("")}</div>` : ""}${pickers.b.html("b")}</div>`}
+  </div></div>`;
+}
+const hintB = `<b>＋ Open project</b> (or <kbd>Alt O</kbd>, or <b>+</b> on an environment header) opens one dialog: environments left, folders right.<br><b>＋ New environment</b> lives in the same dialog.`;
+
+/* ================= Variant C: palette ================= */
+function sideC() {
+  let h = `<div class="side-head"><span>Projects</span><button title="Collapse">«</button></div>`;
+  for (const e of st.environments) {
+    h += envHead(e, `<button data-c-open="${e.id}" title="Open on ${esc(e.name)}">+</button>`);
+    h += st.projects.filter((p) => p.env === e.id).map(projRow).join("") || `<div class="emptyenv">no projects</div>`;
+  }
+  h += `<button class="sidebtn" data-c-open style="margin-top:12px">＋ Open… <kbd>Alt O</kbd></button>`;
+  return h;
+}
+const repoCache = {};
+async function loadRepos(e) {
+  if (repoCache[e.id]) return;
+  repoCache[e.id] = { loading: true, list: [] }; render();
+  try { repoCache[e.id] = { list: await findRepos(e) }; }
+  catch (err) { repoCache[e.id] = { err: String(err), list: [] }; e.status = "off"; }
+  render();
+}
+function paletteItems() {
+  const u = st.ui.pal, q = u.q.trim();
+  const envs = u.env === "*" ? st.environments : st.environments.filter((e) => e.id === u.env);
+  // Path mode: ~/ or / → hand over to the picker-ish completion.
+  if (/^[~/]/.test(q)) return { mode: "path" };
+  const items = [];
+  const recent = st.recent.map((r) => { const [eid, ...rest] = r.split(":"); return { eid, path: rest.join(":") }; });
+  for (const r of recent) { const e = envById(r.eid); if (!e || !envs.includes(e)) continue; const nm = r.path.split("/").pop(); const sc = fuzzy(nm, q); if (sc) items.push({ grp: "Recent", e, path: r.path, nm, sc: sc + 5 }); }
+  for (const e of envs) for (const p of repoCache[e.id]?.list ?? []) {
+    if (items.some((i) => i.e === e && i.path === p)) continue;
+    if (st.projects.some((x) => x.env === e.id && x.path === p)) continue;
+    const nm = p.split("/").pop(); const sc = fuzzy(nm, q) || fuzzy(p, q) / 2; if (sc) items.push({ grp: "Git repos", e, path: p, nm, sc });
+  }
+  if (q) items.sort((a, b) => b.sc - a.sc);
+  return { mode: "fuzzy", items: items.slice(0, 40) };
+}
+function overlayC() {
+  const u = st.ui.pal; if (!u) return "";
+  const loading = st.environments.filter((e) => (u.env === "*" || u.env === e.id) && repoCache[e.id]?.loading).map((e) => e.name);
+  const errs = st.environments.filter((e) => (u.env === "*" || u.env === e.id) && repoCache[e.id]?.err).map((e) => `${e.name}: ${repoCache[e.id].err}`);
+  const curEnv = u.env === "*" ? (envById("local") ?? st.environments[0]) : envById(u.env);
+  let body;
+  if (u.newEnv) body = `<div class="envform-wrap" style="padding:0">${forms.c.html("c")}</div>`;
+  else {
+    const r = paletteItems();
+    if (r.mode === "path") {
+      body = `<div style="padding:8px">${pickers.c.html("c", 260)}</div>`;
+    } else {
+      let lastG = "";
+      body = `<div class="list">` + (r.items.length ? r.items.map((it, i) => {
+        const g = it.grp !== lastG ? `<div class="grp">${it.grp}</div>` : ""; lastG = it.grp;
+        return g + `<div class="row ${i === u.sel ? "sel" : ""}" data-c-pick="${i}"><span class="ic">${it.grp === "Recent" ? "↺" : "⎇"}</span><span class="nm">${hl(it.nm, u.q.trim())}</span><span class="sub">${st.environments.length > 1 ? esc(it.e.name) + ":" : ""}${esc(tilde(it.e, it.path))}</span></div>`;
+      }).join("") : `<div class="note">${loading.length ? "Scanning…" : `Nothing matches. Type <b>~/</b> or <b>/</b> to browse ${esc(curEnv?.name ?? "")}.`}</div>`)
+        + (loading.length ? `<div class="note">scanning ${esc(loading.join(", "))} for git repos…</div>` : "")
+        + errs.map((x) => `<div class="note err">${esc(x)}</div>`).join("") + `</div>`;
+    }
+  }
+  return `<div class="pal-wrap" data-c-close><div class="pal" data-stop>
+    <div class="in"><span class="envtag">${u.newEnv ? "new environment" : u.env === "*" ? "all" : esc(curEnv.name)} ›</span>
+      <input id="palq" placeholder="${u.newEnv ? "" : "repo name, or ~/path to browse"}" value="${esc(u.q)}" autocomplete="off" spellcheck="false" ${u.newEnv ? "disabled" : ""}></div>
+    <div class="envs"><button class="chip ${u.env === "*" && !u.newEnv ? "on" : ""}" data-c-env="*">all</button>${st.environments.map((e) => `<button class="chip ${u.env === e.id && !u.newEnv ? "on" : ""}" data-c-env="${e.id}">${e.kind === "ssh" ? "⇄ " : "⌂ "}${esc(e.name)}</button>`).join("")}<button class="chip ${u.newEnv ? "on" : ""}" data-c-newenv style="border-style:dashed">＋ environment</button></div>
+    ${body}
+    <div class="foot"><span><kbd>↑↓</kbd> select</span><span><kbd>↵</kbd> open</span><span><kbd>Tab</kbd> next environment</span><span><kbd>~/</kbd> browse</span><span><kbd>Esc</kbd> close</span></div>
+  </div></div>`;
+}
+const hintC = `<b>＋ Open…</b> or <kbd>Alt O</kbd>: a palette over git repos found on every environment + recents. Type <b>~/</b> to browse instead.<br><b>＋ environment</b> is a chip in the palette.`;
+
+/* ================= variants ================= */
+const VARIANTS = {
+  A: { name: "Inline", desc: "+ on each environment header; picker opens in the sidebar", side: sideA, overlay: () => "", hint: hintA },
+  B: { name: "Dialog", desc: "One dialog: environments left, folders right, + New environment", side: sideB, overlay: overlayB, hint: hintB },
+  C: { name: "Palette", desc: "Fuzzy over git repos per environment; ~/ to browse", side: sideC, overlay: overlayC, hint: hintC },
+};
+const ORDER = Object.keys(VARIANTS);
+
+/* ================= openers ================= */
+function aOpenPicker(envId) { st.ui = { pickEnv: envId }; pickers.a = new Picker(envById(envId), "~", (p) => { addProject(envId, p); st.ui = {}; render(); }); log(`A: picker on ${envId}`); render(); }
+function aOpenEnv() { st.ui = { envForm: true }; forms.a = new EnvForm((e) => { st.ui = {}; aOpenPicker(e.id); }, () => { st.ui = {}; render(); }); render(); }
+function bOpen(envId, newEnv) {
+  const env = newEnv ? "+" : envId || (envById(st.projects.find((p) => p.id === st.active)?.env) ? st.projects.find((p) => p.id === st.active).env : st.environments[0]?.id);
+  st.ui = { dlg: { env } }; if (newEnv) bMakeForm(); else bMakePicker(env); log(`B: dialog (${env})`); render();
+}
+function bMakePicker(envId) { pickers.b = new Picker(envById(envId), "~", (p) => { addProject(envId, p); st.ui = {}; render(); }); }
+function bMakeForm() { forms.b = new EnvForm((e) => { st.ui.dlg.env = e.id; bMakePicker(e.id); render(); }, () => { st.ui.dlg.env = st.environments[0].id; bMakePicker(st.ui.dlg.env); render(); }); }
+function cOpen(envId) {
+  st.ui = { pal: { q: "", sel: 0, env: envId || "*", newEnv: false } };
+  for (const e of st.environments) loadRepos(e);
+  log(`C: palette (${envId || "all"})`); render();
+  requestAnimationFrame(() => document.getElementById("palq")?.focus());
+}
+function cPathPicker(q) {
+  const u = st.ui.pal; const env = u.env === "*" ? (envById("local") ?? st.environments[0]) : envById(u.env);
+  const dir = q.endsWith("/") ? q : q.replace(/[^/]*$/, "") || "/";
+  const tail = q.endsWith("/") ? "" : q.split("/").pop();
+  if (!pickers.c || pickers.c.env !== env || pickers.c._dir !== dir) {
+    pickers.c = new Picker(env, dir, (p) => { addProject(env.id, p); st.ui = {}; render(); }, { bare: true }); pickers.c._dir = dir;
+  }
+  pickers.c.q = tail;
+}
+
+/* ================= render ================= */
+function render() {
+  const prevFocus = document.activeElement; const selStart = prevFocus?.selectionStart; const focusKey = prevFocus?.id || (prevFocus?.matches?.("input.q") ? "q" : prevFocus?.matches?.("[data-dest]") ? "dest" : "");
+  const V = VARIANTS[st.v];
+  const active = st.projects.find((p) => p.id === st.active);
+  const ae = active && envById(active.env);
+  document.getElementById("side").innerHTML = V.side();
+  document.getElementById("top").innerHTML = active ? `<b>${esc(active.name)}</b><span>${ae.kind === "ssh" ? esc(ae.dest) + ":" : ""}${esc(tilde(ae, active.path))}</span>` : "no project";
+  document.getElementById("vp").innerHTML = `<div class="hint">${V.hint}</div>`;
+  const vp = document.getElementById("vp"); vp.style.background = active ? bgCss(active.bg, active.accent) : ""; vp.style.boxShadow = active?.dim ? `inset 0 0 0 9999px rgba(0,0,0,${active.dim / 100})` : "";
+  document.getElementById("overlay").innerHTML = V.overlay() + appearancePop();
+  // keep focus in inputs across re-renders
+  const re = focusKey === "palq" ? document.getElementById("palq") : focusKey === "q" ? document.querySelector("input.q") : focusKey === "dest" ? document.querySelector("[data-dest]") : null;
+  if (re) { re.focus(); try { re.setSelectionRange(selStart, selStart); } catch {} }
+  document.getElementById("cur").innerHTML = `<b>${st.v} · ${V.name}</b><span>${V.desc}</span>`;
+  const view = {
+    environments: st.environments.map(({ id, kind, dest, status }) => ({ id, kind, dest, status })),
+    projects: st.projects.map((p) => ({ env: p.env, name: p.name, path: tilde(envById(p.env) ?? { dest: "local" }, p.path), icon: p.icon ? { ...p.icon } : "auto", accent: p.accent, bg: p.bg })),
+    active: active?.name ?? null,
+    recent: st.recent,
+    ui: st.ui.pal ? { palette: { q: st.ui.pal.q, env: st.ui.pal.env, newEnv: st.ui.pal.newEnv } } : st.ui,
+  };
+  document.getElementById("state").textContent = JSON.stringify(view, null, 2);
+  document.getElementById("log").innerHTML = logs.map((l) => `<div>${esc(l)}</div>`).join("");
+  st.justAdded = null;
+}
+
+function renameProject(id, v) {
+  const p = st.projects.find((x) => x.id === id); if (!p) return;
+  const name = v.trim() || p.path.split("/").filter(Boolean).pop();
+  if (name !== p.name) { log(`renameProject(${p.name} → ${name})`); p.name = name; }
+}
+function startRename(id) {
+  st.ui = { rename: id }; render();
+  requestAnimationFrame(() => { const i = document.querySelector(`.project input[data-rename="${id}"]`); i?.focus(); i?.select(); });
+}
+document.addEventListener("focusout", (ev) => {
+  const t = ev.target; if (!t.dataset?.rename || t._done) return;
+  t._done = true; renameProject(t.dataset.rename, t.value);
+  if (st.ui.rename) st.ui = {};
+  setTimeout(render);
+});
+
+/* ================= events ================= */
+document.addEventListener("click", (ev) => {
+  if (ev.target.dataset?.rename) return;
+  // Double-click a name to rename. Caught here (detail 2) because the first click re-renders the row.
+  const rn = ev.target.closest("[data-rn]"); if (rn && ev.detail === 2) return startRename(rn.dataset.rn);
+  if (st.ui.app && !ev.target.closest(".pop, [data-app]")) { st.ui = {}; render(); return; }
+  const t = ev.target.closest("button, [data-proj], [data-into], [data-c-pick], [data-b-close], [data-c-close]");
+  if (!t) return;
+  const d = t.dataset;
+  if (d.stop !== undefined) return;
+  // close-on-scrim: only when the scrim itself was clicked
+  if ((d.bClose !== undefined || d.cClose !== undefined) && t.tagName !== "BUTTON" && ev.target !== t) return;
+  if (d.app) { ev.stopPropagation(); const r = t.getBoundingClientRect(); st.active = d.app; st.ui = st.ui.app?.id === d.app ? {} : { app: { id: d.app, x: document.getElementById("side").getBoundingClientRect().right + 10, y: Math.max(8, Math.min(r.top - 10, innerHeight - 560)) } }; render(); return; }
+  if (d.icotab) { st.ui.app.tab = d.icotab; render(); return; }
+  if (d.setico || d.setacc || d.setbg) {
+    const p = st.projects.find((x) => x.id === st.ui.app.id);
+    if (d.setacc) p.accent = d.setacc;
+    else if (d.setbg) p.bg = d.setbg;
+    else p.icon = d.setico === "auto" ? null : d.setico === "letter" ? { type: "letter" } : d.setico === "image" ? { type: "image" } : d.setico === "logo" ? { type: "logo", file: d.v } : { type: "glyph", g: d.v };
+    log(`setAppearance(${p.name}, ${d.setacc ? "accent " + d.setacc : d.setbg ? "bg " + d.setbg : "icon " + (d.v ?? d.setico)})`); render(); return;
+  }
+  if (d.proj) { st.active = d.proj; render(); return; }
+  if (d.rmenv) { removeEnv(d.rmenv); st.ui = {}; render(); return; }
+  // picker
+  if (d.pk) {
+    const pk = pickers[d.pk];
+    if (d.go) return pk.go(d.go);
+    if (d.use) { ev.stopPropagation(); return pk.onUse(pk.into(d.use)); }
+    if (d.usehere !== undefined) return pk.onUse(pk.list.path);
+    if (d.into) return pk.go(pk.into(d.into));
+  }
+  // env form
+  if (d.ef) {
+    const f = forms[d.ef];
+    if (d.kind) { f.kind = d.kind; f.test = null; }
+    if (d.host) { f.dest = d.host; f.test = null; f.runTest(); }
+    if (d.cancel !== undefined) return f.onCancel();
+    if (d.add !== undefined) return f.add();
+    render(); return;
+  }
+  // A
+  if (d.aAdd) return st.ui.pickEnv === d.aAdd ? (st.ui = {}, render()) : aOpenPicker(d.aAdd);
+  if (d.aEnv !== undefined) return aOpenEnv();
+  // B
+  if (d.bOpen !== undefined) return bOpen(d.bOpen || null, d.bNewenv !== undefined);
+  if (d.bEnv) { st.ui.dlg.env = d.bEnv; if (d.bEnv === "+") bMakeForm(); else bMakePicker(d.bEnv); render(); return; }
+  if (d.bRecent) { addProject(st.ui.dlg.env, d.bRecent); st.ui = {}; render(); return; }
+  if (d.bClose !== undefined) { st.ui = {}; render(); return; }
+  // C
+  if (d.cOpen !== undefined) return cOpen(d.cOpen || null);
+  if (d.cEnv) { Object.assign(st.ui.pal, { env: d.cEnv, newEnv: false, sel: 0 }); if (/^[~/]/.test(st.ui.pal.q)) { pickers.c = null; cPathPicker(st.ui.pal.q); } render(); document.getElementById("palq")?.focus(); return; }
+  if (d.cNewenv !== undefined) { st.ui.pal.newEnv = true; forms.c = new EnvForm((e) => { repoCache[e.id] = null; loadRepos(e); Object.assign(st.ui.pal, { newEnv: false, env: e.id, q: "" }); render(); document.getElementById("palq")?.focus(); }, () => { st.ui.pal.newEnv = false; render(); }); render(); return; }
+  if (d.cPick) { const it = paletteItems().items[+d.cPick]; addProject(it.e.id, it.path); st.ui = {}; render(); return; }
+  if (d.cClose !== undefined) { st.ui = {}; render(); return; }
+});
+document.addEventListener("input", (ev) => {
+  const t = ev.target;
+  if (t.dataset.setdim) { st.projects.find((x) => x.id === t.dataset.setdim).dim = +t.value; render(); return; }
+  if (t.matches("input.q")) pickers[t.dataset.pk].input(t.value);
+  else if (t.matches("[data-dest]")) { const f = forms[t.dataset.ef]; f.dest = t.value; f.test = null; render(); }
+  else if (t.id === "palq") { st.ui.pal.q = t.value; st.ui.pal.sel = 0; if (/^[~/]/.test(t.value.trim())) cPathPicker(t.value.trim()); render(); }
+});
+document.addEventListener("change", (ev) => {
+  const t = ev.target; if (!t.dataset.upico) return;
+  const f = t.files?.[0]; if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => { const p = st.projects.find((x) => x.id === t.dataset.upico); iconImages[p.id] = String(fr.result); p.icon = { type: "image" }; log(`icon_save(${p.name}, ${f.name})`); render(); };
+  fr.readAsDataURL(f);
+});
+document.addEventListener("keydown", (e) => {
+  const t = e.target;
+  if (e.altKey && e.code === "KeyO") { e.preventDefault(); if (st.v === "B") bOpen(); else if (st.v === "C") cOpen(); else aOpenPicker(envById(st.projects.find((p) => p.id === st.active)?.env)?.id ?? st.environments[0].id); return; }
+  if (t.dataset?.rename) {
+    if (e.key === "Enter") { e.preventDefault(); t.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); t.value = st.projects.find((x) => x.id === t.dataset.rename).name; t.blur(); }
+    return;
+  }
+  if (e.key === "F2" && t.tagName !== "INPUT") { e.preventDefault(); startRename(st.active); return; }
+  if (e.key === "Escape") { if (st.ui.pal?.newEnv) { st.ui.pal.newEnv = false; } else st.ui = {}; render(); return; }
+  if (t.matches?.("input.q") && t.dataset.pk !== "c") { pickers[t.dataset.pk].key(e); return; }
+  if (t.matches?.("[data-dest]") && e.key === "Enter") { forms[t.dataset.ef].add(); return; }
+  if (t.id === "palq") {
+    const u = st.ui.pal, q = u.q.trim();
+    if (e.key === "Tab") { e.preventDefault(); const ids = ["*", ...st.environments.map((x) => x.id)]; u.env = ids[(ids.indexOf(u.env) + (e.shiftKey ? -1 : 1) + ids.length) % ids.length]; if (/^[~/]/.test(q)) { pickers.c = null; cPathPicker(q); } render(); return; }
+    if (/^[~/]/.test(q)) {
+      const pk = pickers.c; if (!pk) return;
+      const s = pk.shown();
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { pk.key(e); return; }
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && s[pk.sel]) { e.preventDefault(); pk.onUse(pk.into(s[pk.sel].name)); return; }
+      if (e.key === "Enter") { e.preventDefault(); if (pk.q && s[pk.sel]) { u.q = tilde(pk.env, pk.into(s[pk.sel].name)) + "/"; cPathPicker(u.q); render(); } else if (pk.list) pk.onUse(pk.list.path); return; }
+      if (e.key === "ArrowRight" && s[pk.sel] && t.selectionStart === t.value.length) { e.preventDefault(); u.q = tilde(pk.env, pk.into(s[pk.sel].name)) + "/"; cPathPicker(u.q); render(); return; }
+      return;
+    }
+    const items = paletteItems().items ?? [];
+    if (e.key === "ArrowDown") { u.sel = Math.min(u.sel + 1, items.length - 1); e.preventDefault(); render(); }
+    else if (e.key === "ArrowUp") { u.sel = Math.max(u.sel - 1, 0); e.preventDefault(); render(); }
+    else if (e.key === "Enter" && items[u.sel]) { e.preventDefault(); addProject(items[u.sel].e.id, items[u.sel].path); st.ui = {}; render(); }
+    return;
+  }
+  if (t.tagName === "INPUT") return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  else if (e.key === "ArrowRight") cycle(1);
+});
+
+/* ================= switcher ================= */
+function setVariant(v, push) {
+  if (!ORDER.includes(v)) v = "A";
+  st.v = v; st.ui = {};
+  if (push) try {
+    if (location.protocol === "file:") location.hash = v;
+    else { const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null, "", u); }
+  } catch {}
+  render();
+}
+const cycle = (d) => setVariant(ORDER[(ORDER.indexOf(st.v) + d + ORDER.length) % ORDER.length], true);
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+document.getElementById("rst").onclick = () => { const v = st.v; reset(); for (const k in repoCache) delete repoCache[k]; st.v = v; render(); };
+
+reset();
+const initial = (new URLSearchParams(location.search).get("variant") || location.hash.replace(/^#/, "") || "A").toUpperCase();
+setVariant(initial, false);
+addEventListener("hashchange", () => setVariant((location.hash.replace(/^#/, "") || "A").toUpperCase(), false));
+</script>
+</body>
+</html>

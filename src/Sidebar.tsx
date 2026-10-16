@@ -1,10 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createSignal, onMount } from "solid-js";
-import { Project, addProject, app, isTerminal, live, removeProject, setApp, setSidebarCollapsed } from "./state";
+import { For, Show, createSignal } from "solid-js";
+import {
+  Project, app, isLocalHost, isTerminal, live, removeEnvironment, removeProject, renameProject, setApp, setSidebarCollapsed,
+} from "./state";
 import { closeBrowser } from "./browsers";
 import { closeSession } from "./terms";
 import { closeAppearance, forgetBgImage, openAppearance } from "./Appearance";
 import { dev, forgetProject, isActive } from "./issues";
+import { IconFace, forgetIcon } from "./icons";
+import { openProjectDialog } from "./OpenProject";
 import { flash } from "./ui";
 
 /** Collapse to the rail, or expand back to the full list. */
@@ -15,23 +19,60 @@ export function toggleSidebar() {
   flash(collapsed ? "sidebar collapsed" : "sidebar expanded");
 }
 
-export default function Sidebar() {
-  const [adding, setAdding] = createSignal(false);
+/** End a project's windows and drop everything stored for it. */
+function dropProject(p: Project) {
+  for (const t of p.tabs) {
+    if (t.kind === "browser") closeBrowser(t.id);
+    else if (isTerminal(t)) closeSession(t.id);
+  }
+  invoke("bg_delete", { projectId: p.id }).catch((e) => console.error("bg_delete failed:", e));
+  forgetBgImage(p.id);
+  forgetIcon(p.id);
+  forgetProject(p.id);
+  removeProject(p.id);
+}
 
-  const hosts = () => [...new Set(app.projects.map((p) => p.host))];
+/** Rename in place: Enter or blur saves, Escape cancels, empty falls back to the folder name. */
+function RenameInput(props: { project: Project; done: () => void }) {
+  let cancelled = false;
+  const save = (value: string) => {
+    if (!cancelled) renameProject(props.project.id, value.trim() || props.project.path.split(/[\\/]/).filter(Boolean).pop() || props.project.name);
+    props.done();
+  };
+  return (
+    <input
+      class="rename"
+      value={props.project.name}
+      spellcheck={false}
+      ref={(el) => requestAnimationFrame(() => (el.focus(), el.select()))}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={(e) => save(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") e.currentTarget.blur();
+        else if (e.key === "Escape") (cancelled = true), e.currentTarget.blur();
+      }}
+    />
+  );
+}
+
+export default function Sidebar() {
+  const [renaming, setRenaming] = createSignal<string | null>(null);
+
   const needsAttention = (p: Project) =>
     app.activeProject !== p.id && p.tabs.some((t) => live[t.id]?.attention);
 
   const remove = (p: Project) => {
     if (!confirm(`Remove "${p.name}" and end its ${p.tabs.length} tab(s)?`)) return;
-    for (const t of p.tabs) {
-      if (t.kind === "browser") closeBrowser(t.id);
-      else if (isTerminal(t)) closeSession(t.id);
-    }
-    invoke("bg_delete", { projectId: p.id }).catch((e) => console.error("bg_delete failed:", e));
-    forgetBgImage(p.id);
-    forgetProject(p.id);
-    removeProject(p.id);
+    dropProject(p);
+  };
+
+  const removeEnv = (host: string) => {
+    const ps = app.projects.filter((p) => p.host === host);
+    const tabs = ps.reduce((n, p) => n + p.tabs.length, 0);
+    if (ps.length && !confirm(`Remove environment "${host}", its ${ps.length} project(s) and ${tabs} tab(s)?`)) return;
+    ps.forEach(dropProject);
+    removeEnvironment(host);
   };
 
   /** Active Plane issues per State, in Plane's colours (the pi-todos widget). */
@@ -50,10 +91,6 @@ export default function Sidebar() {
     return [...counts.values()];
   };
 
-  const expandThenAdd = () => {
-    if (app.sidebarCollapsed) setSidebarCollapsed(false);
-    setAdding(true);
-  };
 
   return (
     <aside>
@@ -69,11 +106,18 @@ export default function Sidebar() {
           {app.sidebarCollapsed ? "»" : "«"}
         </button>
       </div>
-      <For each={hosts()}>
+      <For each={app.environments}>
         {(host) => (
           <section>
-            <h2>{host}</h2>
-            <For each={app.projects.filter((p) => p.host === host)}>
+            <h2>
+              <span class="host" title={isLocalHost(host) ? "This machine" : `ssh ${host}`}>{host}</span>
+              <button class="env-add" title={`Open a project on ${host}`} aria-label={`Open a project on ${host}`} onClick={() => openProjectDialog(host)}>+</button>
+              <button class="env-x" title="Remove environment" aria-label={`Remove environment ${host}`} onClick={() => removeEnv(host)}>×</button>
+            </h2>
+            <For
+              each={app.projects.filter((p) => p.host === host)}
+              fallback={<button class="env-empty" onClick={() => openProjectDialog(host)}>No projects · open one</button>}
+            >
               {(p) => (
                 <div
                   class="project"
@@ -82,8 +126,10 @@ export default function Sidebar() {
                   title={app.sidebarCollapsed ? `${p.name} · ${p.host} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : undefined}
                   onClick={() => setApp("activeProject", p.id)}
                 >
-                  <span class="swatch"><b>{p.name[0]}</b></span>
-                  <span class="name">{p.name}</span>
+                  <span class="swatch"><IconFace project={p} /></span>
+                  <Show when={renaming() === p.id} fallback={<span class="name" title="Double-click to rename" onDblClick={() => setRenaming(p.id)}>{p.name}</span>}>
+                    <RenameInput project={p} done={() => setRenaming(null)} />
+                  </Show>
                   <Show when={miniBar(p).length}>
                     <span class="minibar" title={miniBar(p).map((c) => `${c.n} ${c.name}`).join(" · ")}>
                       <For each={miniBar(p)}>{(c) => <i style={{ flex: String(c.n), background: c.color }} />}</For>
@@ -110,100 +156,14 @@ export default function Sidebar() {
           </section>
         )}
       </For>
-      <Show
-        when={adding()}
-        fallback={
-          <button class="add" title="Add project" onClick={expandThenAdd}>
-            +<span class="label"> Add project</span>
-          </button>
-        }
-      >
-        <AddProject done={() => setAdding(false)} />
-      </Show>
+      <div class="side-actions">
+        <button class="add" title="Open project (Alt+O)" onClick={() => openProjectDialog()}>
+          +<span class="label"> Open project</span><kbd class="label">Alt O</kbd>
+        </button>
+        <button class="add env" title="Add environment" onClick={() => openProjectDialog(undefined, true)}>
+          ⇄<span class="label"> Add environment</span>
+        </button>
+      </div>
     </aside>
-  );
-}
-
-type DirList = { path: string; dirs: string[] };
-
-function AddProject(props: { done: () => void }) {
-  const [host, setHost] = createSignal("local");
-  const [path, setPath] = createSignal("");
-  const [browsing, setBrowsing] = createSignal(false);
-
-  const submit = (e: SubmitEvent) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget as HTMLFormElement);
-    const p = path().trim();
-    const h = host().trim() || "local";
-    const name = String(f.get("name")).trim() || p.split(/[\\/]/).filter(Boolean).pop() || p;
-    if (!p) return;
-    addProject(name, h, p);
-    props.done();
-  };
-  const knownHosts = () => [...new Set(["local", ...app.projects.map((p) => p.host)])];
-
-  return (
-    <form class="add-form" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && props.done()}>
-      <input name="host" placeholder="host (local or ssh alias)" list="hosts" value={host()} onInput={(e) => setHost(e.currentTarget.value)} />
-      <datalist id="hosts">
-        <For each={knownHosts()}>{(h) => <option value={h} />}</For>
-      </datalist>
-      <div class="path-row">
-        <input name="path" placeholder="path, e.g. ~/code/app" autofocus value={path()} onInput={(e) => setPath(e.currentTarget.value)} />
-        <button type="button" title="Browse folders" onClick={() => setBrowsing(!browsing())}>…</button>
-      </div>
-      <Show when={browsing()}>
-        <DirBrowser host={host().trim() || "local"} start={path().trim() || "~"} pick={(p) => (setPath(p), setBrowsing(false))} />
-      </Show>
-      <input name="name" placeholder="name (optional)" />
-      <div class="row">
-        <button type="submit">Add</button>
-        <button type="button" onClick={props.done}>Cancel</button>
-      </div>
-    </form>
-  );
-}
-
-/** Folder picker that works the same for local and ssh hosts. */
-function DirBrowser(props: { host: string; start: string; pick: (path: string) => void }) {
-  const [list, setList] = createSignal<DirList>();
-  const [error, setError] = createSignal("");
-  const [loading, setLoading] = createSignal(false);
-
-  const go = async (path: string) => {
-    setLoading(true);
-    setError("");
-    try {
-      setList(await invoke<DirList>("list_dirs", { host: props.host, path }));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-  const into = (name: string) => `${list()!.path.replace(/[\\/]$/, "")}/${name}`;
-  // Fall back to home if the typed path does not exist.
-  onMount(() => go(props.start).then(() => { if (error()) go("~"); }));
-
-  return (
-    <div class="dirs" classList={{ loading: loading() }}>
-      <Show when={list()}>
-        {(l) => (
-          <>
-            <div class="dirs-head" title={l().path}><bdi>{l().path}</bdi></div>
-            <div class="dirs-list">
-              <div class="dir" onClick={() => go(into(".."))}>..</div>
-              <For each={l().dirs}>
-                {(d) => <div class="dir" onClick={() => go(into(d))}>{d}</div>}
-              </For>
-            </div>
-            <button type="button" class="dirs-pick" onClick={() => props.pick(l().path)}>Use this folder</button>
-          </>
-        )}
-      </Show>
-      <Show when={error()}><div class="dirs-error">{error()}</div></Show>
-      <Show when={!list() && loading()}><div class="dirs-head">Loading…</div></Show>
-    </div>
   );
 }

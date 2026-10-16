@@ -46,10 +46,12 @@ export function HelpOverlay() {
           </dl>
           <h4>Project</h4>
           <dl>
+            <dt><Keys keys={["Alt", "O"]} /></dt>
+            <dd>Open a project, or add an environment (local or ssh)</dd>
             <dt><Keys keys={["Alt", "S"]} /></dt>
             <dd>Collapse or expand the sidebar</dd>
             <dt><Keys keys={["Alt", "P"]} /></dt>
-            <dd>Change this project's accent colour and background</dd>
+            <dd>Change this project's name, icon, accent colour and background</dd>
           </dl>
           <h4>Windows and links</h4>
           <dl>

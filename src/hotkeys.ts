@@ -9,6 +9,7 @@ import {
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
 import { helpOpen, setHelpOpen } from "./Help";
+import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
 import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeFavEdit, favEditOpen } from "./favs";
@@ -136,6 +137,7 @@ function onKey(e: KeyboardEvent) {
   // Escape closes the overlays first; it is never bound on its own.
   if (e.code === "Escape" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     if (helpOpen()) setHelpOpen(false);
+    else if (openProjectOpen()) closeOpenProject();
     else if (appearanceOpen()) closeAppearance();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
@@ -146,6 +148,14 @@ function onKey(e: KeyboardEvent) {
   }
 
   if (!e.altKey) return;
+  // Alt+O works with no project yet: it is how the first one is opened.
+  if (e.code === "KeyO" && !e.ctrlKey && !e.shiftKey) {
+    if (openProjectOpen()) closeOpenProject();
+    else openProjectDialog();
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   const p = activeProject();
   if (!p) return;
   if (run(e, p, focusedTab(p))) {

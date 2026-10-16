@@ -41,6 +41,20 @@ The single un-stopped Time Entry across the workspace. Shown on the row, in the 
 **In Progress Chip**:
 A toolbar chip for each Plane Issue whose State is named exactly `"In Progress"`, the running one first then by priority. Two chips show, then `+N`. A click drills into that issue in the Issues Panel.
 
+**Environment**:
+Where projects run: `local`, or an ssh destination (an alias from `~/.ssh/config` or `user@host`). Kept as an ordered list in `state.json`, so one can exist with no projects; the sidebar shows one section per Environment. A project's `host` is its Environment.
+_Avoid_: Host group, machine, server.
+
+**Open Project Dialog**:
+The `Alt+O` dialog: Environments on the left (with "New environment"), a Folder Picker on the right. Opening a folder that is already a project focuses it.
+_Avoid_: Add project form, folder browser.
+
+**Folder Picker**:
+The path field that is also the folder list: typing filters, `Enter` goes in or opens, `Backspace` on empty goes up, a `~` or `/` path jumps.
+
+**Project Icon**:
+What the sidebar draws for a project: a logo file from the project, an uploaded image, a glyph or the first letter. **Auto** is tri-code's pick (the first logo found, else the letter); any other choice in the Appearance panel is an override until "reset to auto".
+
 **Tab Strip**:
 The leftmost toolbar group: the active workspace's Windows in tiling order, the focused one underlined, then `+`. A strip tab only focuses a Window that already exists, so nothing is created or moved by clicking one; Windows on other workspaces are not listed.
 _Avoid_: Tab bar (there is no tab bar), window list, tab buttons.

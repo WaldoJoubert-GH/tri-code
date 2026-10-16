@@ -41,6 +41,20 @@ export type Space = {
   mono?: string;
 };
 
+/**
+ * How a project is drawn in the sidebar. `auto` marks the one tri-code chose (the first logo
+ * file found in the folder, else the letter); anything else is an override from the
+ * Appearance panel. An `image` is stored by icon_save: a logo from the project (`file`,
+ * relative to the project folder) or an upload (no `file`). Undefined = not scanned yet.
+ */
+export type ProjectIcon =
+  | { kind: "image"; file?: string; auto?: boolean }
+  | { kind: "glyph"; glyph: string }
+  | { kind: "letter"; auto?: boolean };
+
+/** A folder opened before, offered as Recent in the Open project dialog. */
+export type RecentFolder = { host: string; path: string };
+
 /** A favourite page of a project's browser windows. Keyed by `url`. */
 export type Fav = { url: string; name: string };
 
@@ -63,10 +77,15 @@ export type Project = {
   dim: number;
   /** Favourite pages, in bar order; shared by every browser window of the project. */
   favs: Fav[];
+  icon?: ProjectIcon;
 };
 
 type Persisted = {
+  /** Environments in sidebar order: "local" or an ssh destination. Each project's host is one of them. */
+  environments: string[];
   projects: Project[];
+  /** Most recent first, at most RECENT_MAX. */
+  recent: RecentFolder[];
   activeProject?: string;
   /** Gap between tiled windows and around the edge, px. */
   gap: number;
@@ -82,12 +101,15 @@ export const SPACES = 4;
 export const GAPS = [0, 4, 8, 12, 16, 24, 32];
 export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "#ff9e64", "#f5a3d0", "#73daca"];
 
-export const [app, setApp] = createStore<Persisted>({ projects: [], gap: 12, sidebarCollapsed: false });
+const RECENT_MAX = 12;
+
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], projects: [], recent: [], gap: 12, sidebarCollapsed: false });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
 
 export const isRemote = (p: Project) => p.host !== "local" && p.host !== "";
+export const isLocalHost = (host: string) => host === "local" || host === "";
 
 /** Stable name of the persistent remote session behind a tab. */
 export const sessionName = (p: Project, t: Tab) => `tri-${p.id}-${t.id}`;
@@ -109,16 +131,42 @@ function edit(projectId: string, fn: (p: Project, s: Persisted) => void) {
   }));
 }
 
-export function addProject(name: string, host: string, path: string) {
+/** Add a project and make it active. Returns its id. */
+export function addProject(name: string, host: string, path: string): string {
   const id = newId();
+  host = host || "local";
   // A new project picks the next accent so neighbours in the sidebar differ.
   const accent = ACCENTS[app.projects.length % ACCENTS.length];
   setApp(produce((s) => {
     s.projects.push({
-      id, name, host: host || "local", path, tabs: [], ws: 0,
+      id, name, host, path, tabs: [], ws: 0,
       spaces: Array.from({ length: SPACES }, newSpace), accent, bg: "none", dim: 0, favs: [],
     });
     s.activeProject = id;
+    if (!s.environments.includes(host)) s.environments.push(host);
+    s.recent = [{ host, path }, ...s.recent.filter((r) => r.host !== host || r.path !== path)].slice(0, RECENT_MAX);
+  }));
+  return id;
+}
+
+export function renameProject(projectId: string, name: string) {
+  edit(projectId, (p) => { p.name = name; });
+}
+
+export function setIcon(projectId: string, icon: ProjectIcon) {
+  edit(projectId, (p) => { p.icon = icon; });
+}
+
+export function addEnvironment(host: string) {
+  setApp(produce((s) => {
+    if (!s.environments.includes(host)) s.environments.push(host);
+  }));
+}
+
+/** Drop an environment from the sidebar. Its projects must be removed first. */
+export function removeEnvironment(host: string) {
+  setApp(produce((s) => {
+    s.environments = s.environments.filter((h) => h !== host);
   }));
 }
 
@@ -310,10 +358,16 @@ function migrate(raw: any): Persisted {
       id: p.id, name: p.name, host: p.host || "local", path: p.path, tabs,
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
-      favs: p.favs ?? [],
+      favs: p.favs ?? [], icon: p.icon,
     };
   });
-  return { projects, activeProject: raw.activeProject, gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false };
+  // Before environments existed, hosts only came from projects.
+  const environments: string[] = raw.environments ?? ["local"];
+  for (const p of projects) if (!environments.includes(p.host)) environments.push(p.host);
+  return {
+    environments, projects, recent: raw.recent ?? [],
+    activeProject: raw.activeProject, gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
+  };
 }
 
 export async function loadState() {
