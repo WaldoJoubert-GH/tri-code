@@ -18,7 +18,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # One draft for every build to upload into. Left to itself, each tauri-action
+  # job creates its own draft, since drafts can't be looked up by tag.
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.create.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches package.json
+        run: |
+          want="v$(node -p 'require("./package.json").version')"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version ($want)"
+            exit 1
+          fi
+
+      - name: Create the draft release
+        id: create
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            -f tag_name="$GITHUB_REF_NAME" \
+            -f name="tri-code $GITHUB_REF_NAME" \
+            -f body="Download the installer for your platform below. Installed copies update themselves." \
+            -F draft=true --jq .id)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -35,15 +65,6 @@ jobs:
       CARGO_BUILD_JOBS: 4
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check the tag matches package.json
-        shell: bash
-        run: |
-          want="v$(node -p 'require("./package.json").version')"
-          if [ "$GITHUB_REF_NAME" != "$want" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match package.json version ($want)"
-            exit 1
-          fi
 
       - uses: oven-sh/setup-bun@v2
 
@@ -66,19 +87,15 @@ jobs:
         with:
           tauriScript: bun tauri
           args: ${{ matrix.args }}
-          tagName: ${{ github.ref_name }}
-          releaseName: tri-code ${{ github.ref_name }}
-          releaseBody: Download the installer for your platform below. Installed copies update themselves.
-          # Stays a draft until every platform has uploaded, so apps never see a
+          # A draft until every platform has uploaded, so apps never see a
           # latest.json that is missing a platform.
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.id }}
 
   publish:
-    needs: build
+    needs: [create-release, build]
     runs-on: ubuntu-latest
     steps:
       - name: Publish the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+        run: gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/${{ needs.create-release.outputs.id }}" -F draft=false -f make_latest=true
