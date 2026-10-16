@@ -4,6 +4,7 @@ mod dirs;
 mod pty;
 mod spawn;
 mod store;
+mod usage;
 
 use std::sync::Arc;
 
@@ -53,6 +54,7 @@ pub fn run() {
             bg::bg_save,
             bg::bg_load,
             bg::bg_delete,
+            usage::claude_usage,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

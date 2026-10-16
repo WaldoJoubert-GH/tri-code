@@ -224,6 +224,24 @@ aside h2 {
 .status .focus, .status .flash { flex: none; }
 .status .hints span { display: flex; gap: 4px; align-items: center; }
 .status .flash { color: var(--accent); font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+.usage {
+  flex: none; display: flex; align-items: center; gap: 12px; height: 100%; padding: 0 2px;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.usage:hover { color: var(--text); }
+.usage .who { color: var(--text); font-weight: 600; }
+.usage .na { font-style: italic; }
+.usage .meter { display: flex; align-items: center; gap: 5px; }
+.usage .meter i {
+  width: 44px; height: 4px; border-radius: 2px; background: var(--raised);
+  background-image: linear-gradient(var(--lvl), var(--lvl)); background-size: var(--pct) 100%; background-repeat: no-repeat;
+}
+.usage .meter b { font: 600 11px var(--mono); color: var(--text); }
+.usage .meter em { font: normal 11px var(--mono); }
+.usage .meter[data-level="ok"] { --lvl: var(--ok); }
+.usage .meter[data-level="warn"] { --lvl: var(--warn); }
+.usage .meter[data-level="bad"] { --lvl: var(--bad); }
+.usage .meter[data-level="bad"] b { color: var(--bad); }
 
 /* Toast */
 .toast {

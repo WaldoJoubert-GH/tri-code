@@ -6,6 +6,7 @@ import {
 } from "./state";
 import Canvas from "./Canvas";
 import Sidebar from "./Sidebar";
+import ClaudeUsage from "./Usage";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
 import { installHotkeys } from "./hotkeys";
@@ -193,15 +194,9 @@ function StatusBar() {
       <span class="focus">{info()}</span>
       <span class="flash">{flashMsg()}</span>
       <div class="hints">
-        <span><kbd>Alt</kbd><kbd>1–4</kbd> workspace</span>
-        <span><kbd>Alt</kbd><kbd>Shift</kbd><kbd>1–4</kbd> send</span>
-        <span><kbd>Alt</kbd><kbd>H J K L</kbd> focus</span>
-        <span><kbd>Alt</kbd><kbd>Shift</kbd>+dir swap</span>
-        <span><kbd>Alt</kbd><kbd>Ctrl</kbd><kbd>H L</kbd> split</span>
-        <span><kbd>Alt</kbd><kbd>G</kbd> layout</span>
-        <span><kbd>Ctrl</kbd>+click link</span>
         <span><kbd>Alt</kbd><kbd>/</kbd> all keys</span>
       </div>
+      <ClaudeUsage />
     </div>
   );
 }
