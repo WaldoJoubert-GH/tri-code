@@ -10,7 +10,7 @@ import { addEnvironment, addProject, app, isLocalHost, setApp } from "./state";
 import { autoIcon } from "./icons";
 import { flash } from "./ui";
 
-type DirList = { path: string; dirs: string[]; repos: string[] };
+type DirList = { path: string; dirs: string[]; repos: string[]; drives: string[] };
 
 /** The selected environment, or NEW for the New environment form. */
 const NEW = "+";
@@ -125,7 +125,7 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void }) {
   };
   onMount(() => go("~"));
 
-  const isPath = () => /^[~/]/.test(q()) || /^[a-zA-Z]:[\\/]/.test(q());
+  const isPath = () => /^[~/]/.test(q()) || /^[a-zA-Z]:([\\/]|$)/.test(q());
   /** Folders matching the filter, prefix matches first. */
   const shown = () => {
     const l = list();
@@ -165,6 +165,17 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void }) {
 
   return (
     <div class="picker" classList={{ loading: loading() }}>
+      <Show when={(list()?.drives.length ?? 0) > 1}>
+        <div class="drives">
+          <For each={list()!.drives}>
+            {(d) => (
+              <button type="button" aria-pressed={list()!.path.toUpperCase().startsWith(d.slice(0, 2))} onClick={() => go(d)}>
+                {d.slice(0, 2)}
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
       <div class="crumbs">
         <Show when={list()?.path.startsWith("/")}>
           <button type="button" onClick={() => go("/")}>/</button>
@@ -181,7 +192,7 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void }) {
       <input
         ref={input}
         class="q"
-        placeholder="Filter, or type ~/path"
+        placeholder="Filter, or type ~/path or D:"
         value={q()}
         spellcheck={false}
         autocomplete="off"

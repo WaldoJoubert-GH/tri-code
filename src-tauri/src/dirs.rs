@@ -9,10 +9,17 @@ use crate::spawn::{expand_home, remote_path, sq};
 pub struct DirList {
     /// Absolute, normalized path that was listed.
     pub path: String,
-    /// Names of the visible subdirectories, sorted.
+    /// Names of the subdirectories, sorted, dot-folders last.
     pub dirs: Vec<String>,
     /// The subset of `dirs` that are git repositories (contain `.git`).
     pub repos: Vec<String>,
+    /// Drive roots (`C:\`, `D:\`, ...) to jump between; only for local Windows.
+    pub drives: Vec<String>,
+}
+
+/// Sort key: dot-folders after the rest, then case-insensitive.
+fn sort_key(n: &String) -> (bool, String) {
+    (n.starts_with('.'), n.to_lowercase())
 }
 
 #[tauri::command]
@@ -26,27 +33,39 @@ pub async fn list_dirs(host: String, path: String) -> Result<DirList, String> {
 }
 
 fn list_local(path: &str) -> Result<DirList, String> {
+    // A bare `D:` means the current directory on D:, not its root.
+    let path = &if path.len() == 2 && path.ends_with(':') { format!("{path}\\") } else { path.to_string() };
     let dir = std::fs::canonicalize(expand_home(path)).map_err(|e| format!("{path}: {e}"))?;
     let mut dirs: Vec<String> = std::fs::read_dir(&dir)
         .map_err(|e| e.to_string())?
         .filter_map(Result::ok)
         .filter(|e| e.path().is_dir())
         .filter_map(|e| e.file_name().into_string().ok())
-        .filter(|n| !n.starts_with('.'))
         .collect();
-    dirs.sort_by_key(|n| n.to_lowercase());
+    dirs.sort_by_key(sort_key);
     let repos = dirs.iter().filter(|n| dir.join(n).join(".git").exists()).cloned().collect();
     let path = dir.to_string_lossy();
     // canonicalize returns verbatim `\\?\C:\...` paths on Windows.
     let path = path.strip_prefix(r"\\?\").unwrap_or(&path).to_string();
-    Ok(DirList { path, dirs, repos })
+    Ok(DirList { path, dirs, repos, drives: drives() })
+}
+
+#[cfg(windows)]
+fn drives() -> Vec<String> {
+    // Skip A: and B: so a floppy controller with no disk doesn't stall the listing.
+    (b'C'..=b'Z').map(|c| format!("{}:\\", c as char)).filter(|d| std::path::Path::new(d).exists()).collect()
+}
+
+#[cfg(not(windows))]
+fn drives() -> Vec<String> {
+    Vec::new()
 }
 
 /// Remote script: print the resolved directory, then one subdirectory per line,
 /// prefixed `g` for a git repository and `d` otherwise.
 fn remote_script(path: &str) -> String {
     let inner = format!(
-        "cd {} || exit 1; pwd; for d in */; do [ -d \"$d\" ] || continue; t=d; [ -e \"$d.git\" ] && t=g; printf '%s%s\\n' \"$t\" \"${{d%/}}\"; done; true",
+        "cd {} || exit 1; pwd; for d in */ .*/; do [ -d \"$d\" ] || continue; case $d in ./|../) continue;; esac; t=d; [ -e \"$d.git\" ] && t=g; printf '%s%s\\n' \"$t\" \"${{d%/}}\"; done; true",
         remote_path(path)
     );
     // `sh -c` so it works whatever the login shell is (bash, zsh, fish, ...).
@@ -66,9 +85,9 @@ fn list_remote(host: &str, path: &str) -> Result<DirList, String> {
         }
         dirs.push(name.to_string());
     }
-    dirs.sort_by_key(|n| n.to_lowercase());
-    repos.sort_by_key(|n| n.to_lowercase());
-    Ok(DirList { path, dirs, repos })
+    dirs.sort_by_key(sort_key);
+    repos.sort_by_key(sort_key);
+    Ok(DirList { path, dirs, repos, drives: Vec::new() })
 }
 
 #[cfg(all(test, unix))]
@@ -85,7 +104,7 @@ mod tests {
         std::fs::write(root.join("file"), "").unwrap();
         let l = list_local(&format!("{}/A/..", root.display())).unwrap();
         std::fs::remove_dir_all(&root).ok();
-        assert_eq!(l.dirs, ["A", "b dir"]);
+        assert_eq!(l.dirs, ["A", "b dir", ".hidden"]);
         assert_eq!(l.repos, ["b dir"]);
         assert_eq!(l.path, std::fs::canonicalize(std::env::temp_dir()).unwrap().join(root.file_name().unwrap()).to_string_lossy());
     }
@@ -95,6 +114,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("tri-rdirs-{}", std::process::id()));
         std::fs::create_dir_all(root.join("it's here")).unwrap();
         std::fs::create_dir_all(root.join("repo/.git")).unwrap();
+        std::fs::create_dir_all(root.join(".config")).unwrap();
         std::fs::write(root.join("file"), "").unwrap();
         // ssh hands the command string to the remote login shell as-is.
         let out = std::process::Command::new("/bin/sh")
@@ -106,6 +126,7 @@ mod tests {
         let text = String::from_utf8_lossy(&out.stdout);
         assert_eq!(text.lines().nth(1), Some("dit's here"), "{out:?}");
         assert_eq!(text.lines().nth(2), Some("grepo"), "{out:?}");
-        assert_eq!(text.lines().count(), 3, "{out:?}");
+        assert_eq!(text.lines().nth(3), Some("d.config"), "{out:?}");
+        assert_eq!(text.lines().count(), 4, "{out:?}");
     }
 }
