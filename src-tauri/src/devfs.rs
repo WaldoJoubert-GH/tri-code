@@ -27,6 +27,31 @@ pub async fn dev_write(host: String, path: String, contents: String) -> Result<(
         .map_err(|e| e.to_string())?
 }
 
+/// Save a pasted image (base64 PNG) on `host` and return its path, so a
+/// terminal agent can attach it: claude and pi read images from pasted paths,
+/// and a remote agent cannot see this machine's clipboard.
+#[tauri::command]
+pub async fn save_pasted_image(host: String, png_base64: String) -> Result<String, String> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(png_base64.as_bytes())
+        .map_err(|e| format!("bad base64: {e}"))?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis();
+    let name = format!("tri-code-paste-{stamp}.png");
+    let path = match host.as_str() {
+        "" | "local" => std::env::temp_dir().join(name).to_string_lossy().into_owned(),
+        _ => format!("/tmp/{name}"),
+    };
+    let target = path.clone();
+    tauri::async_runtime::spawn_blocking(move || write(&host, &target, &bytes))
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(path)
+}
+
 /// Read a text file on `host`, or `None` when it does not exist.
 pub(crate) fn read(host: &str, path: &str) -> Result<Option<String>, String> {
     match host {

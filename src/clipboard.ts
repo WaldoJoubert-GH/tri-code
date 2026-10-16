@@ -20,6 +20,25 @@ export async function readText(): Promise<string> {
   }
 }
 
+/** The clipboard's image as base64 PNG, or "" when it holds none. */
+export async function readImagePng(): Promise<string> {
+  try {
+    for (const item of (await navigator.clipboard?.read()) ?? []) {
+      if (!item.types.includes("image/png")) continue;
+      const url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        item.getType("image/png").then((blob) => reader.readAsDataURL(blob), reject);
+      });
+      return url.slice(url.indexOf(",") + 1);
+    }
+  } catch {
+    // denied or unavailable
+  }
+  return "";
+}
+
 const editable = (el: HTMLElement | null): boolean =>
   !!el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA");
 

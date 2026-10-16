@@ -8,7 +8,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Project, Tab, TabStatus, TerminalKind, TAB_COMMANDS, isRemote, isTerminal, sessionName, setLive } from "./state";
-import { copyText, readText } from "./clipboard";
+import { copyText, readImagePng, readText } from "./clipboard";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;
@@ -120,13 +120,22 @@ class TermSession {
    * WebView2 swallows the Ctrl+C / Ctrl+V accelerators before those events fire,
    * so nothing happens. Handle the keys here and use the Clipboard API directly:
    * Ctrl+C copies a selection (and still sends SIGINT when there is none) and
-   * Ctrl+V pastes as if typed. Full-screen TUIs such as claude and pi copy
-   * through OSC 52, which xterm core ignores, so forward that too.
+   * Ctrl+V pastes as if typed. A clipboard image is saved on the project's
+   * host and its path pasted, which claude and pi attach as an image.
+   * Shift+Enter sends ESC CR (Alt+Enter), which claude and pi read as a
+   * newline; xterm would otherwise send a plain CR and submit.
+   * Full-screen TUIs such as claude and pi copy through OSC 52, which xterm
+   * core ignores, so forward that too.
    */
   private installClipboard() {
     this.term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown" || e.altKey) return true;
       const mod = e.ctrlKey || e.metaKey;
+      if (e.shiftKey && !mod && e.key === "Enter") {
+        e.preventDefault(); // no keypress, so xterm does not also send CR
+        this.term.input("\x1b\r");
+        return false;
+      }
       if (mod && e.code === "KeyC" && this.term.hasSelection()) {
         copyText(this.term.getSelection());
         return false;
@@ -139,7 +148,7 @@ class TermSession {
         // The browser may still fire a paste event for this keystroke. Mark it so
         // the listener below drops that event instead of pasting twice.
         this.ownPasteAt = performance.now();
-        readText().then((text) => text && this.term.paste(text));
+        this.pasteClipboard();
         return false;
       }
       return true;
@@ -161,6 +170,19 @@ class TermSession {
       if (payload) copyText(decodeBase64(payload));
       return true;
     });
+  }
+
+  private async pasteClipboard() {
+    const text = await readText();
+    if (text) return this.term.paste(text);
+    const png = await readImagePng();
+    if (!png) return;
+    try {
+      const path = await invoke<string>("save_pasted_image", { host: this.project.host, pngBase64: png });
+      this.term.paste(path.includes(" ") ? `"${path}"` : path);
+    } catch (e) {
+      console.warn("save_pasted_image failed:", e);
+    }
   }
 
   private update(patch: Partial<{ status: TabStatus; attention: boolean; title: string }>) {

@@ -48,6 +48,7 @@ pub fn run() {
             fs::read_file,
             devfs::dev_read,
             devfs::dev_write,
+            devfs::save_pasted_image,
             plane::plane_sync,
             plane::plane_set_state,
             plane::plane_set_labels,
