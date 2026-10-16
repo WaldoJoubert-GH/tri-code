@@ -4,6 +4,26 @@
 
 tri-code is a minimal agent development environment. The left sidebar lists projects grouped by host (`local` or an ssh destination). Each project has terminal tabs that run `claude` (Claude Code), `pi`, or a plain shell. Local tabs run in a local PTY. Remote tabs run the system `ssh` client and attach to a persistent session on the remote host, so agents survive network drops and app restarts. The app is built with Tauri v2 (Rust), SolidJS, and xterm.js. Projects and tabs are saved to `state.json` in the Tauri app config directory.
 
+![A claude tab, the git window and a shell tiled in one project](docs/screenshots/hero.png)
+
+## Screenshots
+
+**Agents side by side.** claude, pi, the issues panel and a shell tiled in the grid layout. The sidebar groups projects by environment, local or ssh.
+
+![Grid layout with claude, pi, issues and a shell](docs/screenshots/grid.png)
+
+**Git window.** Stage files, read the diff, browse recent commits, and draft the commit message with ✦ from the diff, the In Progress issue and the commit style.
+
+![Git window with staged and unstaged changes and a diff](docs/screenshots/git.png)
+
+**Files window.** Browse the project folder and preview Markdown and HTML.
+
+![Files window with the README previewed](docs/screenshots/files.png)
+
+**Open project.** Pick an environment, then type to filter folders. Git repositories are marked.
+
+![The Open project dialog](docs/screenshots/open.png)
+
 ## Windows development setup
 
 1. Install Microsoft C++ Build Tools with the "Desktop development with C++" workload.
