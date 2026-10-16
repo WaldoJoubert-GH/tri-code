@@ -8,11 +8,12 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Project, Tab, TabKind, addTab, focusTab, live, projectById, space, visibleTabs } from "./state";
 import { openFilesPanel } from "./files";
 import { openIssuePanel } from "./issues";
+import { openGitPanel } from "./git";
 import { flash } from "./ui";
 
 /** Window glyphs. A `file` window shows the file name as its label, so it shares the files glyph. */
 const GLYPH: Record<TabKind, string> = {
-  claude: "✳", pi: "π", shell: "›", browser: "◎", issues: "☑", files: "▤", file: "▤",
+  claude: "✳", pi: "π", shell: "›", browser: "◎", issues: "☑", files: "▤", file: "▤", git: "±",
 };
 
 /** The kinds the New window menu offers, in toolbar order, with the key that also makes one. */
@@ -23,6 +24,7 @@ const NEW_KINDS: { kind: TabKind; key: string }[] = [
   { kind: "browser", key: "Alt+B" },
   { kind: "issues", key: "Alt+I" },
   { kind: "files", key: "Alt+E" },
+  { kind: "git", key: "Alt+C" },
 ];
 
 /** What the strip shows for a window. `file` windows are named by their file. */
@@ -39,6 +41,7 @@ function hint(t: Tab): string {
 function newWindow(p: Project, kind: TabKind) {
   if (kind === "issues") return openIssuePanel(p);
   if (kind === "files") return void openFilesPanel(p);
+  if (kind === "git") return void openGitPanel(p);
   addTab(p.id, kind);
   flash(`new ${kind}`);
 }

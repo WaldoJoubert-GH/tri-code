@@ -11,6 +11,8 @@ import { closeSession, ensureSession, focusSession, mountSession, unmountSession
 import IssuesPanel from "./IssuesPanel";
 import FileList from "./FileList";
 import FileView from "./FileView";
+import GitPanel from "./GitPanel";
+import { gitOf } from "./git";
 import { dev, panelTitle } from "./issues";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
 
@@ -120,7 +122,8 @@ export default function Canvas(props: { project: Project }) {
     const isIssues = tab.kind === "issues";
     const isFiles = tab.kind === "files";
     const isFile = tab.kind === "file";
-    const isPanel = isIssues || isFiles || isFile;
+    const isGit = tab.kind === "git";
+    const isPanel = isIssues || isFiles || isFile || isGit;
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -165,6 +168,7 @@ export default function Canvas(props: { project: Project }) {
       : isIssues ? panelTitle(props.project)
       : isFiles ? `${props.project.name} files`
       : isFile ? ((tab.path ?? "").split("/").pop() ?? "")
+      : isGit ? `${props.project.name} · ${gitOf(props.project.id).status?.branch ?? ""}`
       : (live[id]?.title ?? "");
 
     const url = () => browserInfo[id]?.url ?? tab.url ?? "";
@@ -334,6 +338,7 @@ export default function Canvas(props: { project: Project }) {
               isBrowser ? "web"
               : isIssues ? `plane${dev[props.project.id]?.syncing ? " syncing" : ""}`
               : isFiles || isFile ? "files"
+              : isGit ? "git"
               : (live[id]?.status ?? "connecting")
             }`}
           />
@@ -387,6 +392,8 @@ export default function Canvas(props: { project: Project }) {
           <FileList project={props.project} tab={tab} focused={focused()} />
         ) : isFile ? (
           <FileView project={props.project} tab={tab} />
+        ) : isGit ? (
+          <GitPanel project={props.project} tab={tab} focused={focused()} />
         ) : (
           <div class="body" ref={termEl} />
         )}
@@ -455,6 +462,7 @@ export function requestClose(projectId: string, tabId: string): void {
     tab.kind === "browser" ? browserInfo[tabId]?.title
     : tab.kind === "file" ? tab.path
     : tab.kind === "files" ? `${p.name} files`
+    : tab.kind === "git" ? `${p.name} git`
     : isTerminal(tab) ? live[tabId]?.title
     : undefined;
   removeTab(projectId, tabId);

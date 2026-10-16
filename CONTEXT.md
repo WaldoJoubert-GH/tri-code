@@ -62,6 +62,19 @@ _Avoid_: Tab bar (there is no tab bar), window list, tab buttons.
 **New Window Menu**:
 The popup under the Tab Strip's `+`: one row per `TabKind`, each with the key that also opens it (`Alt+Enter`, `Alt+B`, `Alt+I`, `Alt+E`). Issues and Files open or focus their one-per-project Window rather than adding a second one.
 
+**Git Window**:
+A canvas Window, one per project, that takes the current branch from changes to a merged PR: stage, commit, push, open a PR, merge. New `TabKind` `"git"`, addressed with `Alt+C`. Runs git and gh on the project's host. Chosen from design/git.html (variant B).
+_Avoid_: Source control panel, VCS view.
+
+**Draft** (✦):
+Text that `claude -p` writes for the user to edit before it is used: a commit message, a PR title and body, or a Review. Shown tinted until edited; never committed, pushed or posted unseen.
+
+**Context Chip**:
+One input a Draft is given, shown under "✦ reads" and switched off with a click: the diff, the linked In Progress issue, the recent commit subjects, CONTEXT.md.
+
+**Review**:
+A Draft over the whole branch diff before merging: findings as `fix`, `note` or `ok`, each with a location. "Send to claude" types a finding into the project's agent window, not submitted.
+
 **Favourite**:
 A page a project keeps for its browser windows: a URL and a name, in `state.json` under the project (`favs`). The star in a browser's address field (or `Ctrl+D`) adds one; they show on the bar under the address and as tiles on a blank browser window. Per project, not global, since each project has its own dev server and tracker.
 _Avoid_: Bookmark.

@@ -4,6 +4,7 @@ mod devfs;
 mod dirs;
 mod envs;
 mod fs;
+mod git;
 mod plane;
 mod pty;
 mod remote;
@@ -49,6 +50,17 @@ pub fn run() {
             envs::scan_logos,
             fs::list_files,
             fs::read_file,
+            git::git_status,
+            git::git_diff,
+            git::git_range,
+            git::git_stage,
+            git::git_unstage,
+            git::git_commit,
+            git::git_push,
+            git::gh_pr_view,
+            git::gh_pr_create,
+            git::gh_pr_merge,
+            git::claude_draft,
             devfs::dev_read,
             devfs::dev_write,
             devfs::save_pasted_image,

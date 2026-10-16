@@ -59,6 +59,8 @@ export function HelpOverlay() {
             <dd>Open or focus this project's issues panel (the `.dev/` folder)</dd>
             <dt><Keys keys={["Alt", "E"]} /></dt>
             <dd>Open or focus this project's files window (the project folder)</dd>
+            <dt><Keys keys={["Alt", "C"]} /></dt>
+            <dd>Open or focus this project's git window: stage, commit, push, open a PR and merge, with ✦ drafts</dd>
             <dt><Keys keys={["Alt", "Enter"]} /></dt>
             <dd>New window of the focused kind</dd>
             <dt><Keys keys={["Alt", "B"]} /></dt>

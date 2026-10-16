@@ -15,6 +15,7 @@ import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { openIssuePanel } from "./issues";
 import { openFilesPanel } from "./files";
+import { openGitPanel } from "./git";
 import { flash } from "./ui";
 
 const DIRS: Record<string, [number, number]> = {
@@ -79,6 +80,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       return true;
     case "KeyE":
       openFilesPanel(p);
+      return true;
+    case "KeyC":
+      openGitPanel(p);
       return true;
     case "KeyQ":
       if (!f) return false;
