@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: the app's sidebar stays; the tab bar becomes a slim toolbar over an auto-tiled area of terminal and browser windows (main + stack or grid, with a gap). Follows the system light/dark setting; the dark palette is the one in src/styles.css. */
+/* Layout: the app's sidebar stays; the tab bar becomes a slim toolbar over an auto-tiled area of terminal, browser and issues windows (main + stack or grid, with a gap). The issues window renders the project's .dev/ (Plane + Sentry), the files pi-todos and dev-hub share. Follows the system light/dark setting; the dark palette is the one in src/styles.css. */
 :root {
   /* light palette (system default when the OS is in light mode) */
   --bg: #fbfbfc;
@@ -258,6 +258,44 @@ body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; 
   border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; outline: none; user-select: text;
 }
 .url:focus { border-color: var(--accent); }
+/* Favourites: a star in the address field, a bar under the nav, tiles on the new-tab page. Saved per project, so every browser window in it shares them. */
+.addr { flex: 1; min-width: 0; margin: 0 4px; position: relative; display: flex; }
+.addr .url { margin: 0; padding-right: 26px; }
+.nav .star { position: absolute; right: 1px; top: 1px; width: 22px; height: 20px; font-size: 14px; line-height: 1; }
+.nav .star[aria-pressed="true"] { color: var(--warn); }
+.favs {
+  height: 26px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--line); overflow: hidden;
+}
+.favs[hidden] { display: none; }
+.fav {
+  height: 20px; max-width: 150px; min-width: 30px; flex: 0 1 auto; display: flex; align-items: center; gap: 6px;
+  padding: 0 8px 0 4px; border-radius: 4px; color: var(--text); font-size: 12px;
+}
+.fav:hover { background: var(--hover); }
+.fav.on { background: var(--raised); }
+.fav.over { box-shadow: inset 2px 0 0 var(--accent); }
+.fav span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ico { width: 14px; height: 14px; flex: none; border-radius: 3px; display: grid; place-items: center; background: var(--c); color: #16181d; font: 700 9px var(--ui); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; min-width: 0; max-width: 560px; margin-top: 4px; }
+.tile {
+  min-width: 0; display: grid; justify-items: center; gap: 4px; padding: 14px 6px 10px; cursor: pointer;
+  border: 1px solid var(--page-line); border-radius: 8px; background: var(--page-bg); color: var(--page-fg); font: 12px var(--ui);
+}
+.tile:hover { border-color: var(--page-link); }
+.tile .ico { width: 30px; height: 30px; border-radius: 8px; font-size: 14px; margin-bottom: 4px; }
+.tile span, .tile small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile small { font: 10px var(--mono); color: var(--page-muted); }
+.pop input.fname {
+  font: 13px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 4px; padding: 5px 8px; outline: none; user-select: text;
+}
+.pop input.fname:focus { border-color: var(--accent); }
+.pop .furl { font: 11px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.pop .acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+.pop .acts button { padding: 4px 12px; border-radius: 4px; border: 1px solid var(--line); color: var(--text); }
+.pop .acts button:hover { background: var(--hover); }
+.pop .acts .primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .page { flex: 1; overflow: auto; background: var(--page-bg); color: var(--page-fg); user-select: text; transition: opacity 120ms; }
 .page.loading { opacity: .35; }
 .doc { padding: 22px 26px; max-width: 70ch; font: 14px/1.55 var(--ui); }
@@ -282,6 +320,233 @@ body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; 
 .mock-tiles { display: grid; grid-template-columns: 1.3fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; padding: 6px; }
 .mock-tiles b { border: 1px solid var(--line); border-radius: 3px; background: var(--canvas); }
 .mock-tiles b:first-child { grid-row: span 2; border-color: var(--accent); }
+
+/* Issues window: a view of the project's .dev/ (config.json, issues.json, plane-states.json),
+   the same files pi-todos and dev-hub read and write. Plain HTML, not a terminal, so plain keys drive it. */
+.dot.plane { width: 6px; height: 6px; border-radius: 1px; background: var(--violet); transform: rotate(45deg); }
+.dot.plane.syncing { animation: syncp .7s ease-in-out infinite alternate; }
+@keyframes syncp { to { opacity: .2; } }
+.iss { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
+.itools {
+  height: 32px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.itools .seg { margin: 0 4px 0 0; }
+.itools .seg button { padding: 1px 8px; }
+.isearch {
+  flex: 1; min-width: 40px; margin: 0 4px 0 0; font: 12px var(--mono); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; outline: none; user-select: text;
+}
+.isearch:focus { border-color: var(--accent); }
+.ib { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
+.ib:hover { background: var(--hover); color: var(--text); }
+.ib[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.ib.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.imain { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.win:not(.focused) .imain { opacity: .8; }
+.ilist {
+  overflow: auto; min-height: 0; padding: 4px 0; display: grid; align-content: start;
+  grid-template-columns: 24px auto minmax(0, 1fr) auto auto 1px; column-gap: 9px;
+}
+/* Drill-down: the list fills the window; opening an issue replaces it, Esc goes back */
+.idetail { display: none; overflow: auto; min-height: 0; user-select: text; }
+.iss.detail .ilist, .iss.detail .itools { display: none; }
+.iss.detail .idetail { display: block; }
+.dhead {
+  position: sticky; top: 0; z-index: 1; height: 32px; display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--line); user-select: none;
+}
+.dhead .crumb { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; }
+.dhead .crumb b { color: var(--text); font: 600 11.5px var(--mono); }
+.dhead .pos { font: 11px var(--mono); color: var(--muted); padding: 0 4px; }
+.dbody { padding: 14px 16px 18px; display: grid; gap: 4px 28px; max-width: 980px; }
+.dside { min-width: 0; }
+@container (min-width: 640px) {
+  /* a wide window lays the issue page out in two columns: what it is (and the thread), then what you can do */
+  .dbody { grid-template-columns: minmax(0, 1fr) 230px; padding: 18px 22px 22px; }
+  .dside { grid-row: span 2; align-self: start; position: sticky; top: 50px; border-left: 1px solid var(--line); padding-left: 20px; }
+}
+/* Comments: cached in .dev/plane/comments/<issue>.json, images in .dev/plane/assets/ */
+.dcomments { min-width: 0; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.dcomments h4 { margin: 0 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.cmt { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 9px 0; }
+.cmt + .cmt { border-top: 1px dashed color-mix(in srgb, var(--line) 70%, transparent); }
+.av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 10.5px var(--ui); color: #fff; background: var(--avc); }
+.cmeta { display: flex; gap: 6px; align-items: baseline; font-size: 12px; color: var(--muted); }
+.cmeta b { color: var(--text); font-weight: 600; }
+.ctext { margin: 2px 0 0; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cimgs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.cimgs button { padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--canvas); cursor: zoom-in; }
+.cimgs button:hover { border-color: var(--accent); }
+.cimgs img { display: block; height: 116px; max-width: min(100%, 240px); object-fit: cover; }
+.cnone { padding: 6px 0 2px; color: var(--muted); font-size: 12px; }
+.ccompose { margin-top: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.ccompose:focus-within { border-color: var(--accent); }
+.ccompose.over { border-style: dashed; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--bg)); }
+.ccompose textarea {
+  display: block; width: 100%; min-height: 62px; resize: vertical; border: 0; background: none; outline: none;
+  padding: 8px 10px; color: var(--text); font: 13px/1.45 var(--ui); user-select: text;
+}
+.cattach { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 10px 10px; }
+.cattach span { position: relative; }
+.cattach img { display: block; height: 54px; max-width: 120px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
+.cattach button {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--raised); border: 1px solid var(--line); color: var(--text); font-size: 11px; line-height: 1;
+}
+.cbar { display: flex; align-items: center; gap: 6px; padding: 4px 6px 5px 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.cbar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cbar .post { padding: 3px 12px; border-radius: 5px; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 12px; flex: none; }
+.cbar .post:disabled { opacity: .4; cursor: default; }
+.cc { margin-left: 7px; color: var(--muted); font-size: 11px; }
+.cc::before {
+  content: ""; display: inline-block; width: 8px; height: 6px; margin-right: 3px; vertical-align: 0;
+  border: 1.5px solid currentColor; border-radius: 2px 2px 2px 0;
+}
+.ilight { position: absolute; inset: 0; z-index: 8; display: grid; grid-template-rows: minmax(0, 1fr) auto; padding: 12px; background: rgba(6, 7, 9, .86); }
+.ilight .lwrap { min-height: 0; display: grid; place-items: center; }
+.ilight img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 20px 60px -20px #000; }
+.ilight .cap { display: flex; gap: 10px; align-items: center; justify-content: center; padding-top: 10px; color: #c9ccd3; font-size: 12px; }
+.ilight .cap button { color: #c9ccd3; width: 26px; height: 24px; border-radius: 4px; }
+.ilight .cap button:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.ilight kbd { background: #1c1f26; border-color: #333844; color: #c9ccd3; }
+.irow {
+  grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center;
+  column-gap: 9px; height: 26px; cursor: default;
+}
+/* subgrid rows: edge spacing comes from the outer tracks, not padding */
+.irow > :first-child { justify-self: end; }
+.irow:hover { background: var(--hover); }
+.irow.sel { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 2px 0 var(--accent); }
+.win:not(.focused) .irow.sel { background: var(--hover); box-shadow: inset 2px 0 var(--muted); }
+.sid { font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.irow .t { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.irow .tt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.irow .t .lb, .irow .t .cc, .lbmore { flex: none; }
+/* Labels: Plane's label colour as a dot, the name in a quiet outline chip */
+.lb {
+  display: inline-flex; align-items: center; gap: 4px; height: 17px; padding: 0 6px;
+  border: 1px solid var(--line); border-radius: 9px; font-size: 10.5px; color: var(--muted); white-space: nowrap;
+}
+.lb i { width: 6px; height: 6px; border-radius: 50%; background: var(--lc); }
+.lbmore { font-size: 10.5px; color: var(--muted); }
+@container (max-width: 520px) { .irow .t .lb, .irow .t .lbmore { display: none; } }
+.dlabels { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -2px 0 12px; }
+.dlabels .lb { height: 19px; font-size: 11px; color: var(--text); }
+.lblbtn { height: 19px; padding: 0 8px; border: 1px dashed var(--line); border-radius: 10px; font-size: 11px; color: var(--muted); }
+.lblbtn:hover, .lblbtn[aria-expanded="true"] { border-color: var(--accent); color: var(--text); }
+.ldrop .lb { color: var(--text); }
+.ldrop .lfoot { padding: 6px 6px 2px; font-size: 10.5px; color: var(--muted); }
+.irow.closed .tt { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.irow .pill { justify-self: start; }
+.idate { font: 11px var(--mono); color: var(--muted); white-space: nowrap; text-align: right; }
+.idate.late { color: var(--bad); }
+.irun { font: 600 11px var(--mono); color: var(--accent); white-space: nowrap; text-align: right; }
+@container (max-width: 400px) {
+  .ilist { grid-template-columns: 24px auto minmax(0, 1fr) auto 1px; }
+  .irow .idate, .irow .irun { display: none; }
+}
+/* State Pill: Plane's own State Hex, black or white text by luminance (as in pi-todos) */
+.pill { font: 600 10.5px/17px var(--ui); padding: 0 6px; border-radius: 3px; white-space: nowrap; }
+.pill.ghost { background: var(--raised); color: var(--muted); }
+/* Priority: signal bars in the priority colour; urgent is a filled square */
+.pri { display: inline-flex; align-items: flex-end; gap: 1px; width: 12px; height: 11px; }
+.pri b { width: 3px; border-radius: 1px; background: var(--line); }
+.pri b:nth-child(1) { height: 4px; } .pri b:nth-child(2) { height: 7px; } .pri b:nth-child(3) { height: 11px; }
+.pri b.on { background: color-mix(in oklab, var(--pc) 82%, var(--text)); }
+.pri.none { align-items: center; } .pri.none b { height: 2px !important; }
+.pri.urgent { align-items: center; justify-content: center; border-radius: 3px; background: var(--pc); color: #fff; font: 800 9px/1 var(--ui); }
+.lvl { width: 8px; height: 8px; border-radius: 50%; background: var(--pc); margin-left: 2px; }
+.inew { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; padding: 2px 10px 6px 12px; }
+.inew .pri { flex: none; }
+.inew input {
+  flex: 1; font: 12.5px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 4px 8px; outline: none; user-select: text;
+}
+.iempty { grid-column: 1 / -1; padding: 28px 16px; color: var(--muted); text-align: center; }
+.idetail h3 { margin: 4px 0 8px; font-size: 14px; line-height: 1.35; text-wrap: balance; }
+.ichips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+.ichips span { display: inline-flex; gap: 5px; align-items: center; }
+.idetail p { margin: 0 0 12px; line-height: 1.5; }
+.idetail dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0 0 12px; font-size: 12px; }
+.idetail dt { color: var(--muted); }
+.idetail dd { margin: 0; font: 11.5px var(--mono); }
+.iacts { display: grid; gap: 1px; margin: 0 -6px; }
+.iacts button { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; text-align: left; }
+.iacts button:hover { background: var(--hover); }
+.iacts button:disabled { opacity: .45; cursor: default; background: none; }
+.iacts kbd { min-width: 18px; text-align: center; }
+.iacts button.on { color: var(--accent); }
+.iback { height: 24px; padding: 0 8px 0 6px; border-radius: 4px; color: var(--muted); font-size: 12px; flex: none; }
+.iback:hover { background: var(--hover); color: var(--text); }
+.ihint {
+  height: 22px; flex: none; display: flex; gap: 10px; align-items: center; padding: 0 10px;
+  border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden;
+}
+.ihint span { display: flex; gap: 3px; align-items: center; }
+.ihint kbd { font-size: 10px; padding: 0 3px; }
+.ihint .src { margin-left: auto; font: 10.5px var(--mono); }
+/* The State Pill is the control: it opens the State Dropdown anchored under itself */
+.pillbtn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px 2px 2px; margin-left: -3px;
+  border: 1px solid transparent; border-radius: 5px;
+}
+.pillbtn:hover, .pillbtn[aria-expanded="true"] { border-color: var(--line); background: var(--hover); }
+.pillbtn .caret { font-size: 9px; color: var(--muted); }
+.irow.plane .pill { cursor: pointer; }
+.irow.plane .pill:hover { box-shadow: 0 0 0 2px var(--line); }
+.idrop {
+  position: absolute; top: 0; left: 0; z-index: 5;
+  width: min(220px, calc(100% - 8px)); max-height: calc(100% - 8px); overflow: auto; padding: 6px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 16px 40px -12px var(--shadow);
+}
+.idrop .ttl { padding: 2px 6px 4px; font-size: 12px; color: var(--muted); }
+.idrop h5 { margin: 6px 6px 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.idrop button { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 3px 6px; border-radius: 4px; }
+.idrop button:hover { background: var(--hover); }
+.idrop button.hi { background: var(--hover); box-shadow: inset 0 0 0 1px var(--accent); }
+.idrop .cur { font-size: 11px; color: var(--muted); }
+.isetup { flex: 1; overflow: auto; display: grid; place-items: center; padding: 16px; }
+.isetup form { width: min(340px, 100%); display: grid; gap: 9px; }
+.isetup b { font-size: 14px; }
+.isetup p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.isetup p.ok { color: var(--ok); }
+.isetup code { font: 11px var(--mono); color: var(--text); }
+.isetup label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); }
+.isetup input {
+  font: 12px var(--mono); color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 4px; padding: 5px 8px; outline: none; user-select: text;
+}
+.isetup input:focus { border-color: var(--accent); }
+.isetup .go { justify-self: start; margin-top: 2px; padding: 5px 14px; border-radius: 5px; background: var(--accent); color: var(--bg); font-weight: 600; }
+.isetup .files { font: 10.5px/1.7 var(--mono); color: var(--muted); }
+/* Sidebar: active Plane issues per State, in Plane's colours (the pi-todos widget) */
+.minibar { display: flex; gap: 1px; width: 26px; height: 4px; border-radius: 2px; overflow: hidden; flex: none; }
+.minibar i { height: 100%; }
+.rail .project .minibar { display: none; }
+/* Toolbar: the project's In Progress issues, next to Appearance. One click drills into the issue */
+.prog { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; margin: 0 4px; overflow: hidden; }
+.prog button {
+  display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 260px; height: 22px; padding: 0 8px 0 6px;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--bg); color: var(--text); font-size: 12px; flex: 0 1 auto;
+}
+.prog button:hover { border-color: var(--accent); }
+.prog button.run { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.prog .sd { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.prog .sid { color: var(--muted); font-size: 11px; }
+.prog .pt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog .pe { font: 600 11px var(--mono); color: var(--accent); white-space: nowrap; }
+.prog .pe .rec { margin-right: 4px; }
+.prog .more { color: var(--muted); padding: 0 8px; flex: none; }
+/* only the first chip (the timed or most urgent issue) spends room on its title; the rest show the ID, title on hover */
+.prog button + button { flex: none; }
+.prog button + button .pt { display: none; }
+@media (max-width: 1100px) { .prog .pt { display: none; } }
+.status .timer { flex: none; color: var(--muted); font: 11px var(--mono); }
+.status .timer b { color: var(--accent); font-weight: 600; }
+/* Running Entry marker */
+.rec { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; animation: syncp 1s ease-in-out infinite alternate; }
 
 .split { position: absolute; cursor: ew-resize; z-index: 1; }
 .split::after {
@@ -368,6 +633,7 @@ body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; 
       <select id="gap"><option>0</option><option>4</option><option>8</option><option selected>12</option><option>16</option><option>24</option><option>32</option></select>
     </label>
     <span class="where" id="where"></span>
+    <div class="prog" id="prog" role="group" aria-label="In Progress issues"></div>
     <button class="tool theme-btn" id="themeBtn" title="Project appearance (Alt+P)"><i></i>Appearance</button>
     <button class="tool" id="helpBtn" title="Hotkeys (Alt+/)">?</button>
   </div>
@@ -378,7 +644,9 @@ body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; 
   <div class="status">
     <span class="focus" id="focusInfo"></span>
     <span class="flash" id="flash"></span>
+    <span class="timer" id="timer"></span>
     <div class="hints">
+      <span><kbd>Alt</kbd><kbd>I</kbd> issues</span>
       <span><kbd>Alt</kbd><kbd>1–4</kbd> workspace</span>
       <span><kbd>Alt</kbd><kbd>Shift</kbd><kbd>1–4</kbd> send</span>
       <span><kbd>Alt</kbd><kbd>H J K L</kbd> focus</span>
@@ -392,7 +660,7 @@ body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; 
 </div>
 
 <script>
-const CW = 7.5, LH = 17, PADX = 10, PADY = 8, BAR = 28, NAV = 32;
+const CW = 7.5, LH = 17, PADX = 10, PADY = 8, BAR = 28, NAV = 32, FAVS = 26;
 const $ = (id) => document.getElementById(id);
 const app = $("app"), vp = $("vp"), world = $("world"), split = $("split");
 const cells = (w, h) => ({ cols: Math.floor((w - PADX * 2 - 2) / CW), rows: Math.floor((h - BAR - PADY * 2 - 2) / LH) });
@@ -470,12 +738,20 @@ const linkify = (html) => html.replace(/https?:\/\/[^\s<"]+[^\s<".,)]/g, (u) =>
   `<span class="link" data-url="${u}" title="Ctrl+click: open in a browser window · Ctrl+Shift+click: system browser">${u}</span>`);
 
 /* ---------- web pages (stand-ins for a real webview) ---------- */
-function pageFor(url) {
-  if (!url) return { title: "New tab", html: `<div class="start"><b>New browser window</b>
-    Type a URL above, or Ctrl+click a link in any terminal.
+function pageFor(url, favs = []) {
+  if (!url) return { title: "New tab", html: favs.length
+    ? `<div class="start"><b>Favourites</b><div class="tiles">${favs.map((f) => `<button class="tile" data-url="${esc(f.url)}" title="${esc(f.url)}">${favIco(f)}<span>${esc(f.name)}</span><small>${esc(hostOf(f.url))}</small></button>`).join("")}</div>
+      Type a URL above, or Ctrl+click a link in any terminal. Star a page to add it here.</div>`
+    : `<div class="start"><b>New browser window</b>
+    Type a URL above, or Ctrl+click a link in any terminal. Star a page (${"Ctrl+D"}) to keep it here.
     <a data-url="http://localhost:1420/">http://localhost:1420/</a></div>` };
   let u;
   try { u = new URL(url); } catch { return { title: "Bad address", html: `<div class="start"><b>Can't open ${esc(url)}</b>Check the address and press Enter again.</div>` }; }
+  if (u.host === "app.plane.so" || u.host.endsWith("sentry.io")) {
+    const last = u.pathname.split("/").filter(Boolean).at(-1);
+    const [d, i] = findIssue(u.host === "app.plane.so" ? last : "se" + last);
+    if (i) return issuePage(d, i);
+  }
   if (u.host === "localhost:1420") return { title: "tri-code (dev)", html: `<div class="mock"><div class="mock-side"><i></i><i class="on"></i><i></i><i></i></div>
     <div class="mock-main"><div class="mock-top"></div><div class="mock-tiles"><b></b><b></b><b></b></div></div></div>` };
   const seg = u.pathname.split("/").filter(Boolean);
@@ -488,6 +764,12 @@ function pageFor(url) {
     <ul><li><a data-url="http://localhost:1420/">Local dev server</a></li>
     <li><a data-url="${esc(u.origin)}/">${esc(u.host)} home</a></li></ul></div>` };
 }
+const hostOf = (url) => { try { return new URL(url).host; } catch { return url; } };
+/** A stand-in favicon: the name's first letter on a colour picked from the host, so one site keeps one colour. */
+function favIco(f) {
+  const h = hostOf(f.url), c = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#2ac3de", "#ff9e64", "#e0af68", "#73daca"][[...h].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 8];
+  return `<i class="ico" style="--c:${c}">${esc((f.name.trim()[0] || h[0] || "?").toUpperCase())}</i>`;
+}
 function normalizeUrl(s) {
   s = s.trim();
   if (!s) return "";
@@ -495,31 +777,203 @@ function normalizeUrl(s) {
   return (/^(localhost|127\.|\d+\.\d+\.\d+\.\d+)/.test(s) ? "http://" : "https://") + s;
 }
 
+/* ---------- sample .dev/ data (shapes follow pi-todos: issues.json, plane-states.json) ---------- */
+const DAY = 864e5;
+const isoDay = (n) => new Date(Date.now() + n * DAY).toISOString().slice(0, 10);
+const STATES = [
+  { id: "s-bl", name: "Backlog", group: "backlog", color: "#d9d9d9" },
+  { id: "s-todo", name: "Todo", group: "unstarted", color: "#3f76ff" },
+  { id: "s-ip", name: "In Progress", group: "started", color: "#f59e0b" },
+  { id: "s-rev", name: "In Review", group: "started", color: "#8b5cf6" },
+  { id: "s-done", name: "Done", group: "completed", color: "#16a34a" },
+  { id: "s-x", name: "Cancelled", group: "cancelled", color: "#dc2626" },
+];
+/** Workspace labels, cached like States: .dev/plane-labels.json (GET /projects/{id}/labels/). Issues carry label ids. */
+const LABELS = [
+  { id: "l-bug", name: "bug", color: "#ef4444" },
+  { id: "l-perf", name: "perf", color: "#f59e0b" },
+  { id: "l-ui", name: "ui", color: "#8b5cf6" },
+  { id: "l-win", name: "windows", color: "#3b82f6" },
+  { id: "l-remote", name: "remote", color: "#06b6d4" },
+  { id: "l-api", name: "api", color: "#64748b" },
+  { id: "l-sec", name: "security", color: "#dc2626" },
+  { id: "l-docs", name: "docs", color: "#10b981" },
+];
+const ISSUE_LABELS = {
+  "tri-12": ["l-bug", "l-perf", "l-win"], "tri-13": ["l-bug", "l-ui"], "tri-14": ["l-ui"], "tri-15": ["l-remote"],
+  "tri-9": ["l-ui"], "tri-16": ["l-docs"], "tri-8": ["l-ui"],
+  "api-31": ["l-api", "l-sec", "l-perf"], "api-29": ["l-sec"], "api-27": ["l-api"], "api-22": ["l-api", "l-docs"],
+  "dot-3": ["l-win"], "inf-7": ["l-bug", "l-sec"],
+};
+const labelOf = (id) => LABELS.find((l) => l.id === id);
+const lbChip = (l) => `<span class="lb" style="--lc:${l.color}"><i></i>${esc(l.name)}</span>`;
+/** Active = any State Group except completed and cancelled. */
+const ACTIVE = new Set(["backlog", "unstarted", "started", "triage"]);
+const GROUP_SORT = { started: 0, unstarted: 1, backlog: 2, triage: 3, completed: 4, cancelled: 5 };
+const PRI = { urgent: ["#EF4444", 0], high: ["#F59E0B", 1], medium: ["#EAB308", 2], low: ["#3B82F6", 3], none: ["#9CA3AF", 4] };
+const LEVEL = { fatal: "#b91c1c", error: "#EF4444", warning: "#F59E0B", info: "#3B82F6" };
+const stateOf = (i) => STATES.find((s) => s.id === i.state);
+const PI = (seq, title, state, priority, start, target, desc = "") =>
+  ({ source: "plane", seq, title, state, priority, start: start == null ? null : isoDay(start), target: target == null ? null : isoDay(target), desc });
+const SE = (sid, title, level, status, events, culprit, seenMin) =>
+  ({ source: "sentry", id: "se" + sid, sid, title, level, status, events, culprit, seen: Date.now() - seenMin * 6e4 });
+/** A project's .dev/: config (workspace, project, identifier), the cached issue list, the Time Entry Store. */
+const devData = (ident, issues, extra = {}) => ({
+  ws: "fl_systems", pid: ident.toLowerCase() + "-5b3b-7f09-4ebf-aeb5", ident,
+  issues: issues.map((i) => {
+    if (i.source !== "plane") return i;
+    const id = `${ident.toLowerCase()}-${i.seq}`;
+    return { ...i, id, comments: COMMENTS[id] ?? [], labels: ISSUE_LABELS[id] ?? [] };
+  }),
+  synced: Date.now() - 2 * 6e4, syncing: false, entry: null, spent: {}, ...extra,
+});
+/* Stand-in screenshots for comment images (real ones are Plane assets, fetched with the token into .dev/plane/assets/) */
+const svgUri = (s) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 380'>${s}</svg>`);
+const termLines = (y0, n, c = "#3a3f4b") => Array.from({ length: n }, (_, k) =>
+  `<rect x='18' y='${y0 + k * 18}' width='${120 + ((k * 137) % 360)}' height='7' rx='3' fill='${k % 4 === 0 ? "#7aa2f7" : c}'/>`).join("");
+const winFrame = (title, body) => `<rect width='640' height='380' fill='#0b0c0f'/><rect x='10' y='10' width='620' height='360' rx='8' fill='#0e0f12' stroke='#24272f'/>
+  <rect x='10' y='10' width='620' height='30' rx='8' fill='#15171c'/><circle cx='28' cy='25' r='4' fill='#9ece6a'/>
+  <text x='42' y='29' font-family='monospace' font-size='12' fill='#d6d8de'>${title}</text>${body}`;
+const SHOTS = {
+  flash: svgUri(winFrame("claude · canvas windows", termLines(58, 5) + `<rect x='11' y='150' width='618' height='130' fill='#fbfbfc'/>
+    <text x='320' y='222' text-anchor='middle' font-family='sans-serif' font-size='15' fill='#c4314b'>frame 2 of the resize: blank white</text>` + termLines(296, 3))),
+  fixed: svgUri(winFrame("claude · canvas windows (debounced)", termLines(58, 16))),
+  toast: svgUri(winFrame("browser · New tab", `<rect x='11' y='41' width='618' height='328' fill='#f7f8fa'/>
+    <text x='320' y='190' text-anchor='middle' font-family='sans-serif' font-size='14' fill='#6b7280'>history is empty after Undo</text>
+    <rect x='190' y='318' width='260' height='34' rx='6' fill='#232733'/><text x='206' y='340' font-family='sans-serif' font-size='13' fill='#d6d8de'>Closed browser.</text>
+    <text x='398' y='340' font-family='sans-serif' font-size='13' fill='#7aa2f7'>Undo</text>`)),
+  p95: svgUri(`<rect width='640' height='380' fill='#ffffff'/><text x='24' y='36' font-family='sans-serif' font-size='15' font-weight='600' fill='#1b1e24'>/v1/upload p95 latency (ms)</text>
+    <line x1='40' y1='330' x2='620' y2='330' stroke='#d9dce3'/>` + [380, 410, 395, 1240, 1310, 420, 210, 190, 205, 198, 185, 192].map((v, k) =>
+    `<rect x='${52 + k * 47}' y='${330 - v / 5}' width='30' height='${v / 5}' rx='3' fill='${k < 6 ? "#f7768e" : "#7aa2f7"}'/>`).join("") +
+    `<text x='330' y='360' font-family='sans-serif' font-size='12' fill='#6b7280'>rate limit on →</text><line x1='326' y1='60' x2='326' y2='330' stroke='#6b7280' stroke-dasharray='4 4'/>`),
+};
+/** Plane comments per issue (comment_html in the API; plain text here). */
+const COMMENTS = {
+  "tri-12": [
+    { author: "Lerato M.", at: Date.now() - 26 * 3600e3, text: "Reproduced on Windows 11 with the WebGL renderer. Frame 2 of every resize is blank:", images: [{ src: SHOTS.flash, name: "resize-frame-2.png" }] },
+    { author: "Sam K.", at: Date.now() - 5 * 3600e3, text: "Debouncing fit() to 50ms fixes it here. Same window after the change:", images: [{ src: SHOTS.fixed, name: "debounced.png" }] },
+  ],
+  "tri-13": [
+    { author: "Sam K.", at: Date.now() - 2 * 864e5, text: "Steps: open a browser window, visit two pages, Alt+Q, Undo. Back is greyed out and the page is blank.", images: [{ src: SHOTS.toast, name: "after-undo.png" }] },
+  ],
+  "api-31": [
+    { author: "Lerato M.", at: Date.now() - 3 * 3600e3, text: "Staging numbers with the governor bucket at 20 req/s per key. The spike was one client retrying in a loop.", images: [{ src: SHOTS.p95, name: "p95.png" }] },
+    { author: "Sam K.", at: Date.now() - 50 * 6e4, text: "Looks good. Can we return Retry-After in seconds, not ms?", images: [] },
+  ],
+};
+const AV = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#ff9e64", "#73daca"];
+const avColor = (name) => name === "You" ? "var(--accent)" : AV[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV.length];
+const initials = (name) => name.split(/\s+/).map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+const SEEDS = {
+  p2: () => devData("DOT", [
+    PI(4, "Move zsh plugins to antidote", "s-todo", "medium", null, 6),
+    PI(3, "Share .gitconfig between WSL and Windows", "s-ip", "high", -1, 2, "Include a per-host file so the signing key differs."),
+    PI(1, "Bootstrap script for a new machine", "s-bl", "low", null, null),
+  ]),
+  p4: () => devData("INF", [
+    PI(7, "Terraform credentials on devbox", "s-ip", "urgent", -1, 0, "terraform plan fails with no credential sources. Use the instance profile instead of static keys."),
+    PI(5, "Tag every resource with a cost centre", "s-todo", "low", null, 12),
+  ]),
+};
+const findIssue = (id) => {
+  for (const p of projects) { const i = p.dev?.issues.find((x) => x.id === id); if (i) return [p.dev, i]; }
+  return [];
+};
+const slugOf = (d, i) => i.source === "plane" ? `${d.ident}-${i.seq}` : `S-${i.sid}`;
+const linkOf = (d, i) => i.source === "plane"
+  ? `https://app.plane.so/${d.ws}/projects/${d.pid}/issues/${i.id}`
+  : `https://fl-systems.sentry.io/issues/${i.sid}/`;
+const fgFor = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.5 ? "#000" : "#fff";
+};
+const pill = (s) => `<span class="pill" style="background:${s.color};color:${fgFor(s.color)}">${esc(s.name)}</span>`;
+function priIcon(p) {
+  const [c, rank] = PRI[p] ?? PRI.none;
+  if (p === "urgent") return `<span class="pri urgent" style="--pc:${c}" title="urgent">!</span>`;
+  const on = p === "none" ? 0 : 3 - rank + 1;
+  return `<span class="pri ${p}" style="--pc:${c}" title="${p}">${[1, 2, 3].map((k) => `<b class="${k <= on ? "on" : ""}"></b>`).join("")}</span>`;
+}
+const hms = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h ? h + "h " : "") + (h || m ? m + "m " : "") + (s % 60) + "s"; };
+const hm = (ms) => { const m = Math.max(0, Math.floor(ms / 6e4)); return (m >= 60 ? Math.floor(m / 60) + "h " : "") + (m % 60) + "m"; };
+const ago = (t) => { const m = Math.floor((Date.now() - t) / 6e4); return m < 1 ? "just now" : m < 60 ? m + "m ago" : Math.floor(m / 60) + "h ago"; };
+const fmtDay = (iso) => iso ? new Date(iso + "T00:00").toLocaleDateString("en", { month: "short", day: "numeric" }) : "—";
+const spentOf = (d, id) => (d.spent[id] ?? 0) + (d.entry?.id === id ? Date.now() - d.entry.start : 0);
+const todayTotal = (d) => Object.keys(d.spent).reduce((a, id) => a + (d.spent[id] ?? 0), 0) + (d.entry ? Date.now() - d.entry.start : 0);
+function issuePage(d, i) {
+  const s = slugOf(d, i);
+  if (i.source === "sentry") return { title: `${s} · Sentry`, html: `<div class="doc"><div class="crumb">sentry.io / fl-systems / issues / ${i.sid}</div>
+    <h1>${esc(i.title)}</h1><p><b>${i.level}</b> · ${i.status} · ${i.events} events · ${esc(i.culprit)}</p>
+    <p>Stand-in for Sentry's issue page: stack trace, breadcrumbs and tags load here in the real webview.</p>
+    <div class="sk" style="width:92%"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:86%"></div></div>` };
+  return { title: `${s} ${i.title} · Plane`, html: `<div class="doc"><div class="crumb">app.plane.so / ${d.ws} / ${d.ident} / ${s}</div>
+    <h1>${esc(i.title)}</h1><p>${pill(stateOf(i))} &nbsp;${i.priority} priority · target ${fmtDay(i.target)}</p>
+    <p>${esc(i.desc || "No description.")}</p>
+    <p>Stand-in for Plane's issue page: comments, activity and sub-issues load here in the real webview.</p>
+    <div class="sk" style="width:90%"></div><div class="sk" style="width:76%"></div></div>` };
+}
+
 /* ---------- sample state ---------- */
 const W = (kind, screen, extra = {}) => ({ id: "w" + uid++, kind, screen, x: 0, y: 0, w: 0, h: 0, z: uid, space: 0, status: "running", attention: false, title: "", ...extra });
 const B = (url, extra = {}) => W("browser", null, { url, hist: url ? [url] : [], hi: url ? 0 : -1, title: pageFor(url).title, ...extra });
+/** The issues window keeps only view state; the issues themselves live in the project's .dev/. */
+const I = (extra = {}) => W("issues", null, { sel: null, src: "all", done: false, q: "", view: "list", drop: null, ldrop: null, creating: false, ...extra });
 const SPACES = 4;
 /** Each project has 4 workspaces; every window lives in one (w.space), and each workspace keeps its own layout, split and focus. */
 const proj = (id, name, host, path, wins, { layout = "master", ...extra } = {}) => ({
   id, name, host, path, wins, ws: 0,
   spaces: Array.from({ length: SPACES }, (_, i) => ({ layout: i ? "master" : layout, ratio: 0.55, mono: null, focus: wins.find((w) => w.space === i)?.id ?? null })),
-  accent: "#7aa2f7", bg: "none", dim: 0, ...extra,
+  accent: "#7aa2f7", bg: "none", dim: 0, favs: [], ...extra,
 });
 const projects = [
   proj("p1", "tri-code", "local", "~/code/tri-code", [
     W("claude", "claude", { title: "canvas windows" }),
+    I(),
     B("http://localhost:1420/"),
-    W("pi", "pi", { title: "xterm resize" }),
+    W("pi", "pi", { title: "xterm resize", space: 1 }),
     W("shell", "shellDev", { title: "bun run tauri dev", space: 1 }),
     W("shell", "shell", { space: 1 }),
-  ], { accent: "#7aa2f7", bg: "aurora" }),
-  proj("p2", "dotfiles", "local", "~/dotfiles", [W("shell", "shell")], { accent: "#9ece6a", bg: "rings" }),
+  ], {
+    accent: "#7aa2f7", bg: "aurora",
+    hostToken: true,
+    favs: [
+      { url: "http://localhost:1420/", name: "tri-code dev" },
+      { url: "https://app.plane.so/fl-systems/projects/tri-code/issues/", name: "Plane · TRI" },
+      { url: "https://v2.tauri.app/reference/javascript/api/", name: "Tauri JS API" },
+      { url: "https://xtermjs.org/docs/api/terminal/", name: "xterm.js" },
+    ],
+    dev: devData("TRI", [
+      PI(12, "Terminal flashes white when a window resizes", "s-ip", "urgent", -2, 1, "xterm re-measures on every animation frame while the canvas re-tiles. Debounce FitAddon.fit() and keep the WebGL canvas until the new size settles."),
+      PI(14, "Issues panel as a canvas window", "s-todo", "high", 0, 8, "New TabKind \"issues\". It reads and writes the project's .dev/ (config.json, issues.json, plane-states.json), the same files pi-todos and dev-hub use, so all three always agree."),
+      PI(13, "Undo toast drops a browser window's history", "s-rev", "high", -4, -1, "restoreTab puts the tab back but the native webview was already closed. Keep it hidden until the toast expires."),
+      PI(15, "Read .dev/ over ssh for remote projects (devfs.rs)", "s-todo", "medium", null, 10, "dev_read / dev_write: plain fs locally, ssh cat and an atomic mv on remote hosts. Share the ssh builder with dirs.rs."),
+      PI(11, "Gantt view in the issues panel", "s-bl", "medium", null, null),
+      PI(9, "Nerd Font glyphs in window title bars", "s-bl", "low", null, null),
+      PI(16, "Document Alt+I in the README", "s-todo", "none", null, 3),
+      PI(8, "Replace the tab bar with a tiled canvas", "s-done", "high", -10, -3),
+      PI(6, "Free-floating windows", "s-x", "low", null, null),
+      SE(4412, "TypeError: Cannot read properties of undefined (reading 'fit')", "error", "unresolved", 37, "terms.ts in mountSession", 14),
+    ], { entry: { id: "tri-12", start: Date.now() - 47 * 6e4 }, spent: { "tri-12": 80 * 6e4, "tri-13": 35 * 6e4 } }),
+  }),
+  proj("p2", "dotfiles", "local", "~/dotfiles", [W("shell", "shell")], { accent: "#9ece6a", bg: "rings", hostToken: true, dev: null }),
   proj("p3", "api-server", "devbox", "~/srv/api", [
     W("claude", "claudeAsk", { attention: true, title: "rate limiting", space: 2 }),
     W("shell", "remote", { status: "reconnecting", title: "logs", space: 1 }),
     W("claude", "claude", { title: "refactor auth" }),
-  ], { layout: "grid", accent: "#f7768e", bg: "blueprint" }),
-  proj("p4", "infra", "devbox", "~/infra", [W("shell", "exited", { status: "exited", title: "terraform" })], { accent: "#bb9af7", bg: "dusk", dim: 20 }),
+    I(),
+  ], {
+    layout: "grid", accent: "#f7768e", bg: "blueprint",
+    hostToken: true,
+    dev: devData("API", [
+      PI(31, "Rate limit /v1/upload", "s-ip", "urgent", -1, 0, "Per-key token bucket with the governor crate. 429 with Retry-After."),
+      PI(29, "Rotate signing keys without downtime", "s-todo", "high", null, 5),
+      PI(27, "Move sessions to Redis", "s-rev", "medium", -6, 2),
+      PI(22, "OpenAPI spec for v2", "s-bl", "low", null, null),
+      SE(9087, "PoolTimedOut: pool timed out while waiting for an open connection", "fatal", "unresolved", 212, "db::pool in acquire", 3),
+      SE(9120, "Slow query on uploads (2.4s)", "warning", "unresolved", 18, "uploads::list", 41),
+    ]),
+  }),
+  proj("p4", "infra", "devbox", "~/infra", [W("shell", "exited", { status: "exited", title: "terraform" })], { accent: "#bb9af7", bg: "dusk", dim: 20, hostToken: false, dev: null }),
 ];
 let cur = projects[0];
 const sp = () => cur.spaces[cur.ws];
@@ -571,13 +1025,16 @@ function winEl(w) {
   els.set(w.id, el);
   const body = w.kind === "browser"
     ? `<div class="nav"><button data-nav="back" title="Back">←</button><button data-nav="fwd" title="Forward">→</button><button data-nav="reload" title="Reload">↻</button>
-       <input class="url" id="url-${w.id}" spellcheck="false" aria-label="Address"><button data-nav="ext" title="Open in system browser">↗</button></div><div class="page"></div>`
+       <span class="addr"><input class="url" id="url-${w.id}" spellcheck="false" aria-label="Address"><button class="star" title="Favourite this page (Ctrl+D)" aria-pressed="false">☆</button></span><button data-nav="ext" title="Open in system browser">↗</button></div>
+       <div class="favs" role="toolbar" aria-label="Favourites"></div><div class="page"></div>`
+    : w.kind === "issues" ? `<div class="iss"></div>`
     : `<pre class="screen"></pre>`;
   el.innerHTML = `<div class="bar"><span class="dot"></span><span class="kind"></span><span class="ttl"></span>
     <button data-act="max" title="Maximize (Alt+F)">▢</button><button data-act="close" title="Close (Alt+Q)">×</button></div>
     ${body}<div class="tip"></div>`;
   if (w.kind === "browser") wireBrowser(w, el);
-  else el.querySelector(".screen").innerHTML = linkify(S[w.screen](cur));
+  else if (w.kind === "issues") wireIssues(w, el);
+  else el.querySelector(".screen").innerHTML = screenHtml(w);
   el.addEventListener("pointerdown", (e) => { if (!e.target.closest("button")) focus(w.id); });
   el.querySelector(".bar").addEventListener("pointerdown", (e) => !e.target.closest("button") && startDrag(e, w));
   el.querySelector(".bar").addEventListener("dblclick", (e) => !e.target.closest("button") && toggleMax(w));
@@ -587,7 +1044,8 @@ function winEl(w) {
   return el;
 }
 function sizeLabel(w) {
-  if (w.kind === "browser") return `${w.w} × ${w.h - BAR - NAV} <span>px</span>`;
+  if (w.kind === "browser") return `${w.w} × ${pageH(w)} <span>px</span>`;
+  if (w.kind === "issues") return `${w.w} × ${w.h - BAR} <span>px</span>`;
   const c = cells(w.w, w.h);
   return `${c.cols} × ${c.rows} <span>cols × rows</span>`;
 }
@@ -596,7 +1054,7 @@ function renderWin(w) {
   Object.assign(el.style, { left: w.x + "px", top: w.y + "px", width: w.w + "px", height: w.h + "px", zIndex: w.z });
   el.classList.toggle("focused", sp().focus === w.id);
   el.classList.toggle("attention", w.attention);
-  el.querySelector(".dot").className = "dot " + (w.kind === "browser" ? "web" : w.status);
+  el.querySelector(".dot").className = "dot " + (w.kind === "browser" ? "web" : w.kind === "issues" ? "plane" + (cur.dev?.syncing ? " syncing" : "") : w.status);
   el.querySelector(".kind").textContent = w.kind;
   el.querySelector(".ttl").textContent = w.title;
   el.querySelector(".tip").innerHTML = sizeLabel(w);
@@ -627,7 +1085,7 @@ function render() {
   // windows on other workspaces stay alive (their sessions keep running), just hidden
   for (const w of cur.wins) w.space === cur.ws ? (renderWin(w), els.get(w.id).hidden = false) : els.has(w.id) && (els.get(w.id).hidden = true);
   renderSpaces();
-  renderSide(); renderStatus();
+  renderSide(); renderStatus(); tick();
   $("layout").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.layout === sp().layout));
   $("empty")?.remove();
   if (!vis().length) {
@@ -644,7 +1102,7 @@ function renderSide() {
   $("side").innerHTML = `<div class="side-head"><span>Projects</span><button class="collapse" id="collapse"
       title="${rail ? "Expand" : "Collapse"} sidebar (Alt+S)" aria-label="${rail ? "Expand" : "Collapse"} sidebar" aria-expanded="${!rail}">${rail ? "»" : "«"}</button></div>` + hosts.map((h) => `<section><h2>${h}</h2>` + projects.filter((p) => p.host === h).map((p) =>
     `<div class="project${p === cur ? " active" : ""}" data-p="${p.id}" style="--pa:${p.accent}" title="${rail ? `${p.name} · ${p.host} · ${p.wins.length} window${p.wins.length === 1 ? "" : "s"}` : ""}"><span class="swatch"><b>${p.name[0]}</b></span>
-     <span class="name">${p.name}</span>${p !== cur && p.wins.some((w) => w.attention) ? '<span class="badge" title="Needs input"></span>' : ""}
+     <span class="name">${p.name}</span>${miniBar(p)}${p !== cur && p.wins.some((w) => w.attention) ? '<span class="badge" title="Needs input"></span>' : ""}
      <span class="count">${p.wins.length || ""}</span><button class="gear" title="Appearance" aria-label="Appearance of ${p.name}">◐</button></div>`).join("") + `</section>`).join("") +
     `<button class="add" title="Add project">+<span class="label"> Add project</span></button>`;
   $("collapse").onclick = toggleSidebar;
@@ -658,7 +1116,7 @@ function renderStatus() {
   const w = focused();
   const where = `${sp().layout === "master" ? `main ${Math.round(sp().ratio * 100)}%` : "grid"} · gap ${gap}`;
   if (!w) return $("focusInfo").textContent = where;
-  const size = w.kind === "browser" ? `${w.w}×${w.h - BAR - NAV}px` : (({ cols, rows }) => `${cols}×${rows}`)(cells(w.w, w.h));
+  const size = w.kind === "browser" ? `${w.w}×${pageH(w)}px` : w.kind === "issues" ? `${w.w}×${w.h - BAR}px` : (({ cols, rows }) => `${cols}×${rows}`)(cells(w.w, w.h));
   $("focusInfo").textContent = `${w.kind}${w.title ? " · " + w.title : ""}  ${size}  [${where}]`;
 }
 let flashT;
@@ -676,13 +1134,98 @@ function wireBrowser(w, el) {
   el.querySelector('[data-nav="reload"]').onclick = () => { page.classList.add("loading"); setTimeout(() => page.classList.remove("loading"), 250); };
   el.querySelector('[data-nav="ext"]').onclick = () => w.url && flash(`opened in system browser: ${w.url}`);
   page.addEventListener("click", (e) => { const a = e.target.closest("[data-url]"); if (a) navigate(w, a.dataset.url); });
+  el.querySelector(".star").onclick = (e) => $("pop")?.dataset.fav === w.id ? closeTheme() : starPage(w, e.currentTarget);
+  const bar = el.querySelector(".favs");
+  bar.addEventListener("click", (e) => { const f = e.target.closest(".fav"); if (f) navigate(w, f.dataset.url); });
+  bar.addEventListener("contextmenu", (e) => {
+    const f = e.target.closest(".fav");
+    if (f) { e.preventDefault(); openFav(w, cur.favs.find((x) => x.url === f.dataset.url), f); }
+  });
+  // drag a favourite along the bar to reorder
+  let dragged = null;
+  bar.addEventListener("dragstart", (e) => { dragged = e.target.closest(".fav")?.dataset.url; e.dataTransfer.effectAllowed = "move"; });
+  bar.addEventListener("dragover", (e) => {
+    const f = e.target.closest(".fav");
+    if (!dragged || !f) return;
+    e.preventDefault();
+    bar.querySelectorAll(".over").forEach((x) => x.classList.remove("over"));
+    f.classList.add("over");
+  });
+  bar.addEventListener("drop", (e) => {
+    const f = e.target.closest(".fav");
+    if (!dragged || !f || f.dataset.url === dragged) return refreshFavs();
+    const from = cur.favs.findIndex((x) => x.url === dragged), [m] = cur.favs.splice(from, 1);
+    cur.favs.splice(cur.favs.findIndex((x) => x.url === f.dataset.url), 0, m);
+    refreshFavs();
+  });
+  bar.addEventListener("dragend", () => { dragged = null; refreshFavs(); });
   fillBrowser(w, el);
+}
+const favOf = (url) => url && cur.favs.find((f) => f.url === url);
+/** Page height under the nav and, when this project has favourites, the favourites bar. */
+const pageH = (w) => w.h - BAR - NAV - (cur.favs.length ? FAVS : 0);
+/** Star and favourites bar of one browser window. */
+function paintFavs(w, el) {
+  const star = el.querySelector(".star"), on = !!favOf(w.url);
+  star.textContent = on ? "★" : "☆";
+  star.setAttribute("aria-pressed", on);
+  star.title = on ? "Edit favourite (Ctrl+D)" : "Favourite this page (Ctrl+D)";
+  star.disabled = !w.url;
+  const bar = el.querySelector(".favs");
+  bar.hidden = !cur.favs.length;
+  bar.innerHTML = cur.favs.map((f) => `<button class="fav${f.url === w.url ? " on" : ""}" draggable="true" data-url="${esc(f.url)}" title="${esc(f.name)}\n${esc(f.url)}\nRight-click to rename or remove · drag to reorder">${favIco(f)}<span>${esc(f.name)}</span></button>`).join("");
+}
+/** Favourites belong to the project, so a change repaints every browser window in it (and new-tab pages, which list them). */
+function refreshFavs() {
+  for (const w of cur.wins) {
+    const el = els.get(w.id);
+    if (w.kind !== "browser" || !el) continue;
+    paintFavs(w, el);
+    if (!w.url) el.querySelector(".page").innerHTML = pageFor("", cur.favs).html;
+    el.querySelector(".tip").innerHTML = sizeLabel(w);
+  }
+  renderStatus();
+}
+/** The star (or Ctrl+D): favourite the page if it isn't one yet, then show the editor either way. */
+function starPage(w, anchor = els.get(w.id)?.querySelector(".star")) {
+  if (!w.url) return flash("nothing to favourite on a new tab");
+  let f = favOf(w.url), added = false;
+  if (!f) {
+    f = { url: w.url, name: w.title.replace(/ · [^·]+$/, "").slice(0, 40) || hostOf(w.url) };
+    cur.favs.push(f); added = true;
+    refreshFavs();
+  }
+  openFav(w, f, anchor, added);
+}
+function openFav(w, f, anchor, added = false) {
+  closeTheme();
+  const pop = document.createElement("div");
+  pop.className = "pop"; pop.id = "pop"; pop.dataset.fav = w.id;
+  pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Favourite");
+  pop.innerHTML = `<div class="ttl">${added ? "Favourite added" : "Edit favourite"} <span>${esc(cur.name)}</span></div>
+    <h4>Name</h4><input class="fname" value="${esc(f.name)}" spellcheck="false" aria-label="Name">
+    <h4>Address</h4><div class="furl">${esc(f.url)}</div>
+    <div class="acts"><button data-f="remove">Remove</button><button class="primary" data-f="done">Done</button></div>`;
+  document.body.appendChild(pop);
+  const r = anchor.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(innerWidth - pop.offsetWidth - 8, r.right - pop.offsetWidth)) + "px";
+  pop.style.top = Math.min(innerHeight - pop.offsetHeight - 8, r.bottom + 6) + "px";
+  const name = pop.querySelector(".fname");
+  name.oninput = () => { f.name = name.value.trim() || hostOf(f.url); refreshFavs(); };
+  name.onkeydown = (e) => { if (e.key === "Enter") closeTheme(); };
+  pop.querySelector('[data-f="done"]').onclick = closeTheme;
+  pop.querySelector('[data-f="remove"]').onclick = () => {
+    cur.favs.splice(cur.favs.indexOf(f), 1);
+    closeTheme(); refreshFavs(); flash(`removed ${f.name} from favourites`);
+  };
+  name.focus(); name.select();
 }
 /** Paint the page for w.url. Touches only the browser's own DOM, so it is safe while the window is being built. */
 function fillBrowser(w, el = els.get(w.id)) {
   if (!el) return;
-  const p = pageFor(w.url);
+  const p = pageFor(w.url, cur.favs);
   w.title = p.title;
+  paintFavs(w, el);
   el.querySelector(".url").value = w.url;
   el.querySelector(".page").innerHTML = p.html;
   el.querySelector(".ttl").textContent = w.title;
@@ -714,6 +1257,547 @@ function openUrl(url, from) {
   flash(`open ${url}`);
   focus(b.id);
 }
+
+/* ---------- terminal screens (with text typed in by "send to agent") ---------- */
+const CURSOR = '<span class="cursor"> </span>';
+function screenHtml(w) {
+  let raw = S[w.screen](cur);
+  for (const t of w.typed ?? []) {
+    const k = raw.lastIndexOf(CURSOR);
+    raw = k >= 0 ? raw.slice(0, k) + esc(t) + raw.slice(k) : raw + `\n<span class="c-a">&gt;</span> ${esc(t)}${CURSOR}`;
+  }
+  return linkify(raw);
+}
+
+/* ---------- issues panel ---------- */
+function miniBar(p) {
+  const d = p.dev;
+  if (!d) return "";
+  const counts = STATES.filter((s) => ACTIVE.has(s.group)).reverse()
+    .map((s) => [s, d.issues.filter((i) => i.state === s.id).length]).filter(([, n]) => n);
+  if (!counts.length) return "";
+  return `<span class="minibar" title="${counts.map(([s, n]) => `${n} ${s.name}`).join(" · ")}">${counts.map(([s, n]) => `<i style="flex:${n};background:${s.color}"></i>`).join("")}</span>`;
+}
+const isOpen = (i) => i.source === "plane" ? ACTIVE.has(stateOf(i).group) : i.status !== "resolved";
+/** What the list shows: source filter, done toggle, search; sorted priority → state group → title, Sentry last. */
+function shown(w, d) {
+  const q = w.q.trim().toLowerCase();
+  const key = (i) => i.source === "plane"
+    ? [0, PRI[i.priority][1], GROUP_SORT[stateOf(i).group], i.title]
+    : [1, Object.keys(LEVEL).indexOf(i.level), 0, i.title];
+  return d.issues
+    .filter((i) => (w.src === "all" || i.source === w.src) && (w.done || isOpen(i)) &&
+      (!q || `${slugOf(d, i)} ${i.title} ${(i.labels ?? []).map((id) => labelOf(id).name).join(" ")}`.toLowerCase().includes(q)))
+    .sort((a, b) => { const x = key(a), y = key(b); for (let k = 0; k < 3; k++) if (x[k] !== y[k]) return x[k] - y[k]; return x[3].localeCompare(y[3]); });
+}
+const agentFor = () => cur.wins.filter((x) => x.kind === "claude" || x.kind === "pi")
+  .sort((a, b) => (b.space === cur.ws) - (a.space === cur.ws) || b.z - a.z)[0];
+
+function rowHtml(w, d, i) {
+  const cls = `irow${i.id === w.sel ? " sel" : ""}${isOpen(i) ? "" : " closed"}`;
+  if (i.source === "sentry") return `<div class="${cls}" data-i="${i.id}"><span class="lvl" style="--pc:${LEVEL[i.level]}" title="${i.level}"></span>
+    <span class="sid">${slugOf(d, i)}</span><span class="t">${esc(i.title)}</span><span class="pill ghost">${i.status}</span><span class="idate">${i.events}×</span></div>`;
+  const late = i.target && isOpen(i) && i.target < isoDay(0);
+  const end = d.entry?.id === i.id
+    ? `<span class="irun" data-run title="Running Entry"><i class="rec"></i>${hms(Date.now() - d.entry.start)}</span>`
+    : `<span class="idate${late ? " late" : ""}" title="${late ? "past its Target Date" : "Target Date"}">${i.target ? fmtDay(i.target) : ""}</span>`;
+  return `<div class="${cls} plane" data-i="${i.id}">${priIcon(i.priority)}<span class="sid">${slugOf(d, i)}</span><span class="t"><span class="tt">${esc(i.title)}</span>${i.labels.slice(0, 2).map((id) => lbChip(labelOf(id))).join("")}${i.labels.length > 2 ? `<span class="lbmore" title="${i.labels.slice(2).map((id) => labelOf(id).name).join(", ")}">+${i.labels.length - 2}</span>` : ""}${i.comments.length ? `<span class="cc" title="${i.comments.length} comment${i.comments.length === 1 ? "" : "s"}">${i.comments.length}</span>` : ""}</span>${pill(stateOf(i))}${end}</div>`;
+}
+/** The drilled-into issue: a header with the way back and prev/next, then the issue itself. */
+function detailHtml(w, d, i, list) {
+  const k = list.indexOf(i);
+  const head = `<div class="dhead"><button class="iback" data-act="back" title="Back to the list (Esc)">‹ Issues</button>
+    <span class="crumb">/ <b>${slugOf(d, i)}</b>${i.source === "plane" ? "Plane" : "Sentry"}</span>
+    <span class="pos">${k >= 0 ? `${k + 1} / ${list.length}` : "not in this filter"}</span>
+    <button class="ib" data-act="prev" title="Previous issue (k)">↑</button><button class="ib" data-act="next" title="Next issue (j)">↓</button></div>`;
+  const ag = agentFor();
+  const send = `<button data-act="send"${ag ? "" : " disabled"}><kbd>a</kbd>${ag ? `Send to ${ag.kind}${ag.title ? " · " + esc(ag.title) : ""}` : "Send to agent (no claude or pi window)"}</button>`;
+  if (i.source === "sentry") return head + `<div class="dbody"><div class="dmain"><h3>${esc(i.title)}</h3>
+    <div class="ichips"><span><span class="lvl" style="--pc:${LEVEL[i.level]}"></span>${i.level}</span><span class="pill ghost">${i.status}</span></div>
+    <p class="c-m">Stack trace and breadcrumbs are in .dev/sentry/${i.sid}.json; o opens the full issue in Sentry.</p></div>
+    <div class="dside"><dl><dt>Culprit</dt><dd>${esc(i.culprit)}</dd><dt>Events</dt><dd>${i.events}</dd><dt>Last seen</dt><dd>${ago(i.seen)}</dd></dl>
+    <div class="iacts"><button data-act="open"><kbd>o</kbd>Open in Sentry</button>${send}<button data-act="copy"><kbd>y</kbd>Copy ${slugOf(d, i)}</button></div></div></div>`;
+  const run = d.entry?.id === i.id, t = spentOf(d, i.id);
+  return head + `<div class="dbody"><div class="dmain"><h3>${esc(i.title)}</h3>
+    <div class="ichips"><button class="pillbtn" data-act="state" title="Change state (d)" aria-haspopup="listbox" aria-expanded="${w.drop !== null}">${pill(stateOf(i))}<span class="caret">▾</span></button>
+      <span>${priIcon(i.priority)}${i.priority}</span></div>
+    <div class="dlabels">${i.labels.map((id) => lbChip(labelOf(id))).join("")}
+      <button class="lblbtn" data-act="labels" title="Edit labels (l)" aria-haspopup="listbox" aria-expanded="${w.ldrop != null}">${i.labels.length ? "+ Label" : "+ Add label"}</button></div>
+    <p>${i.desc ? esc(i.desc) : '<span class="c-m">No description.</span>'}</p></div>
+    <div class="dside"><dl><dt>Start</dt><dd>${fmtDay(i.start)}</dd><dt>Target</dt><dd>${fmtDay(i.target)}</dd>
+      <dt>Time</dt><dd data-acc>${t ? hm(t) : "—"}${run ? " · running" : ""}</dd></dl>
+    <div class="iacts"><button data-act="open"><kbd>o</kbd>Open in Plane</button>${send}
+      <button data-act="timer" class="${run ? "on" : ""}"><kbd>s</kbd>${run ? "Stop timer" : "Start timer"}</button>
+      <button data-act="copy"><kbd>y</kbd>Copy ${slugOf(d, i)}</button></div></div>
+    ${commentsHtml(w, d, i)}</div>`;
+}
+const draftOf = (w, id) => ((w.drafts ??= {})[id] ??= { text: "", images: [] });
+/** The thread under an issue: comments with their images, then the composer (paste, drop or attach images). */
+function commentsHtml(w, d, i) {
+  const list = i.comments.map((c, ci) => `<div class="cmt"><span class="av" style="--avc:${avColor(c.author)}">${initials(c.author)}</span><div>
+      <div class="cmeta"><b>${esc(c.author)}</b><span>${ago(c.at)}</span></div>
+      ${c.text ? `<div class="ctext">${esc(c.text)}</div>` : ""}
+      ${c.images.length ? `<div class="cimgs">${c.images.map((m, ii) => `<button data-img="${ci}:${ii}" title="${esc(m.name)} · click to enlarge"><img src="${m.src}" alt="${esc(m.name)}"></button>`).join("")}</div>` : ""}
+    </div></div>`).join("") || `<div class="cnone">No comments yet.</div>`;
+  const dr = draftOf(w, i.id);
+  return `<div class="dcomments"><h4>Comments${i.comments.length ? ` · ${i.comments.length}` : ""}</h4>${list}
+    <div class="ccompose"><textarea placeholder="Add a comment… paste or drop images here" spellcheck="true">${esc(dr.text)}</textarea>
+      ${dr.images.length ? `<div class="cattach">${dr.images.map((m, k) => `<span><img src="${m.src}" alt="${esc(m.name)}" title="${esc(m.name)}"><button data-rm="${k}" title="Remove ${esc(m.name)}" aria-label="Remove ${esc(m.name)}">×</button></span>`).join("")}</div>` : ""}
+      <div class="cbar"><button class="ib" data-act="attach" title="Attach images">⊕</button><input class="cfile" type="file" accept="image/*" multiple hidden>
+        <span class="grow">images upload to Plane · <kbd>Ctrl</kbd><kbd>Enter</kbd> posts</span>
+        <button class="post" data-act="post"${dr.text.trim() || dr.images.length ? "" : " disabled"}>Comment</button></div></div></div>`;
+}
+function lightHtml(i, light) {
+  const c = i.comments[light.c], m = c?.images[light.i];
+  if (!m) return "";
+  // arrows walk every image on the issue, across comments
+  const all = i.comments.flatMap((x, ci) => x.images.map((_, ii) => ci + ":" + ii)), n = all.length, k = all.indexOf(light.c + ":" + light.i);
+  return `<div class="ilight" role="dialog" aria-label="${esc(m.name)}"><div class="lwrap"><img src="${m.src}" alt="${esc(m.name)}"></div>
+    <div class="cap">${n > 1 ? `<button data-act="lprev" title="Previous image (←)">‹</button>` : ""}<span>${esc(m.name)} · ${esc(c.author)} ${ago(c.at)}${n > 1 ? ` · ${k + 1} / ${n}` : ""}</span>
+    ${n > 1 ? `<button data-act="lnext" title="Next image (→)">›</button>` : ""}<span><kbd>Esc</kbd> close</span></div></div>`;
+}
+function dropHtml(w, d, i) {
+  let k = 0;
+  return `<div class="idrop" role="listbox" aria-label="State"><div class="ttl">${slugOf(d, i)} state</div>` +
+    ["backlog", "unstarted", "started", "completed", "cancelled"].map((g) => `<h5>${g}</h5>` + STATES.filter((s) => s.group === g).map((s) =>
+      `<button data-state="${s.id}" class="${STATES.indexOf(s) === w.drop ? "hi" : ""}" role="option">${pill(s)}${s.id === i.state ? '<span class="cur">current</span>' : ""}</button>`).join("")).join("") + `</div>`;
+}
+/** Multi-select: toggling a label keeps the dropdown open, like Plane's own label picker. */
+function labelDropHtml(w, d, i) {
+  return `<div class="idrop ldrop" role="listbox" aria-multiselectable="true" aria-label="Labels"><div class="ttl">${slugOf(d, i)} labels</div>` +
+    LABELS.map((l, k) => { const on = i.labels.includes(l.id);
+      return `<button data-label="${l.id}" class="${k === w.ldrop ? "hi" : ""}" role="option" aria-selected="${on}">${lbChip(l)}<span class="cur">${on ? "✓" : ""}</span></button>`; }).join("") +
+    `<div class="lfoot">Enter toggles · Esc closes</div></div>`;
+}
+function toggleLabel(w, labelId) {
+  const d = cur.dev, i = d.issues.find((x) => x.id === w.sel), l = labelOf(labelId);
+  if (!i || !l) return;
+  const on = i.labels.includes(labelId);
+  i.labels = on ? i.labels.filter((x) => x !== labelId) : [...i.labels, labelId];
+  w.ldrop = LABELS.indexOf(l);
+  d.syncing = true;
+  paintAllIssues();
+  setTimeout(() => { d.syncing = false; d.synced = Date.now(); if (cur.dev === d) paintAllIssues(); }, 500);
+  flash(`${slugOf(d, i)} ${on ? "−" : "+"}${l.name} · PATCH labels sent to Plane`);
+}
+function setupHtml(p) {
+  const remote = p.host !== "local", on = remote ? ` on <code>${esc(p.host)}</code>` : "";
+  return `<div class="isetup"><form autocomplete="off">
+    <b>Connect Plane to ${esc(p.name)}</b>
+    <p>tri-code keeps no Plane data of its own. It reads and writes this project's <code>.dev/</code>${on}: the same files pi-todos and dev-hub use, so all three always agree.</p>
+    <label>Workspace slug<input name="ws" value="fl_systems" spellcheck="false"></label>
+    <label>Project ID<input name="pid" placeholder="dc6c5b3b-7f09-4ebf-…" spellcheck="false"></label>
+    ${p.hostToken ? `<p class="ok">✓ Plane token found in <code>~/.pi/agent/secrets/plane.json</code>${on}</p>`
+      : `<label>Personal Access Token<input name="tok" type="password" placeholder="plane_api_…"></label>`}
+    <button class="go">Connect</button>
+    <div class="files">writes ${esc(p.path)}/.dev/config.json${p.hostToken ? "" : "<br>writes ~/.pi/agent/secrets/plane.json"}${remote ? ` (over ssh)` : ""}<br>then syncs every 5 min into .dev/issues.json, plane-states.json, plane-labels.json</div>
+  </form></div>`;
+}
+
+function wireIssues(w, el) {
+  const root = el.querySelector(".iss");
+  root.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.closest("[data-state]")) return setState(w, t.closest("[data-state]").dataset.state);
+    if (t.closest("[data-label]")) return toggleLabel(w, t.closest("[data-label]").dataset.label);
+    if ((w.drop !== null || w.ldrop != null) && !t.closest(".idrop")) {
+      // a click on the button that opened it just closes it
+      const reopen = t.closest('[data-act="labels"]') && w.ldrop == null;
+      w.drop = null; w.ldrop = null;
+      if (!reopen) return paintIssues(w);
+    }
+    // a row's State Pill opens the dropdown in place; the rest of the row drills in
+    const rowPill = t.closest(".irow.plane .pill");
+    if (rowPill) { w.sel = rowPill.closest(".irow").dataset.i; return issueAct(w, "state"); }
+    const row = t.closest(".irow");
+    if (row) { w.sel = row.dataset.i; w.view = "detail"; return paintIssues(w); }
+    const img = t.closest("[data-img]");
+    if (img) { const [c, i] = img.dataset.img.split(":").map(Number); w.light = { c, i }; return paintIssues(w); }
+    if (t.closest(".ilight") && !t.closest("button, img")) { w.light = null; return paintIssues(w); }
+    const rm = t.closest("[data-rm]");
+    if (rm) { draftOf(w, w.sel).images.splice(+rm.dataset.rm, 1); return paintIssues(w); }
+    const src = t.closest("[data-src]");
+    if (src) { w.src = src.dataset.src; return paintIssues(w); }
+    const act = t.closest("[data-act]");
+    if (act && !act.disabled) issueAct(w, act.dataset.act);
+  });
+  root.addEventListener("input", (e) => {
+    if (e.target.matches(".isearch")) { w.q = e.target.value; paintIssues(w); }
+    else if (e.target.matches(".ccompose textarea")) {
+      draftOf(w, w.sel).text = e.target.value;
+      const dr = draftOf(w, w.sel);
+      root.querySelector(".cbar .post").disabled = !dr.text.trim() && !dr.images.length;
+    }
+  });
+  // images: attach button, paste into the comment box, or drop onto it
+  root.addEventListener("change", (e) => { if (e.target.matches(".cfile")) { addImages(w, e.target.files); e.target.value = ""; } });
+  root.addEventListener("paste", (e) => {
+    if (!e.target.closest(".ccompose")) return;
+    const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+    if (files.length) { e.preventDefault(); addImages(w, files); }
+  });
+  root.addEventListener("dragover", (e) => {
+    const box = e.target.closest(".ccompose");
+    if (!box) return;
+    e.preventDefault(); box.classList.add("over");
+  });
+  root.addEventListener("dragleave", (e) => e.target.closest(".ccompose")?.classList.remove("over"));
+  root.addEventListener("drop", (e) => {
+    const box = e.target.closest(".ccompose");
+    if (!box) return;
+    e.preventDefault(); box.classList.remove("over");
+    addImages(w, e.dataTransfer.files);
+  });
+  root.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (t.matches(".isearch")) {
+      if (e.key === "Escape") { if (t.value) { t.value = w.q = ""; paintIssues(w); } else t.blur(); }
+      else if (e.key === "Enter" || e.key === "ArrowDown") t.blur();
+      else return;
+    } else if (t.matches(".ccompose textarea")) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) postComment(w);
+      else if (e.key === "Escape") t.blur();
+      else return;
+    } else if (t.matches(".inew input")) {
+      if (e.key === "Enter" && t.value.trim()) createIssue(w, t.value.trim());
+      else if (e.key === "Escape" || e.key === "Enter") { w.creating = false; paintIssues(w); }
+      else return;
+    } else return;
+    e.preventDefault(); e.stopPropagation();
+  });
+  root.addEventListener("submit", (e) => { e.preventDefault(); connect(w, new FormData(e.target)); });
+  // the dropdown hangs off the pill, so it follows the pill when the issue scrolls
+  root.addEventListener("scroll", (e) => {
+    if ((w.drop !== null || w.ldrop != null) && !e.target.closest?.(".idrop")) placeDrop(root, w.view === "detail");
+  }, true);
+  paintIssues(w);
+}
+function titleOf(d) {
+  if (!d) return "not connected";
+  const n = d.issues.filter((i) => i.source === "plane" && isOpen(i)).length;
+  return `${d.ident} · ${n} active · ${d.syncing ? "syncing…" : "synced " + ago(d.synced)}${cur.host !== "local" ? " via " + cur.host : ""}`;
+}
+/** Repaint the panel from cur.dev. The toolbar is built once so the search box keeps focus while typing. */
+function paintIssues(w) {
+  const el = els.get(w.id);
+  if (!el) return;
+  const root = el.querySelector(".iss"), d = cur.dev;
+  w.title = titleOf(d);
+  el.querySelector(".ttl").textContent = w.title;
+  el.querySelector(".dot").className = "dot plane" + (d?.syncing ? " syncing" : "");
+  if (!d) { if (!root.querySelector(".isetup")) root.innerHTML = setupHtml(cur); return; }
+  if (!root.querySelector(".itools")) {
+    root.innerHTML = `<div class="itools"><div class="seg" role="group" aria-label="Source">
+        <button data-src="all" title="All sources (f)">All</button><button data-src="plane" title="Plane only (f)">Plane</button><button data-src="sentry" title="Sentry only (f)">Sentry</button></div>
+      <input class="isearch" placeholder="/ filter" spellcheck="false" aria-label="Filter issues">
+      <button class="ib" data-act="done" title="Show done and cancelled (c)">✓</button>
+      <button class="ib" data-act="sync" title="Sync with Plane now (r)">⟳</button>
+      <button class="ib" data-act="new" title="New Issue (n)">+</button></div>
+      <div class="imain"><div class="ilist"></div><div class="idetail"></div></div>
+      <div class="ihint"></div><div class="islot"></div>`;
+    root.querySelector(".isearch").value = w.q;
+  }
+  root.querySelectorAll("[data-src]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.src === w.src));
+  root.querySelector('[data-act="done"]').setAttribute("aria-pressed", w.done);
+  root.querySelector('[data-act="sync"]').classList.toggle("spin", d.syncing);
+  const list = shown(w, d);
+  // in the list the cursor stays on a visible row; a drilled-into issue stays open even if it leaves the filter
+  if (w.view !== "detail" && !list.some((i) => i.id === w.sel)) w.sel = list[Math.min(w.at ?? 0, list.length - 1)]?.id ?? null;
+  const sel = d.issues.find((i) => i.id === w.sel);
+  if (list.includes(sel)) w.at = list.indexOf(sel);
+  if (!sel) w.view = "list";
+  const nw = w.creating ? `<div class="inew">${priIcon("none")}<input placeholder="New Issue title · Enter to create in ${d.ident}, Esc to cancel" spellcheck="false"></div>` : "";
+  root.querySelector(".ilist").innerHTML = nw + (list.map((i) => rowHtml(w, d, i)).join("") ||
+    `<div class="iempty">${w.q ? `Nothing matches “${esc(w.q)}”` : `No ${w.done ? "" : "open "}issues${w.src === "all" ? "" : " from " + w.src}.`}<br><kbd>n</kbd> creates one</div>`);
+  const detail = w.view === "detail";
+  const dEl = root.querySelector(".idetail"), was = dEl.dataset.i;
+  // repainting must not cost the comment being typed: keep focus and caret in the composer
+  const ta = dEl.querySelector(".ccompose textarea"), typing = ta && document.activeElement === ta && was === sel?.id;
+  const caret = typing ? ta.selectionStart : 0;
+  dEl.innerHTML = detail ? detailHtml(w, d, sel, list) : "";
+  if (typing && detail) { const t2 = dEl.querySelector(".ccompose textarea"); t2.focus(); t2.setSelectionRange(caret, caret); }
+  if (detail && was !== sel.id) { dEl.scrollTop = 0; dEl.dataset.i = sel.id; }
+  if (!detail) delete dEl.dataset.i;
+  root.classList.toggle("detail", detail);
+  root.querySelector(".ihint").innerHTML = (detail
+    ? `<span><kbd>Esc</kbd> back</span><span><kbd>j</kbd><kbd>k</kbd> next / prev</span><span><kbd>o</kbd> open in ${sel.source === "plane" ? "Plane" : "Sentry"}</span>
+       <span><kbd>d</kbd> state</span><span><kbd>l</kbd> labels</span><span><kbd>c</kbd> comment</span><span><kbd>a</kbd> send to agent</span><span><kbd>s</kbd> timer</span>`
+    : `<span><kbd>j</kbd><kbd>k</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>/</kbd> filter</span>
+       <span><kbd>n</kbd> new</span><span><kbd>f</kbd> source</span><span><kbd>r</kbd> sync</span>`) + `
+    <span class="src" title="The panel only renders this file; pi-todos and dev-hub read the same one">${cur.host !== "local" ? esc(cur.host) + ":" : ""}.dev/issues.json</span>`;
+  if (!detail || sel?.source !== "plane") { w.light = null; w.ldrop = null; }
+  root.querySelector(".islot").innerHTML = (w.drop !== null && sel ? dropHtml(w, d, sel) : "") +
+    (w.ldrop != null ? labelDropHtml(w, d, sel) : "") + (w.light ? lightHtml(sel, w.light) : "");
+  placeDrop(root, detail);
+  if (w.creating) root.querySelector(".inew input").focus();
+  root.querySelector(".irow.sel")?.scrollIntoView({ block: "nearest" });
+}
+/** Hang the State Dropdown under the pill it belongs to; flip above it when there is no room below. */
+function placeDrop(root, detail) {
+  const drop = root.querySelector(".idrop");
+  if (!drop) return;
+  const anchor = (drop.classList.contains("ldrop") ? root.querySelector(".lblbtn")
+    : detail ? root.querySelector(".pillbtn") : root.querySelector(".irow.sel .pill")) ?? root;
+  const rr = root.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
+  const dw = drop.offsetWidth, dh = drop.offsetHeight;
+  let top = ar.bottom - rr.top + 4;
+  if (top + dh > rr.height - 4) top = ar.top - rr.top - dh - 4;
+  top = Math.max(4, Math.min(top, rr.height - dh - 4));
+  const left = Math.max(4, Math.min(ar.left - rr.left - 6, rr.width - dw - 4));
+  Object.assign(drop.style, { left: left + "px", top: top + "px" });
+  // keep the highlighted State visible without scrolling anything outside the dropdown
+  const hi = drop.querySelector(".hi");
+  if (hi) {
+    if (hi.offsetTop < drop.scrollTop) drop.scrollTop = hi.offsetTop - 6;
+    else if (hi.offsetTop + hi.offsetHeight > drop.scrollTop + drop.clientHeight) drop.scrollTop = hi.offsetTop + hi.offsetHeight - drop.clientHeight + 6;
+  }
+}
+const paintAllIssues = () => cur.wins.forEach((x) => x.kind === "issues" && paintIssues(x));
+
+function issueAct(w, act) {
+  const d = cur.dev, i = d?.issues.find((x) => x.id === w.sel);
+  if (act === "done") { w.done = !w.done; flash(w.done ? "showing done and cancelled" : "showing active only"); return paintIssues(w); }
+  if (act === "sync") return syncDev(cur);
+  if (act === "new") { w.creating = true; w.view = "list"; return paintIssues(w); }
+  if (act === "back") { w.view = "list"; return paintIssues(w); }
+  if (act === "next" || act === "prev") return step(w, act === "next" ? 1 : -1);
+  if (act === "lnext" || act === "lprev") return lightStep(w, act === "lnext" ? 1 : -1);
+  if (act === "labels") {
+    if (i?.source !== "plane") return flash("labels are for Plane issues");
+    w.drop = null; w.ldrop = 0; return paintIssues(w);
+  }
+  if (act === "attach") return els.get(w.id).querySelector(".cfile")?.click();
+  if (act === "post") return postComment(w);
+  if (act === "comment") {
+    const t = els.get(w.id).querySelector(".ccompose textarea");
+    if (!t) return flash("comments are for Plane issues");
+    t.focus(); t.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if (!i) return flash("no issue selected");
+  const s = slugOf(d, i);
+  if (act === "detail") { w.view = "detail"; paintIssues(w); }
+  else if (act === "open") openUrl(linkOf(d, i), w);
+  else if (act === "copy") { try { navigator.clipboard?.writeText(s); } catch {} flash(`copied ${s}`); }
+  else if (act === "state") {
+    if (i.source !== "plane") return flash("Sentry issues have no Plane state");
+    w.drop = STATES.findIndex((x) => x.id === i.state); paintIssues(w);
+  }
+  else if (act === "timer") {
+    if (i.source !== "plane") return flash("timers are for Plane issues");
+    const prev = d.entry;
+    if (prev) d.spent[prev.id] = (d.spent[prev.id] ?? 0) + Date.now() - prev.start;
+    d.entry = prev?.id === i.id ? null : { id: i.id, start: Date.now() };
+    flash(d.entry ? `timer on ${s}${prev ? ` (stopped ${slugOf(d, findIssue(prev.id)[1])})` : ""} · .dev/time-entries.json` : `stopped ${s} · ${hm(spentOf(d, i.id))} total`);
+    paintIssues(w); tick();
+  }
+  else if (act === "send") {
+    const ag = agentFor();
+    if (!ag) return flash("open a claude or pi window first (Alt+Enter)");
+    // typed, not submitted: the agent's dev-hub / pi-todos tools resolve the ID from the same .dev/issues.json
+    const text = i.source === "plane" ? `${s}: ${i.title} ${linkOf(d, i)}` : `Sentry ${s}: ${i.title} (${i.culprit}) ${linkOf(d, i)}`;
+    (ag.typed ??= []).push(text);
+    const ael = els.get(ag.id);
+    if (ael) ael.querySelector(".screen").innerHTML = screenHtml(ag);
+    focus(ag.id);
+    flash(`typed ${s} into ${ag.kind}${ag.title ? " · " + ag.title : ""}, not sent`);
+  }
+}
+function setState(w, stateId) {
+  const d = cur.dev, i = d.issues.find((x) => x.id === w.sel), s = STATES.find((x) => x.id === stateId);
+  w.drop = null;
+  if (!i || i.state === stateId) return paintIssues(w);
+  const list = shown(w, d), k = list.indexOf(i);
+  i.state = stateId;
+  // in the list, a row that leaves the filter hands the cursor to its neighbour; an open issue stays open
+  if (w.view === "list" && !shown(w, d).includes(i)) w.sel = (list[k + 1] ?? list[k - 1])?.id ?? null;
+  if (d.entry?.id === i.id && !ACTIVE.has(s.group)) { d.spent[i.id] = spentOf(d, i.id); d.entry = null; }
+  d.syncing = true;
+  paintAllIssues(); renderSide();
+  setTimeout(() => { d.syncing = false; d.synced = Date.now(); if (cur.dev === d) paintAllIssues(); }, 500);
+  flash(`${slugOf(d, i)} → ${s.name} · PATCH sent to Plane`);
+}
+function createIssue(w, title) {
+  const d = cur.dev, seq = Math.max(0, ...d.issues.filter((i) => i.source === "plane").map((i) => i.seq)) + 1;
+  const i = { ...PI(seq, title, "s-todo", "none", null, null), id: `${d.ident.toLowerCase()}-${seq}`, comments: [], labels: [] };
+  d.issues.push(i);
+  Object.assign(w, { creating: false, sel: i.id, src: w.src === "sentry" ? "all" : w.src, q: "" });
+  els.get(w.id).querySelector(".isearch").value = "";
+  paintAllIssues(); renderSide();
+  flash(`created ${d.ident}-${seq} in Plane`);
+}
+function syncDev(p, quiet) {
+  const d = p.dev;
+  if (!d || d.syncing) return;
+  d.syncing = true;
+  if (p === cur) paintAllIssues();
+  setTimeout(() => {
+    d.syncing = false; d.synced = Date.now();
+    if (p !== cur) return;
+    paintAllIssues(); renderSide();
+    if (!quiet) flash(`synced ${d.issues.filter((i) => i.source === "plane").length} Plane issues, ${STATES.length} states, ${LABELS.length} labels · wrote ${p.host !== "local" ? p.host + ":" : ""}.dev/`);
+  }, 900);
+}
+function connect(w, form) {
+  const p = cur, pid = (form.get("pid") ?? "").trim();
+  if (!(form.get("ws") ?? "").trim() || !pid) return flash("workspace slug and project ID are both needed");
+  if (!p.hostToken && !(form.get("tok") ?? "").trim()) return flash("paste a Plane Personal Access Token");
+  p.hostToken = true;
+  p.dev = (SEEDS[p.id] ?? (() => devData(p.name.slice(0, 3).toUpperCase(), [])))();
+  p.dev.synced = 0;
+  flash(`wrote ${p.host !== "local" ? p.host + ":" : ""}${p.path}/.dev/config.json · first sync…`);
+  els.get(w.id).querySelector(".iss").innerHTML = "";
+  syncDev(p);
+}
+function issueKey(w, e) {
+  if (e.target.closest?.("input, textarea, select")) return false;
+  const d = cur.dev;
+  if (!d) return false;
+  const k = e.key;
+  if (w.drop !== null) {
+    if (k === "ArrowDown" || k === "j") w.drop = (w.drop + 1) % STATES.length;
+    else if (k === "ArrowUp" || k === "k") w.drop = (w.drop + STATES.length - 1) % STATES.length;
+    else if (k === "Enter") return setState(w, STATES[w.drop].id), true;
+    else if (k === "Escape" || k === "d") w.drop = null;
+    else return true;
+    paintIssues(w);
+    return true;
+  }
+  if (w.ldrop != null) {
+    if (k === "ArrowDown" || k === "j") w.ldrop = (w.ldrop + 1) % LABELS.length;
+    else if (k === "ArrowUp" || k === "k") w.ldrop = (w.ldrop + LABELS.length - 1) % LABELS.length;
+    else if (k === "Enter" || k === " ") return toggleLabel(w, LABELS[w.ldrop].id), true;
+    else if (k === "Escape" || k === "l") w.ldrop = null;
+    else return true;
+    paintIssues(w);
+    return true;
+  }
+  if (w.light) {
+    if (k === "Escape") w.light = null;
+    else if (k === "ArrowRight" || k === "l" || k === "j") return lightStep(w, 1), true;
+    else if (k === "ArrowLeft" || k === "h" || k === "k") return lightStep(w, -1), true;
+    else return true;
+    paintIssues(w);
+    return true;
+  }
+  const detail = w.view === "detail";
+  if (detail && k === "c") issueAct(w, "comment");
+  else if (detail && k === "l") issueAct(w, "labels");
+  else if (k === "ArrowDown" || k === "j") step(w, 1);
+  else if (k === "ArrowUp" || k === "k") step(w, -1);
+  // Enter drills in; inside an issue it goes one level further, to Plane itself
+  else if (k === "Enter" || (!detail && k === "ArrowRight")) issueAct(w, detail ? "open" : "detail");
+  else if (detail && (k === "Escape" || k === "Backspace" || k === "ArrowLeft" || k === "h")) issueAct(w, "back");
+  else if (k === "Escape") {
+    if (!w.q) return false;
+    w.q = ""; els.get(w.id).querySelector(".isearch").value = ""; paintIssues(w);
+  }
+  else if (k === "/") { w.view = "list"; paintIssues(w); els.get(w.id).querySelector(".isearch").focus(); }
+  else if (!detail && k === "f") { w.src = { all: "plane", plane: "sentry", sentry: "all" }[w.src]; flash(`source: ${w.src}`); paintIssues(w); }
+  else if (!detail && k === "c") issueAct(w, "done");
+  else if (k === "r") issueAct(w, "sync");
+  else if (k === "n") issueAct(w, "new");
+  else if (k === "o") issueAct(w, "open");
+  else if (k === "d") issueAct(w, "state");
+  else if (k === "a") issueAct(w, "send");
+  else if (k === "s") issueAct(w, "timer");
+  else if (k === "y") issueAct(w, "copy");
+  else return false;
+  return true;
+}
+/** Move the cursor in the list, or to the next / previous issue while drilled in. */
+function step(w, n) {
+  const list = shown(w, cur.dev), at = list.findIndex((i) => i.id === w.sel);
+  const i = list[at < 0 ? 0 : Math.min(list.length - 1, Math.max(0, at + n))];
+  if (!i) return;
+  if (i.id === w.sel) return flash(n > 0 ? "last issue" : "first issue");
+  w.sel = i.id; w.light = null; w.ldrop = null;
+  paintIssues(w);
+}
+/** Lightbox: step through the images of every comment on the issue, in thread order. */
+function lightStep(w, n) {
+  const i = cur.dev.issues.find((x) => x.id === w.sel);
+  const all = i.comments.flatMap((c, ci) => c.images.map((_, ii) => ({ c: ci, i: ii })));
+  const k = all.findIndex((x) => x.c === w.light.c && x.i === w.light.i);
+  w.light = all[(k + n + all.length) % all.length];
+  paintIssues(w);
+}
+function addImages(w, files) {
+  const imgs = [...files].filter((f) => f.type.startsWith("image/"));
+  if (!imgs.length) return flash("only images can be attached");
+  const id = w.sel;
+  for (const f of imgs) {
+    const r = new FileReader();
+    r.onload = () => {
+      draftOf(w, id).images.push({ src: r.result, name: f.name || "pasted-image.png" });
+      paintIssues(w);
+      els.get(w.id)?.querySelector(".ccompose")?.scrollIntoView({ block: "nearest" });
+    };
+    r.readAsDataURL(f);
+  }
+}
+function postComment(w) {
+  const d = cur.dev, i = d.issues.find((x) => x.id === w.sel), dr = draftOf(w, i.id);
+  if (!dr.text.trim() && !dr.images.length) return;
+  i.comments.push({ author: "You", at: Date.now(), text: dr.text.trim(), images: dr.images });
+  const n = dr.images.length;
+  delete w.drafts[i.id];
+  document.activeElement?.blur();
+  d.syncing = true;
+  paintAllIssues();
+  [...els.get(w.id).querySelectorAll(".cmt")].pop()?.scrollIntoView({ block: "nearest" });
+  setTimeout(() => { d.syncing = false; d.synced = Date.now(); if (cur.dev === d) paintAllIssues(); }, 600);
+  flash(`commented on ${slugOf(d, i)}${n ? ` · uploaded ${n} image${n === 1 ? "" : "s"} to Plane` : ""}`);
+}
+/** Toolbar chips for the In Progress issues. Rebuilt only when the set changes, so a click never lands on a replaced node. */
+function renderProg() {
+  const d = cur.dev, el = $("prog");
+  const ip = d ? d.issues.filter((i) => i.source === "plane" && i.state === "s-ip")
+    .sort((a, b) => (b.id === d.entry?.id) - (a.id === d.entry?.id) || PRI[a.priority][1] - PRI[b.priority][1]) : [];
+  const key = cur.id + "|" + ip.map((i) => i.id + i.title + (d.entry?.id === i.id)).join("|");
+  if (el.dataset.key !== key) {
+    el.dataset.key = key;
+    const MAX = 2, color = STATES.find((s) => s.id === "s-ip").color;
+    el.innerHTML = ip.slice(0, MAX).map((i) => {
+      const run = d.entry?.id === i.id;
+      return `<button data-open="${i.id}" class="${run ? "run" : ""}" title="${slugOf(d, i)} · ${esc(i.title)} · In Progress${run ? " · timer running" : ""}. Click to open">
+        <span class="sd" style="background:${color}"></span><span class="sid">${slugOf(d, i)}</span><span class="pt">${esc(i.title)}</span>
+        ${run ? `<span class="pe"><i class="rec"></i><span data-prun></span></span>` : ""}</button>`;
+    }).join("") + (ip.length > MAX ? `<button class="more" data-open="" title="${ip.slice(MAX).map((i) => slugOf(d, i)).join(", ")} · open the list">+${ip.length - MAX}</button>` : "");
+  }
+  const t = el.querySelector("[data-prun]");
+  if (t && d?.entry) t.textContent = hm(Date.now() - d.entry.start);
+}
+/** Open the project's issues panel (tiling one in if needed) and drill into an issue, or show the list. */
+function openIssue(id) {
+  let w = cur.wins.find((x) => x.kind === "issues");
+  if (!w) { newWin("issues"); w = cur.wins.find((x) => x.kind === "issues"); }
+  Object.assign(w, id ? { sel: id, view: "detail", src: w.src === "sentry" ? "all" : w.src } : { view: "list" });
+  w.drop = null; w.ldrop = null; w.light = null;
+  focus(w.id);
+  paintIssues(w);
+}
+$("prog").addEventListener("click", (e) => { const b = e.target.closest("[data-open]"); if (b) openIssue(b.dataset.open); });
+
+/** Once a second: Running Entry, status line, "synced Xm ago". Cheap; touches text only. */
+function tick() {
+  const d = cur.dev;
+  renderStatus(); renderProg();
+  $("timer").innerHTML = d?.entry
+    ? `<i class="rec"></i><b>${slugOf(d, findIssue(d.entry.id)[1])}</b> ${hms(Date.now() - d.entry.start)} · today ${hm(todayTotal(d))}`
+    : d ? `today ${hm(todayTotal(d))}` : "";
+  for (const w of cur.wins) {
+    const el = w.kind === "issues" && els.get(w.id);
+    if (!el) continue;
+    w.title = titleOf(d);
+    el.querySelector(".ttl").textContent = w.title;
+    const run = el.querySelector("[data-run]");
+    if (run && d?.entry) run.lastChild.textContent = hms(Date.now() - d.entry.start);
+  }
+}
+setInterval(tick, 1000);
+// background sync, like pi-todos' 5-minute SYNC_INTERVAL_MS
+setInterval(() => projects.forEach((p) => p.wins.some((w) => w.kind === "issues") && syncDev(p, true)), 5 * 60e3);
 
 /* ---------- window operations ---------- */
 function focus(id) {
@@ -773,7 +1857,12 @@ function promote(w) {
   relayout(`${w.kind} is main`);
 }
 function newWin(kind) {
-  const w = kind === "browser" ? B("", { space: cur.ws }) : W(kind, kind === "claude" ? "claude" : kind === "pi" ? "pi" : "shell", { space: cur.ws });
+  if (kind === "issues") {
+    // one issues panel per project: it is a view of .dev/, a second copy would show the same thing
+    const ex = cur.wins.find((x) => x.kind === "issues");
+    if (ex) { flash(ex.space === cur.ws ? "issues panel is already open" : `issues panel is on workspace ${ex.space + 1}`); return focus(ex.id); }
+  }
+  const w = kind === "browser" ? B("", { space: cur.ws }) : kind === "issues" ? I({ space: cur.ws }) : W(kind, kind === "claude" ? "claude" : kind === "pi" ? "pi" : "shell", { space: cur.ws });
   cur.wins.push(w);
   sp().mono = null;
   world.classList.add("anim");
@@ -788,7 +1877,7 @@ function closeWin(w) {
   if (sp().focus === w.id) { const v = vis(); sp().focus = (v.filter((x) => cur.wins.indexOf(x) < i).pop() ?? v[0])?.id ?? null; }
   world.classList.add("anim");
   render();
-  const what = w.kind === "browser" ? "browser" : `${w.kind}${w.title ? " · " + w.title : ""}. Its session ends in 5s`;
+  const what = w.kind === "browser" ? "browser" : w.kind === "issues" ? "issues panel (.dev/ is untouched)" : `${w.kind}${w.title ? " · " + w.title : ""}. Its session ends in 5s`;
   showToast(`Closed ${esc(what)}.`, () => { cur.wins.splice(i, 0, w); world.classList.add("anim"); focus(w.id); });
 }
 function showToast(msg, onUndo) {
@@ -915,14 +2004,18 @@ window.addEventListener("keydown", (e) => {
     const u = els.get(w.id).querySelector(".url"); u.focus(); u.select();
     return;
   }
+  if (e.ctrlKey && !e.altKey && e.code === "KeyD" && w?.kind === "browser") { e.preventDefault(); return starPage(w); }
+  // the issues panel is not a terminal, so it takes plain keys while focused
+  if (w?.kind === "issues" && !e.altKey && !e.ctrlKey && !e.metaKey && issueKey(w, e)) return e.preventDefault();
   if (!e.altKey) return;
   const d = DIRS[e.code];
   let handled = true;
   if (d && e.ctrlKey && w) d[0] ? nudgeSplit(w, d[0]) : flash("stack windows share height equally");
   else if (d && e.shiftKey && w) swapToward(w, ...d);
   else if (d) { const n = neighbor(...d); n ? focus(n.id) : flash("no window that way"); }
-  else if (e.code === "Enter") newWin(w?.kind ?? "shell");
+  else if (e.code === "Enter") newWin(w && w.kind !== "issues" ? w.kind : "shell");
   else if (e.code === "KeyB") newWin("browser");
+  else if (e.code === "KeyI") newWin("issues");
   else if (e.code === "KeyQ" && w) closeWin(w);
   else if (e.code === "KeyF" && w) toggleMax(w);
   else if (e.code === "KeyM" && w) promote(w);
@@ -972,9 +2065,20 @@ function toggleHelp(force) {
       <dt>${k("Alt", "Enter")}</dt><dd>New window of the focused kind</dd>
       <dt>${k("Alt", "B")}</dt><dd>New browser window</dd>
       <dt>${k("Ctrl", "L")}</dt><dd>Edit the address of the focused browser</dd>
+      <dt>${k("Ctrl", "D")}</dt><dd>Favourite the page (or click ☆). Favourites belong to the project: they sit on a bar under the address and on every new tab. Right-click one to rename or remove it, drag to reorder</dd>
       <dt>${k("Ctrl")} + click link</dt><dd>Open it in this project's browser window (one tiles in if needed)</dd>
       <dt>${k("Ctrl", "Shift")} + click link</dt><dd>Open it in the system browser</dd>
       <dt>${k("Alt", "Q")}</dt><dd>Close the focused window (undo for 5s)</dd></dl>
+    <h4>Issues panel</h4><dl>
+      <dt>${k("Alt", "I")}</dt><dd>Open this project's issues panel. It shows the project's .dev/issues.json, the list pi-todos and dev-hub also use</dd>
+      <dt>${k("j")} ${k("k")} ${k("Enter")}</dt><dd>Move, and drill into an issue (or click it). Plain keys work here because the panel is not a terminal</dd>
+      <dt>${k("Esc")}</dt><dd>Back from an issue to the list; inside an issue ${k("j")} ${k("k")} step to the next / previous one</dd>
+      <dt>${k("l")}</dt><dd>Inside an issue: add or remove labels (the filter also matches label names)</dd>
+      <dt>${k("c")}</dt><dd>Inside an issue: write a comment. Paste, drop or attach images; ${k("Ctrl", "Enter")} posts. Click an image to enlarge it</dd>
+      <dt>${k("o")}</dt><dd>Open the issue in this project's browser window</dd>
+      <dt>${k("a")}</dt><dd>Type the issue's ID and link into the last-used claude or pi window, without sending it</dd>
+      <dt>${k("d")} ${k("n")} ${k("s")} ${k("y")}</dt><dd>Change state · new issue · start/stop the timer · copy the ID</dd>
+      <dt>${k("f")} ${k("c")} ${k("/")} ${k("r")}</dt><dd>Cycle source · show done · search · sync now</dd></dl>
   </div>`;
   h.onclick = (e) => e.target === h && h.remove();
   vp.appendChild(h);
@@ -1030,11 +2134,11 @@ function openTheme(anchor) {
 }
 function closeTheme() { $("pop")?.remove(); }
 document.addEventListener("pointerdown", (e) => {
-  if ($("pop") && !e.target.closest("#pop, #themeBtn, .gear")) closeTheme();
+  if ($("pop") && !e.target.closest("#pop, #themeBtn, .gear, .star")) closeTheme();
 });
 
 /* ---------- toolbar ---------- */
-$("new").innerHTML = ["claude", "pi", "shell", "browser"].map((k) => `<button data-k="${k}">+ ${k}</button>`).join("");
+$("new").innerHTML = ["claude", "pi", "shell", "browser", "issues"].map((k) => `<button data-k="${k}">+ ${k}</button>`).join("");
 $("new").querySelectorAll("button").forEach((b) => b.onclick = () => newWin(b.dataset.k));
 $("layout").querySelectorAll("button").forEach((b) => b.onclick = () => setLayout(b.dataset.layout));
 $("gap").onchange = (e) => setGap(+e.target.value);
