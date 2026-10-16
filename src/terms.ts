@@ -6,17 +6,51 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
-import { Project, Tab, TabStatus, TAB_COMMANDS, isRemote, sessionName, setLive } from "./state";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import { Project, Tab, TabStatus, TerminalKind, TAB_COMMANDS, isRemote, sessionName, setLive } from "./state";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;
 
-const THEME = {
+const DARK = {
   background: "#0e0f12",
   foreground: "#d6d8de",
   cursor: "#d6d8de",
   selectionBackground: "#3a3f4b",
+  black: "#15171c",
+  red: "#f7768e",
+  green: "#9ece6a",
+  yellow: "#e0af68",
+  blue: "#7aa2f7",
+  magenta: "#bb9af7",
+  cyan: "#7dcfff",
+  white: "#d6d8de",
+  brightBlack: "#7d828f",
+  brightWhite: "#d6d8de",
 };
+
+const LIGHT = {
+  background: "#fbfbfc",
+  foreground: "#23262d",
+  cursor: "#23262d",
+  selectionBackground: "#cfd6e6",
+  black: "#23262d",
+  red: "#c4314b",
+  green: "#3d7a1c",
+  yellow: "#9a6400",
+  blue: "#2f5fc4",
+  magenta: "#7c4dbd",
+  cyan: "#0f7a8a",
+  white: "#6b7080",
+  brightBlack: "#6b7080",
+  brightWhite: "#6b7080",
+};
+
+const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+const themeNow = () => (darkQuery.matches ? DARK : LIGHT);
+
+/** Receives Ctrl+click links: the URL, the tab it was clicked in, and whether to use the system browser. */
+let linkHandler: ((url: string, tabId: string, external: boolean) => void) | undefined;
 
 /** Fire-and-forget invoke that logs instead of raising unhandled rejections. */
 const call = (cmd: string, args: Record<string, unknown>) =>
@@ -37,10 +71,11 @@ class TermSession {
   private pending: string[] = [];
   private observer = new ResizeObserver(() => this.refit());
 
-  constructor(private project: Project, private tab: Tab, host: HTMLElement) {
+  constructor(private project: Project, private tab: Tab) {
     this.el.className = "term";
+    this.el.style.cssText = "width:100%;height:100%";
     this.el.style.display = "none";
-    host.appendChild(this.el);
+    parkElement().appendChild(this.el); // xterm measures fonts, so open it inside the document
 
     this.term = new Terminal({
       // Capped scrollback: each line costs memory per terminal.
@@ -49,9 +84,15 @@ class TermSession {
       fontSize: 13,
       cursorBlink: false,
       allowProposedApi: true,
-      theme: THEME,
+      theme: themeNow(),
     });
     this.term.loadAddon(this.fit);
+    // Plain clicks do nothing; Ctrl+click opens in the canvas, Ctrl+Shift+click in the system browser.
+    this.term.loadAddon(new WebLinksAddon((event, uri) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      linkHandler?.(uri, this.tab.id, event.shiftKey);
+    }));
     this.term.open(this.el);
 
     this.term.onData((data) => {
@@ -96,7 +137,7 @@ class TermSession {
         spec: {
           host: this.project.host,
           cwd: this.project.path,
-          cmd: TAB_COMMANDS[this.tab.kind],
+          cmd: TAB_COMMANDS[this.tab.kind as TerminalKind],
           session: sessionName(this.project, this.tab),
         },
         cols: this.term.cols,
@@ -147,11 +188,20 @@ class TermSession {
         }
       }
       this.refit();
-      this.term.focus();
+      // output written while parked (display:none) is in the buffer but was never painted
+      this.term.refresh(0, this.term.rows - 1);
       this.update({ attention: false });
     } else {
       this.dropWebgl();
     }
+  }
+
+  focus() {
+    this.term.focus();
+  }
+
+  applyTheme() {
+    this.term.options.theme = themeNow();
   }
 
   private dropWebgl() {
@@ -185,11 +235,47 @@ class TermSession {
 
 const sessions = new Map<string, TermSession>();
 
+/** Hidden container that holds the elements of sessions that are not mounted. */
+let park: HTMLElement | undefined;
+function parkElement() {
+  if (!park) {
+    park = document.createElement("div");
+    park.id = "term-park";
+    park.style.display = "none";
+    document.body.appendChild(park);
+  }
+  return park;
+}
 
-export function ensureSession(project: Project, tab: Tab, host: HTMLElement) {
-  let s = sessions.get(tab.id);
-  if (!s) sessions.set(tab.id, (s = new TermSession(project, tab, host)));
-  return s;
+// One listener for the whole app: follow the OS light/dark setting live.
+darkQuery.addEventListener("change", () => {
+  for (const s of sessions.values()) s.applyTheme();
+});
+
+/** Create the session for a terminal tab once; it starts parked until mounted. */
+export function ensureSession(project: Project, tab: Tab): void {
+  if (tab.kind === "browser" || sessions.has(tab.id)) return;
+  sessions.set(tab.id, new TermSession(project, tab));
+}
+
+/** Move a session's element into `el` and show it. */
+export function mountSession(tabId: string, el: HTMLElement): void {
+  const s = sessions.get(tabId);
+  if (!s) return;
+  el.appendChild(s.el);
+  s.setVisible(true);
+}
+
+/** Hide a session and move its element back into the park container (the PTY keeps running). */
+export function unmountSession(tabId: string): void {
+  const s = sessions.get(tabId);
+  if (!s) return;
+  s.setVisible(false);
+  parkElement().appendChild(s.el);
+}
+
+export function focusSession(tabId: string): void {
+  sessions.get(tabId)?.focus();
 }
 
 export function closeSession(tabId: string) {
@@ -197,6 +283,6 @@ export function closeSession(tabId: string) {
   sessions.delete(tabId);
 }
 
-export function showOnly(tabId: string | undefined) {
-  for (const [id, s] of sessions) s.setVisible(id === tabId);
+export function setLinkHandler(fn: (url: string, tabId: string, external: boolean) => void): void {
+  linkHandler = fn;
 }

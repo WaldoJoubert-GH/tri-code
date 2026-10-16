@@ -10,16 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "tri-code",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 640,
-        "minHeight": 400
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }

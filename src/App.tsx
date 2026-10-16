@@ -1,195 +1,207 @@
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createEffect, createSignal, onMount } from "solid-js";
+import { For, Show, createEffect, createSignal, onMount, untrack } from "solid-js";
 import {
-  Project, TabKind, activeProject, addProject, addTab, app, isRemote,
-  live, loadState, persistChanges, removeProject, removeTab, selectTab, setApp,
+  GAPS, SPACES, TabKind, activeProject, addTab, app, focusedTab, goSpace, isRemote, live, loadState,
+  persistChanges, setGap, setLayout, space,
 } from "./state";
-import { closeSession, ensureSession, showOnly } from "./terms";
-
-const KINDS: TabKind[] = ["claude", "pi", "shell"];
+import Canvas from "./Canvas";
+import Sidebar from "./Sidebar";
+import { AppearancePopover, appearanceOpen, backgroundCss, setBgImages, toggleAppearance } from "./Appearance";
+import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
+import { installHotkeys } from "./hotkeys";
+import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
+import { ensureSession, setLinkHandler } from "./terms";
+import { flash, flashMsg, toast, undoToast } from "./ui";
 
 export default function App() {
-  let termHost!: HTMLDivElement;
   const [ready, setReady] = createSignal(false);
 
   onMount(async () => {
+    installHotkeys();
+    setLinkHandler((url, tabId, external) => {
+      if (external) {
+        openExternal(url);
+        return;
+      }
+      const owner = app.projects.find((p) => p.tabs.some((t) => t.id === tabId))?.id ?? app.activeProject;
+      if (owner) openUrlInProject(owner, url, tabId);
+    });
     // After a webview reload, PTYs from the previous page are unreachable.
     await invoke("pty_kill_all");
     await loadState();
+    for (const p of app.projects) {
+      if (p.bg !== "image") continue;
+      invoke<string | null>("bg_load", { projectId: p.id })
+        .then((dataUrl) => {
+          if (dataUrl) setBgImages(p.id, dataUrl);
+        })
+        .catch((e) => console.error("bg_load failed:", e));
+    }
     setReady(true);
   });
   persistChanges(ready);
 
-  // Create sessions for every persisted tab (remote tabs reattach to their
-  // shpool/tmux session), then show only the active one.
+  // Start a session for every terminal tab once, including tabs added later.
+  const started = new Set<string>();
   createEffect(() => {
     if (!ready()) return;
-    for (const p of app.projects) for (const t of p.tabs) ensureSession(p, t, termHost);
-    showOnly(activeProject()?.activeTab);
+    for (const p of app.projects) {
+      for (const t of p.tabs) {
+        if (t.kind === "browser" || started.has(t.id)) continue;
+        started.add(t.id);
+        untrack(() => ensureSession(p, t));
+      }
+    }
   });
 
-  const closeTab = (p: Project, tabId: string) => {
-    if (live[tabId]?.status === "running" && !confirm("Close this tab and end its session?")) return;
-    closeSession(tabId);
-    removeTab(p.id, tabId);
+  // The accent of the active project drives --accent (see styles.css).
+  createEffect(() => {
+    document.documentElement.style.setProperty("--accent-raw", activeProject()?.accent ?? "#7aa2f7");
+  });
+
+  // Native browser windows draw above HTML, so hide them while an overlay is open.
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen()));
+
+  const backdrop = () => {
+    const p = activeProject();
+    return p ? { background: backgroundCss(p), "--dim": String(p.dim / 100) } : { background: "var(--canvas)", "--dim": "0" };
   };
 
   return (
-    <div class="app">
+    <div class="app" classList={{ rail: app.sidebarCollapsed }}>
       <Sidebar />
-      <main>
-        <Show when={activeProject()} fallback={<div class="empty">Add a project to get started.</div>}>
-          {(p) => (
-            <div class="tabbar">
-              <For each={p().tabs}>
-                {(t) => (
-                  <div
-                    class="tab"
-                    classList={{ active: p().activeTab === t.id, attention: live[t.id]?.attention }}
-                    title={live[t.id]?.title || t.kind}
-                    onClick={() => selectTab(p().id, t.id)}
-                    onAuxClick={(e) => e.button === 1 && closeTab(p(), t.id)}
-                  >
-                    <span class={`dot ${live[t.id]?.status ?? "connecting"}`} />
-                    {t.kind}
-                    <button class="x" onClick={(e) => (e.stopPropagation(), closeTab(p(), t.id))}>×</button>
-                  </div>
-                )}
-              </For>
-              <div class="new-tabs">
-                <For each={KINDS}>
-                  {(k) => <button onClick={() => addTab(p().id, k)}>+ {k}</button>}
-                </For>
-              </div>
-              <span class="where">{isRemote(p()) ? `${p().host}:` : ""}{p().path}</span>
+      <Toolbar />
+      <div class="stage">
+        <div class="bg" style={backdrop()} />
+        <Show when={activeProject()} keyed fallback={<div class="empty">Add a project to get started.</div>}>
+          {(p) => <Canvas project={p} />}
+        </Show>
+        <Show when={toast()}>
+          {(t) => (
+            <div class="toast">
+              <span>{t().msg}</span>
+              <Show when={t().undo}>
+                <button onClick={undoToast}>Undo</button>
+              </Show>
             </div>
           )}
         </Show>
-        <div class="terms" ref={termHost} />
-      </main>
+      </div>
+      <StatusBar />
+      <AppearancePopover />
+      <HelpOverlay />
     </div>
   );
 }
 
-function Sidebar() {
-  const [adding, setAdding] = createSignal(false);
-
-  const hosts = () => [...new Set(app.projects.map((p) => p.host))];
-  const needsAttention = (p: Project) =>
-    p.tabs.some((t) => live[t.id]?.attention) && app.activeProject !== p.id;
-
-  const remove = (p: Project) => {
-    if (!confirm(`Remove "${p.name}" and end its ${p.tabs.length} tab(s)?`)) return;
-    for (const t of p.tabs) closeSession(t.id);
-    removeProject(p.id);
+function Toolbar() {
+  const where = () => {
+    const p = activeProject();
+    return p ? `${isRemote(p) ? `${p.host}:` : ""}${p.path}` : "";
   };
 
   return (
-    <aside>
-      <For each={hosts()}>
-        {(host) => (
-          <section>
-            <h2>{host}</h2>
-            <For each={app.projects.filter((p) => p.host === host)}>
-              {(p) => (
-                <div class="project" classList={{ active: app.activeProject === p.id }} onClick={() => setApp("activeProject", p.id)}>
-                  <Show when={needsAttention(p)}><span class="badge" title="Needs input" /></Show>
-                  <span class="name">{p.name}</span>
-                  <span class="count">{p.tabs.length || ""}</span>
-                  <button class="x" onClick={(e) => (e.stopPropagation(), remove(p))}>×</button>
-                </div>
-              )}
-            </For>
-          </section>
-        )}
-      </For>
-      <Show when={adding()} fallback={<button class="add" onClick={() => setAdding(true)}>+ Add project</button>}>
-        <AddProject done={() => setAdding(false)} />
-      </Show>
-    </aside>
-  );
-}
-
-type DirList = { path: string; dirs: string[] };
-
-function AddProject(props: { done: () => void }) {
-  const [host, setHost] = createSignal("local");
-  const [path, setPath] = createSignal("");
-  const [browsing, setBrowsing] = createSignal(false);
-
-  const submit = (e: SubmitEvent) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget as HTMLFormElement);
-    const p = path().trim();
-    const h = host().trim() || "local";
-    const name = String(f.get("name")).trim() || p.split(/[\\/]/).filter(Boolean).pop() || p;
-    if (!p) return;
-    addProject(name, h, p);
-    props.done();
-  };
-  const knownHosts = () => [...new Set(["local", ...app.projects.map((p) => p.host)])];
-
-  return (
-    <form class="add-form" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && props.done()}>
-      <input name="host" placeholder="host (local or ssh alias)" list="hosts" value={host()} onInput={(e) => setHost(e.currentTarget.value)} />
-      <datalist id="hosts">
-        <For each={knownHosts()}>{(h) => <option value={h} />}</For>
-      </datalist>
-      <div class="path-row">
-        <input name="path" placeholder="path, e.g. ~/code/app" autofocus value={path()} onInput={(e) => setPath(e.currentTarget.value)} />
-        <button type="button" title="Browse folders" onClick={() => setBrowsing(!browsing())}>…</button>
-      </div>
-      <Show when={browsing()}>
-        <DirBrowser host={host().trim() || "local"} start={path().trim() || "~"} pick={(p) => (setPath(p), setBrowsing(false))} />
-      </Show>
-      <input name="name" placeholder="name (optional)" />
-      <div class="row">
-        <button type="submit">Add</button>
-        <button type="button" onClick={props.done}>Cancel</button>
-      </div>
-    </form>
-  );
-}
-
-/** Folder picker that works the same for local and ssh hosts. */
-function DirBrowser(props: { host: string; start: string; pick: (path: string) => void }) {
-  const [list, setList] = createSignal<DirList>();
-  const [error, setError] = createSignal("");
-  const [loading, setLoading] = createSignal(false);
-
-  const go = async (path: string) => {
-    setLoading(true);
-    setError("");
-    try {
-      setList(await invoke<DirList>("list_dirs", { host: props.host, path }));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-  const into = (name: string) => `${list()!.path.replace(/[\\/]$/, "")}/${name}`;
-  // Fall back to home if the typed path does not exist.
-  onMount(() => go(props.start).then(() => { if (error()) go("~"); }));
-
-  return (
-    <div class="dirs" classList={{ loading: loading() }}>
-      <Show when={list()}>
-        {(l) => (
+    <div class="top">
+      <Show when={activeProject()} keyed>
+        {(p) => (
           <>
-            <div class="dirs-head" title={l().path}><bdi>{l().path}</bdi></div>
-            <div class="dirs-list">
-              <div class="dir" onClick={() => go(into(".."))}>..</div>
-              <For each={l().dirs}>
-                {(d) => <div class="dir" onClick={() => go(into(d))}>{d}</div>}
+            <div class="new">
+              <For each={["claude", "pi", "shell", "browser"] as TabKind[]}>
+                {(k) => (
+                  <button
+                    onClick={() => {
+                      addTab(p.id, k);
+                      flash(`new ${k}`);
+                    }}
+                  >
+                    + {k}
+                  </button>
+                )}
               </For>
             </div>
-            <button type="button" class="dirs-pick" onClick={() => props.pick(l().path)}>Use this folder</button>
+            <div class="sep" />
+            <div class="spaces" id="spaces" role="group" aria-label="Workspaces">
+              <For each={Array.from({ length: SPACES }, (_, i) => i)}>
+                {(i) => {
+                  const inWs = () => p.tabs.filter((t) => t.space === i);
+                  return (
+                    <button
+                      data-ws={i}
+                      classList={{
+                        used: inWs().length > 0,
+                        att: i !== p.ws && inWs().some((t) => live[t.id]?.attention),
+                      }}
+                      aria-current={p.ws === i}
+                      title={`Workspace ${i + 1}${inWs().length ? ": " + inWs().map((t) => t.kind).join(", ") : " (empty)"} · Alt+${i + 1}`}
+                      onClick={() => {
+                        goSpace(p.id, i);
+                        flash(`workspace ${i + 1}`);
+                      }}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                }}
+              </For>
+            </div>
+            <div class="sep" />
+            <div class="seg" role="group" aria-label="Tiling layout">
+              <button aria-pressed={space(p).layout === "master"} title="Main + stack (Alt+G)" onClick={() => setLayout(p.id, "master")}>
+                Main + stack
+              </button>
+              <button aria-pressed={space(p).layout === "grid"} title="Grid (Alt+G)" onClick={() => setLayout(p.id, "grid")}>
+                Grid
+              </button>
+            </div>
+            <label class="gapctl">
+              Gap
+              <select value={String(app.gap)} onChange={(e) => setGap(+e.currentTarget.value)}>
+                <For each={GAPS}>{(g) => <option value={String(g)} selected={app.gap === g}>{g}</option>}</For>
+              </select>
+            </label>
           </>
         )}
       </Show>
-      <Show when={error()}><div class="dirs-error">{error()}</div></Show>
-      <Show when={!list() && loading()}><div class="dirs-head">Loading…</div></Show>
+      <span class="where">{where()}</span>
+      <Show when={activeProject()}>
+        <button class="tool theme-btn" id="themeBtn" title="Project appearance (Alt+P)" onClick={(e) => toggleAppearance(e.currentTarget)}>
+          <i />
+          Appearance
+        </button>
+      </Show>
+      <button class="tool" title="Hotkeys (Alt+/)" onClick={() => setHelpOpen(!helpOpen())}>
+        ?
+      </button>
+    </div>
+  );
+}
+
+function StatusBar() {
+  const info = () => {
+    const p = activeProject();
+    if (!p) return "";
+    const sp = space(p);
+    const where = `${sp.layout === "master" ? `main ${Math.round(sp.ratio * 100)}%` : "grid"} · gap ${app.gap}`;
+    const f = focusedTab(p);
+    if (!f) return where;
+    const title = live[f.id]?.title;
+    return `${f.kind}${title ? " · " + title : ""}  [${where}]`;
+  };
+
+  return (
+    <div class="status">
+      <span class="focus">{info()}</span>
+      <span class="flash">{flashMsg()}</span>
+      <div class="hints">
+        <span><kbd>Alt</kbd><kbd>1–4</kbd> workspace</span>
+        <span><kbd>Alt</kbd><kbd>Shift</kbd><kbd>1–4</kbd> send</span>
+        <span><kbd>Alt</kbd><kbd>H J K L</kbd> focus</span>
+        <span><kbd>Alt</kbd><kbd>Shift</kbd>+dir swap</span>
+        <span><kbd>Alt</kbd><kbd>Ctrl</kbd><kbd>H L</kbd> split</span>
+        <span><kbd>Alt</kbd><kbd>G</kbd> layout</span>
+        <span><kbd>Ctrl</kbd>+click link</span>
+        <span><kbd>Alt</kbd><kbd>/</kbd> all keys</span>
+      </div>
     </div>
   );
 }

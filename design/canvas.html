@@ -1,0 +1,1046 @@
+<title>tri-code Canvas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the app's sidebar stays; the tab bar becomes a slim toolbar over an auto-tiled area of terminal and browser windows (main + stack or grid, with a gap). Follows the system light/dark setting; the dark palette is the one in src/styles.css. */
+:root {
+  /* light palette (system default when the OS is in light mode) */
+  --bg: #fbfbfc;
+  --panel: #f1f2f5;
+  --canvas: #e6e8ed;
+  --line: #d9dce3;
+  --hover: #e6e8ee;
+  --raised: #dfe2ea;
+  --text: #23262d;
+  --muted: #6b7080;
+  --warn: #9a6400;
+  --ok: #3d7a1c;
+  --bad: #c4314b;
+  --violet: #7c4dbd;
+  --scrim: rgba(30, 34, 44, .35);
+  --shadow: rgba(30, 34, 44, .22);
+  --dusk-a: #e6e1f6; --dusk-b: #eedcef; --dusk-c: #f6dfdc; --dusk-d: #f3ece6;
+  /* the project's chosen accent; darkened in light mode so borders and text keep contrast */
+  --accent-raw: #7aa2f7;
+  --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  /* web content inside browser windows */
+  --page-bg: #ffffff;
+  --page-fg: #1b1e24;
+  --page-muted: #6b7280;
+  --page-line: #e3e6eb;
+  --page-link: #2f6fdf;
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26; --raised: #232733;
+    --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a; --bad: #f7768e; --violet: #bb9af7;
+    --scrim: rgba(8, 9, 11, .6); --shadow: rgba(0, 0, 0, .8);
+    --dusk-a: #1b1533; --dusk-b: #2c1a3c; --dusk-c: #43202f; --dusk-d: #16100f;
+    --accent: var(--accent-raw);
+    --page-bg: #f7f8fa;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26; --raised: #232733;
+  --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a; --bad: #f7768e; --violet: #bb9af7;
+  --scrim: rgba(8, 9, 11, .6); --shadow: rgba(0, 0, 0, .8);
+  --dusk-a: #1b1533; --dusk-b: #2c1a3c; --dusk-c: #43202f; --dusk-d: #16100f;
+  --accent: var(--accent-raw);
+  --page-bg: #f7f8fa;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 13px/1.4 var(--ui); overflow: hidden; user-select: none;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, select:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+kbd {
+  font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line);
+  border-bottom-width: 2px; border-radius: 3px; color: var(--text); background: var(--panel);
+}
+
+.app {
+  display: grid; height: 100%;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 34px 1fr 26px;
+  transition: grid-template-columns 160ms ease;
+  grid-template-areas: "side top" "side canvas" "side status";
+}
+
+/* Sidebar: full list, or collapsed to a rail of project chips */
+.app.rail { grid-template-columns: 48px 1fr; }
+aside {
+  grid-area: side; background: var(--panel); border-right: 1px solid var(--line);
+  padding: 4px 6px 8px; overflow-y: auto; overflow-x: hidden; min-width: 0;
+}
+.side-head { display: flex; align-items: center; justify-content: space-between; height: 26px; padding-left: 8px; }
+.side-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.collapse { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; font-size: 14px; line-height: 1; }
+.collapse:hover { background: var(--hover); color: var(--text); }
+.rail aside { padding-inline: 6px; }
+.rail .side-head { justify-content: center; padding: 0; }
+.rail .side-head span, .rail .project .name, .rail .project .count, .rail .project .gear { display: none; }
+.rail aside h2 { height: 1px; margin: 8px 6px; background: var(--line); font-size: 0; }
+.rail .project { justify-content: center; padding: 4px 0; position: relative; }
+.project .swatch b { display: none; }
+.rail .project .swatch {
+  width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--pa) 22%, var(--raised)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent);
+}
+.rail .project .swatch b { display: block; font-size: 12px; font-weight: 600; color: var(--text); text-transform: uppercase; }
+.rail .project.active { background: none; }
+.rail .project.active .swatch { background: var(--pa); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
+.rail .project.active .swatch b { color: #111; }
+.rail .project .badge { position: absolute; top: 2px; right: 3px; box-shadow: 0 0 0 2px var(--panel); }
+.rail .add { text-align: center; padding: 6px 0; font-size: 15px; }
+.rail .add .label { display: none; }
+aside h2 {
+  margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted);
+}
+.project { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.project:hover { background: var(--hover); }
+.project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
+.project .swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--pa); flex: none; }
+.project .gear { opacity: 0; color: var(--muted); padding: 0 2px; font-size: 12px; }
+.project:hover .gear, .project .gear:focus-visible { opacity: 1; }
+.project .gear:hover { color: var(--text); }
+.project .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project .count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.badge { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.add { width: 100%; margin-top: 10px; white-space: nowrap; padding: 6px 8px; text-align: left; color: var(--muted); border-radius: 5px; }
+.add:hover { background: var(--hover); color: var(--text); }
+
+/* Toolbar */
+.top {
+  grid-area: top; display: flex; align-items: stretch; background: var(--panel);
+  border-bottom: 1px solid var(--line); min-width: 0; overflow-x: auto; scrollbar-width: none;
+}
+.top .new { display: flex; flex: none; }
+.top .new button, .top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
+.top .new button:hover, .top .tool:hover { color: var(--text); background: var(--hover); }
+.top .where {
+  align-self: center; padding: 0 12px; color: var(--muted); font-size: 11px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1;
+}
+.top .sep { width: 1px; background: var(--line); margin: 7px 6px; flex: none; }
+.seg { display: flex; align-self: center; flex: none; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 0 4px; }
+.seg button { padding: 2px 9px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.gapctl { align-self: center; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 6px; flex: none; }
+.gapctl select {
+  font: 11px var(--mono); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 1px 2px; outline: none;
+}
+
+/* Canvas */
+.viewport {
+  grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas);
+}
+.world { position: absolute; inset: 0; }
+.bg { position: absolute; inset: 0; pointer-events: none; transition: background 200ms; }
+.bg::after { content: ""; position: absolute; inset: 0; background: var(--canvas); opacity: var(--dim, 0); }
+
+/* Project appearance panel */
+.theme-btn { display: flex; align-items: center; gap: 6px; }
+.theme-btn i { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
+.pop {
+  position: fixed; z-index: 10000; width: 300px; padding: 14px; display: grid; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 18px 50px -12px var(--shadow);
+}
+.pop .ttl { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.pop .ttl span { color: var(--muted); font-weight: 400; font-size: 12px; }
+.pop h4 { margin: 6px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.swatches button { width: 22px; height: 22px; border-radius: 5px; border: 2px solid transparent; outline: 1px solid var(--line); }
+.swatches button[aria-pressed="true"] { border-color: var(--panel); outline: 2px solid var(--text); }
+.swatches label { position: relative; width: 22px; height: 22px; border-radius: 5px; outline: 1px dashed var(--muted); display: grid; place-items: center; color: var(--muted); cursor: pointer; font-size: 14px; }
+.swatches label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.bgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.bgs button {
+  height: 46px; border-radius: 5px; border: 1px solid var(--line); position: relative; overflow: hidden;
+  font-size: 10px; color: var(--text); display: flex; align-items: flex-end; padding: 3px 5px; text-shadow: 0 0 3px var(--bg), 0 0 1px var(--bg);
+}
+.bgs button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bgs .upload { border-style: dashed; color: var(--muted); align-items: center; justify-content: center; text-shadow: none; background: var(--bg); }
+.pop .row { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.pop input[type="range"] { flex: 1; accent-color: var(--accent); }
+.pop .val { font: 11px var(--mono); width: 34px; text-align: right; color: var(--text); }
+.world.anim .win { transition: left 160ms ease, top 160ms ease, width 160ms ease, height 160ms ease; }
+
+.win {
+  position: absolute; display: flex; flex-direction: column;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  overflow: hidden;
+}
+.app.gap0 .win { border-radius: 0; }
+.win[hidden] { display: none; }
+.win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.win.attention:not(.focused) { border-color: var(--warn); animation: bell 1.6s ease-in-out infinite; }
+@keyframes bell { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); } }
+.win.floating { opacity: .92; box-shadow: 0 24px 60px -16px var(--shadow) !important; transition: none !important; }
+.win.drop::after {
+  content: ""; position: absolute; inset: 6px; border: 2px dashed var(--accent);
+  border-radius: 4px; background: color-mix(in srgb, var(--accent) 8%, transparent); pointer-events: none;
+}
+
+.bar {
+  height: 28px; flex: none; display: flex; align-items: center; gap: 7px;
+  padding: 0 4px 0 10px; background: var(--panel); border-bottom: 1px solid var(--line);
+  cursor: grab; color: var(--muted);
+}
+.win.focused .bar { color: var(--text); }
+.bar .kind { font-weight: 600; }
+.bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.spaces { display: flex; align-self: center; gap: 2px; margin: 0 4px; flex: none; }
+.spaces button {
+  position: relative; width: 26px; height: 22px; border-radius: 4px; color: var(--muted);
+  font: 600 11px var(--mono); border: 1px solid transparent;
+}
+.spaces button:hover { background: var(--hover); color: var(--text); }
+.spaces button.used { color: var(--text); }
+.spaces button[aria-current="true"] { background: color-mix(in srgb, var(--accent) 22%, var(--raised)); border-color: var(--accent); color: var(--text); }
+.spaces button.used::after {
+  content: ""; position: absolute; left: 50%; bottom: 2px; width: 10px; height: 2px; border-radius: 1px;
+  transform: translateX(-50%); background: var(--muted);
+}
+.spaces button[aria-current="true"]::after { background: var(--accent); }
+.spaces button.att::before {
+  content: ""; position: absolute; top: -2px; right: -2px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--warn); box-shadow: 0 0 0 2px var(--panel);
+}
+.spaces button.target { background: color-mix(in srgb, var(--accent) 35%, var(--raised)); color: var(--text); outline: 2px dashed var(--accent); }
+.world.enter .win { animation: wsin 160ms ease; }
+@keyframes wsin { from { opacity: 0; transform: translateY(6px); } }
+.bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); line-height: 1; }
+.bar button:hover { background: var(--hover); color: var(--text); }
+
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.running { background: var(--ok); }
+.dot.reconnecting { background: var(--warn); }
+.dot.exited { background: var(--bad); }
+.dot.web { background: var(--accent); border-radius: 2px; }
+
+.screen {
+  flex: 1; margin: 0; padding: 8px 10px; overflow: hidden; white-space: pre;
+  font: 12.5px/17px var(--mono); color: var(--text); user-select: text;
+}
+.win:not(.focused) .screen, .win:not(.focused) .page { opacity: .72; }
+.c-a { color: var(--accent); } .c-m { color: var(--muted); } .c-o { color: var(--ok); }
+.c-w { color: var(--warn); } .c-b { color: var(--bad); } .c-v { color: var(--violet); }
+.cursor { background: var(--text); color: var(--bg); }
+.win:not(.focused) .cursor { background: none; outline: 1px solid var(--muted); color: inherit; }
+
+/* Terminal links: dotted at rest, live while Ctrl is held */
+.link { text-decoration: underline dotted; text-decoration-color: color-mix(in srgb, currentColor 50%, transparent); text-underline-offset: 3px; }
+body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; cursor: pointer; }
+
+/* Browser window */
+.nav {
+  height: 32px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.nav button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
+.nav button:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.nav button:disabled { opacity: .35; cursor: default; }
+.url {
+  flex: 1; min-width: 0; margin: 0 4px; font: 12px var(--mono); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; outline: none; user-select: text;
+}
+.url:focus { border-color: var(--accent); }
+.page { flex: 1; overflow: auto; background: var(--page-bg); color: var(--page-fg); user-select: text; transition: opacity 120ms; }
+.page.loading { opacity: .35; }
+.doc { padding: 22px 26px; max-width: 70ch; font: 14px/1.55 var(--ui); }
+.doc .crumb { font: 12px var(--mono); color: var(--page-muted); }
+.doc h1 { font-size: 22px; margin: 6px 0 10px; text-wrap: balance; }
+.doc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--page-muted); margin: 20px 0 8px; }
+.doc p { margin: 0 0 12px; }
+.doc a { color: var(--page-link); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.doc ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.doc code { font: 12px var(--mono); background: var(--page-line); padding: 1px 5px; border-radius: 3px; }
+.sk { height: 9px; border-radius: 5px; background: var(--page-line); margin: 0 0 9px; }
+.start { padding: 28px; display: grid; gap: 10px; color: var(--page-muted); font: 13px var(--ui); }
+.start b { color: var(--page-fg); font-size: 15px; }
+.start a { color: var(--page-link); cursor: pointer; font-family: var(--mono); font-size: 12px; }
+/* localhost:1420, which is tri-code itself */
+.mock { height: 100%; min-height: 180px; display: grid; grid-template-columns: 22% 1fr; background: var(--bg); }
+.mock-side { background: var(--panel); border-right: 1px solid var(--line); padding: 10px 8px; display: grid; align-content: start; gap: 6px; }
+.mock-side i { height: 8px; border-radius: 3px; background: var(--raised); }
+.mock-side i.on { background: color-mix(in srgb, var(--accent) 40%, var(--raised)); }
+.mock-main { display: grid; grid-template-rows: 18px 1fr; min-width: 0; }
+.mock-top { background: var(--panel); border-bottom: 1px solid var(--line); }
+.mock-tiles { display: grid; grid-template-columns: 1.3fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; padding: 6px; }
+.mock-tiles b { border: 1px solid var(--line); border-radius: 3px; background: var(--canvas); }
+.mock-tiles b:first-child { grid-row: span 2; border-color: var(--accent); }
+
+.split { position: absolute; cursor: ew-resize; z-index: 1; }
+.split::after {
+  content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%);
+  background: var(--accent); border-radius: 1px; opacity: 0; transition: opacity 120ms;
+}
+.split:hover::after, .split.active::after { opacity: .8; }
+
+.tip {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3;
+  font: 600 13px var(--mono); padding: 6px 10px; border-radius: 5px;
+  background: var(--raised); border: 1px solid var(--accent); color: var(--text);
+  pointer-events: none; opacity: 0; transition: opacity 120ms; white-space: nowrap;
+}
+.tip span { color: var(--muted); font-weight: 400; }
+.win.sizing .tip { opacity: 1; }
+
+.empty {
+  position: absolute; inset: 0; display: grid; place-content: center; gap: 10px;
+  text-align: center; color: var(--muted); pointer-events: none;
+}
+.empty div { display: flex; gap: 6px; justify-content: center; align-items: center; }
+
+/* Status line */
+.status {
+  grid-area: status; display: flex; align-items: center; gap: 14px; padding: 0 10px;
+  background: var(--panel); border-top: 1px solid var(--line); color: var(--muted);
+  font-size: 11px; white-space: nowrap; overflow: hidden;
+}
+.status .focus { color: var(--text); font: 11px var(--mono); font-variant-numeric: tabular-nums; }
+.status .hints { display: flex; gap: 12px; margin-left: auto; overflow: hidden; min-width: 0; }
+.status .focus, .status .flash { flex: none; }
+.status .hints span { display: flex; gap: 4px; align-items: center; }
+.status .flash { color: var(--accent); font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+
+/* Help + toast */
+.help {
+  position: absolute; inset: 0; display: grid; place-items: center; z-index: 9999;
+  background: var(--scrim);
+}
+.help .card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 18px 20px; width: min(580px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto;
+}
+.help h3 { margin: 0 0 4px; font-size: 14px; }
+.help p { margin: 0 0 14px; color: var(--muted); max-width: 60ch; }
+.help h4 { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.help dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; align-items: center; }
+.help dt { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; }
+.help dd { margin: 0; }
+.toast {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 9998;
+  display: flex; gap: 12px; align-items: center; padding: 7px 8px 7px 12px;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 6px; white-space: nowrap;
+}
+.toast button { color: var(--accent); padding: 2px 6px; border-radius: 4px; }
+.toast button:hover { background: var(--hover); }
+
+@media (max-width: 720px) {
+  .app { grid-template-columns: 1fr; grid-template-areas: "top" "canvas" "status"; }
+  aside { display: none; }
+  .top .where, .status .hints { display: none; }
+  .top { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .world.anim .win { transition: none; }
+  .world.enter .win { animation: none; }
+  .win.attention:not(.focused) { animation: none; }
+}
+</style>
+
+<div class="app" id="app">
+  <aside id="side"></aside>
+  <div class="top">
+    <div class="new" id="new"></div>
+    <div class="sep"></div>
+    <div class="spaces" id="spaces" role="group" aria-label="Workspaces"></div>
+    <div class="sep"></div>
+    <div class="seg" id="layout" role="group" aria-label="Tiling layout">
+      <button data-layout="master" title="Main + stack (Alt+G)">Main + stack</button>
+      <button data-layout="grid" title="Grid (Alt+G)">Grid</button>
+    </div>
+    <label class="gapctl" for="gap">Gap
+      <select id="gap"><option>0</option><option>4</option><option>8</option><option selected>12</option><option>16</option><option>24</option><option>32</option></select>
+    </label>
+    <span class="where" id="where"></span>
+    <button class="tool theme-btn" id="themeBtn" title="Project appearance (Alt+P)"><i></i>Appearance</button>
+    <button class="tool" id="helpBtn" title="Hotkeys (Alt+/)">?</button>
+  </div>
+  <div class="viewport" id="vp">
+    <div class="bg" id="bg"></div>
+    <div class="world" id="world"><div class="split" id="split" hidden></div></div>
+  </div>
+  <div class="status">
+    <span class="focus" id="focusInfo"></span>
+    <span class="flash" id="flash"></span>
+    <div class="hints">
+      <span><kbd>Alt</kbd><kbd>1–4</kbd> workspace</span>
+      <span><kbd>Alt</kbd><kbd>Shift</kbd><kbd>1–4</kbd> send</span>
+      <span><kbd>Alt</kbd><kbd>H J K L</kbd> focus</span>
+      <span><kbd>Alt</kbd><kbd>Shift</kbd>+dir swap</span>
+      <span><kbd>Alt</kbd><kbd>Ctrl</kbd><kbd>H L</kbd> split</span>
+      <span><kbd>Alt</kbd><kbd>G</kbd> layout</span>
+      <span><kbd>Ctrl</kbd>+click link</span>
+      <span><kbd>Alt</kbd><kbd>/</kbd> all keys</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const CW = 7.5, LH = 17, PADX = 10, PADY = 8, BAR = 28, NAV = 32;
+const $ = (id) => document.getElementById(id);
+const app = $("app"), vp = $("vp"), world = $("world"), split = $("split");
+const cells = (w, h) => ({ cols: Math.floor((w - PADX * 2 - 2) / CW), rows: Math.floor((h - BAR - PADY * 2 - 2) / LH) });
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let uid = 100, gap = 12;
+
+/* ---------- sample screens ---------- */
+const S = {
+  claude: (p) => `<span class="c-v">✻</span> Welcome to <b>Claude Code</b>
+<span class="c-m">  cwd: ${p.path}</span>
+
+<span class="c-a">&gt;</span> turn the tab bar into a canvas of windows
+
+<span class="c-o">●</span> Read(src/App.tsx)
+<span class="c-m">  └  Read 195 lines</span>
+<span class="c-o">●</span> Each tab gets a rect in state.json, so
+  layouts survive restarts:
+<span class="c-m">    type Tab = { id, kind, x, y, w, h }</span>
+<span class="c-o">●</span> Update(src/state.ts)
+<span class="c-m">  └  Updated with 9 additions, 2 removals</span>
+<span class="c-o">●</span> Dev server is up at http://localhost:1420/
+  Ctrl+click it to open the preview.
+
+<span class="c-w">✻ Wiring hotkeys…</span> <span class="c-m">(esc to interrupt)</span>
+
+<span class="c-a">&gt;</span> <span class="cursor"> </span>`,
+  claudeAsk: (p) => `<span class="c-v">✻</span> Welcome to <b>Claude Code</b>
+<span class="c-m">  cwd: ${p.path}</span>
+
+<span class="c-a">&gt;</span> add rate limiting to /v1/upload
+
+<span class="c-o">●</span> Using the governor crate:
+  https://docs.rs/governor/latest/governor/
+<span class="c-o">●</span> Bash(cargo test upload)
+<span class="c-m">  └  test result: ok. 14 passed</span>
+
+<span class="c-w">Do you want to run</span> <b>sqlx migrate run</b><span class="c-w">?</span>
+<span class="c-a">❯ 1. Yes</span>
+  2. Yes, and don't ask again
+  3. No, tell Claude what to do
+
+<span class="c-m">  waiting for input · bell rang 2m ago</span>`,
+  pi: (p) => `<span class="c-a">pi</span> <span class="c-m">· ${p.path}</span>
+
+<span class="c-m">you</span>  why does the webview flash on resize?
+<span class="c-v">pi</span>   xterm re-measures on every frame. Debounce
+     FitAddon.fit() to ~50ms. Docs:
+     https://xtermjs.org/docs/api/addons/fit/
+
+<span class="c-m">you</span>  <span class="cursor"> </span>`,
+  shellDev: (p) => `<span class="c-o">PS</span> <span class="c-a">${p.path}</span>&gt; bun run tauri dev
+<span class="c-m">$ tauri dev</span>
+     Running BeforeDevCommand (\`bun run dev\`)
+  <span class="c-o">VITE v5.4.10</span>  ready in 312 ms
+  <span class="c-a">➜</span>  Local:   http://localhost:1420/
+<span class="c-o">   Compiling</span> tri-code v0.1.0
+<span class="c-o">    Finished</span> \`dev\` profile in 6.41s
+<span class="c-m">[vite] hmr update /src/App.tsx</span>`,
+  shell: (p) => `<span class="c-o">PS</span> <span class="c-a">${p.path}</span>&gt; git status -sb
+<span class="c-o">## main...origin/main</span>
+ <span class="c-b">M</span> src/App.tsx
+ <span class="c-b">M</span> src/state.ts
+<span class="c-b">??</span> src/canvas.ts
+<span class="c-o">PS</span> <span class="c-a">${p.path}</span>&gt; <span class="cursor"> </span>`,
+  remote: (p) => `<span class="c-m">[tri] attaching shpool session tri-a1-s2…</span>
+<span class="c-w">ssh: connect to host devbox port 22: Connection timed out</span>
+<span class="c-m">[tri] reconnecting in 4s (attempt 3)</span>`,
+  exited: (p) => `deploy@devbox:${p.path}$ terraform plan
+<span class="c-b">Error:</span> No valid credential sources found
+
+<span class="c-m">[process exited with code 1 · press Enter to restart]</span>`,
+};
+/** What xterm's link provider does: find URLs in the output. */
+const linkify = (html) => html.replace(/https?:\/\/[^\s<"]+[^\s<".,)]/g, (u) =>
+  `<span class="link" data-url="${u}" title="Ctrl+click: open in a browser window · Ctrl+Shift+click: system browser">${u}</span>`);
+
+/* ---------- web pages (stand-ins for a real webview) ---------- */
+function pageFor(url) {
+  if (!url) return { title: "New tab", html: `<div class="start"><b>New browser window</b>
+    Type a URL above, or Ctrl+click a link in any terminal.
+    <a data-url="http://localhost:1420/">http://localhost:1420/</a></div>` };
+  let u;
+  try { u = new URL(url); } catch { return { title: "Bad address", html: `<div class="start"><b>Can't open ${esc(url)}</b>Check the address and press Enter again.</div>` }; }
+  if (u.host === "localhost:1420") return { title: "tri-code (dev)", html: `<div class="mock"><div class="mock-side"><i></i><i class="on"></i><i></i><i></i></div>
+    <div class="mock-main"><div class="mock-top"></div><div class="mock-tiles"><b></b><b></b><b></b></div></div></div>` };
+  const seg = u.pathname.split("/").filter(Boolean);
+  const title = (seg.filter((s) => s !== "latest" && s !== "docs").pop() || u.host).replace(/[-_]/g, " ").replace(/\.html?$/, "");
+  return { title: `${title} · ${u.host}`, html: `<div class="doc"><div class="crumb">${esc(u.host)} / ${esc(seg.join(" / "))}</div>
+    <h1>${esc(title)}</h1>
+    <p>Stand-in page for the prototype. In tri-code this window is a real webview, so <code>${esc(u.host)}</code> loads here.</p>
+    <div class="sk" style="width:94%"></div><div class="sk" style="width:88%"></div><div class="sk" style="width:72%"></div>
+    <h2>Links on this page</h2>
+    <ul><li><a data-url="http://localhost:1420/">Local dev server</a></li>
+    <li><a data-url="${esc(u.origin)}/">${esc(u.host)} home</a></li></ul></div>` };
+}
+function normalizeUrl(s) {
+  s = s.trim();
+  if (!s) return "";
+  if (/^[a-z]+:\/\//i.test(s)) return s;
+  return (/^(localhost|127\.|\d+\.\d+\.\d+\.\d+)/.test(s) ? "http://" : "https://") + s;
+}
+
+/* ---------- sample state ---------- */
+const W = (kind, screen, extra = {}) => ({ id: "w" + uid++, kind, screen, x: 0, y: 0, w: 0, h: 0, z: uid, space: 0, status: "running", attention: false, title: "", ...extra });
+const B = (url, extra = {}) => W("browser", null, { url, hist: url ? [url] : [], hi: url ? 0 : -1, title: pageFor(url).title, ...extra });
+const SPACES = 4;
+/** Each project has 4 workspaces; every window lives in one (w.space), and each workspace keeps its own layout, split and focus. */
+const proj = (id, name, host, path, wins, { layout = "master", ...extra } = {}) => ({
+  id, name, host, path, wins, ws: 0,
+  spaces: Array.from({ length: SPACES }, (_, i) => ({ layout: i ? "master" : layout, ratio: 0.55, mono: null, focus: wins.find((w) => w.space === i)?.id ?? null })),
+  accent: "#7aa2f7", bg: "none", dim: 0, ...extra,
+});
+const projects = [
+  proj("p1", "tri-code", "local", "~/code/tri-code", [
+    W("claude", "claude", { title: "canvas windows" }),
+    B("http://localhost:1420/"),
+    W("pi", "pi", { title: "xterm resize" }),
+    W("shell", "shellDev", { title: "bun run tauri dev", space: 1 }),
+    W("shell", "shell", { space: 1 }),
+  ], { accent: "#7aa2f7", bg: "aurora" }),
+  proj("p2", "dotfiles", "local", "~/dotfiles", [W("shell", "shell")], { accent: "#9ece6a", bg: "rings" }),
+  proj("p3", "api-server", "devbox", "~/srv/api", [
+    W("claude", "claudeAsk", { attention: true, title: "rate limiting", space: 2 }),
+    W("shell", "remote", { status: "reconnecting", title: "logs", space: 1 }),
+    W("claude", "claude", { title: "refactor auth" }),
+  ], { layout: "grid", accent: "#f7768e", bg: "blueprint" }),
+  proj("p4", "infra", "devbox", "~/infra", [W("shell", "exited", { status: "exited", title: "terraform" })], { accent: "#bb9af7", bg: "dusk", dim: 20 }),
+];
+let cur = projects[0];
+const sp = () => cur.spaces[cur.ws];
+/** Windows on the current workspace, in tiling order. */
+const vis = () => cur.wins.filter((w) => w.space === cur.ws);
+const focused = () => vis().find((w) => w.id === sp().focus);
+
+/* ---------- coordinates ---------- */
+const vpSize = () => ({ w: vp.clientWidth, h: vp.clientHeight });
+const toLocal = (cx, cy) => { const r = vp.getBoundingClientRect(); return { x: cx - r.left, y: cy - r.top }; };
+
+/* ---------- auto-tiling ---------- */
+/** Fill the area with the project's windows, `gap` px between them and around the edge. */
+function layout() {
+  split.hidden = true;
+  const { w: vw, h: vh } = vpSize(), g = gap, ws = vis(), n = ws.length;
+  const ax = g, ay = g, aw = vw - 2 * g, ah = vh - 2 * g;
+  const put = (w, x, y, ww, hh) => Object.assign(w, { x: Math.round(x), y: Math.round(y), w: Math.round(ww), h: Math.round(hh) });
+  if (!n) return;
+  if (sp().layout === "master" && n > 1) {
+    const mw = (aw - g) * sp().ratio, k = n - 1, sh = (ah - g * (k - 1)) / k;
+    put(ws[0], ax, ay, mw, ah);
+    ws.slice(1).forEach((w, i) => put(w, ax + mw + g, ay + i * (sh + g), aw - mw - g, sh));
+    const hit = Math.max(g, 10);
+    Object.assign(split.style, { left: ax + mw + g / 2 - hit / 2 + "px", top: ay + "px", width: hit + "px", height: ah + "px" });
+    split.hidden = false;
+  } else {
+    const cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols), th = (ah - g * (rows - 1)) / rows;
+    ws.forEach((w, i) => {
+      const r = Math.floor(i / cols), inRow = r < rows - 1 ? cols : n - cols * (rows - 1), c = i - r * cols;
+      const tw = (aw - g * (inRow - 1)) / inRow;
+      put(w, ax + c * (tw + g), ay + r * (th + g), tw, th);
+    });
+  }
+  const mono = ws.find((w) => w.id === sp().mono);
+  if (mono) put(mono, ax, ay, aw, ah);
+}
+function relayout(msg) { world.classList.add("anim"); render(); if (msg) flash(msg); }
+function setLayout(l) { sp().layout = l; sp().mono = null; relayout(l === "master" ? "main + stack" : "grid"); }
+function setGap(v) { gap = v; $("gap").value = String(v); relayout(`gap ${v}px`); }
+
+/* ---------- rendering ---------- */
+const els = new Map();
+function winEl(w) {
+  let el = els.get(w.id);
+  if (el) return el;
+  el = document.createElement("div");
+  el.className = "win";
+  els.set(w.id, el);
+  const body = w.kind === "browser"
+    ? `<div class="nav"><button data-nav="back" title="Back">←</button><button data-nav="fwd" title="Forward">→</button><button data-nav="reload" title="Reload">↻</button>
+       <input class="url" id="url-${w.id}" spellcheck="false" aria-label="Address"><button data-nav="ext" title="Open in system browser">↗</button></div><div class="page"></div>`
+    : `<pre class="screen"></pre>`;
+  el.innerHTML = `<div class="bar"><span class="dot"></span><span class="kind"></span><span class="ttl"></span>
+    <button data-act="max" title="Maximize (Alt+F)">▢</button><button data-act="close" title="Close (Alt+Q)">×</button></div>
+    ${body}<div class="tip"></div>`;
+  if (w.kind === "browser") wireBrowser(w, el);
+  else el.querySelector(".screen").innerHTML = linkify(S[w.screen](cur));
+  el.addEventListener("pointerdown", (e) => { if (!e.target.closest("button")) focus(w.id); });
+  el.querySelector(".bar").addEventListener("pointerdown", (e) => !e.target.closest("button") && startDrag(e, w));
+  el.querySelector(".bar").addEventListener("dblclick", (e) => !e.target.closest("button") && toggleMax(w));
+  el.querySelector('[data-act="max"]').onclick = () => toggleMax(w);
+  el.querySelector('[data-act="close"]').onclick = () => closeWin(w);
+  world.appendChild(el);
+  return el;
+}
+function sizeLabel(w) {
+  if (w.kind === "browser") return `${w.w} × ${w.h - BAR - NAV} <span>px</span>`;
+  const c = cells(w.w, w.h);
+  return `${c.cols} × ${c.rows} <span>cols × rows</span>`;
+}
+function renderWin(w) {
+  const el = winEl(w);
+  Object.assign(el.style, { left: w.x + "px", top: w.y + "px", width: w.w + "px", height: w.h + "px", zIndex: w.z });
+  el.classList.toggle("focused", sp().focus === w.id);
+  el.classList.toggle("attention", w.attention);
+  el.querySelector(".dot").className = "dot " + (w.kind === "browser" ? "web" : w.status);
+  el.querySelector(".kind").textContent = w.kind;
+  el.querySelector(".ttl").textContent = w.title;
+  el.querySelector(".tip").innerHTML = sizeLabel(w);
+}
+/* ---------- per-project appearance ---------- */
+const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "#ff9e64", "#f5a3d0", "#73daca"];
+const tint = (a, p) => `color-mix(in srgb, ${a} ${p}%, transparent)`;
+/** Built-in backgrounds, drawn in CSS from the project's accent. Uploaded images are stored as "url(...)". */
+const BGS = {
+  none: { name: "None", css: () => "var(--canvas)" },
+  aurora: { name: "Aurora", css: (a) => `radial-gradient(60% 80% at 12% 8%, ${tint(a, 48)}, transparent 70%), radial-gradient(50% 70% at 92% 95%, ${tint(a, 32)}, transparent 70%), var(--canvas)` },
+  blueprint: { name: "Blueprint", css: (a) => `linear-gradient(${tint(a, 13)} 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, ${tint(a, 13)} 1px, transparent 1px) 0 0 / 32px 32px, radial-gradient(80% 80% at 50% 0%, ${tint(a, 12)}, transparent), var(--canvas)` },
+  rings: { name: "Rings", css: (a) => `repeating-radial-gradient(circle at 78% 115%, transparent 0 26px, ${tint(a, 22)} 26px 27px), var(--canvas)` },
+  dusk: { name: "Dusk", css: () => "linear-gradient(185deg, var(--dusk-a) 0%, var(--dusk-b) 40%, var(--dusk-c) 72%, var(--dusk-d) 100%)" },
+};
+const bgCss = (p) => p.bg.startsWith("url(") ? `center / cover no-repeat ${p.bg}, var(--canvas)` : (BGS[p.bg] ?? BGS.none).css(p.accent);
+function applyTheme() {
+  document.documentElement.style.setProperty("--accent-raw", cur.accent);
+  $("bg").style.background = bgCss(cur);
+  $("bg").style.setProperty("--dim", cur.dim / 100);
+}
+
+function render() {
+  app.classList.toggle("gap0", gap === 0);
+  applyTheme();
+  layout();
+  for (const [id, el] of els) if (!cur.wins.some((w) => w.id === id)) { el.remove(); els.delete(id); }
+  // windows on other workspaces stay alive (their sessions keep running), just hidden
+  for (const w of cur.wins) w.space === cur.ws ? (renderWin(w), els.get(w.id).hidden = false) : els.has(w.id) && (els.get(w.id).hidden = true);
+  renderSpaces();
+  renderSide(); renderStatus();
+  $("layout").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.layout === sp().layout));
+  $("empty")?.remove();
+  if (!vis().length) {
+    const e = document.createElement("div");
+    e.className = "empty"; e.id = "empty";
+    e.innerHTML = `<b>Workspace ${cur.ws + 1} of ${esc(cur.name)} is empty</b><div><kbd>Alt</kbd><kbd>Enter</kbd> opens a shell here</div>
+      <div><kbd>Alt</kbd><kbd>Shift</kbd><kbd>${cur.ws + 1}</kbd> sends the focused window from another workspace</div>`;
+    vp.appendChild(e);
+  }
+}
+function renderSide() {
+  const hosts = [...new Set(projects.map((p) => p.host))];
+  const rail = app.classList.contains("rail");
+  $("side").innerHTML = `<div class="side-head"><span>Projects</span><button class="collapse" id="collapse"
+      title="${rail ? "Expand" : "Collapse"} sidebar (Alt+S)" aria-label="${rail ? "Expand" : "Collapse"} sidebar" aria-expanded="${!rail}">${rail ? "»" : "«"}</button></div>` + hosts.map((h) => `<section><h2>${h}</h2>` + projects.filter((p) => p.host === h).map((p) =>
+    `<div class="project${p === cur ? " active" : ""}" data-p="${p.id}" style="--pa:${p.accent}" title="${rail ? `${p.name} · ${p.host} · ${p.wins.length} window${p.wins.length === 1 ? "" : "s"}` : ""}"><span class="swatch"><b>${p.name[0]}</b></span>
+     <span class="name">${p.name}</span>${p !== cur && p.wins.some((w) => w.attention) ? '<span class="badge" title="Needs input"></span>' : ""}
+     <span class="count">${p.wins.length || ""}</span><button class="gear" title="Appearance" aria-label="Appearance of ${p.name}">◐</button></div>`).join("") + `</section>`).join("") +
+    `<button class="add" title="Add project">+<span class="label"> Add project</span></button>`;
+  $("collapse").onclick = toggleSidebar;
+  $("side").querySelectorAll(".project").forEach((el) => el.onclick = (e) => {
+    switchProject(projects.find((p) => p.id === el.dataset.p));
+    if (e.target.closest(".gear")) openTheme(el.querySelector(".gear") ?? el);
+  });
+  $("where").textContent = (cur.host !== "local" ? cur.host + ":" : "") + cur.path;
+}
+function renderStatus() {
+  const w = focused();
+  const where = `${sp().layout === "master" ? `main ${Math.round(sp().ratio * 100)}%` : "grid"} · gap ${gap}`;
+  if (!w) return $("focusInfo").textContent = where;
+  const size = w.kind === "browser" ? `${w.w}×${w.h - BAR - NAV}px` : (({ cols, rows }) => `${cols}×${rows}`)(cells(w.w, w.h));
+  $("focusInfo").textContent = `${w.kind}${w.title ? " · " + w.title : ""}  ${size}  [${where}]`;
+}
+let flashT;
+function flash(msg) { $("flash").textContent = msg; clearTimeout(flashT); flashT = setTimeout(() => $("flash").textContent = "", 1800); }
+
+/* ---------- browser windows ---------- */
+function wireBrowser(w, el) {
+  const input = el.querySelector(".url"), page = el.querySelector(".page");
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { navigate(w, normalizeUrl(input.value)); input.blur(); }
+    if (e.key === "Escape") { input.value = w.url; input.blur(); }
+  });
+  el.querySelector('[data-nav="back"]').onclick = () => go(w, -1);
+  el.querySelector('[data-nav="fwd"]').onclick = () => go(w, 1);
+  el.querySelector('[data-nav="reload"]').onclick = () => { page.classList.add("loading"); setTimeout(() => page.classList.remove("loading"), 250); };
+  el.querySelector('[data-nav="ext"]').onclick = () => w.url && flash(`opened in system browser: ${w.url}`);
+  page.addEventListener("click", (e) => { const a = e.target.closest("[data-url]"); if (a) navigate(w, a.dataset.url); });
+  fillBrowser(w, el);
+}
+/** Paint the page for w.url. Touches only the browser's own DOM, so it is safe while the window is being built. */
+function fillBrowser(w, el = els.get(w.id)) {
+  if (!el) return;
+  const p = pageFor(w.url);
+  w.title = p.title;
+  el.querySelector(".url").value = w.url;
+  el.querySelector(".page").innerHTML = p.html;
+  el.querySelector(".ttl").textContent = w.title;
+  el.querySelector('[data-nav="back"]').disabled = w.hi <= 0;
+  el.querySelector('[data-nav="fwd"]').disabled = w.hi >= w.hist.length - 1;
+}
+function navigate(w, url) {
+  if (!url) return;
+  w.hist = w.hist.slice(0, w.hi + 1).concat(url);
+  w.hi = w.hist.length - 1; w.url = url;
+  fillBrowser(w); renderStatus();
+}
+function go(w, d) {
+  const i = w.hi + d;
+  if (i < 0 || i >= w.hist.length) return;
+  w.hi = i; w.url = w.hist[i];
+  fillBrowser(w); renderStatus();
+}
+/** Ctrl+click on a terminal link: reuse the project's browser window, or tile one in right after the terminal. */
+function openUrl(url, from) {
+  let b = vis().filter((w) => w.kind === "browser").sort((a, c) => c.z - a.z)[0];
+  if (b) navigate(b, url);
+  else {
+    b = B(url, { space: cur.ws });
+    cur.wins.splice(from ? cur.wins.indexOf(from) + 1 : cur.wins.length, 0, b);
+    sp().mono = null;
+    world.classList.add("anim");
+  }
+  flash(`open ${url}`);
+  focus(b.id);
+}
+
+/* ---------- window operations ---------- */
+function focus(id) {
+  const w = cur.wins.find((w) => w.id === id);
+  if (!w) return;
+  if (w.space !== cur.ws) { cur.ws = w.space; world.classList.add("enter"); setTimeout(() => world.classList.remove("enter"), 200); }
+  sp().focus = id; w.z = ++uid; w.attention = false;
+  render();
+}
+function neighbor(dx, dy) {
+  const f = focused();
+  if (!f) return vis()[0];
+  const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
+  let best = null, bs = Infinity;
+  for (const w of vis()) {
+    if (w === f) continue;
+    const vx = w.x + w.w / 2 - cx, vy = w.y + w.h / 2 - cy;
+    const along = vx * dx + vy * dy, across = Math.abs(dx ? vy : vx);
+    if (along <= 1) continue;
+    const s = along + across * 2;
+    if (s < bs) { bs = s; best = w; }
+  }
+  return best;
+}
+function swap(a, b) {
+  const i = cur.wins.indexOf(a), j = cur.wins.indexOf(b);
+  [cur.wins[i], cur.wins[j]] = [cur.wins[j], cur.wins[i]];
+  sp().mono = null;
+}
+function swapToward(w, dx, dy) {
+  const n = neighbor(dx, dy);
+  if (!n) return flash("nothing to swap with that way");
+  swap(w, n);
+  relayout(`swap with ${n.kind}`);
+}
+function nudgeSplit(w, d) {
+  if (sp().layout !== "master" || vis().length < 2) return flash("grid tiles share space equally; use Main + stack to resize");
+  sp().ratio = Math.min(0.8, Math.max(0.2, sp().ratio + d * 0.05));
+  relayout(`main ${Math.round(sp().ratio * 100)}%`);
+  showTip(w);
+}
+let tipT;
+function showTip(w) {
+  const el = els.get(w.id); el.classList.add("sizing");
+  clearTimeout(tipT); tipT = setTimeout(() => el.classList.remove("sizing"), 700);
+}
+function toggleMax(w) {
+  sp().mono = sp().mono === w.id ? null : w.id;
+  flash(sp().mono ? "maximize" : "restore");
+  world.classList.add("anim"); focus(w.id); showTip(w);
+}
+function promote(w) {
+  if (sp().layout !== "master") return flash("promote works in Main + stack");
+  cur.wins.splice(cur.wins.indexOf(w), 1);
+  cur.wins.unshift(w);
+  sp().mono = null;
+  relayout(`${w.kind} is main`);
+}
+function newWin(kind) {
+  const w = kind === "browser" ? B("", { space: cur.ws }) : W(kind, kind === "claude" ? "claude" : kind === "pi" ? "pi" : "shell", { space: cur.ws });
+  cur.wins.push(w);
+  sp().mono = null;
+  world.classList.add("anim");
+  flash(`new ${kind}`);
+  focus(w.id);
+  if (kind === "browser") els.get(w.id).querySelector(".url").focus();
+}
+function closeWin(w) {
+  const i = cur.wins.indexOf(w);
+  cur.wins.splice(i, 1);
+  if (sp().mono === w.id) sp().mono = null;
+  if (sp().focus === w.id) { const v = vis(); sp().focus = (v.filter((x) => cur.wins.indexOf(x) < i).pop() ?? v[0])?.id ?? null; }
+  world.classList.add("anim");
+  render();
+  const what = w.kind === "browser" ? "browser" : `${w.kind}${w.title ? " · " + w.title : ""}. Its session ends in 5s`;
+  showToast(`Closed ${esc(what)}.`, () => { cur.wins.splice(i, 0, w); world.classList.add("anim"); focus(w.id); });
+}
+function showToast(msg, onUndo) {
+  document.querySelector(".toast")?.remove();
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = `<span>${msg}</span><button>Undo</button>`;
+  t.querySelector("button").onclick = () => { onUndo(); t.remove(); };
+  vp.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+/* ---------- workspaces ---------- */
+function renderSpaces() {
+  $("spaces").innerHTML = cur.spaces.map((_, i) => {
+    const ws = cur.wins.filter((w) => w.space === i);
+    const att = i !== cur.ws && ws.some((w) => w.attention);
+    return `<button data-ws="${i}" class="${ws.length ? "used" : ""}${att ? " att" : ""}" aria-current="${i === cur.ws}"
+      title="Workspace ${i + 1}${ws.length ? ": " + ws.map((w) => w.kind).join(", ") : " (empty)"} · Alt+${i + 1}">${i + 1}</button>`;
+  }).join("");
+  $("spaces").querySelectorAll("button").forEach((b) => b.onclick = () => goSpace(+b.dataset.ws));
+}
+function goSpace(i) {
+  if (i === cur.ws) return;
+  cur.ws = i;
+  world.classList.remove("anim");
+  world.classList.add("enter"); setTimeout(() => world.classList.remove("enter"), 200);
+  const f = focused() ?? vis()[0];
+  if (f) { sp().focus = f.id; f.attention = false; }
+  render();
+  flash(`workspace ${i + 1}`);
+}
+/** Move a window to another workspace; stay where you are (follow it with Alt+number). */
+function sendTo(w, i) {
+  if (w.space === i) return flash(`already on workspace ${i + 1}`);
+  const from = w.space;
+  w.space = i;
+  if (cur.spaces[from].mono === w.id) cur.spaces[from].mono = null;
+  cur.spaces[i].focus = w.id;
+  const rest = cur.wins.filter((x) => x.space === from);
+  if (cur.spaces[from].focus === w.id) cur.spaces[from].focus = rest[0]?.id ?? null;
+  world.classList.add("anim");
+  render();
+  flash(`${w.kind} → workspace ${i + 1}`);
+}
+
+function switchProject(p) {
+  if (p === cur) return;
+  for (const el of els.values()) el.remove();
+  els.clear();
+  cur = p;
+  world.classList.remove("anim");
+  render();
+}
+
+/* ---------- pointer: drag to swap, drag the split ---------- */
+function startDrag(e, w) {
+  if (e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  world.classList.remove("anim");
+  const start = toLocal(e.clientX, e.clientY), o = { x: w.x, y: w.y };
+  const el = els.get(w.id), tgt = e.currentTarget;
+  let drop = null, target = null;
+  tgt.setPointerCapture(e.pointerId);
+  el.classList.add("floating");
+  const move = (ev) => {
+    const p = toLocal(ev.clientX, ev.clientY);
+    w.x = o.x + p.x - start.x; w.y = o.y + p.y - start.y;
+    const t = vis().find((x) => x !== w && p.x > x.x && p.x < x.x + x.w && p.y > x.y && p.y < x.y + x.h) ?? null;
+    if (t !== drop) { drop && els.get(drop.id).classList.remove("drop"); drop = t; drop && els.get(drop.id).classList.add("drop"); }
+    const sb = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("#spaces button");
+    target = sb && +sb.dataset.ws !== cur.ws ? +sb.dataset.ws : null;
+    $("spaces").querySelectorAll("button").forEach((b) => b.classList.toggle("target", +b.dataset.ws === target));
+    renderWin(w);
+  };
+  const up = () => {
+    el.classList.remove("floating");
+    tgt.removeEventListener("pointermove", move); tgt.removeEventListener("pointerup", up);
+    if (target !== null) { drop && els.get(drop.id).classList.remove("drop"); return sendTo(w, target); }
+    if (drop) { els.get(drop.id).classList.remove("drop"); swap(w, drop); }
+    relayout(drop ? `swap with ${drop.kind}` : "");
+  };
+  tgt.addEventListener("pointermove", move);
+  tgt.addEventListener("pointerup", up);
+}
+split.addEventListener("pointerdown", (e) => {
+  e.preventDefault(); e.stopPropagation();
+  split.setPointerCapture(e.pointerId); split.classList.add("active");
+  world.classList.remove("anim");
+  const move = (ev) => {
+    const p = toLocal(ev.clientX, ev.clientY), aw = vpSize().w - 2 * gap;
+    sp().ratio = Math.min(0.8, Math.max(0.2, (p.x - gap - gap / 2) / (aw - gap)));
+    render();
+  };
+  const up = () => { split.classList.remove("active"); split.removeEventListener("pointermove", move); split.removeEventListener("pointerup", up); };
+  split.addEventListener("pointermove", move); split.addEventListener("pointerup", up);
+});
+new ResizeObserver(() => { world.classList.remove("anim"); render(); }).observe(vp);
+
+/* ---------- terminal links ---------- */
+const setCtrl = (e) => document.body.classList.toggle("ctrl", e.ctrlKey || e.metaKey);
+window.addEventListener("keydown", setCtrl);
+window.addEventListener("keyup", setCtrl);
+window.addEventListener("blur", () => document.body.classList.remove("ctrl"));
+world.addEventListener("click", (e) => {
+  const l = e.target.closest(".screen .link");
+  if (!l || !(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault();
+  if (e.shiftKey) return flash(`opened in system browser: ${l.dataset.url}`);
+  openUrl(l.dataset.url, cur.wins.find((w) => els.get(w.id)?.contains(l)));
+});
+world.addEventListener("mouseover", (e) => {
+  if (e.target.closest(".screen .link") && !document.body.classList.contains("ctrl")) flash("hold Ctrl and click to open this link");
+});
+
+/* ---------- hotkeys ---------- */
+const DIRS = { KeyH: [-1, 0], ArrowLeft: [-1, 0], KeyL: [1, 0], ArrowRight: [1, 0], KeyK: [0, -1], ArrowUp: [0, -1], KeyJ: [0, 1], ArrowDown: [0, 1] };
+const GAPS = [0, 4, 8, 12, 16, 24, 32];
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Escape" && $("pop")) return closeTheme();
+  if (e.code === "Escape" && document.querySelector(".help")) return toggleHelp(false);
+  const w = focused();
+  if (e.ctrlKey && !e.altKey && e.code === "KeyL" && w?.kind === "browser") {
+    e.preventDefault();
+    const u = els.get(w.id).querySelector(".url"); u.focus(); u.select();
+    return;
+  }
+  if (!e.altKey) return;
+  const d = DIRS[e.code];
+  let handled = true;
+  if (d && e.ctrlKey && w) d[0] ? nudgeSplit(w, d[0]) : flash("stack windows share height equally");
+  else if (d && e.shiftKey && w) swapToward(w, ...d);
+  else if (d) { const n = neighbor(...d); n ? focus(n.id) : flash("no window that way"); }
+  else if (e.code === "Enter") newWin(w?.kind ?? "shell");
+  else if (e.code === "KeyB") newWin("browser");
+  else if (e.code === "KeyQ" && w) closeWin(w);
+  else if (e.code === "KeyF" && w) toggleMax(w);
+  else if (e.code === "KeyM" && w) promote(w);
+  else if (e.code === "KeyG") setLayout(sp().layout === "master" ? "grid" : "master");
+  else if (e.code === "Comma" || e.code === "Period") {
+    const i = GAPS.indexOf(gap) + (e.code === "Period" ? 1 : -1);
+    setGap(GAPS[Math.min(GAPS.length - 1, Math.max(0, i))]);
+  }
+  else if (/^Digit[1-4]$/.test(e.code)) { const i = +e.code.slice(5) - 1; e.shiftKey ? (w ? sendTo(w, i) : flash("no window to send")) : goSpace(i); }
+  else if (e.code === "Slash") toggleHelp();
+  else if (e.code === "KeyS") toggleSidebar();
+  else if (e.code === "KeyP") $("pop") ? closeTheme() : openTheme($("themeBtn"));
+  else if (e.code === "BracketLeft" || e.code === "BracketRight") {
+    const i = projects.indexOf(cur), n = projects.length;
+    switchProject(projects[(i + (e.code === "BracketRight" ? 1 : n - 1)) % n]);
+  }
+  else handled = false;
+  if (handled) e.preventDefault();
+});
+
+function toggleHelp(force) {
+  const open = document.querySelector(".help");
+  if (force === false || (open && force !== true)) return open?.remove();
+  if (open) return;
+  const k = (...ks) => ks.map((x) => `<kbd>${x}</kbd>`).join("");
+  const h = document.createElement("div");
+  h.className = "help";
+  h.innerHTML = `<div class="card" role="dialog" aria-label="Hotkeys">
+    <h3>Window hotkeys</h3>
+    <p>Windows always tile. Every window binding starts with Alt, so plain keys and Ctrl chords still reach the terminal. Arrow keys work anywhere H J K L do.</p>
+    <h4>Focus</h4><dl>
+      <dt>${k("Alt", "H J K L")}</dt><dd>Focus the nearest window in that direction</dd>
+      <dt>${k("Alt", "1…4")}</dt><dd>Go to workspace 1–4 of this project</dd>
+      <dt>${k("Alt", "Shift", "1…4")}</dt><dd>Send the focused window to that workspace (or drag its title bar onto a workspace number)</dd>
+      <dt>${k("Alt", "[")} ${k("Alt", "]")}</dt><dd>Previous / next project</dd></dl>
+    <h4>Arrange</h4><dl>
+      <dt>${k("Alt", "Shift", "dir")}</dt><dd>Swap with the neighbouring window (or drag a title bar onto another window)</dd>
+      <dt>${k("Alt", "Ctrl", "H / L")}</dt><dd>Move the main / stack split (or drag the gap)</dd>
+      <dt>${k("Alt", "M")}</dt><dd>Make the focused window the main one</dd>
+      <dt>${k("Alt", "G")}</dt><dd>Switch layout: main + stack, or grid</dd>
+      <dt>${k("Alt", ",")} ${k("Alt", ".")}</dt><dd>Less / more gap between windows</dd>
+      <dt>${k("Alt", "F")}</dt><dd>Maximize the focused window, again to restore</dd></dl>
+    <h4>Project</h4><dl>
+      <dt>${k("Alt", "S")}</dt><dd>Collapse or expand the sidebar</dd>
+      <dt>${k("Alt", "P")}</dt><dd>Change this project's accent colour and background</dd></dl>
+    <h4>Windows and links</h4><dl>
+      <dt>${k("Alt", "Enter")}</dt><dd>New window of the focused kind</dd>
+      <dt>${k("Alt", "B")}</dt><dd>New browser window</dd>
+      <dt>${k("Ctrl", "L")}</dt><dd>Edit the address of the focused browser</dd>
+      <dt>${k("Ctrl")} + click link</dt><dd>Open it in this project's browser window (one tiles in if needed)</dd>
+      <dt>${k("Ctrl", "Shift")} + click link</dt><dd>Open it in the system browser</dd>
+      <dt>${k("Alt", "Q")}</dt><dd>Close the focused window (undo for 5s)</dd></dl>
+  </div>`;
+  h.onclick = (e) => e.target === h && h.remove();
+  vp.appendChild(h);
+}
+
+/* ---------- collapsible sidebar ---------- */
+function toggleSidebar() {
+  const rail = app.classList.toggle("rail");
+  try { localStorage.setItem("tri.sidebar", rail ? "rail" : "full"); } catch {}
+  closeTheme();
+  renderSide();
+  flash(rail ? "sidebar collapsed" : "sidebar expanded");
+}
+try { if (localStorage.getItem("tri.sidebar") === "rail") app.classList.add("rail"); } catch {}
+
+/* ---------- appearance panel ---------- */
+function openTheme(anchor) {
+  closeTheme();
+  const pop = document.createElement("div");
+  pop.className = "pop"; pop.id = "pop";
+  pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Project appearance");
+  document.body.appendChild(pop);
+  const paint = () => {
+    const p = cur;
+    pop.innerHTML = `<div class="ttl">${esc(p.name)} <span>appearance</span></div>
+      <h4>Accent</h4>
+      <div class="swatches">${ACCENTS.map((a) => `<button data-accent="${a}" style="background:${a}" aria-label="Accent ${a}" aria-pressed="${a === p.accent}"></button>`).join("")}
+        <label title="Custom colour">+<input type="color" id="accentPick" value="${p.accent}"></label></div>
+      <h4>Background</h4>
+      <div class="bgs">${Object.entries(BGS).map(([k, b]) => `<button data-bg="${k}" style="background:${b.css(p.accent)}" aria-pressed="${p.bg === k}">${b.name}</button>`).join("")}
+        ${p.bg.startsWith("url(") ? `<button data-bg="${esc(p.bg)}" style="background:center/cover ${esc(p.bg)}" aria-pressed="true">Your image</button>` : ""}
+        <label class="upload" for="bgFile" role="button" tabindex="0" style="display:flex;height:46px;border:1px dashed var(--line);border-radius:5px;cursor:pointer;font-size:11px">Upload image…</label>
+        <input type="file" id="bgFile" accept="image/*" hidden></div>
+      <div class="row">Dim <input type="range" id="dim" min="0" max="85" step="5" value="${p.dim}"><span class="val">${p.dim}%</span></div>`;
+    pop.querySelectorAll("[data-accent]").forEach((b) => b.onclick = () => { p.accent = b.dataset.accent; render(); paint(); });
+    pop.querySelector("#accentPick").oninput = (e) => { p.accent = e.target.value; render(); };
+    pop.querySelector("#accentPick").onchange = paint;
+    pop.querySelectorAll("[data-bg]").forEach((b) => b.onclick = () => { p.bg = b.dataset.bg; applyTheme(); paint(); });
+    pop.querySelector("#bgFile").onchange = (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { p.bg = `url("${r.result}")`; if (!p.dim) p.dim = 30; applyTheme(); paint(); };
+      r.readAsDataURL(f);
+    };
+    pop.querySelector("#dim").oninput = (e) => { p.dim = +e.target.value; pop.querySelector(".val").textContent = p.dim + "%"; applyTheme(); };
+  };
+  paint();
+  const r = anchor.getBoundingClientRect(), pw = 300;
+  const left = Math.min(Math.max(8, r.left), window.innerWidth - pw - 8);
+  Object.assign(pop.style, { left: left + "px", top: Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 8) + "px" });
+  if (anchor.closest("aside")) Object.assign(pop.style, { left: r.right + 10 + "px", top: Math.max(8, Math.min(r.top - 10, window.innerHeight - pop.offsetHeight - 8)) + "px" });
+}
+function closeTheme() { $("pop")?.remove(); }
+document.addEventListener("pointerdown", (e) => {
+  if ($("pop") && !e.target.closest("#pop, #themeBtn, .gear")) closeTheme();
+});
+
+/* ---------- toolbar ---------- */
+$("new").innerHTML = ["claude", "pi", "shell", "browser"].map((k) => `<button data-k="${k}">+ ${k}</button>`).join("");
+$("new").querySelectorAll("button").forEach((b) => b.onclick = () => newWin(b.dataset.k));
+$("layout").querySelectorAll("button").forEach((b) => b.onclick = () => setLayout(b.dataset.layout));
+$("gap").onchange = (e) => setGap(+e.target.value);
+$("helpBtn").onclick = () => toggleHelp();
+$("themeBtn").onclick = () => $("pop") ? closeTheme() : openTheme($("themeBtn"));
+
+render();
+</script>
+
