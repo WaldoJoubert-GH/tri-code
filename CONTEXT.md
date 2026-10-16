@@ -47,3 +47,7 @@ _Avoid_: Tab bar (there is no tab bar), window list, tab buttons.
 
 **New Window Menu**:
 The popup under the Tab Strip's `+`: one row per `TabKind`, each with the key that also opens it (`Alt+Enter`, `Alt+B`, `Alt+I`, `Alt+E`). Issues and Files open or focus their one-per-project Window rather than adding a second one.
+
+**Favourite**:
+A page a project keeps for its browser windows: a URL and a name, in `state.json` under the project (`favs`). The star in a browser's address field (or `Ctrl+D`) adds one; they show on the bar under the address and as tiles on a blank browser window. Per project, not global, since each project has its own dev server and tracker.
+_Avoid_: Bookmark.

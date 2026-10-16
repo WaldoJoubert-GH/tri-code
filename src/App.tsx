@@ -13,6 +13,7 @@ import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
 import { installHotkeys } from "./hotkeys";
 import { installClipboardFallback } from "./clipboard";
 import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
+import { FavPopover, favEditOpen } from "./favs";
 import { ensureSession, setLinkHandler } from "./terms";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import {
@@ -75,7 +76,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || favEditOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -105,6 +106,7 @@ export default function App() {
       <StatusBar />
       <TabMenu />
       <AppearancePopover />
+      <FavPopover />
       <HelpOverlay />
     </div>
   );

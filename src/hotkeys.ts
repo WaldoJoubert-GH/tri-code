@@ -11,6 +11,7 @@ import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance"
 import { helpOpen, setHelpOpen } from "./Help";
 import { toggleSidebar } from "./Sidebar";
 import { closeTabMenu, tabMenuOpen } from "./tabs";
+import { closeFavEdit, favEditOpen } from "./favs";
 import { openIssuePanel } from "./issues";
 import { openFilesPanel } from "./files";
 import { flash } from "./ui";
@@ -137,6 +138,7 @@ function onKey(e: KeyboardEvent) {
     if (helpOpen()) setHelpOpen(false);
     else if (appearanceOpen()) closeAppearance();
     else if (tabMenuOpen()) closeTabMenu();
+    else if (favEditOpen()) closeFavEdit();
     else return;
     e.preventDefault();
     e.stopPropagation();

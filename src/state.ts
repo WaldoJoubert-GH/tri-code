@@ -41,6 +41,9 @@ export type Space = {
   mono?: string;
 };
 
+/** A favourite page of a project's browser windows. Keyed by `url`. */
+export type Fav = { url: string; name: string };
+
 export type Project = {
   id: string;
   name: string;
@@ -58,6 +61,8 @@ export type Project = {
   bg: string;
   /** Dim over the background, 0..85 (percent). */
   dim: number;
+  /** Favourite pages, in bar order; shared by every browser window of the project. */
+  favs: Fav[];
 };
 
 type Persisted = {
@@ -111,7 +116,7 @@ export function addProject(name: string, host: string, path: string) {
   setApp(produce((s) => {
     s.projects.push({
       id, name, host: host || "local", path, tabs: [], ws: 0,
-      spaces: Array.from({ length: SPACES }, newSpace), accent, bg: "none", dim: 0,
+      spaces: Array.from({ length: SPACES }, newSpace), accent, bg: "none", dim: 0, favs: [],
     });
     s.activeProject = id;
   }));
@@ -255,6 +260,35 @@ export function setTabUrl(projectId: string, tabId: string, url: string) {
   });
 }
 
+/** Add a favourite at the end of the bar; a URL that is already one is left as it is. */
+export function addFav(projectId: string, fav: Fav) {
+  edit(projectId, (p) => {
+    if (!p.favs.some((f) => f.url === fav.url)) p.favs.push(fav);
+  });
+}
+
+export function renameFav(projectId: string, url: string, name: string) {
+  edit(projectId, (p) => {
+    const f = p.favs.find((f) => f.url === url);
+    if (f) f.name = name;
+  });
+}
+
+export function removeFav(projectId: string, url: string) {
+  edit(projectId, (p) => { p.favs = p.favs.filter((f) => f.url !== url); });
+}
+
+/** Move the favourite `url` to just before `before` on the bar. */
+export function moveFav(projectId: string, url: string, before: string) {
+  edit(projectId, (p) => {
+    const from = p.favs.findIndex((f) => f.url === url);
+    if (from < 0 || url === before) return;
+    const [f] = p.favs.splice(from, 1);
+    const to = p.favs.findIndex((x) => x.url === before);
+    p.favs.splice(to < 0 ? p.favs.length : to, 0, f);
+  });
+}
+
 /** Point a `file` tab at another file (the window is reused). */
 export function setTabPath(projectId: string, tabId: string, path: string) {
   edit(projectId, (p) => {
@@ -276,6 +310,7 @@ function migrate(raw: any): Persisted {
       id: p.id, name: p.name, host: p.host || "local", path: p.path, tabs,
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
+      favs: p.favs ?? [],
     };
   });
   return { projects, activeProject: raw.activeProject, gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false };

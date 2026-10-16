@@ -60,6 +60,49 @@
   border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; outline: none; user-select: text;
 }
 .url:focus { border-color: var(--accent); }
+/* Favourites: a star in the address field, a bar under the nav, tiles on a blank window (src/favs.tsx). */
+.addr { flex: 1; min-width: 0; margin: 0 4px; position: relative; display: flex; }
+.addr .url { margin: 0; padding-right: 26px; }
+.nav .star { position: absolute; right: 1px; top: 1px; width: 22px; height: 20px; font-size: 14px; line-height: 1; }
+.nav .star[aria-pressed="true"] { color: var(--warn); }
+.nav .star:disabled { opacity: .35; background: none; cursor: default; }
+.favs {
+  height: 26px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--line); overflow: hidden;
+}
+.fav {
+  height: 20px; max-width: 150px; min-width: 30px; flex: 0 1 auto; display: flex; align-items: center; gap: 6px;
+  padding: 0 8px 0 4px; border-radius: 4px; color: var(--text); font-size: 12px;
+}
+.fav:hover { background: var(--hover); }
+.fav.on { background: var(--raised); }
+.fav.over { box-shadow: inset 2px 0 0 var(--accent); }
+.fav span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ico {
+  width: 14px; height: 14px; flex: none; border-radius: 3px; display: grid; place-items: center;
+  background: var(--c); color: #16181d; font: 700 9px var(--ui); font-style: normal;
+}
+.start { padding: 28px; display: grid; gap: 10px; align-content: start; color: var(--muted); font-size: 13px; }
+.start b { color: var(--text); font-size: 15px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; min-width: 0; max-width: 560px; margin-top: 4px; }
+.tile {
+  min-width: 0; display: grid; justify-items: center; gap: 4px; padding: 14px 6px 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font-size: 12px;
+}
+.tile:hover { border-color: var(--accent); }
+.tile .ico { width: 30px; height: 30px; border-radius: 8px; font-size: 14px; margin-bottom: 4px; }
+.tile span, .tile small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile small { font: 10px var(--mono); color: var(--muted); }
+.favpop input.fname {
+  font: 13px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 4px; padding: 5px 8px; outline: none; user-select: text;
+}
+.favpop input.fname:focus { border-color: var(--accent); }
+.favpop .furl { font: 11px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.favpop .acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+.favpop .acts button { padding: 4px 12px; border-radius: 4px; border: 1px solid var(--line); color: var(--text); }
+.favpop .acts button:hover { background: var(--hover); }
+.favpop .acts .primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .page { flex: 1; min-height: 0; overflow: auto; background: var(--bg); transition: opacity 120ms; }
 .win:not(.focused) .page { opacity: .72; }
 

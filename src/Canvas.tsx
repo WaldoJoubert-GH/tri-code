@@ -12,9 +12,11 @@ import IssuesPanel from "./IssuesPanel";
 import FileList from "./FileList";
 import FileView from "./FileView";
 import { dev, panelTitle } from "./issues";
+import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
 
 const BAR = 28;
 const NAV = 32;
+const FAVS = 26;
 const px = (n: number) => `${Math.round(n)}px`;
 
 /** Last measured viewport size, for the keyboard helpers that run outside the component. */
@@ -147,7 +149,8 @@ export default function Canvas(props: { project: Project }) {
     const tipText = () => {
       const r = rect();
       if (isBrowser) {
-        return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR - NAV))} <span>px</span></>;
+        const favs = props.project.favs.length ? FAVS : 0;
+        return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR - NAV - favs))} <span>px</span></>;
       }
       if (isPanel) {
         return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR))} <span>px</span></>;
@@ -166,7 +169,10 @@ export default function Canvas(props: { project: Project }) {
 
     const url = () => browserInfo[id]?.url ?? tab.url ?? "";
 
-    const place = () => placeBrowser(props.project, tab, pageEl.getBoundingClientRect());
+    const blank = () => !url() || url() === "about:blank";
+    const isFav = () => !blank() && props.project.favs.some((f) => f.url === url());
+    /** A blank browser shows the start page (favourite tiles), so its webview stays hidden until it has an address. */
+    const place = () => placeBrowser(props.project, tab, blank() ? null : pageEl.getBoundingClientRect());
     /** Keep the native webview on the placeholder while the window animates into place. */
     const follow = (ms = 250) => {
       cancelAnimationFrame(placeRaf);
@@ -196,7 +202,7 @@ export default function Canvas(props: { project: Project }) {
     });
 
     if (isBrowser) {
-      createEffect(on([rect, anyDrag], () => follow(), { defer: true }));
+      createEffect(on([rect, anyDrag, blank], () => follow(), { defer: true }));
     } else if (!isPanel) {
       createEffect(() => {
         // after mount, so the session element is attached and visible when it takes focus
@@ -210,6 +216,14 @@ export default function Canvas(props: { project: Project }) {
       flash(wasMax ? "restore" : "maximize");
       showSizing(id);
     };
+
+    let starEl!: HTMLButtonElement;
+    const star = () => {
+      const s = favEditFor();
+      if (s?.anchor === starEl) closeFavEdit();
+      else starPage(props.project.id, id, url(), starEl);
+    };
+    const open = (u: string) => navigateBrowser(id, u);
 
     const onUrlKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -299,6 +313,13 @@ export default function Canvas(props: { project: Project }) {
           "z-index": z(),
         }}
         onPointerDown={() => focusTab(props.project.id, id)}
+        onKeyDown={(e) => {
+          // Ctrl+D while the window's own HTML (address, bar) has focus; the webview keeps its own keys.
+          if (isBrowser && e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyD") {
+            e.preventDefault();
+            star();
+          }
+        }}
       >
         <div
           class="bar"
@@ -327,17 +348,33 @@ export default function Canvas(props: { project: Project }) {
               <button title="Back" onClick={() => browserBack(id)}>←</button>
               <button title="Forward" onClick={() => browserForward(id)}>→</button>
               <button title="Reload" onClick={() => browserReload(id)}>↻</button>
-              <input
-                class="url"
-                spellcheck={false}
-                aria-label="Address"
-                ref={inputEl}
-                value={url()}
-                onKeyDown={onUrlKey}
-              />
+              <span class="addr">
+                <input
+                  class="url"
+                  spellcheck={false}
+                  aria-label="Address"
+                  ref={inputEl}
+                  value={blank() ? "" : url()}
+                  onKeyDown={onUrlKey}
+                />
+                <button
+                  class="star"
+                  ref={starEl}
+                  aria-pressed={isFav()}
+                  disabled={blank()}
+                  title={isFav() ? "Edit favourite (Ctrl+D)" : "Favourite this page (Ctrl+D)"}
+                  onClick={star}
+                >
+                  {isFav() ? "★" : "☆"}
+                </button>
+              </span>
               <button title="Open in system browser" onClick={() => openExternal(url())}>↗</button>
             </div>
+            <FavBar projectId={props.project.id} favs={props.project.favs} url={url()} onOpen={open} />
             <div class="page" ref={pageEl}>
+              <Show when={blank()}>
+                <StartPage favs={props.project.favs} onOpen={open} />
+              </Show>
               {/* Linux has no positionable native webviews, so the page is framed here instead. */}
               <Show when={!nativeBrowsers && url() ? `${browserInfo[id]?.rev ?? 0}|${url()}` : false} keyed>
                 {(k) => <iframe class="frame" src={k.slice(k.indexOf("|") + 1)} title={tab.url} />}

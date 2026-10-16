@@ -61,6 +61,8 @@ export function HelpOverlay() {
             <dd>New window of the focused kind</dd>
             <dt><Keys keys={["Alt", "B"]} /></dt>
             <dd>New browser window</dd>
+            <dt><Keys keys={["Ctrl", "D"]} /></dt>
+            <dd>Favourite the browser's page (or click ☆). Favourites belong to the project: a bar under the address and the tiles on a new browser. Right-click one to rename or remove it, drag to reorder</dd>
             <dt><Keys keys={["Ctrl"]} /> + click link</dt>
             <dd>Open it in this project's browser window (one tiles in if needed)</dd>
             <dt><Keys keys={["Ctrl", "Shift"]} /> + click link</dt>
