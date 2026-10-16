@@ -20,6 +20,8 @@ use tauri::{LogicalPosition, Manager, WebviewBuilder, WebviewUrl};
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(Arc::new(pty::Ptys::default()))
         .setup(|app| {
             // The main window is built here rather than in tauri.conf.json: browser

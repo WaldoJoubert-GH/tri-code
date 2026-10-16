@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "tri-code",
-  "version": "0.1.0",
+  "version": "../package.json",
   "identifier": "dev.tricode.app",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -24,6 +24,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQxOTlBRUE5RTcyMUFBRjQKUldUMHFpSG5xYTZaMGQ0eEhiWG83VnRZQWhOUUtVN0t0VlFyKzVTZDcrSDVueTdqdDU5RFZrOUsK",
+      "endpoints": [
+        "https://github.com/WaldoJoubert-GH/tri-code/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

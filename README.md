@@ -52,6 +52,19 @@ When ssh exits with code 255 (connection failure), the tab reconnects automatica
 - Ctrl+C copies the terminal selection and still sends SIGINT when nothing is selected; Ctrl+V pastes. Full-screen apps such as claude and pi capture the mouse, so hold Shift while dragging to select their text. To make a plain drag select in Claude Code's fullscreen mode, set `CLAUDE_CODE_DISABLE_MOUSE=1` (it then scrolls with PgUp/PgDn instead of the wheel).
 - A tab that rings the terminal bell while it is hidden is flagged, and its project shows a badge in the sidebar. To get this from Claude Code, set its notification channel to the terminal bell in Claude Code's `/config` (notifications setting).
 
+## Releases and updates
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the Windows installers (NSIS and MSI) and the macOS apps (Apple Silicon and Intel), signs the update bundles, and publishes them as a GitHub Release. The version lives only in `package.json`; `tauri.conf.json` reads it from there.
+
+```
+bun pm version patch          # or minor, major, or 1.2.3; commits and tags v<version>
+git push --follow-tags
+```
+
+Installed copies check the latest release's `latest.json` at startup and every 6 hours, download a newer version in the background, and show "↻ Restart to update" in the status bar. Restarting ends local terminal sessions; remote tabs reattach. Dev builds never update.
+
+The updater checks downloads against the public key in `tauri.conf.json`. The matching private key is the `TAURI_SIGNING_PRIVATE_KEY` repository secret (kept outside the repo at `~/.tauri/tri-code.key` on the machine that made it). If the key is lost, installed copies cannot verify new releases and must be reinstalled by hand. The macOS builds are not notarized, so Gatekeeper blocks the first launch: right-click the app and choose Open.
+
 ## Development
 
 Rust tests:
@@ -82,6 +95,7 @@ Layout:
 - `terms.ts`: one xterm and one PTY per tab. Handles output, resize, reconnect backoff, bell detection, and the WebGL renderer for the visible tab only.
 - `issues.ts`: the `.dev/` store and Plane sync, plus the pure helpers (sort order, State Pill contrast, Slug-ID).
 - `IssuesPanel.tsx`: the issues window: the list, the full-width drill-down, the State Dropdown, labels, and the comment thread.
+- `updater.ts`: the update check, background download, and "Restart to update".
 - `styles.css`: application styles.
 - `vite-env.d.ts`: Vite type declarations.
 

@@ -6,7 +6,9 @@
     "core:default",
     "core:webview:default",
     "core:event:default",
-    "opener:default"
+    "opener:default",
+    "updater:default",
+    "process:allow-restart"
   ],
   "webviews": [
     "main"

@@ -1,0 +1,84 @@
+# Build signed installers for a version tag and publish them as a GitHub Release.
+# The release's latest.json is what installed apps poll for updates
+# (plugins.updater.endpoints in src-tauri/tauri.conf.json).
+#
+# Release: `bun pm version patch` (or minor/major), then `git push --follow-tags`.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+    runs-on: ${{ matrix.platform }}
+    env:
+      # .cargo/config.toml caps jobs at 2 for small dev machines; runners have more.
+      CARGO_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches package.json
+        shell: bash
+        run: |
+          want="v$(node -p 'require("./package.json").version')"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version ($want)"
+            exit 1
+          fi
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.args }}
+
+      - run: bun install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tauriScript: bun tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_name }}
+          releaseName: tri-code ${{ github.ref_name }}
+          releaseBody: Download the installer for your platform below. Installed copies update themselves.
+          # Stays a draft until every platform has uploaded, so apps never see a
+          # latest.json that is missing a platform.
+          releaseDraft: true
+          prerelease: false
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

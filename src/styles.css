@@ -291,6 +291,8 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .status .focus, .status .flash { flex: none; }
 .status .hints span { display: flex; gap: 4px; align-items: center; }
 .status .flash { color: var(--accent); font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+.status .update { flex: none; color: var(--accent); font: 11px var(--mono); padding: 1px 6px; border: 1px solid var(--accent); border-radius: 4px; }
+.status .update:hover { background: var(--hover); }
 .usage {
   flex: none; display: flex; align-items: center; gap: 12px; height: 100%; padding: 0 2px;
   color: var(--muted); font-variant-numeric: tabular-nums;

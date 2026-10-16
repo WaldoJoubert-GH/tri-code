@@ -18,6 +18,7 @@ import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers
 import { FavPopover, favEditOpen } from "./favs";
 import { ensureSession, setLinkHandler } from "./terms";
 import { flash, flashMsg, toast, undoToast } from "./ui";
+import { installUpdate, startUpdateChecks, updateReady } from "./updater";
 import {
   clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
 } from "./issues";
@@ -50,6 +51,7 @@ export default function App() {
     }
     loadIcons();
     setReady(true);
+    startUpdateChecks();
   });
   persistChanges(ready);
 
@@ -211,6 +213,13 @@ function StatusBar() {
         <span><kbd>Alt</kbd><kbd>E</kbd> files</span>
         <span><kbd>Alt</kbd><kbd>/</kbd> all keys</span>
       </div>
+      <Show when={updateReady()}>
+        {(u) => (
+          <button class="update" title={`Install tri-code ${u().version} and restart. Local terminal sessions end; remote ones reattach.`} onClick={installUpdate}>
+            ↻ Restart to update · {u().version}
+          </button>
+        )}
+      </Show>
       <ClaudeUsage />
     </div>
   );
