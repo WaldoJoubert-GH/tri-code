@@ -38,7 +38,7 @@ export function HelpOverlay() {
             <dt><Keys keys={["Alt", "M"]} /></dt>
             <dd>Make the focused window the main one (Main + stack)</dd>
             <dt><Keys keys={["Alt", "G"]} /></dt>
-            <dd>Switch layout: main + stack, or grid</dd>
+            <dd>Switch layout: main + stack, grid, or mono (a centered column)</dd>
             <dt><Keys keys={["Alt", ","]} /> <Keys keys={["Alt", "."]} /></dt>
             <dd>Less / more gap between windows</dd>
             <dt><Keys keys={["Alt", "F"]} /></dt>

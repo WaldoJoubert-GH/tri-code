@@ -11,6 +11,11 @@
 }
 .viewport.gap0 .win { border-radius: 0; }
 .win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/* Mono (carousel): the focused window is centered, its neighbours dim in the side gutters,
+   and any window without a rect is hidden. */
+.win.peek { opacity: .5; filter: saturate(.5); }
+.win.peek:hover { opacity: .82; }
+.win.hidden { display: none; }
 .win.attention:not(.focused) { border-color: var(--warn); animation: bell 1.6s ease-in-out infinite; }
 @keyframes bell { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); } }
 .win.floating { opacity: .92; box-shadow: 0 24px 60px -16px var(--shadow) !important; transition: none !important; }

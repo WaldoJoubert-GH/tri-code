@@ -149,11 +149,14 @@ function Toolbar() {
             </div>
             <div class="sep" />
             <div class="seg" role="group" aria-label="Tiling layout">
-              <button aria-pressed={space(p).layout === "master"} title="Main + stack (Alt+G)" onClick={() => setLayout(p.id, "master")}>
-                Main + stack
+              <button aria-label="Main + stack" aria-pressed={space(p).layout === "master"} title="Main + stack (Alt+G)" onClick={() => setLayout(p.id, "master")}>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6.5" height="11" rx="1.2" /><rect x="9.5" y="2.5" width="5" height="5" rx="1.2" /><rect x="9.5" y="8.5" width="5" height="5" rx="1.2" /></svg>
               </button>
-              <button aria-pressed={space(p).layout === "grid"} title="Grid (Alt+G)" onClick={() => setLayout(p.id, "grid")}>
-                Grid
+              <button aria-label="Grid" aria-pressed={space(p).layout === "grid"} title="Grid (Alt+G)" onClick={() => setLayout(p.id, "grid")}>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6" height="5" rx="1.2" /><rect x="9" y="2.5" width="5.5" height="5" rx="1.2" /><rect x="1.5" y="8.5" width="6" height="5" rx="1.2" /><rect x="9" y="8.5" width="5.5" height="5" rx="1.2" /></svg>
+              </button>
+              <button aria-label="Mono (centered column)" aria-pressed={space(p).layout === "mono"} title="Mono (Alt+G)" onClick={() => setLayout(p.id, "mono")}>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="11" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="5.75" y="2.5" width="4.5" height="11" rx="1.2" /></svg>
               </button>
             </div>
             <label class="gapctl">
@@ -185,7 +188,7 @@ function StatusBar() {
     const p = activeProject();
     if (!p) return "";
     const sp = space(p);
-    const where = `${sp.layout === "master" ? `main ${Math.round(sp.ratio * 100)}%` : "grid"} · gap ${app.gap}`;
+    const where = `${sp.layout === "master" ? `main ${Math.round(sp.ratio * 100)}%` : sp.layout} · gap ${app.gap}`;
     const f = focusedTab(p);
     if (!f) return where;
     const title = live[f.id]?.title;

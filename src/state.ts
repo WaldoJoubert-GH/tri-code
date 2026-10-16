@@ -29,7 +29,7 @@ export type Tab = {
 /** Terminals own a PTY; browsers and issues panels do not. */
 export const isTerminal = (t: Tab): t is Tab & { kind: TerminalKind } => t.kind === "claude" || t.kind === "pi" || t.kind === "shell";
 
-export type Layout = "master" | "grid";
+export type Layout = "master" | "grid" | "mono";
 
 /** Per-workspace tiling state. */
 export type Space = {

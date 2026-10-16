@@ -26,8 +26,9 @@ function layoutOf(p: Project, w: number, h: number) {
   const tabs = visibleTabs(p);
   const sp = space(p);
   const mono = tabs.findIndex((t) => t.id === sp.mono);
-  const t = tile(tabs.length, sp.layout, sp.ratio, w, h, app.gap, mono);
-  return { tabs, rects: t.rects, split: t.split, mono };
+  const focus = tabs.findIndex((t) => t.id === sp.focus);
+  const t = tile(tabs.length, sp.layout, sp.ratio, w, h, app.gap, mono, focus);
+  return { tabs, rects: t.rects, split: t.split, mono, focus };
 }
 
 type DragState = { id: string; dx: number; dy: number; dropId: string | null; ws: number | null };
@@ -129,6 +130,10 @@ export default function Canvas(props: { project: Project }) {
     const rect = () => rectById().get(id) ?? { x: 0, y: 0, w: 0, h: 0 };
     const focused = createMemo(() => space(props.project).focus === id);
     const mono = createMemo(() => space(props.project).mono === id);
+    // Mono (carousel) gives every window a rect: the focused one centered, its neighbours
+    // in the gutters, the rest zero-sized. Zero-sized windows are hidden; the neighbours dim.
+    const hidden = createMemo(() => { const r = rect(); return r.w <= 0 || r.h <= 0; });
+    const peek = createMemo(() => space(props.project).layout === "mono" && !focused() && !hidden());
     const dragging = createMemo(() => drag()?.id === id);
     const dropping = createMemo(() => drag()?.dropId === id);
     const z = () => (dragging() ? 7 : mono() ? 4 : focused() ? 3 : 2);
@@ -283,6 +288,8 @@ export default function Canvas(props: { project: Project }) {
           floating: dragging(),
           drop: dropping(),
           sizing: sized() === id,
+          hidden: hidden(),
+          peek: peek(),
         }}
         style={{
           left: px(geom().left),

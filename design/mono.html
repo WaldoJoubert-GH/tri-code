@@ -1,0 +1,427 @@
+<!doctype html>
+<!-- PROTOTYPE (throwaway). Question: what should the "Mono" layout look like?
+     Three variants of the mono layout on the real canvas chrome, switchable via ?variant=A|B|C
+     and the floating bar at the bottom. Fold the winner into src/layout.ts, then delete me. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>tri-code · Mono layout prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Palette copied from design/canvas.html so variants sit in the real app's skin. */
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --violet: #7c4dbd; --scrim: rgba(30, 34, 44, .35); --shadow: rgba(30, 34, 44, .22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --violet: #bb9af7; --scrim: rgba(8, 9, 11, .6); --shadow: rgba(0, 0, 0, .8);
+    --accent: var(--accent-raw); color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: #0a0b0d; color: var(--text);
+  font: 13px/1.4 var(--ui); overflow: hidden; user-select: none;
+}
+body.preview { background: repeating-linear-gradient(45deg, #08090b 0 8px, #0c0d10 8px 16px); }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+select { font: inherit; }
+kbd { font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; color: var(--text); background: var(--panel); }
+
+.app {
+  display: grid; height: 100%; margin: 0 auto; max-width: var(--preview, 100%);
+  grid-template-columns: 220px 1fr; grid-template-rows: 34px 1fr 26px;
+  grid-template-areas: "side top" "side canvas" "side status";
+  background: var(--bg); box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Sidebar */
+aside { grid-area: side; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 6px 8px; overflow-y: auto; }
+.side-head { display: flex; align-items: center; height: 26px; padding-left: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+aside h2 { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.project { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.project:hover { background: var(--hover); }
+.project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
+.project .swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--pa); flex: none; }
+.project .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project .count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.add { width: 100%; margin-top: 10px; padding: 6px 8px; text-align: left; color: var(--muted); border-radius: 5px; }
+.add:hover { background: var(--hover); color: var(--text); }
+
+/* Toolbar */
+.top { grid-area: top; display: flex; align-items: stretch; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.tabs { display: flex; align-items: stretch; flex: none; padding: 0 2px; }
+.tabs button {
+  display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted);
+  font-size: 12px; border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.tabs button:hover { color: var(--text); background: var(--hover); }
+.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.tabs button.ghost { color: var(--muted); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.running { background: var(--ok); }
+/* Layout segment: icon-only buttons (the glyphs the real toolbar would use). */
+.seg { display: flex; align-self: center; flex: none; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 0 4px; }
+.seg button { display: flex; align-items: center; padding: 3px 8px; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.seg svg { width: 15px; height: 15px; display: block; }
+.top .sep { width: 1px; background: var(--line); margin: 7px 6px; flex: none; }
+.top .where { align-self: center; padding: 0 12px; color: var(--muted); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex: 1; }
+.tool { align-self: center; padding: 4px 10px; color: var(--muted); white-space: nowrap; flex: none; }
+.tool:hover { color: var(--text); background: var(--hover); }
+
+/* Canvas */
+.viewport { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); }
+.world { position: absolute; inset: 0; }
+.win {
+  position: absolute; display: flex; flex-direction: column; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+  transition: left 140ms ease, top 140ms ease, width 140ms ease, height 140ms ease;
+}
+.win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.win.peek { opacity: .5; filter: saturate(.5); }
+.win.peek:hover { opacity: .82; }
+.bar {
+  height: 28px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px;
+  background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted);
+}
+.win.focused .bar { color: var(--text); }
+.bar .kind { font-weight: 600; }
+.bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); line-height: 1; }
+.bar button:hover { background: var(--hover); color: var(--text); }
+.screen { flex: 1; margin: 0; padding: 8px 10px; overflow: hidden; white-space: pre; font: 12.5px/17px var(--mono); color: var(--text); }
+.win:not(.focused) .screen { opacity: .72; }
+.c-a { color: var(--accent); } .c-m { color: var(--muted); } .c-o { color: var(--ok); }
+.c-w { color: var(--warn); } .c-b { color: var(--bad); } .c-v { color: var(--violet); }
+.cursor { background: var(--text); color: var(--bg); }
+.win:not(.focused) .cursor { background: none; outline: 1px solid var(--muted); color: inherit; }
+
+/* Gutter overlay: visualise the left/right padding */
+.gutters { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 140ms; }
+body.gutters-on .gutters { opacity: 1; }
+.gut {
+  position: absolute; top: 0; bottom: 0;
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 22%, transparent) 0 6px, transparent 6px 12px);
+  border-right: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.gut.right { border-right: 0; border-left: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent); }
+.gut .dim {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(90deg);
+  font: 600 11px var(--mono); color: var(--text); background: var(--raised);
+  border: 1px solid var(--accent); border-radius: 4px; padding: 2px 7px; white-space: nowrap;
+}
+.colguide { position: absolute; top: 0; bottom: 0; border-left: 1px dashed color-mix(in srgb, var(--ok) 70%, transparent); border-right: 1px dashed color-mix(in srgb, var(--ok) 70%, transparent); }
+
+/* Monocle switcher (variant B) */
+.mono-switch {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 6;
+  display: flex; align-items: center; gap: 8px; padding: 4px 6px;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 999px; box-shadow: 0 8px 24px -12px var(--shadow);
+}
+.mono-switch button { width: 22px; height: 22px; border-radius: 50%; color: var(--muted); }
+.mono-switch button:hover { background: var(--hover); color: var(--text); }
+.mono-switch .pos { font: 600 11px var(--mono); color: var(--muted); min-width: 46px; text-align: center; }
+.mono-switch .nm { display: flex; align-items: center; color: var(--text); }
+.mono-switch .nm .ico { width: 16px; height: 16px; }
+.mono-switch .hint { font-size: 11px; color: var(--muted); }
+
+/* Status */
+.status { grid-area: status; display: flex; align-items: center; gap: 14px; padding: 0 10px; background: var(--panel); border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; }
+.status .focus { color: var(--text); font: 11px var(--mono); font-variant-numeric: tabular-nums; }
+.status .variant { color: var(--accent); font: 11px var(--mono); }
+.status .hints { display: flex; gap: 12px; margin-left: auto; }
+.status .hints span { display: flex; gap: 4px; align-items: center; }
+
+/* Floating prototype switcher (not part of the design) */
+.pbar {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 10000;
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  background: #14161c; color: #e7e9ee; border: 1px solid #2b2f3a; border-radius: 10px;
+  box-shadow: 0 18px 50px -12px #000; font-size: 12px;
+}
+.pbar button { width: 26px; height: 26px; border-radius: 6px; color: #e7e9ee; font-size: 15px; }
+.pbar button:hover { background: #262a34; }
+.pbar .lab { min-width: 190px; text-align: center; }
+.pbar .lab b { font: 600 12px var(--mono); color: #fff; }
+.pbar .lab span { display: block; color: #9aa3b8; font-size: 11px; }
+.pbar .sep { width: 1px; height: 26px; background: #2b2f3a; }
+.pbar label { display: flex; align-items: center; gap: 6px; color: #9aa3b8; }
+.pbar input[type="range"] { width: 130px; accent-color: #7aa2f7; }
+.pbar input[type="checkbox"] { accent-color: #7aa2f7; }
+.pbar .w { font: 11px var(--mono); color: #e7e9ee; min-width: 46px; text-align: right; }
+.pbar select { background: #0e1015; color: #e7e9ee; border: 1px solid #2b2f3a; border-radius: 5px; padding: 2px 4px; font: 11px var(--mono); }
+.pbar .k { color: #9aa3b8; font: 11px var(--mono); }
+</style>
+</head>
+<body class="gutters-on">
+<div class="app" id="app">
+  <aside>
+    <div class="side-head">tri-code</div>
+    <h2>local</h2>
+    <div class="project active" style="--pa:#7aa2f7"><span class="swatch"></span><span class="name">tri-code</span><span class="count">3</span></div>
+    <div class="project" style="--pa:#9ece6a"><span class="swatch"></span><span class="name">dev-hub</span><span class="count">1</span></div>
+    <h2>devbox</h2>
+    <div class="project" style="--pa:#f7768e"><span class="swatch"></span><span class="name">pi-todos</span><span class="count">2</span></div>
+    <button class="add">+ Add project</button>
+  </aside>
+
+  <div class="top">
+    <div class="tabs" id="tabs"></div>
+    <button class="tool ghost" title="New window">＋</button>
+    <div class="sep"></div>
+    <div class="seg" id="layout" role="group" aria-label="Tiling layout">
+      <button title="Main + stack (Alt+G)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6.5" height="11" rx="1.2"/><rect x="9.5" y="2.5" width="5" height="5" rx="1.2"/><rect x="9.5" y="8.5" width="5" height="5" rx="1.2"/></svg></button>
+      <button title="Grid (Alt+G)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6" height="5" rx="1.2"/><rect x="9" y="2.5" width="5.5" height="5" rx="1.2"/><rect x="1.5" y="8.5" width="6" height="5" rx="1.2"/><rect x="9" y="8.5" width="5.5" height="5" rx="1.2"/></svg></button>
+      <button aria-pressed="true" title="Mono (Alt+G)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4"/><rect x="11" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4"/><rect x="5.75" y="2.5" width="4.5" height="11" rx="1.2"/></svg></button>
+    </div>
+    <div class="sep"></div>
+    <span class="where" id="where">~/code/tri-code</span>
+    <button class="tool">Appearance</button>
+    <button class="tool">?</button>
+  </div>
+
+  <div class="viewport" id="vp">
+    <div class="world" id="world"></div>
+    <div class="gutters" id="gutters"></div>
+    <div id="switcher"></div>
+  </div>
+
+  <div class="status">
+    <span class="focus" id="statusFocus"></span>
+    <span class="variant" id="statusVariant"></span>
+    <div class="hints">
+      <span><kbd>←</kbd><kbd>→</kbd> prototype variant</span>
+      <span id="statusHint"><kbd>Alt</kbd><kbd>G</kbd> layout</span>
+    </div>
+  </div>
+</div>
+
+<div class="pbar">
+  <button id="prev" title="Previous variant (←)">‹</button>
+  <div class="lab" id="plabel"></div>
+  <button id="next" title="Next variant (→)">›</button>
+  <div class="sep"></div>
+  <label>Width <input type="range" id="pw" min="720" max="1900" step="10" value="1400"><span class="w" id="pwv">1400</span></label>
+  <div class="sep"></div>
+  <label>Gap
+    <select id="gap"><option>0</option><option>4</option><option>8</option><option selected>12</option><option>16</option><option>24</option><option>32</option></select>
+  </label>
+  <label><input type="checkbox" id="gut" checked> Show gutters</label>
+  <span class="k">PROTOTYPE</span>
+</div>
+
+<script>
+/* ---------- sample data ---------- */
+const WINDOWS = [
+  { id: "w1", kind: "claude", title: "claude · agent", dot: "running", screen: `<span class="c-v">✻</span> Welcome to <b>Claude Code</b>
+<span class="c-m">  cwd: ~/code/tri-code</span>
+
+<span class="c-a">&gt;</span> add a mono layout that centers the panel
+
+<span class="c-o">●</span> Read(src/layout.ts)
+<span class="c-m">  └  Read 61 lines</span>
+<span class="c-o">●</span> Update(src/layout.ts)
+<span class="c-m">  └  Updated with 8 additions, 1 removal</span>
+<span class="c-o">●</span> Bash(bun run typecheck)
+<span class="c-m">  └  tsc --noEmit · ok</span>
+
+<span class="c-w">✻</span> Centered column capped at MONO_MAX (1024px);
+  the leftover width becomes equal side padding.
+
+<span class="c-a">&gt;</span> <span class="cursor"> </span>` },
+  { id: "w2", kind: "pi", title: "pi · agent", dot: "running", screen: `pi  ·  tri-code
+<span class="c-m">────────────────────────────────────</span>
+
+<span class="c-o">›</span> search the repo for the tiling maths
+<span class="c-a">  ⏺</span> grep -rn "function tile" src
+<span class="c-m">    src/layout.ts:21:  export function tile(...)
+    src/Canvas.tsx:25:  function layoutOf(...)</span>
+
+<span class="c-o">›</span> why does grid stretch the last row?
+<span class="c-a">  ⏺</span> The last row uses <span class="c-v">n - cols*(rows-1)</span> so
+    remaining windows share the width.
+
+<span class="c-a">›</span> <span class="cursor"> </span>` },
+  { id: "w3", kind: "shell", title: "pwsh · ~/code/tri-code", dot: "running", screen: `PS ~/code/tri-code&gt; git status --short
+ M src/layout.ts
+ M src/state.ts
+ M src/App.tsx
+ M src/hotkeys.ts
+ M src/Help.tsx
+?? design/mono.html
+
+PS ~/code/tri-code&gt; bun run build
+vite v8.3.4 building client environment...
+<span class="c-o">✓ built in 733ms</span>
+
+PS ~/code/tri-code&gt; <span class="cursor"> </span>` },
+];
+
+let focus = "w1";
+let gap = 12;
+let variant = new URLSearchParams(location.search).get("variant") || "A";
+
+const VARIANTS = {
+  A: { name: "Stacked column", note: "Every window in one 1024px centered column" },
+  B: { name: "Monocle", note: "Only the focused window, centered" },
+  C: { name: "Carousel", note: "Focused centered; neighbours peek in the gutters" },
+};
+const ORDER = ["A", "B", "C"];
+const MONO_MAX = 1024;
+
+/* Per-layout glyphs for the toolbar segment (same three as the real app). */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ---------- tiling maths (mirrors the real src/layout.ts) ---------- */
+function rects(v, w, h) {
+  const g = gap, ax = g, ay = g, aw = Math.max(0, w - 2 * g), ah = Math.max(0, h - 2 * g);
+  const out = {};
+  const i = WINDOWS.findIndex((x) => x.id === focus);
+  if (v === "B") {
+    const cw = Math.min(aw, MONO_MAX);
+    out[focus] = { x: ax + (aw - cw) / 2, y: ay, w: cw, h: ah };
+    return out;
+  }
+  if (v === "C") {
+    const cw = Math.min(aw * 0.62, MONO_MAX), x0 = ax + (aw - cw) / 2, gut = x0 - ax;
+    out[focus] = { x: x0, y: ay, w: cw, h: ah };
+    if (gut >= 120) {
+      const prev = WINDOWS[(i - 1 + WINDOWS.length) % WINDOWS.length];
+      const next = WINDOWS[(i + 1) % WINDOWS.length];
+      const pw = gut - g;
+      if (prev.id !== focus) out[prev.id] = { x: ax, y: ay + 44, w: pw, h: Math.max(0, ah - 88) };
+      if (next.id !== focus) out[next.id] = { x: x0 + cw + g, y: ay + 44, w: pw, h: Math.max(0, ah - 88) };
+    }
+    return out;
+  }
+  const cw = Math.min(aw, MONO_MAX), x0 = ax + (aw - cw) / 2, th = (ah - g * (WINDOWS.length - 1)) / WINDOWS.length;
+  WINDOWS.forEach((win, k) => out[win.id] = { x: x0, y: ay + k * (th + g), w: cw, h: th });
+  return out;
+}
+
+/* ---------- render ---------- */
+function render() {
+  const vp = $("vp"), r = vp.getBoundingClientRect();
+  if (!r.width) return;
+  const R = rects(variant, r.width, r.height);
+  $("world").innerHTML = WINDOWS.map((win) => {
+    const q = R[win.id];
+    if (!q) return "";
+    const on = win.id === focus;
+    const peek = variant === "C" && !on;
+    return `<div class="win ${peek ? "peek" : on ? "focused" : ""}" data-id="${win.id}"
+        style="left:${Math.round(q.x)}px;top:${Math.round(q.y)}px;width:${Math.round(q.w)}px;height:${Math.round(q.h)}px;z-index:${on ? 3 : 2}">
+      <div class="bar">
+        <span class="dot ${win.dot}"></span>
+        <span class="kind">${win.kind}</span>
+        <span class="ttl">${esc(win.title)}</span>
+        <button title="Maximize">▢</button><button title="Close">×</button>
+      </div>
+      <pre class="screen">${win.screen}</pre>
+    </div>`;
+  }).join("");
+  for (const el of document.querySelectorAll(".win")) el.addEventListener("pointerdown", () => { focus = el.dataset.id; render(); });
+
+  drawGutters(r, R);
+  drawSwitcher(R);
+  drawStatus(R);
+  drawTabs();
+}
+
+function drawGutters(r, R) {
+  const box = $("gutters"), q = R[focus];
+  if (!q) { box.innerHTML = ""; return; }
+  const left = q.x, right = r.width - (q.x + q.w);
+  box.innerHTML =
+    `<div class="gut" style="left:0;width:${Math.max(0, left)}px"><span class="dim">${Math.round(left)}px</span></div>
+     <div class="gut right" style="right:0;width:${Math.max(0, right)}px"><span class="dim">${Math.round(right)}px</span></div>
+     <div class="colguide" style="left:${Math.round(q.x)}px;width:${Math.round(q.w)}px"></div>`;
+}
+
+function drawSwitcher(R) {
+  const host = $("switcher");
+  if (variant !== "B") { host.innerHTML = ""; return; }
+  const i = WINDOWS.findIndex((x) => x.id === focus);
+  const w = WINDOWS[i];
+  host.innerHTML = `<div class="mono-switch">
+    <button data-step="-1" title="Previous window">‹</button>
+    <span class="nm">${w.kind}</span>
+    <span class="pos">${i + 1} / ${WINDOWS.length}</span>
+    <button data-step="1" title="Next window">›</button>
+    <span class="hint">· ${WINDOWS.length - 1} hidden</span>
+  </div>`;
+  host.querySelectorAll("button[data-step]").forEach((b) => b.addEventListener("click", () => {
+    const n = WINDOWS.length;
+    focus = WINDOWS[(i + Number(b.dataset.step) + n) % n].id;
+    render();
+  }));
+}
+
+function drawStatus(R) {
+  const q = R[focus];
+  $("statusFocus").textContent = q
+    ? `mono · column ${Math.round(q.w)}px · pad L ${Math.round(q.x)}px / R ${Math.round($("vp").getBoundingClientRect().width - q.x - q.w)}px · gap ${gap}`
+    : "";
+  $("statusVariant").textContent = `[${variant}] ${VARIANTS[variant].name}`;
+  $("statusHint").innerHTML = "<kbd>Alt</kbd><kbd>G</kbd> layout";
+  $("where").textContent = "~/code/tri-code · mono";
+}
+
+function drawTabs() {
+  $("tabs").innerHTML = WINDOWS.map((w) => `
+    <button data-id="${w.id}" aria-selected="${w.id === focus}">
+      <span class="dot ${w.dot}"></span>${w.kind}
+    </button>`).join("");
+  for (const b of $("tabs").querySelectorAll("button")) b.addEventListener("click", () => { focus = b.dataset.id; render(); });
+}
+
+/* ---------- switcher ---------- */
+function setVariant(v, push) {
+  variant = v;
+  document.body.classList.toggle("preview", $("pw").value < 1900);
+  $("app").style.setProperty("--preview", $("pw").value + "px");
+  $("plabel").innerHTML = `<b>${v} (${VARIANTS[v].name})</b><span>${VARIANTS[v].note}</span>`;
+  const url = new URL(location.href); url.searchParams.set("variant", v);
+  // file:// documents have origin "null", where pushState throws; ignore it there.
+  try { history[push ? "pushState" : "replaceState"]({}, "", url); } catch {}
+  render();
+}
+$("prev").addEventListener("click", () => setVariant(ORDER[(ORDER.indexOf(variant) + 2) % 3], true));
+$("next").addEventListener("click", () => setVariant(ORDER[(ORDER.indexOf(variant) + 1) % 3], true));
+$("pw").addEventListener("input", (e) => {
+  $("pwv").textContent = e.target.value;
+  $("app").style.setProperty("--preview", e.target.value + "px");
+  document.body.classList.toggle("preview", Number(e.target.value) < 1900);
+  render();
+});
+$("gap").addEventListener("change", (e) => { gap = Number(e.target.value); render(); });
+$("gut").addEventListener("change", (e) => document.body.classList.toggle("gutters-on", e.target.checked));
+// Layout segment is visual only here: it just shows the three glyphs in pressed states.
+for (const b of $("layout").querySelectorAll("button"))
+  b.addEventListener("click", () => $("layout").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))));
+document.addEventListener("keydown", (e) => {
+  const t = e.target;
+  if (t.matches?.("input, select, textarea, [contenteditable]")) return;
+  if (e.key === "ArrowLeft") { e.preventDefault(); setVariant(ORDER[(ORDER.indexOf(variant) + 2) % 3], true); }
+  if (e.key === "ArrowRight") { e.preventDefault(); setVariant(ORDER[(ORDER.indexOf(variant) + 1) % 3], true); }
+});
+new ResizeObserver(() => render()).observe($("vp"));
+setVariant(variant, false);
+window.addEventListener("resize", render);
+</script>
+</body>
+</html>

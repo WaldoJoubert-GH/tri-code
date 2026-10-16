@@ -11,20 +11,40 @@ export type Tiling = {
   split?: Rect;
 };
 
+/** Widest a window gets in the mono layout; the leftover width becomes equal side padding. */
+export const MONO_MAX = 1024;
+/** Narrowest a mono peek gutter may get before the neighbours are hidden. */
+const PEEK_MIN = 120;
+
 /**
  * Tile `n` windows into a `width` x `height` area, `gap` px between windows and
  * around the edge.
  * - master: window 0 takes `ratio` of the width; the rest stack evenly on the right.
  * - grid: ceil(sqrt(n)) columns; the last row stretches to fill the width.
+ * - mono (carousel): the focused window (`focus`) sits centered in a column up to
+ *   `MONO_MAX` wide; its neighbours peek in the side gutters when there is room, and
+ *   every other window gets a zero-size rect (hidden). Peek rects are shrunk vertically
+ *   so the focused window keeps the top and bottom edge.
  * `mono` (an index) gets the whole area, drawn above the others.
  */
-export function tile(n: number, layout: Layout, ratio: number, width: number, height: number, gap: number, mono = -1): Tiling {
+export function tile(n: number, layout: Layout, ratio: number, width: number, height: number, gap: number, mono = -1, focus = -1): Tiling {
   const g = gap, ax = g, ay = g, aw = Math.max(0, width - 2 * g), ah = Math.max(0, height - 2 * g);
   const r = (x: number, y: number, w: number, h: number): Rect => ({ x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
   const rects: Rect[] = [];
   let split: Rect | undefined;
   if (n === 0) return { rects };
-  if (layout === "master" && n > 1) {
+  if (layout === "mono") {
+    const f = focus >= 0 && focus < n ? focus : 0;
+    const cw = Math.min(aw * 0.62, MONO_MAX), x0 = ax + (aw - cw) / 2, gut = x0 - ax;
+    for (let i = 0; i < n; i++) rects.push(r(0, 0, 0, 0));
+    rects[f] = r(x0, ay, cw, ah);
+    if (n > 1 && gut >= PEEK_MIN) {
+      const pw = gut - g, ph = Math.max(0, ah - 88);
+      const prev = (f - 1 + n) % n, next = (f + 1) % n;
+      rects[prev] = r(ax, ay + 44, pw, ph);
+      rects[next] = r(x0 + cw + g, ay + 44, pw, ph);
+    }
+  } else if (layout === "master" && n > 1) {
     const mw = (aw - g) * ratio, k = n - 1, sh = (ah - g * (k - 1)) / k;
     rects.push(r(ax, ay, mw, ah));
     for (let i = 0; i < k; i++) rects.push(r(ax + mw + g, ay + i * (sh + g), aw - mw - g, sh));
@@ -55,7 +75,7 @@ export function neighbour(rects: Rect[], from: number, dx: number, dy: number) {
   const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
   let best = -1, bs = Infinity;
   rects.forEach((o, i) => {
-    if (i === from) return;
+    if (i === from || o.w <= 0 || o.h <= 0) return;
     const vx = o.x + o.w / 2 - cx, vy = o.y + o.h / 2 - cy;
     const along = vx * dx + vy * dy, across = Math.abs(dx ? vy : vx);
     if (along <= 1) return;

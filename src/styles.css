@@ -144,6 +144,7 @@ aside h2 {
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.seg button svg { width: 15px; height: 15px; display: block; }
 .gapctl { align-self: center; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 6px; flex: none; }
 .gapctl select {
   font: 11px var(--mono); color: var(--text); background: var(--bg);

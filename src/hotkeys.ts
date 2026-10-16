@@ -3,7 +3,7 @@
 // handled keys never reach the terminal.
 
 import {
-  GAPS, Project, Tab, activeProject, addTab, app, focusedTab, goSpace, isTerminal, promote, sendTo, setApp, setGap,
+  GAPS, Layout, Project, Tab, activeProject, addTab, app, focusedTab, goSpace, isTerminal, promote, sendTo, setApp, setGap,
   setLayout, setRatio, space, toggleMono, visibleTabs,
 } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
@@ -30,7 +30,7 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       if (d[0] === 0) {
         flash("stack windows share height equally");
       } else if (space(p).layout !== "master" || visibleTabs(p).length < 2) {
-        flash("grid tiles share space equally; use Main + stack to resize");
+        flash("only Main + stack has a resizable split");
       } else {
         const ratio = Math.min(0.8, Math.max(0.2, space(p).ratio + d[0] * 0.05));
         setRatio(p.id, ratio);
@@ -96,9 +96,10 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       }
       return true;
     case "KeyG": {
-      const next = space(p).layout === "master" ? "grid" : "master";
+      const order: Layout[] = ["master", "grid", "mono"];
+      const next = order[(order.indexOf(space(p).layout) + 1) % order.length];
       setLayout(p.id, next);
-      flash(next === "master" ? "main + stack" : "grid");
+      flash(next === "master" ? "main + stack" : next);
       return true;
     }
     case "Comma":
