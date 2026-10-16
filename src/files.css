@@ -17,8 +17,9 @@
 .fbar .seg { margin: 0 2px; }
 .fbar .seg button { height: auto; padding: 1px 8px; }
 
-/* The project tree. */
-.files { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; outline: none; }
+/* The project tree. Kept off `.files`: `.dot.files` on a window title bar would inherit
+   this rule's `flex: 1` and stretch the status dot across the title. */
+.ftree { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; outline: none; }
 .frow {
   display: flex; align-items: center; gap: 6px; height: 24px; padding-right: 8px;
   white-space: nowrap; cursor: default; font-size: 12.5px;

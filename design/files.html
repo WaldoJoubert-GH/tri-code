@@ -168,10 +168,10 @@ aside h2 { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transfo
 .t-k { color: var(--violet); }
 .t-n { color: var(--warn); }
 /* A — explorer + editor */
-.files { flex: 1; min-height: 0; display: grid; overflow: hidden; }
-.files.split { grid-template-columns: minmax(150px, 34%) minmax(0, 1fr); }
+.ftree { flex: 1; min-height: 0; display: grid; overflow: hidden; }
+.ftree.split { grid-template-columns: minmax(150px, 34%) minmax(0, 1fr); }
 .explorer { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.files.split .explorer { border-right: 1px solid var(--line); }
+.ftree.split .explorer { border-right: 1px solid var(--line); }
 /* B — drill-down columns */
 .crumbbar {
   height: 30px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 8px;
@@ -182,12 +182,12 @@ aside h2 { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transfo
 .crumbbar button:hover { background: var(--hover); color: var(--text); }
 .crumbbar .seg-part { color: var(--text); }
 .crumbbar .up { margin-left: auto; }
-.files.miller { grid-auto-flow: column; grid-auto-columns: minmax(118px, 1fr); }
-.files.miller .col { border-right: 1px solid var(--line); min-width: 0; overflow: auto; padding: 4px 0; }
-.files.miller .col.preview { display: flex; flex-direction: column; border-right: 0; overflow: hidden; padding: 0; }
-.files.miller .col.preview .code { padding-top: 6px; }
+.ftree.miller { grid-auto-flow: column; grid-auto-columns: minmax(118px, 1fr); }
+.ftree.miller .col { border-right: 1px solid var(--line); min-width: 0; overflow: auto; padding: 4px 0; }
+.ftree.miller .col.preview { display: flex; flex-direction: column; border-right: 0; overflow: hidden; padding: 0; }
+.ftree.miller .col.preview .code { padding-top: 6px; }
 /* C — quick open + tabs */
-.files.quick { position: relative; display: block; }
+.ftree.quick { position: relative; display: block; }
 .qview { display: flex; flex-direction: column; height: 100%; min-width: 0; }
 .qtabs { height: 30px; flex: none; display: flex; align-items: stretch; gap: 1px; padding: 0 6px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .qtabs button { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); font: 12px var(--mono); border-right: 1px solid var(--line); white-space: nowrap; }
@@ -480,7 +480,7 @@ function treeHtml(nodes, depth, prefix) {
 /* ---------- variants ---------- */
 function variantA() {
   return win({ dot: "files", kind: "files", title: `tri-code · ${flatFiles().length} files`, cls: "fileswin", body:
-    `<div class="files split">
+    `<div class="ftree split">
        <div class="explorer">
          <div class="pane-head"><span class="proj">tri-code</span><span class="path">~/code/tri-code</span></div>
          <div class="tree">${treeHtml(TREE, 0, "")}</div>
@@ -511,7 +511,7 @@ function variantB() {
     + `<span class="sepc">›</span><span class="seg-part">${st.sel.split("/").pop()}</span>`;
   return win({ dot: "files", kind: "files", title: `tri-code · ${st.sel}`, cls: "fileswin", body:
     `<div class="crumbbar">${crumb}${st.drill.length ? `<button class="up" data-up title="Up one level (⌫)">↑</button>` : ""}</div>
-     <div class="files miller">
+     <div class="ftree miller">
        ${cols.join("")}
        <div class="col preview"><div class="pane-head"><span class="crumb">${st.sel.split("/").pop()}</span><span class="meta">${meta(st.sel)}</span></div>
          <pre class="code">${codeHtml(CONTENT[st.sel] ?? "")}</pre></div>
@@ -535,7 +535,7 @@ function variantC() {
       <div class="qhint"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open</div>
     </div>` : "";
   return win({ dot: "files", kind: "files", title: st.active, cls: "fileswin", body:
-    `<div class="files quick"><div class="qview">
+    `<div class="ftree quick"><div class="qview">
        <div class="qtabs">${tabs}<button class="qtoggle" data-quick-toggle title="Quick open (Ctrl+P)">⌘P  Quick open</button></div>
        <pre class="code">${codeHtml(CONTENT[st.active] ?? "")}</pre>
      </div>${panel}</div>` }) + termWin();

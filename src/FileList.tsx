@@ -96,7 +96,7 @@ export default function FileList(props: { project: Project; tab: Tab; focused: b
         <button title="Refresh (reloads the whole tree and open files)" onClick={() => refreshProject(props.project)}>⟳</button>
       </div>
       <div
-        class="files"
+        class="ftree"
         ref={rootEl}
         tabIndex={0}
         onKeyDown={onKey}
