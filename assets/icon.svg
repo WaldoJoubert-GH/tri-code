@@ -1,4 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#4f46e5"/>
-  <text x="32" y="32" dy="0.35em" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#ffffff">TC</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+  <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2a55"/><stop offset="1" stop-color="#070b18"/></linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6d58a"/><stop offset="1" stop-color="#d79a3e"/></linearGradient>
+  <clipPath id="sq"><rect width="1024" height="1024" rx="224"/></clipPath>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#g)"/>
+  <g clip-path="url(#sq)">
+  <g fill="url(#gold)" stroke="url(#gold)" stroke-linejoin="round">
+  <path d="M342 262 V372 Q342 464 512 464 Q682 464 682 372 V262" fill="none" stroke-width="58" stroke-linecap="round"/>
+  <rect x="483" y="200" width="58" height="620" rx="29" stroke="none"/>
+  <path d="M342 146 L404 266 L342 240 L280 266 Z" stroke-width="20"/>
+  <path d="M512 100 L574 220 L512 194 L450 220 Z" stroke-width="20"/>
+  <path d="M682 146 L744 266 L682 240 L620 266 Z" stroke-width="20"/>
+  </g>
+  <path d="M-160 650 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 V1100 H-200 Z" fill="#0e1a3a"/>
+  <path d="M-160 650 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0" fill="none" stroke="#7dcfff" stroke-width="40" stroke-linecap="round"/>
+  <path d="M-96 752 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 V1100 H-200 Z" fill="#0b1530"/>
+  <path d="M-96 752 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0" fill="none" stroke="#7aa2f7" stroke-width="40" stroke-linecap="round"/>
+  <path d="M-160 854 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 V1100 H-200 Z" fill="#09102a"/>
+  <path d="M-160 854 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0 q32 -34 64 0 t64 0" fill="none" stroke="#bb9af7" stroke-width="40" stroke-linecap="round"/>
+  </g>
 </svg>
