@@ -120,7 +120,7 @@ aside h2 {
 
 /* Toolbar */
 .top {
-  grid-area: top; display: flex; align-items: stretch; background: var(--panel);
+  grid-area: top; display: flex; align-items: stretch; background: var(--panel); container-type: inline-size;
   border-bottom: 1px solid var(--line); min-width: 0; overflow-x: auto; scrollbar-width: none;
 }
 .top .new { display: flex; flex: none; }
@@ -130,6 +130,7 @@ aside h2 {
   align-self: center; padding: 0 12px; color: var(--muted); font-size: 11px;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1;
 }
+@container (max-width: 1275px) { .top .where { padding: 0; } }
 .top .sep { width: 1px; background: var(--line); margin: 7px 6px; flex: none; }
 .seg { display: flex; align-self: center; flex: none; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 0 4px; }
 .seg button { padding: 2px 9px; color: var(--muted); font-size: 12px; white-space: nowrap; }

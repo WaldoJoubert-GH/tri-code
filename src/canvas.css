@@ -297,11 +297,12 @@
 .minibar { display: flex; gap: 1px; width: 26px; height: 4px; border-radius: 2px; overflow: hidden; flex: none; }
 .minibar i { height: 100%; }
 .rail .project .minibar { display: none; }
-/* Toolbar: the project's In Progress issues, next to Appearance. One click drills into the issue */
-.prog { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; margin: 0 4px; overflow: hidden; }
+/* Toolbar: the project's In Progress issues, next to Appearance. One click drills into the issue.
+   Never shrinks to nothing: on a narrow toolbar (container query on .top) only the first chip stays, as dot + ID. */
+.prog { display: flex; align-items: center; gap: 4px; flex: none; margin: 0 4px; }
 .prog button {
-  display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 260px; height: 22px; padding: 0 8px 0 6px;
-  border: 1px solid var(--line); border-radius: 11px; background: var(--bg); color: var(--text); font-size: 12px; flex: 0 1 auto;
+  display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; max-width: 260px; height: 22px; padding: 0 8px 0 6px;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--bg); color: var(--text); font-size: 12px;
 }
 .prog button:hover { border-color: var(--accent); }
 .prog button.run { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
@@ -312,9 +313,8 @@
 .prog .pe .rec { margin-right: 4px; }
 .prog .more { color: var(--muted); padding: 0 8px; flex: none; }
 /* only the first chip (the timed or most urgent issue) spends room on its title; the rest show the ID, title on hover */
-.prog button + button { flex: none; }
 .prog button + button .pt { display: none; }
-@media (max-width: 1100px) { .prog .pt { display: none; } }
+@container (max-width: 1275px) { .prog button + button, .prog .pt, .prog .pe { display: none; } }
 .status .timer { flex: none; color: var(--muted); font: 11px var(--mono); }
 .status .timer b { color: var(--accent); font-weight: 600; }
 /* Running Entry marker */
