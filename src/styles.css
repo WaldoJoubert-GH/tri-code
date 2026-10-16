@@ -123,9 +123,16 @@ aside h2 {
   grid-area: top; display: flex; align-items: stretch; background: var(--panel); container-type: inline-size;
   border-bottom: 1px solid var(--line); min-width: 0; overflow-x: auto; scrollbar-width: none;
 }
-.top .new { display: flex; flex: none; }
-.top .new button, .top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
-.top .new button:hover, .top .tool:hover { color: var(--text); background: var(--hover); }
+/* Tab strip: the workspace's windows, underlined while focused, then `+` for the New window menu */
+.tabs { display: flex; align-items: stretch; flex: none; }
+.tabs .tab, .tabs .tab-add { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; box-shadow: inset 0 -2px transparent; }
+.tabs .tab .glyph { font-size: 12.5px; line-height: 1; }
+.tabs .tab:hover, .tabs .tab-add:hover { color: var(--text); background: var(--hover); }
+.tabs .tab[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.tabs .tab .att { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); }
+.tabs .tab-add { justify-content: center; width: 30px; padding: 0; font-size: 15px; }
+.top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
+.top .tool:hover { color: var(--text); background: var(--hover); }
 .top .where {
   align-self: center; padding: 0 12px; color: var(--muted); font-size: 11px;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1;
@@ -162,6 +169,18 @@ aside h2 {
 .spaces button.target { background: color-mix(in srgb, var(--accent) 35%, var(--raised)); color: var(--text); outline: 2px dashed var(--accent); }
 .theme-btn { display: flex; align-items: center; gap: 6px; }
 .theme-btn i { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
+
+/* New window menu (the toolbar's `+`). Fixed, so the scrolling toolbar cannot clip it */
+.tabmenu {
+  position: fixed; z-index: 10000; min-width: 192px; padding: 4px; display: grid;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 18px 50px -12px var(--shadow);
+}
+.tabmenu .mt { padding: 5px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.tabmenu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 5px; color: var(--muted); font-size: 12.5px; text-align: left; }
+.tabmenu button:hover { background: var(--hover); color: var(--text); }
+.tabmenu button .glyph { width: 14px; font-size: 12.5px; line-height: 1; text-align: center; }
+.tabmenu button kbd { margin-left: auto; }
 
 /* Stage: the canvas area the windows are drawn on */
 .stage { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); min-width: 0; min-height: 0; }

@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tri-code · tab button prototype</title>
+<!--
+  PROTOTYPE — throwaway. Not imported by the app; open this file directly in a browser
+  (or visit /design/tabs.html on the dev server).
+
+  Question: "What should the tab buttons look like / how should they work, if we keep it
+  simple and minimal?" The row under test is the toolbar's tab controls: today six text
+  buttons, `+ claude | + pi | + shell | + browser | + issues | + files` — ~330px of the
+  34px toolbar, the widest thing in it, and the only place tabs are created.
+
+  Five variants, A–E, switchable from the floating bar at the bottom (also ← / → keys,
+  `c` for a side-by-side compare). URL keeps the choice: tabs.html?variant=B (served) or
+  tabs.html#B (file://). Every variant really adds / focuses / closes windows in the mock
+  canvas below, and the status line prints the resulting state.
+
+  OUTCOME (settled): variant E — quiet underline tabs of the open windows, plus a bare `+`
+  for the New Window Menu. It shipped in src/tabs.tsx (<TabStrip>, <TabMenu>), replacing the
+  six `+ kind` buttons in App.tsx <Toolbar>, with styles in src/styles.css (.tabs, .tabmenu).
+  C was the runner-up (one segmented strip); B and D were rejected for hiding the labels or
+  costing a menu click on every new tab.
+
+  A  Text buttons, all six, always        (baseline, what ships now)
+  B  Icon-only glyphs, all six           (narrowest; presence dots on open kinds)
+  C  Open tabs as a segmented strip + `+` menu
+  D  One `+ New` button, one menu        (nothing else in the row)
+  E  Quiet underline tabs + bare `+`     (open tabs only, no boxes)
+
+  How each would land in the app (not built here):
+  - App.tsx <Toolbar> renders exactly one <div class="new"> row today; whichever variant
+    wins replaces that one div, so the blast radius is App.tsx + styles.css.
+  - B needs a kind→glyph map (works for keyboard-free scanning, loses the label text).
+  - C and E read p.tabs for the active workspace (state.ts `visibleTabs`/`space`) and call
+    focusTab() instead of addTab() for tabs that already exist — a behaviour change, not
+    just CSS: clicking a tab button becomes "go to" as well as "create".
+  - C/D/E open a menu; the toolbar scrolls (overflow-x: auto), so the menu has to be
+    rendered outside it — the AppearancePopover precedent in App.tsx. This prototype
+    cheats by letting .top overflow.
+  - Nothing here needs new persistence: open tabs and focus already live in state.json.
+-->
+<style>
+/* ---- palette: copied from design/canvas.html, which mirrors src/styles.css ---- */
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --violet: #7c4dbd; --scrim: rgba(30,34,44,.35); --shadow: rgba(30,34,44,.22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --violet: #bb9af7; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+    --accent: var(--accent-raw);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 13px/1.4 var(--ui); overflow: hidden; user-select: none;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+kbd {
+  font: 10.5px var(--mono); padding: 0 4px; border: 1px solid var(--line);
+  border-bottom-width: 2px; border-radius: 3px; color: var(--muted); background: var(--bg);
+}
+
+/* ---- app shell (from design/files.html) ---- */
+.app {
+  display: grid; height: 100%;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 34px 1fr 26px;
+  grid-template-areas: "side top" "side canvas" "side status";
+}
+aside { grid-area: side; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 6px 8px; overflow-y: auto; }
+.side-head { display: flex; align-items: center; justify-content: space-between; height: 26px; padding-left: 8px; }
+.side-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.collapse { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+aside h2 { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.project { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.project:hover { background: var(--hover); }
+.project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
+.project .swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--pa); flex: none; }
+.project .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project .count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.add { width: 100%; margin-top: 10px; padding: 6px 8px; text-align: left; color: var(--muted); border-radius: 5px; }
+.add:hover { background: var(--hover); color: var(--text); }
+
+/* The toolbar. overflow is visible here only so the variant menus can hang out of it;
+   the real .top scrolls horizontally, so a real menu would render at App level. */
+.top {
+  grid-area: top; position: relative; display: flex; align-items: stretch; background: var(--panel);
+  border-bottom: 1px solid var(--line); min-width: 0; overflow: visible;
+}
+.top .sep { width: 1px; background: var(--line); margin: 7px 6px; flex: none; }
+.top .where {
+  align-self: center; padding: 0 12px; color: var(--muted); font-size: 11px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1;
+}
+.top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
+.top .tool:hover { color: var(--text); background: var(--hover); }
+.seg { display: flex; align-self: center; flex: none; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 0 4px; }
+.seg button { padding: 2px 9px; color: var(--muted); font-size: 12px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.spaces { display: flex; align-self: center; gap: 2px; margin: 0 4px; flex: none; }
+.spaces button {
+  position: relative; width: 26px; height: 22px; border-radius: 4px; color: var(--muted);
+  font: 600 11px var(--mono); border: 1px solid transparent;
+}
+.spaces button:hover { background: var(--hover); color: var(--text); }
+.spaces button.used { color: var(--text); }
+.spaces button[aria-current="true"] { background: color-mix(in srgb, var(--accent) 22%, var(--raised)); border-color: var(--accent); color: var(--text); }
+.spaces button.att::before {
+  content: ""; position: absolute; top: -2px; right: -2px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--warn); box-shadow: 0 0 0 2px var(--panel);
+}
+.gapctl { align-self: center; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 6px; flex: none; }
+.gapctl select { font: 11px var(--mono); color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 2px; outline: none; }
+
+/* ---- the row under test ---- */
+.tabzone { position: relative; display: flex; align-items: stretch; flex: none; }
+.tabzone .lead { align-self: center; padding: 0 1px 0 10px; color: var(--muted); font-size: 13px; }
+.tabzone button { white-space: nowrap; color: var(--muted); }
+.tabzone button:hover { color: var(--text); }
+.tabzone .g { font-size: 12.5px; line-height: 1; }
+
+/* A — text buttons, all six, always (what ships today) */
+.tabs-a { display: flex; }
+.tabs-a button { padding: 0 10px; }
+.tabs-a button:hover { background: var(--hover); }
+
+/* B — icon-only, all six */
+.tabs-b { display: flex; align-items: center; gap: 1px; padding-left: 6px; }
+.tabs-b button { position: relative; width: 26px; height: 22px; border-radius: 4px; font-size: 13px; line-height: 1; }
+.tabs-b button:hover { background: var(--hover); }
+.tabs-b button.on { color: var(--text); }
+.tabs-b button.on::after {
+  content: ""; position: absolute; left: 50%; bottom: 1px; width: 5px; height: 2px;
+  border-radius: 1px; background: var(--muted); transform: translateX(-50%);
+}
+
+/* C — open tabs as a segmented strip, then one + menu */
+.tabs-c { display: flex; align-items: center; gap: 4px; padding-left: 8px; }
+.tabs-c .strip { display: flex; align-self: center; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.tabs-c .strip button { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; font-size: 12px; }
+.tabs-c .strip button + button { border-left: 1px solid var(--line); }
+.tabs-c .strip button:hover { background: var(--hover); }
+.tabs-c .strip button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.tabs-c .add { width: 22px; height: 22px; border-radius: 4px; font-size: 14px; }
+.tabs-c .add:hover { background: var(--hover); }
+.tabs-c .empty { align-self: center; color: var(--muted); font-size: 11.5px; }
+
+/* D — a single + New button */
+.tabs-d { display: flex; align-items: center; padding-left: 8px; }
+.tabs-d .newbtn {
+  display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px;
+  border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--text); font-size: 12px;
+}
+.tabs-d .newbtn:hover { border-color: var(--accent); }
+.tabs-d .newbtn .car { color: var(--muted); font-size: 8px; }
+
+/* E — quiet underline tabs, open tabs only */
+.tabs-e { display: flex; align-items: stretch; padding-left: 4px; }
+.tabs-e button { display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 12.5px; box-shadow: inset 0 -2px transparent; }
+.tabs-e button:hover { color: var(--text); }
+.tabs-e button[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.tabs-e .plus { justify-content: center; width: 26px; font-size: 15px; box-shadow: none; }
+
+/* the shared kind menu (C, D, E) */
+.menu {
+  position: absolute; top: 31px; left: 8px; z-index: 5; min-width: 194px; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 20px 50px -12px var(--shadow);
+}
+.menu .mt { padding: 5px 8px 4px; color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 5px; font-size: 12.5px; text-align: left; }
+.menu button:hover { background: var(--hover); color: var(--text); }
+.menu .g { width: 14px; text-align: center; }
+.menu kbd, .menu .hint { margin-left: auto; }
+.menu .hint { color: var(--muted); font: 11px var(--mono); }
+
+/* ---- mock canvas: one window per open tab (the real app tiles via layout.ts) ---- */
+.viewport { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); }
+.world { position: absolute; inset: 0; display: grid; gap: 12px; padding: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+.world > .win { min-width: 0; min-height: 0; }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12.5px; }
+.win { display: flex; flex-direction: column; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.win.attention:not(.focused) { border-color: var(--warn); animation: bell 1.6s ease-in-out infinite; }
+@keyframes bell { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .win.attention:not(.focused) { animation: none; } }
+.bar {
+  height: 28px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px;
+  background: var(--panel); border-bottom: 1px solid var(--line); cursor: grab; color: var(--muted);
+}
+.win.focused .bar { color: var(--text); }
+.bar .kind { font-weight: 600; }
+.bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); }
+.bar button:hover { background: var(--hover); color: var(--text); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.running { background: var(--ok); }
+.dot.web { background: var(--accent); border-radius: 2px; }
+.dot.panel { background: var(--violet); border-radius: 2px; }
+.screen { flex: 1; margin: 0; padding: 8px 10px; overflow: hidden; white-space: pre; font: 12.5px/17px var(--mono); color: var(--text); user-select: text; }
+.win:not(.focused) .screen { opacity: .75; }
+.c-a { color: var(--accent); } .c-m { color: var(--muted); } .c-o { color: var(--ok); } .c-v { color: var(--violet); }
+
+/* ---- status bar ---- */
+.status {
+  grid-area: status; display: flex; align-items: center; gap: 12px; padding: 0 10px;
+  background: var(--panel); border-top: 1px solid var(--line); color: var(--muted);
+  font-size: 11px; white-space: nowrap; overflow: hidden;
+}
+.status .state { color: var(--text); font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+.status .flash { color: var(--accent); }
+.status .hints { margin-left: auto; display: flex; gap: 12px; }
+
+/* ---- prototype switcher + compare (throwaway, above everything) ---- */
+.proto-bar {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9999;
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 8px;
+  background: #14161cf2; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px;
+  box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); font: 12px/1.35 var(--ui);
+}
+.proto-bar .tag { font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; border: 1px solid #3a3f4d; border-radius: 999px; padding: 4px 7px; }
+.proto-bar button.arrow { width: 26px; height: 26px; border-radius: 7px; color: #cfd5e4; font-size: 15px; }
+.proto-bar button.arrow:hover, .proto-bar button.cmp:hover { background: #262b36; color: #fff; }
+.proto-bar button.cmp { height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid #3a3f4d; color: #cfd5e4; font-size: 11.5px; }
+.proto-bar .cur { min-width: 268px; }
+.proto-bar .cur b { font: 600 12px var(--mono); color: #fff; }
+.proto-bar .cur span { display: block; color: #9aa3b8; font-size: 11px; }
+.proto-bar .keys { color: #6f778c; font-size: 10.5px; }
+
+.compare {
+  position: fixed; inset: 0; z-index: 9998; overflow: auto; padding: 26px 26px 100px;
+  background: #0a0b0ef5; display: grid; gap: 12px; align-content: start;
+}
+.compare[hidden] { display: none; }
+.compare .chead { display: flex; align-items: baseline; gap: 10px; padding: 0 2px 2px; color: #cfd5e4; }
+.compare .chead b { font: 600 12px var(--mono); }
+.compare .chead span { color: #6f778c; font-size: 11px; margin-left: auto; }
+.ccard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.ccard header { display: flex; align-items: baseline; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.ccard header b { font: 600 12px var(--mono); color: var(--text); }
+.ccard header span { color: var(--muted); font-size: 11.5px; }
+.crow { display: flex; align-items: stretch; height: 36px; padding: 0 6px; pointer-events: none; opacity: .92; }
+.crow .empty { position: static; justify-content: flex-start; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="side-head"><span>Projects</span><button class="collapse" title="Collapse sidebar">«</button></div>
+    <section>
+      <h2>local</h2>
+      <div class="project active" style="--pa:#7aa2f7"><span class="swatch"></span><span class="name">tri-code</span><span class="count" id="sideCount">3</span></div>
+      <div class="project" style="--pa:#9ece6a"><span class="swatch"></span><span class="name">dotfiles</span><span class="count">1</span></div>
+    </section>
+    <section>
+      <h2>devbox</h2>
+      <div class="project" style="--pa:#ff9e64"><span class="swatch"></span><span class="name">infra</span><span class="count">2</span></div>
+    </section>
+    <button class="add">+ Add project</button>
+  </aside>
+
+  <div class="top">
+    <div class="tabzone" id="tabzone"></div>
+    <div class="sep"></div>
+    <div class="spaces" id="spaces" role="group" aria-label="Workspaces"></div>
+    <div class="sep"></div>
+    <div class="seg" role="group" aria-label="Tiling layout" id="layout">
+      <button data-layout="master" aria-pressed="true" title="Main + stack (Alt+G)">Main + stack</button>
+      <button data-layout="grid" aria-pressed="false" title="Grid (Alt+G)">Grid</button>
+    </div>
+    <label class="gapctl">Gap
+      <select><option>0</option><option>4</option><option>8</option><option selected>12</option><option>16</option><option>24</option></select>
+    </label>
+    <span class="where">~/code/tri-code</span>
+    <button class="tool" title="Project appearance (Alt+P)">◐ Appearance</button>
+    <button class="tool" title="Hotkeys (Alt+/)">?</button>
+  </div>
+
+  <div class="viewport">
+    <div class="world" id="world"></div>
+    <div class="empty" id="worldEmpty" hidden></div>
+  </div>
+
+  <div class="status">
+    <span class="state" id="state"></span>
+    <span class="flash" id="flash"></span>
+    <div class="hints">
+      <span><kbd>Alt</kbd><kbd>1–4</kbd> workspace</span>
+      <span><kbd>Alt</kbd><kbd>B I E</kbd> browser issues files</span>
+      <span><kbd>Alt</kbd><kbd>Q</kbd> close</span>
+    </div>
+  </div>
+</div>
+
+<div class="proto-bar">
+  <span class="tag">prototype</span>
+  <button class="arrow" id="prev" title="Previous variant (←)">‹</button>
+  <div class="cur"><b id="vlabel">A · Text buttons</b><span id="vdesc"></span></div>
+  <button class="arrow" id="next" title="Next variant (→)">›</button>
+  <button class="cmp" id="cmp" title="All variants at once (c)">≡ compare</button>
+  <span class="keys">← → switch · c compare · ?variant=A…E</span>
+</div>
+
+<div class="compare" id="compare" hidden></div>
+
+<script>
+/* ---------- kinds (mock: one tab per kind per workspace, so the row can key by kind;
+   the real app keys tabs by id and allows several of the same kind) ---------- */
+const KINDS = [
+  { k: "claude",  g: "✳", key: "Alt+↵" },
+  { k: "pi",      g: "π", key: "Alt+↵" },
+  { k: "shell",   g: "›", key: "Alt+↵" },
+  { k: "browser", g: "◎", key: "Alt+B" },
+  { k: "issues",  g: "☑", key: "Alt+I" },
+  { k: "files",   g: "▤", key: "Alt+E" },
+];
+const byKind = Object.fromEntries(KINDS.map((x) => [x.k, x]));
+const TITLE = {
+  claude: "claude · tri-code", pi: "pi · tri-code", shell: "~/code/tri-code",
+  browser: "localhost:5173", issues: "PI · tri-code", files: "~/code/tri-code files",
+};
+const DOT = { claude: "running", pi: "running", shell: "running", browser: "web", issues: "panel", files: "panel" };
+const BODY = {
+  claude: '<span class="c-a">✳</span> make the tab row quieter\n<span class="c-m">  · read App.tsx Toolbar() · 9.1k tokens</span>\n<span class="c-a">&gt;</span> ▍',
+  pi:     '<span class="c-v">π</span> prototype the tab buttons\n<span class="c-m">  · design/tabs.html · 5 variants</span>\n<span class="c-v">&gt;</span> ▍',
+  shell:  '<span class="c-o">$</span> bun dev\n<span class="c-m">  vite v8 · ready in 214 ms</span>\n<span class="c-m">  ➜  localhost:5173</span>\n<span class="c-o">$</span> ▍',
+  browser:'<span class="c-m">localhost:5173</span>\n\n  tri-code\n  <span class="c-m">tabs, tiled</span>',
+  issues: '<span class="c-o">●</span> TRI-42  Tab buttons, five ways   <span class="c-m">In Progress</span>\n<span class="c-m">○</span> TRI-41  Replace the tab bar      <span class="c-m">Done</span>\n<span class="c-m">○</span> TRI-38  Files window             <span class="c-m">In Review</span>',
+  files:  '<span class="c-m">▾ src/</span>\n    App.tsx     <span class="c-m">9.1k</span>\n    styles.css  <span class="c-m">8.4k</span>\n    Canvas.tsx  <span class="c-m">14k</span>',
+};
+
+const ORDER = ["A", "B", "C", "D", "E"];
+const NAMES = {
+  A: "Text buttons",
+  B: "Icon-only",
+  C: "Open tabs + + menu",
+  D: "One + New button",
+  E: "Quiet underline tabs",
+};
+const DESC = {
+  A: "Six labels, ~330px of toolbar. Nothing hidden, nothing to learn.",
+  B: "~160px. Saves the most room; glyphs need hover titles to be readable.",
+  C: "Shows what is open, so buttons are go-to as well as new. Widest when busy.",
+  D: "Smallest row; every new tab costs a click + a choice.",
+  E: "Calmest look, no boxes. Open tabs only, + opens the same menu.",
+};
+
+/* ---------- state: 4 workspaces, memory only ---------- */
+const t = (k) => ({ kind: k });
+const st = {
+  v: "A", ws: 0, menu: null, layout: "master",
+  spaces: [
+    { tabs: [t("claude"), t("shell"), t("browser")], focus: "shell", att: [] },
+    { tabs: [t("pi"), t("issues")], focus: "pi", att: ["issues"] },
+    { tabs: [], focus: null, att: [] },
+    { tabs: [t("files")], focus: "files", att: [] },
+  ],
+};
+const cur = () => st.spaces[st.ws];
+const has = (k) => cur().tabs.some((x) => x.kind === k);
+
+/* ---------- actions ---------- */
+const flashEl = document.getElementById("flash");
+let flashTimer = 0;
+function flash(msg) {
+  flashEl.textContent = msg;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { flashEl.textContent = ""; }, 2200);
+}
+function add(kind) {
+  if (!has(kind)) cur().tabs.push(t(kind));
+  cur().focus = kind;
+  st.menu = null;
+  flash(`new ${kind}`);
+  render();
+}
+function focusTab(kind) { cur().focus = kind; st.menu = null; flash(`focus ${kind}`); render(); }
+function closeTab(kind) {
+  const sp = cur();
+  const i = sp.tabs.findIndex((x) => x.kind === kind);
+  sp.tabs = sp.tabs.filter((x) => x.kind !== kind);
+  // focus the neighbour that slid into the gap, as a browser tab strip would
+  if (sp.focus === kind) sp.focus = sp.tabs[Math.min(i, sp.tabs.length - 1)]?.kind ?? null;
+  flash(`closed ${kind}`);
+  render();
+}
+function goWs(i) { st.ws = i; st.menu = null; flash(`workspace ${i + 1}`); render(); }
+
+/* ---------- the five rows (pure: state in, HTML out) ---------- */
+function menuHtml() {
+  return `<div class="menu" role="menu"><div class="mt">New tab</div>` + KINDS.map((x) =>
+    `<button role="menuitem" data-add="${x.k}"><span class="g">${x.g}</span>${x.k}` +
+    (has(x.k) ? `<span class="hint">open</span>` : `<kbd>${x.key}</kbd>`) + `</button>`).join("") + `</div>`;
+}
+function rowA() {
+  return `<div class="tabs-a">` + KINDS.map((x) => `<button data-add="${x.k}" title="New ${x.k} (${x.key})">+ ${x.k}</button>`).join("") + `</div>`;
+}
+function rowB() {
+  return `<span class="lead">+</span><div class="tabs-b">` + KINDS.map((x) =>
+    `<button class="${has(x.k) ? "on" : ""}" data-add="${x.k}" title="New ${x.k} (${x.key})" aria-label="New ${x.k}"><span class="g">${x.g}</span></button>`).join("") + `</div>`;
+}
+function rowC(s) {
+  const sp = s.spaces[s.ws];
+  const strip = sp.tabs.length
+    ? `<div class="strip">` + sp.tabs.map((tab) => {
+        const x = byKind[tab.kind];
+        return `<button data-focus="${x.k}" aria-pressed="${sp.focus === x.k}" title="${TITLE[x.k]}">` +
+          `<span class="g">${x.g}</span>${x.k}` +
+          (sp.att.includes(x.k) ? `<span class="g" style="color:var(--warn)">●</span>` : "") + `</button>`;
+      }).join("") + `</div>`
+    : `<span class="empty">no tabs on this workspace</span>`;
+  return `<div class="tabs-c">${strip}<button class="add" data-menu="1" title="New tab" aria-label="New tab">+</button>` + (s.menu ? menuHtml() : "") + `</div>`;
+}
+function rowD(s) {
+  return `<div class="tabs-d"><button class="newbtn" data-menu="1" aria-haspopup="menu">+ New <span class="car">▼</span></button>` + (s.menu ? menuHtml() : "") + `</div>`;
+}
+function rowE(s) {
+  const sp = s.spaces[s.ws];
+  return `<div class="tabs-e">` + sp.tabs.map((tab) => {
+    const x = byKind[tab.kind];
+    return `<button data-focus="${x.k}" aria-pressed="${sp.focus === x.k}" title="${TITLE[x.k]}">` +
+      `<span class="g">${x.g}</span>${x.k}` +
+      (sp.att.includes(x.k) ? `<span class="g" style="color:var(--warn)">●</span>` : "") + `</button>`;
+  }).join("") + `<button class="plus" data-menu="1" title="New tab" aria-label="New tab">+</button>` + (s.menu ? menuHtml() : "") + `</div>`;
+}
+const BUILD = { A: rowA, B: rowB, C: rowC, D: rowD, E: rowE };
+const row = (v, s) => BUILD[v](s);
+
+/* ---------- the rest of the mock shell ---------- */
+function spacesHtml() {
+  return st.spaces.map((sp, i) => {
+    const classes = ["used", i === st.ws ? "cur" : "", sp.att.length ? "att" : ""].filter(Boolean).join(" ");
+    return `<button data-ws="${i}" class="${classes}" aria-current="${i === st.ws}" title="Workspace ${i + 1}: ${sp.tabs.map((x) => x.kind).join(", ") || "empty"}">${i + 1}</button>`;
+  }).join("");
+}
+function windowsHtml() {
+  const sp = cur();
+  return sp.tabs.map((tab) => {
+    const x = byKind[tab.kind];
+    const att = sp.att.includes(x.k) && sp.focus !== x.k;
+    return `<div class="win ${sp.focus === x.k ? "focused" : ""} ${att ? "attention" : ""}" data-win="${x.k}">
+      <div class="bar"><span class="dot ${DOT[x.k]}"></span><span class="kind">${x.k}</span><span class="ttl">${TITLE[x.k]}</span>` +
+      `<button data-max="${x.k}" title="Maximize (Alt+F)">▢</button><button data-close="${x.k}" title="Close (Alt+Q)">×</button></div>
+      <pre class="screen">${BODY[x.k]}</pre>
+    </div>`;
+  }).join("");
+}
+function stateText() {
+  const sp = cur();
+  const tabs = sp.tabs.map((x) => (x.kind === sp.focus ? x.kind + "*" : x.kind)).join(", ") || "—";
+  return `ws ${st.ws + 1}/${st.spaces.length} · ${sp.tabs.length} tabs: ${tabs} · focus ${sp.focus ?? "none"}`;
+}
+
+/* ---------- render ---------- */
+const tabzone = document.getElementById("tabzone");
+const world = document.getElementById("world");
+const worldEmpty = document.getElementById("worldEmpty");
+const vlabel = document.getElementById("vlabel");
+const vdesc = document.getElementById("vdesc");
+const stateEl = document.getElementById("state");
+
+function render() {
+  tabzone.innerHTML = row(st.v, st);
+  world.innerHTML = windowsHtml();
+  worldEmpty.hidden = cur().tabs.length > 0;
+  worldEmpty.textContent = `Workspace ${st.ws + 1} is empty · Alt+↵ for a shell, or use the tab buttons above`;
+  document.getElementById("spaces").innerHTML = spacesHtml();
+  document.getElementById("sideCount").textContent = String(st.spaces.reduce((n, s) => n + s.tabs.length, 0));
+  vlabel.textContent = `${st.v} · ${NAMES[st.v]}`;
+  vdesc.textContent = DESC[st.v];
+  stateEl.textContent = stateText();
+  if (compareOpen) buildCompare();
+}
+
+/* ---------- events ---------- */
+tabzone.addEventListener("click", (e) => {
+  const el = e.target.closest("button");
+  if (!el) return;
+  if (el.dataset.add) return add(el.dataset.add);
+  if (el.dataset.focus) return focusTab(el.dataset.focus);
+  if (el.dataset.menu) { st.menu = st.menu ? null : 1; render(); return; }
+});
+document.addEventListener("click", (e) => {
+  if (st.menu && !e.target.closest(".menu") && !e.target.closest("[data-menu]")) { st.menu = null; render(); }
+});
+world.addEventListener("click", (e) => {
+  const el = e.target.closest("button");
+  if (!el) return;
+  if (el.dataset.close) return closeTab(el.dataset.close);
+  if (el.dataset.max) { focusTab(el.dataset.max); flash(`main + stack · ${el.dataset.max} gets the big tile`); return; }
+});
+document.getElementById("spaces").addEventListener("click", (e) => {
+  const el = e.target.closest("button[data-ws]");
+  if (el) goWs(+el.dataset.ws);
+});
+document.getElementById("layout").addEventListener("click", (e) => {
+  const el = e.target.closest("button[data-layout]");
+  if (!el) return;
+  st.layout = el.dataset.layout;
+  [...e.currentTarget.children].forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.layout === st.layout)));
+  flash(st.layout === "master" ? "main + stack" : "grid");
+});
+
+/* ---------- variant switcher + compare ---------- */
+function setVariant(v, push) {
+  if (!ORDER.includes(v)) v = "A";
+  st.v = v; st.menu = null;
+  if (push) {
+    try {
+      if (location.protocol === "file:") location.hash = v;
+      else { const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null, "", u); }
+    } catch { /* ignore */ }
+  }
+  render();
+}
+const cycle = (d) => setVariant(ORDER[(ORDER.indexOf(st.v) + d + ORDER.length) % ORDER.length], true);
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+
+let compareOpen = false;
+const compare = document.getElementById("compare");
+function buildCompare() {
+  compare.innerHTML = `<div class="chead"><b>all five, same state</b><span>click anywhere to close</span></div>` +
+    ORDER.map((v) => `<div class="ccard"><header><b>${v} · ${NAMES[v]}</b><span>${DESC[v]}</span></header><div class="crow">${row(v, { ...st, menu: null })}</div></div>`).join("");
+}
+function setCompare(on) {
+  compareOpen = on;
+  compare.hidden = !on;
+  document.getElementById("cmp").textContent = on ? "≡ close" : "≡ compare";
+  if (on) buildCompare();
+}
+document.getElementById("cmp").onclick = (e) => { e.stopPropagation(); setCompare(!compareOpen); };
+compare.onclick = () => setCompare(false);
+
+addEventListener("keydown", (e) => {
+  if (e.altKey && /^Digit[1-4]$/.test(e.code)) { goWs(+e.code.slice(5) - 1); e.preventDefault(); return; }
+  if (e.altKey && e.code === "KeyB") { add("browser"); e.preventDefault(); return; }
+  if (e.altKey && e.code === "KeyI") { add("issues"); e.preventDefault(); return; }
+  if (e.altKey && e.code === "KeyE") { add("files"); e.preventDefault(); return; }
+  if (e.altKey && (e.code === "Enter" || e.code === "NumpadEnter")) { add(cur().focus ?? "shell"); e.preventDefault(); return; }
+  if (e.altKey && e.code === "KeyQ") { if (cur().focus) closeTab(cur().focus); e.preventDefault(); return; }
+  if (e.key === "Escape") { if (compareOpen) setCompare(false); else if (st.menu) { st.menu = null; render(); } return; }
+  if (e.key === "ArrowLeft") cycle(-1);
+  else if (e.key === "ArrowRight") cycle(1);
+  else if (e.key === "c") setCompare(!compareOpen);
+});
+
+/* ---------- boot ---------- */
+const initial = (new URLSearchParams(location.search).get("variant") || location.hash.replace(/^#/, "") || "A").toUpperCase();
+setVariant(ORDER.includes(initial) ? initial : "A", false);
+addEventListener("hashchange", () => setVariant((location.hash.replace(/^#/, "") || "A").toUpperCase(), false));
+</script>
+</body>
+</html>

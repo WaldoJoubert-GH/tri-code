@@ -1,11 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onMount, untrack } from "solid-js";
 import {
-  GAPS, SPACES, TabKind, activeProject, addTab, app, focusedTab, goSpace, isRemote, isTerminal, live, loadState,
+  GAPS, SPACES, activeProject, app, focusedTab, goSpace, isRemote, isTerminal, live, loadState,
   persistChanges, setGap, setLayout, space,
 } from "./state";
 import Canvas from "./Canvas";
 import Sidebar from "./Sidebar";
+import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
@@ -17,7 +18,6 @@ import { flash, flashMsg, toast, undoToast } from "./ui";
 import {
   clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
 } from "./issues";
-import { openFilesPanel } from "./files";
 
 export default function App() {
   const [ready, setReady] = createSignal(false);
@@ -75,7 +75,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -103,6 +103,7 @@ export default function App() {
         </Show>
       </div>
       <StatusBar />
+      <TabMenu />
       <AppearancePopover />
       <HelpOverlay />
     </div>
@@ -120,28 +121,7 @@ function Toolbar() {
       <Show when={activeProject()} keyed>
         {(p) => (
           <>
-            <div class="new">
-              <For each={["claude", "pi", "shell", "browser", "issues", "files"] as TabKind[]}>
-                {(k) => (
-                  <button
-                    onClick={() => {
-                      if (k === "issues") {
-                        openIssuePanel(p);
-                        return;
-                      }
-                      if (k === "files") {
-                        openFilesPanel(p);
-                        return;
-                      }
-                      addTab(p.id, k);
-                      flash(`new ${k}`);
-                    }}
-                  >
-                    + {k}
-                  </button>
-                )}
-              </For>
-            </div>
+            <TabStrip project={p} />
             <div class="sep" />
             <div class="spaces" id="spaces" role="group" aria-label="Workspaces">
               <For each={Array.from({ length: SPACES }, (_, i) => i)}>

@@ -40,3 +40,10 @@ The single un-stopped Time Entry across the workspace. Shown on the row, in the 
 
 **In Progress Chip**:
 A toolbar chip for each Plane Issue whose State is named exactly `"In Progress"`, the running one first then by priority. Two chips show, then `+N`. A click drills into that issue in the Issues Panel.
+
+**Tab Strip**:
+The leftmost toolbar group: the active workspace's Windows in tiling order, the focused one underlined, then `+`. A strip tab only focuses a Window that already exists, so nothing is created or moved by clicking one; Windows on other workspaces are not listed.
+_Avoid_: Tab bar (there is no tab bar), window list, tab buttons.
+
+**New Window Menu**:
+The popup under the Tab Strip's `+`: one row per `TabKind`, each with the key that also opens it (`Alt+Enter`, `Alt+B`, `Alt+I`, `Alt+E`). Issues and Files open or focus their one-per-project Window rather than adding a second one.

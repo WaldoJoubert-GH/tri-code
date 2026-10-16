@@ -10,6 +10,7 @@ import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
 import { helpOpen, setHelpOpen } from "./Help";
 import { toggleSidebar } from "./Sidebar";
+import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { openIssuePanel } from "./issues";
 import { openFilesPanel } from "./files";
 import { flash } from "./ui";
@@ -134,6 +135,7 @@ function onKey(e: KeyboardEvent) {
   if (e.code === "Escape" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     if (helpOpen()) setHelpOpen(false);
     else if (appearanceOpen()) closeAppearance();
+    else if (tabMenuOpen()) closeTabMenu();
     else return;
     e.preventDefault();
     e.stopPropagation();
