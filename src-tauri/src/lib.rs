@@ -1,3 +1,4 @@
+mod dirs;
 mod pty;
 mod spawn;
 mod store;
@@ -17,6 +18,7 @@ pub fn run() {
             pty::pty_kill,
             pty::pty_kill_all,
             pty::remote_kill_session,
+            dirs::list_dirs,
             store::state_load,
             store::state_save,
         ])

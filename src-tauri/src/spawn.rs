@@ -122,7 +122,7 @@ pub fn kill_remote(host: &str, session: &str) -> Program {
 }
 
 /// POSIX single-quote escaping.
-fn sq(s: &str) -> String {
+pub(crate) fn sq(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
 
@@ -139,7 +139,7 @@ fn dq_escape(s: &str) -> String {
 }
 
 /// Quote a remote path while keeping a leading `~` expandable.
-fn remote_path(path: &str) -> String {
+pub(crate) fn remote_path(path: &str) -> String {
     match path {
         "" | "~" => "~".into(),
         p if p.starts_with("~/") => format!("~/{}", sq(&p[2..])),
@@ -153,7 +153,7 @@ fn sanitize_session(s: &str) -> String {
         .collect()
 }
 
-fn expand_home(path: &str) -> String {
+pub(crate) fn expand_home(path: &str) -> String {
     let home = if cfg!(windows) {
         std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME"))
     } else {

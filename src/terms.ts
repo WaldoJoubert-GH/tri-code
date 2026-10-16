@@ -33,6 +33,8 @@ class TermSession {
   private disposed = false;
   private backoff = 1000;
   private lastSize = "";
+  /** Input typed before pty_spawn resolves (e.g. xterm's reply to ConPTY's startup DSR query). */
+  private pending: string[] = [];
   private observer = new ResizeObserver(() => this.refit());
 
   constructor(private project: Project, private tab: Tab, host: HTMLElement) {
@@ -55,6 +57,7 @@ class TermSession {
     this.term.onData((data) => {
       if (this.status === "exited" && data === "\r") return void this.start();
       if (this.ptyId !== undefined) call("pty_write", { id: this.ptyId, data });
+      else if (this.status !== "exited") this.pending.push(data);
     });
     this.term.onBell(() => {
       if (!this.visible || !document.hasFocus()) this.update({ attention: true });
@@ -73,6 +76,7 @@ class TermSession {
 
   private async start() {
     if (this.disposed) return;
+    this.pending = [];
     this.update({ status: this.status === "reconnecting" ? "reconnecting" : "connecting" });
 
     const onData = new Channel<ArrayBuffer | number[]>();
@@ -100,7 +104,12 @@ class TermSession {
         onData,
         onExit,
       });
-      if (this.disposed) call("pty_kill", { id: this.ptyId });
+      if (this.disposed) return void call("pty_kill", { id: this.ptyId });
+      // Output can arrive before the id does; Windows ConPTY prints nothing
+      // until xterm answers its cursor-position query, so flush that now.
+      const queued = this.pending.join("");
+      this.pending = [];
+      if (queued) call("pty_write", { id: this.ptyId, data: queued });
     } catch (e) {
       this.term.write(`\r\n\x1b[31m${e}\x1b[0m\r\n`);
       this.exited(-1);

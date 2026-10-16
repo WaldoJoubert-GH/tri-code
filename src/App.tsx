@@ -110,31 +110,86 @@ function Sidebar() {
   );
 }
 
+type DirList = { path: string; dirs: string[] };
+
 function AddProject(props: { done: () => void }) {
+  const [host, setHost] = createSignal("local");
+  const [path, setPath] = createSignal("");
+  const [browsing, setBrowsing] = createSignal(false);
+
   const submit = (e: SubmitEvent) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget as HTMLFormElement);
-    const path = String(f.get("path")).trim();
-    const host = String(f.get("host")).trim() || "local";
-    const name = String(f.get("name")).trim() || path.split(/[\\/]/).filter(Boolean).pop() || path;
-    if (!path) return;
-    addProject(name, host, path);
+    const p = path().trim();
+    const h = host().trim() || "local";
+    const name = String(f.get("name")).trim() || p.split(/[\\/]/).filter(Boolean).pop() || p;
+    if (!p) return;
+    addProject(name, h, p);
     props.done();
   };
   const knownHosts = () => [...new Set(["local", ...app.projects.map((p) => p.host)])];
 
   return (
     <form class="add-form" onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && props.done()}>
-      <input name="host" placeholder="host (local or ssh alias)" list="hosts" value="local" />
+      <input name="host" placeholder="host (local or ssh alias)" list="hosts" value={host()} onInput={(e) => setHost(e.currentTarget.value)} />
       <datalist id="hosts">
         <For each={knownHosts()}>{(h) => <option value={h} />}</For>
       </datalist>
-      <input name="path" placeholder="path, e.g. ~/code/app" autofocus />
+      <div class="path-row">
+        <input name="path" placeholder="path, e.g. ~/code/app" autofocus value={path()} onInput={(e) => setPath(e.currentTarget.value)} />
+        <button type="button" title="Browse folders" onClick={() => setBrowsing(!browsing())}>…</button>
+      </div>
+      <Show when={browsing()}>
+        <DirBrowser host={host().trim() || "local"} start={path().trim() || "~"} pick={(p) => (setPath(p), setBrowsing(false))} />
+      </Show>
       <input name="name" placeholder="name (optional)" />
       <div class="row">
         <button type="submit">Add</button>
         <button type="button" onClick={props.done}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+/** Folder picker that works the same for local and ssh hosts. */
+function DirBrowser(props: { host: string; start: string; pick: (path: string) => void }) {
+  const [list, setList] = createSignal<DirList>();
+  const [error, setError] = createSignal("");
+  const [loading, setLoading] = createSignal(false);
+
+  const go = async (path: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      setList(await invoke<DirList>("list_dirs", { host: props.host, path }));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+  const into = (name: string) => `${list()!.path.replace(/[\\/]$/, "")}/${name}`;
+  // Fall back to home if the typed path does not exist.
+  onMount(() => go(props.start).then(() => { if (error()) go("~"); }));
+
+  return (
+    <div class="dirs" classList={{ loading: loading() }}>
+      <Show when={list()}>
+        {(l) => (
+          <>
+            <div class="dirs-head" title={l().path}><bdi>{l().path}</bdi></div>
+            <div class="dirs-list">
+              <div class="dir" onClick={() => go(into(".."))}>..</div>
+              <For each={l().dirs}>
+                {(d) => <div class="dir" onClick={() => go(into(d))}>{d}</div>}
+              </For>
+            </div>
+            <button type="button" class="dirs-pick" onClick={() => props.pick(l().path)}>Use this folder</button>
+          </>
+        )}
+      </Show>
+      <Show when={error()}><div class="dirs-error">{error()}</div></Show>
+      <Show when={!list() && loading()}><div class="dirs-head">Loading…</div></Show>
+    </div>
   );
 }

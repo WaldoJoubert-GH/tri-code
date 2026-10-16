@@ -40,6 +40,7 @@ When ssh exits with code 255 (connection failure), the tab reconnects automatica
 ## Usage
 
 - Add a project with "+ Add project" in the sidebar. Enter a host (`local` or an ssh alias such as `devbox` or `user@host`), a path such as `~/code/app` (remote paths are resolved on the remote host), and an optional name.
+  Click `…` next to the path to browse folders on that host (remote hosts are listed over ssh, so key auth must work).
 - Open a tab with the "+ claude", "+ pi", or "+ shell" buttons in the tab bar. On Windows, local `claude` and `pi` tabs run through `cmd.exe /d /c`, and shell tabs run `powershell.exe`.
 - Switch tabs by clicking them. Close a tab with its × button or a middle click. Closing a running tab asks for confirmation. For a remote tab, closing it also ends the remote shpool/tmux session.
 - Remove a project with the × next to it in the sidebar. This closes all of its tabs.
@@ -77,6 +78,7 @@ Layout:
 
 - `main.rs`: binary entry point. Hides the console window in Windows release builds.
 - `lib.rs`: Tauri setup. Registers the commands and the shared PTY state.
+- `dirs.rs`: folder listing for the project picker, local or over ssh.
 - `pty.rs`: PTY sessions (spawn, output channel, write, resize, kill) and remote session cleanup.
 - `spawn.rs`: builds the program and arguments for local and ssh tabs, including the shpool and tmux fallback. Contains the unit tests and the ignored SSH end-to-end test.
 - `store.rs`: loads and atomically saves `state.json`.

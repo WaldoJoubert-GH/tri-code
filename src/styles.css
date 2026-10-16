@@ -131,3 +131,16 @@ main { display: flex; flex-direction: column; min-width: 0; }
 
 .terms { flex: 1; position: relative; min-height: 0; }
 .term { position: absolute; inset: 0; padding: 6px 0 0 8px; }
+
+.path-row { display: flex; gap: 4px; }
+.path-row input { flex: 1; min-width: 0; }
+.path-row button { padding: 0 8px; border-radius: 4px; background: #232733; }
+
+.dirs { border: 1px solid var(--line); border-radius: 4px; background: var(--bg); font-size: 12px; }
+.dirs.loading { opacity: 0.6; pointer-events: none; }
+.dirs-head { padding: 5px 7px; color: var(--muted); border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.dirs-list { max-height: 220px; overflow-y: auto; }
+.dir { padding: 3px 7px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dir:hover { background: #1c1f26; }
+.dirs-pick { width: 100%; padding: 5px; border-top: 1px solid var(--line); color: var(--accent); }
+.dirs-error { padding: 5px 7px; color: var(--bad); white-space: pre-wrap; }
