@@ -11,6 +11,7 @@ import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance"
 import { helpOpen, setHelpOpen } from "./Help";
 import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./issues";
+import { openFilesPanel } from "./files";
 import { flash } from "./ui";
 
 const DIRS: Record<string, [number, number]> = {
@@ -72,6 +73,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       return true;
     case "KeyI":
       openIssuePanel(p);
+      return true;
+    case "KeyE":
+      openFilesPanel(p);
       return true;
     case "KeyQ":
       if (!f) return false;

@@ -2,8 +2,8 @@ import { createEffect, on } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 
-export type TabKind = "claude" | "pi" | "shell" | "browser" | "issues";
-export type TerminalKind = Exclude<TabKind, "browser" | "issues">;
+export type TabKind = "claude" | "pi" | "shell" | "browser" | "issues" | "files" | "file";
+export type TerminalKind = Exclude<TabKind, "browser" | "issues" | "files" | "file">;
 export const TERMINAL_KINDS: TerminalKind[] = ["claude", "pi", "shell"];
 
 export const TAB_COMMANDS: Record<TerminalKind, string | null> = {
@@ -13,7 +13,8 @@ export const TAB_COMMANDS: Record<TerminalKind, string | null> = {
 };
 
 /** A window on the canvas. Terminals run a PTY; browsers are native child webviews;
- *  issues panels render the project's `.dev/` as plain HTML. */
+ *  issues panels render the project's `.dev/`; files lists the project folder and
+ *  file shows one file. */
 export type Tab = {
   id: string;
   kind: TabKind;
@@ -21,6 +22,8 @@ export type Tab = {
   space: number;
   /** Browser tabs only: the current address ("" for a new, blank browser). */
   url?: string;
+  /** `file` tabs only: the path being viewed. */
+  path?: string;
 };
 
 /** Terminals own a PTY; browsers and issues panels do not. */
@@ -122,10 +125,14 @@ export function removeProject(id: string) {
 }
 
 /** Add a window on the active workspace and focus it. `after` inserts it right after that tab. */
-export function addTab(projectId: string, kind: TabKind, opts: { url?: string; after?: string } = {}) {
+export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string } = {}) {
   const id = newId();
   edit(projectId, (p) => {
-    const tab: Tab = { id, kind, space: p.ws, ...(kind === "browser" ? { url: opts.url ?? "" } : {}) };
+    const tab: Tab = {
+      id, kind, space: p.ws,
+      ...(kind === "browser" ? { url: opts.url ?? "" } : {}),
+      ...(kind === "file" ? { path: opts.path ?? "" } : {}),
+    };
     const i = opts.after ? p.tabs.findIndex((t) => t.id === opts.after) : -1;
     if (i >= 0) p.tabs.splice(i + 1, 0, tab);
     else p.tabs.push(tab);
@@ -245,6 +252,14 @@ export function setTabUrl(projectId: string, tabId: string, url: string) {
   edit(projectId, (p) => {
     const t = p.tabs.find((t) => t.id === tabId);
     if (t) t.url = url;
+  });
+}
+
+/** Point a `file` tab at another file (the window is reused). */
+export function setTabPath(projectId: string, tabId: string, path: string) {
+  edit(projectId, (p) => {
+    const t = p.tabs.find((t) => t.id === tabId);
+    if (t) t.path = path;
   });
 }
 

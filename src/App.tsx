@@ -17,6 +17,7 @@ import { flash, flashMsg, toast, undoToast } from "./ui";
 import {
   clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
 } from "./issues";
+import { openFilesPanel } from "./files";
 
 export default function App() {
   const [ready, setReady] = createSignal(false);
@@ -120,12 +121,16 @@ function Toolbar() {
         {(p) => (
           <>
             <div class="new">
-              <For each={["claude", "pi", "shell", "browser", "issues"] as TabKind[]}>
+              <For each={["claude", "pi", "shell", "browser", "issues", "files"] as TabKind[]}>
                 {(k) => (
                   <button
                     onClick={() => {
                       if (k === "issues") {
                         openIssuePanel(p);
+                        return;
+                      }
+                      if (k === "files") {
+                        openFilesPanel(p);
                         return;
                       }
                       addTab(p.id, k);
@@ -214,6 +219,7 @@ function StatusBar() {
       <StatusTimer />
       <div class="hints">
         <span><kbd>Alt</kbd><kbd>I</kbd> issues</span>
+        <span><kbd>Alt</kbd><kbd>E</kbd> files</span>
         <span><kbd>Alt</kbd><kbd>/</kbd> all keys</span>
       </div>
       <ClaudeUsage />

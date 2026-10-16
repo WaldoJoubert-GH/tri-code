@@ -26,6 +26,11 @@ pub fn command(host: &str, script: &str) -> Command {
 /// Run `script` and return stdout. A non-zero exit becomes an error carrying
 /// stderr, so `list_dirs` and `dev_read` can surface the remote message.
 pub fn run(host: &str, script: &str) -> Result<String, String> {
+    Ok(String::from_utf8_lossy(&run_bytes(host, script)?).into_owned())
+}
+
+/// Run `script` and return raw stdout bytes, for a file that may be binary.
+pub fn run_bytes(host: &str, script: &str) -> Result<Vec<u8>, String> {
     let out = command(host, script).output().map_err(|e| format!("ssh: {e}"))?;
     checked(out, host)
 }
@@ -42,13 +47,13 @@ pub fn run_stdin(host: &str, script: &str, input: &[u8]) -> Result<String, Strin
         .write_all(input)
         .map_err(|e| format!("{host}: {e}"))?;
     let out = child.wait_with_output().map_err(|e| e.to_string())?;
-    checked(out, host)
+    Ok(String::from_utf8_lossy(&checked(out, host)?).into_owned())
 }
 
-fn checked(out: Output, host: &str) -> Result<String, String> {
+fn checked(out: Output, host: &str) -> Result<Vec<u8>, String> {
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
         return Err(if err.is_empty() { format!("{host}: ssh failed") } else { err });
     }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    Ok(out.stdout)
 }

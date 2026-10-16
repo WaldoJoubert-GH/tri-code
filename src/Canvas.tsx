@@ -9,6 +9,8 @@ import { flash, showToast } from "./ui";
 import { browserInfo, nativeBrowsers, closeBrowser, browserBack, browserForward, browserReload, navigateBrowser, normalizeUrl, openExternal, placeBrowser, setBrowsersSuspended } from "./browsers";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
 import IssuesPanel from "./IssuesPanel";
+import FileList from "./FileList";
+import FileView from "./FileView";
 import { dev, panelTitle } from "./issues";
 
 const BAR = 28;
@@ -113,6 +115,9 @@ export default function Canvas(props: { project: Project }) {
     const id = tab.id;
     const isBrowser = tab.kind === "browser";
     const isIssues = tab.kind === "issues";
+    const isFiles = tab.kind === "files";
+    const isFile = tab.kind === "file";
+    const isPanel = isIssues || isFiles || isFile;
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -139,7 +144,7 @@ export default function Canvas(props: { project: Project }) {
       if (isBrowser) {
         return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR - NAV))} <span>px</span></>;
       }
-      if (isIssues) {
+      if (isPanel) {
         return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR))} <span>px</span></>;
       }
       const cols = Math.max(0, Math.floor((r.w - 22) / 7.8));
@@ -148,7 +153,11 @@ export default function Canvas(props: { project: Project }) {
     };
 
     const title = () =>
-      isBrowser ? (browserInfo[id]?.title ?? "") : isIssues ? panelTitle(props.project) : (live[id]?.title ?? "");
+      isBrowser ? (browserInfo[id]?.title ?? "")
+      : isIssues ? panelTitle(props.project)
+      : isFiles ? `${props.project.name} files`
+      : isFile ? ((tab.path ?? "").split("/").pop() ?? "")
+      : (live[id]?.title ?? "");
 
     const url = () => browserInfo[id]?.url ?? tab.url ?? "";
 
@@ -169,7 +178,7 @@ export default function Canvas(props: { project: Project }) {
         pageRo = new ResizeObserver(() => place());
         pageRo.observe(pageEl);
         follow();
-      } else if (!isIssues) {
+      } else if (!isPanel) {
         ensureSession(props.project, tab);
         mountSession(id, termEl);
       }
@@ -178,12 +187,12 @@ export default function Canvas(props: { project: Project }) {
       pageRo?.disconnect();
       cancelAnimationFrame(placeRaf);
       if (isBrowser) placeBrowser(props.project, tab, null);
-      else if (!isIssues) unmountSession(id);
+      else if (!isPanel) unmountSession(id);
     });
 
     if (isBrowser) {
       createEffect(on([rect, anyDrag], () => follow(), { defer: true }));
-    } else if (!isIssues) {
+    } else if (!isPanel) {
       createEffect(() => {
         // after mount, so the session element is attached and visible when it takes focus
         if (focused()) requestAnimationFrame(() => focusSession(id));
@@ -292,7 +301,14 @@ export default function Canvas(props: { project: Project }) {
             if (!(e.target as Element).closest("button")) doMax();
           }}
         >
-          <span class={`dot ${isBrowser ? "web" : isIssues ? `plane${dev[props.project.id]?.syncing ? " syncing" : ""}` : (live[id]?.status ?? "connecting")}`} />
+          <span
+            class={`dot ${
+              isBrowser ? "web"
+              : isIssues ? `plane${dev[props.project.id]?.syncing ? " syncing" : ""}`
+              : isFiles || isFile ? "files"
+              : (live[id]?.status ?? "connecting")
+            }`}
+          />
           <span class="kind">{tab.kind}</span>
           <span class="ttl">{title()}</span>
           <button title="Maximize (Alt+F)" onClick={doMax}>▢</button>
@@ -323,6 +339,10 @@ export default function Canvas(props: { project: Project }) {
           </>
         ) : isIssues ? (
           <IssuesPanel project={props.project} tab={tab} focused={focused()} />
+        ) : isFiles ? (
+          <FileList project={props.project} tab={tab} focused={focused()} />
+        ) : isFile ? (
+          <FileView project={props.project} tab={tab} />
         ) : (
           <div class="body" ref={termEl} />
         )}
@@ -387,7 +407,12 @@ export function requestClose(projectId: string, tabId: string): void {
   if (!p || index < 0) return;
   const tab: Tab = { ...p.tabs[index] };
   // Read the title first: removeTab drops the live entry.
-  const title = tab.kind === "browser" ? browserInfo[tabId]?.title : isTerminal(tab) ? live[tabId]?.title : undefined;
+  const title =
+    tab.kind === "browser" ? browserInfo[tabId]?.title
+    : tab.kind === "file" ? tab.path
+    : tab.kind === "files" ? `${p.name} files`
+    : isTerminal(tab) ? live[tabId]?.title
+    : undefined;
   removeTab(projectId, tabId);
   showToast(
     {

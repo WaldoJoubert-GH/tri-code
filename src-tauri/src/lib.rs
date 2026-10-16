@@ -2,6 +2,7 @@ mod bg;
 mod browser;
 mod devfs;
 mod dirs;
+mod fs;
 mod plane;
 mod pty;
 mod remote;
@@ -43,6 +44,8 @@ pub fn run() {
             pty::pty_kill_all,
             pty::remote_kill_session,
             dirs::list_dirs,
+            fs::list_files,
+            fs::read_file,
             devfs::dev_read,
             devfs::dev_write,
             plane::plane_sync,
