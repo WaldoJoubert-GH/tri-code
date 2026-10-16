@@ -1,6 +1,6 @@
 /* Files window (tree) and file window (viewer). See src/FileList.tsx, src/FileView.tsx. */
 
-.dot.files { background: var(--accent); border-radius: 2px; }
+.dot.files { background: var(--accent); }
 
 .filewin, .filev { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 

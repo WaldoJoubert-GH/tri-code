@@ -4,7 +4,7 @@
 
 import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js";
 import { type Project, type Tab, isRemote } from "./state";
-import { dirState, loadDir, openFile, refreshDir } from "./files";
+import { dirState, loadDir, openFile, refreshProject } from "./files";
 import "./files.css";
 
 type Row = { path: string; name: string; dir: boolean; depth: number };
@@ -93,7 +93,7 @@ export default function FileList(props: { project: Project; tab: Tab; focused: b
       <div class="fbar">
         <span class="proj">{props.project.name}</span>
         <span class="path" title={where()}>{where()}</span>
-        <button title="Refresh" onClick={() => refreshDir(props.project, props.project.path)}>⟳</button>
+        <button title="Refresh (reloads the whole tree and open files)" onClick={() => refreshProject(props.project)}>⟳</button>
       </div>
       <div
         class="files"

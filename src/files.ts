@@ -2,7 +2,7 @@
 // what. Listings and file bodies are cached by host + path and refreshed on demand.
 
 import { invoke } from "@tauri-apps/api/core";
-import { createStore } from "solid-js/store";
+import { createStore, produce } from "solid-js/store";
 import { type Project, addTab, focusTab, setTabPath } from "./state";
 
 export type FsEntry = { name: string; dir: boolean; size: number };
@@ -35,6 +35,39 @@ export function refreshDir(project: Project, path: string): void {
   invoke<FsList>("list_files", { host: project.host, path: full(project, path) })
     .then((list) => setDirs(k, { loading: false, list }))
     .catch((e) => setDirs(k, { loading: false, error: String(e) }));
+}
+
+/**
+ * Reload everything on disk for a project: every directory already listed in
+ * the files window (not just the root) and every open `file` window. Without
+ * this, `loadDir`'s cache kept expanded subdirectories stale until the whole
+ * webview was reloaded — new and changed files never showed up.
+ */
+export function refreshProject(project: Project): void {
+  const root = project.path;
+  const prefix = root.endsWith("/") ? root : `${root}/`;
+  const under = (path: string) => path === root || path.startsWith(prefix);
+  /** Host and remaining path of a `key(host, path)` cache entry. */
+  const split = (k: string): { host: string; path: string } => {
+    const sep = k.indexOf("\u0000");
+    return { host: k.slice(0, sep), path: k.slice(sep + 1) };
+  };
+
+  for (const k of Object.keys(dirs)) {
+    const { host, path } = split(k);
+    if (host !== project.host || !under(path)) continue;
+    refreshDir(project, path);
+  }
+
+  // Bodies of open file windows reload now; every other cached body is dropped
+  // so it is re-read the next time that file is opened (the window is reused).
+  const shown = new Set(project.tabs.filter((t) => t.kind === "file" && t.path).map((t) => t.path!));
+  for (const k of Object.keys(texts)) {
+    const { host, path } = split(k);
+    if (host !== project.host || !under(path) || shown.has(path)) continue;
+    setTexts(produce((t) => { delete t[k]; }));
+  }
+  for (const path of shown) reloadText(project, path);
 }
 
 export function loadText(project: Project, path: string): void {
