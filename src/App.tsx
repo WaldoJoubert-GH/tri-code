@@ -6,7 +6,7 @@ import {
 } from "./state";
 import Canvas from "./Canvas";
 import Sidebar from "./Sidebar";
-import { AppearancePopover, appearanceOpen, backgroundCss, setBgImages, toggleAppearance } from "./Appearance";
+import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
 import { installHotkeys } from "./hotkeys";
 import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
@@ -33,7 +33,7 @@ export default function App() {
       if (p.bg !== "image") continue;
       invoke<string | null>("bg_load", { projectId: p.id })
         .then((dataUrl) => {
-          if (dataUrl) setBgImages(p.id, dataUrl);
+          if (dataUrl) return setBgImage(p.id, dataUrl);
         })
         .catch((e) => console.error("bg_load failed:", e));
     }

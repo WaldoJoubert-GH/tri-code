@@ -18,12 +18,26 @@ export const BACKGROUNDS: Record<string, { name: string; css: (accent: string) =
   dusk: { name: "Dusk", css: () => "linear-gradient(185deg, var(--dusk-a) 0%, var(--dusk-b) 40%, var(--dusk-c) 72%, var(--dusk-d) 100%)" },
 };
 
-/** Uploaded background images by project id, as data URLs. Loaded once at startup, filled on upload. */
-export const [bgImages, setBgImages] = createStore<Record<string, string>>({});
+/**
+ * Uploaded background images by project id, as blob: URLs. Loaded once at startup, filled on upload.
+ * Not data URLs: Chromium drops a `background` declaration whose data URL runs to megabytes, so photos never showed.
+ */
+const [bgImages, setBgImages] = createStore<Record<string, string>>({});
+export { bgImages };
+
+/** Show `image` (a Blob, or the data URL stored on disk) as a project's uploaded background. */
+export async function setBgImage(projectId: string, image: Blob | string) {
+  const blob = typeof image === "string" ? await (await fetch(image)).blob() : image;
+  const old = bgImages[projectId];
+  setBgImages(projectId, URL.createObjectURL(blob));
+  if (old) URL.revokeObjectURL(old);
+}
 
 /** Drop a project's cached image (project removed). */
 export function forgetBgImage(projectId: string) {
+  const old = bgImages[projectId];
   setBgImages(produce((s) => { delete s[projectId]; }));
+  if (old) URL.revokeObjectURL(old);
 }
 
 /** CSS `background` for a project's backdrop layer. */
@@ -101,7 +115,7 @@ export function AppearancePopover() {
                   flash(`couldn't save image: ${err}`);
                   return;
                 }
-                setBgImages(p.id, dataUrl);
+                await setBgImage(p.id, f);
                 setAppearance(p.id, { bg: "image", dim: p.dim || 30 });
               };
               r.readAsDataURL(f);
