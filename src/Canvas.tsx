@@ -1,13 +1,15 @@
 import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import {
-  type Project, type Tab, app, focusTab, live, projectById, removeTab, restoreTab,
+  type Project, type Tab, app, focusTab, isTerminal, live, projectById, removeTab, restoreTab,
   sendTo, setRatio, space, swapTabs, toggleMono, visibleTabs,
 } from "./state";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
 import { browserInfo, nativeBrowsers, closeBrowser, browserBack, browserForward, browserReload, navigateBrowser, normalizeUrl, openExternal, placeBrowser, setBrowsersSuspended } from "./browsers";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
+import IssuesPanel from "./IssuesPanel";
+import { dev, panelTitle } from "./issues";
 
 const BAR = 28;
 const NAV = 32;
@@ -110,6 +112,7 @@ export default function Canvas(props: { project: Project }) {
     const tab = wp.tab;
     const id = tab.id;
     const isBrowser = tab.kind === "browser";
+    const isIssues = tab.kind === "issues";
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -136,10 +139,16 @@ export default function Canvas(props: { project: Project }) {
       if (isBrowser) {
         return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR - NAV))} <span>px</span></>;
       }
+      if (isIssues) {
+        return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR))} <span>px</span></>;
+      }
       const cols = Math.max(0, Math.floor((r.w - 22) / 7.8));
       const rows = Math.max(0, Math.floor((r.h - 28 - 14) / 17));
       return <>{cols} × {rows} <span>cols × rows</span></>;
     };
+
+    const title = () =>
+      isBrowser ? (browserInfo[id]?.title ?? "") : isIssues ? panelTitle(props.project) : (live[id]?.title ?? "");
 
     const url = () => browserInfo[id]?.url ?? tab.url ?? "";
 
@@ -160,7 +169,7 @@ export default function Canvas(props: { project: Project }) {
         pageRo = new ResizeObserver(() => place());
         pageRo.observe(pageEl);
         follow();
-      } else {
+      } else if (!isIssues) {
         ensureSession(props.project, tab);
         mountSession(id, termEl);
       }
@@ -169,12 +178,12 @@ export default function Canvas(props: { project: Project }) {
       pageRo?.disconnect();
       cancelAnimationFrame(placeRaf);
       if (isBrowser) placeBrowser(props.project, tab, null);
-      else unmountSession(id);
+      else if (!isIssues) unmountSession(id);
     });
 
     if (isBrowser) {
       createEffect(on([rect, anyDrag], () => follow(), { defer: true }));
-    } else {
+    } else if (!isIssues) {
       createEffect(() => {
         // after mount, so the session element is attached and visible when it takes focus
         if (focused()) requestAnimationFrame(() => focusSession(id));
@@ -283,9 +292,9 @@ export default function Canvas(props: { project: Project }) {
             if (!(e.target as Element).closest("button")) doMax();
           }}
         >
-          <span class={`dot ${isBrowser ? "web" : (live[id]?.status ?? "connecting")}`} />
+          <span class={`dot ${isBrowser ? "web" : isIssues ? `plane${dev[props.project.id]?.syncing ? " syncing" : ""}` : (live[id]?.status ?? "connecting")}`} />
           <span class="kind">{tab.kind}</span>
-          <span class="ttl">{isBrowser ? (browserInfo[id]?.title ?? "") : (live[id]?.title ?? "")}</span>
+          <span class="ttl">{title()}</span>
           <button title="Maximize (Alt+F)" onClick={doMax}>▢</button>
           <button title="Close (Alt+Q)" onClick={() => requestClose(props.project.id, id)}>×</button>
         </div>
@@ -312,6 +321,8 @@ export default function Canvas(props: { project: Project }) {
               </Show>
             </div>
           </>
+        ) : isIssues ? (
+          <IssuesPanel project={props.project} tab={tab} focused={focused()} />
         ) : (
           <div class="body" ref={termEl} />
         )}
@@ -376,13 +387,13 @@ export function requestClose(projectId: string, tabId: string): void {
   if (!p || index < 0) return;
   const tab: Tab = { ...p.tabs[index] };
   // Read the title first: removeTab drops the live entry.
-  const title = tab.kind === "browser" ? browserInfo[tabId]?.title : live[tabId]?.title;
+  const title = tab.kind === "browser" ? browserInfo[tabId]?.title : isTerminal(tab) ? live[tabId]?.title : undefined;
   removeTab(projectId, tabId);
   showToast(
     {
       msg: `Closed ${tab.kind}${title ? " · " + title : ""}.`,
       undo: () => restoreTab(projectId, tab, index),
     },
-    () => (tab.kind === "browser" ? closeBrowser(tabId) : closeSession(tabId)),
+    () => (tab.kind === "browser" ? closeBrowser(tabId) : isTerminal(tab) ? closeSession(tabId) : undefined),
   );
 }

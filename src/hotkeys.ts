@@ -3,13 +3,14 @@
 // handled keys never reach the terminal.
 
 import {
-  GAPS, Project, Tab, activeProject, addTab, app, focusedTab, goSpace, promote, sendTo, setApp, setGap,
+  GAPS, Project, Tab, activeProject, addTab, app, focusedTab, goSpace, isTerminal, promote, sendTo, setApp, setGap,
   setLayout, setRatio, space, toggleMono, visibleTabs,
 } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
 import { helpOpen, setHelpOpen } from "./Help";
 import { toggleSidebar } from "./Sidebar";
+import { openIssuePanel } from "./issues";
 import { flash } from "./ui";
 
 const DIRS: Record<string, [number, number]> = {
@@ -60,7 +61,7 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
   switch (e.code) {
     case "Enter":
     case "NumpadEnter": {
-      const kind = f?.kind ?? "shell";
+      const kind = f && isTerminal(f) ? f.kind : "shell";
       addTab(p.id, kind);
       flash(`new ${kind}`);
       return true;
@@ -68,6 +69,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
     case "KeyB":
       addTab(p.id, "browser");
       flash("new browser");
+      return true;
+    case "KeyI":
+      openIssuePanel(p);
       return true;
     case "KeyQ":
       if (!f) return false;

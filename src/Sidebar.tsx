@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onMount } from "solid-js";
-import { Project, addProject, app, live, removeProject, setApp, setSidebarCollapsed } from "./state";
+import { Project, addProject, app, isTerminal, live, removeProject, setApp, setSidebarCollapsed } from "./state";
 import { closeBrowser } from "./browsers";
 import { closeSession } from "./terms";
 import { closeAppearance, forgetBgImage, openAppearance } from "./Appearance";
+import { dev, forgetProject, isActive } from "./issues";
 import { flash } from "./ui";
 
 /** Collapse to the rail, or expand back to the full list. */
@@ -25,11 +26,28 @@ export default function Sidebar() {
     if (!confirm(`Remove "${p.name}" and end its ${p.tabs.length} tab(s)?`)) return;
     for (const t of p.tabs) {
       if (t.kind === "browser") closeBrowser(t.id);
-      else closeSession(t.id);
+      else if (isTerminal(t)) closeSession(t.id);
     }
     invoke("bg_delete", { projectId: p.id }).catch((e) => console.error("bg_delete failed:", e));
     forgetBgImage(p.id);
+    forgetProject(p.id);
     removeProject(p.id);
+  };
+
+  /** Active Plane issues per State, in Plane's colours (the pi-todos widget). */
+  const miniBar = (p: Project) => {
+    const d = dev[p.id];
+    if (!d?.connected) return [];
+    const counts = new Map<string, { color: string; name: string; n: number }>();
+    for (const i of d.issues) {
+      if (i.source !== "plane" || !isActive(d, i)) continue;
+      const s = d.states.find((x) => x.id === i.state_id);
+      const key = s?.id ?? "?";
+      const entry = counts.get(key) ?? { color: s?.color ?? "#888", name: s?.name ?? "Unknown", n: 0 };
+      entry.n += 1;
+      counts.set(key, entry);
+    }
+    return [...counts.values()];
   };
 
   const expandThenAdd = () => {
@@ -66,6 +84,11 @@ export default function Sidebar() {
                 >
                   <span class="swatch"><b>{p.name[0]}</b></span>
                   <span class="name">{p.name}</span>
+                  <Show when={miniBar(p).length}>
+                    <span class="minibar" title={miniBar(p).map((c) => `${c.n} ${c.name}`).join(" · ")}>
+                      <For each={miniBar(p)}>{(c) => <i style={{ flex: String(c.n), background: c.color }} />}</For>
+                    </span>
+                  </Show>
                   <Show when={needsAttention(p)}><span class="badge" title="Needs input" /></Show>
                   <span class="count">{p.tabs.length || ""}</span>
                   <button

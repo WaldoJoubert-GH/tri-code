@@ -7,7 +7,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { Project, Tab, TabStatus, TerminalKind, TAB_COMMANDS, isRemote, sessionName, setLive } from "./state";
+import { Project, Tab, TabStatus, TerminalKind, TAB_COMMANDS, isRemote, isTerminal, sessionName, setLive } from "./state";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;
@@ -200,6 +200,12 @@ class TermSession {
     this.term.focus();
   }
 
+  /** Type `text` into the terminal without submitting (used by "send to agent"). */
+  sendText(text: string) {
+    if (this.ptyId !== undefined) call("pty_write", { id: this.ptyId, data: text });
+    else if (this.status !== "exited") this.pending.push(text);
+  }
+
   applyTheme() {
     this.term.options.theme = themeNow();
   }
@@ -254,7 +260,7 @@ darkQuery.addEventListener("change", () => {
 
 /** Create the session for a terminal tab once; it starts parked until mounted. */
 export function ensureSession(project: Project, tab: Tab): void {
-  if (tab.kind === "browser" || sessions.has(tab.id)) return;
+  if (!isTerminal(tab) || sessions.has(tab.id)) return;
   sessions.set(tab.id, new TermSession(project, tab));
 }
 
@@ -276,6 +282,14 @@ export function unmountSession(tabId: string): void {
 
 export function focusSession(tabId: string): void {
   sessions.get(tabId)?.focus();
+}
+
+/** Type text into a tab's PTY without a newline. Returns false if it has no session. */
+export function sendText(tabId: string, text: string): boolean {
+  const s = sessions.get(tabId);
+  if (!s) return false;
+  s.sendText(text);
+  return true;
 }
 
 export function closeSession(tabId: string) {

@@ -2,8 +2,8 @@ import { createEffect, on } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 
-export type TabKind = "claude" | "pi" | "shell" | "browser";
-export type TerminalKind = Exclude<TabKind, "browser">;
+export type TabKind = "claude" | "pi" | "shell" | "browser" | "issues";
+export type TerminalKind = Exclude<TabKind, "browser" | "issues">;
 export const TERMINAL_KINDS: TerminalKind[] = ["claude", "pi", "shell"];
 
 export const TAB_COMMANDS: Record<TerminalKind, string | null> = {
@@ -12,7 +12,8 @@ export const TAB_COMMANDS: Record<TerminalKind, string | null> = {
   shell: null,
 };
 
-/** A window on the canvas. Terminals run a PTY; browsers are native child webviews. */
+/** A window on the canvas. Terminals run a PTY; browsers are native child webviews;
+ *  issues panels render the project's `.dev/` as plain HTML. */
 export type Tab = {
   id: string;
   kind: TabKind;
@@ -21,6 +22,9 @@ export type Tab = {
   /** Browser tabs only: the current address ("" for a new, blank browser). */
   url?: string;
 };
+
+/** Terminals own a PTY; browsers and issues panels do not. */
+export const isTerminal = (t: Tab): t is Tab & { kind: TerminalKind } => t.kind === "claude" || t.kind === "pi" || t.kind === "shell";
 
 export type Layout = "master" | "grid";
 

@@ -44,6 +44,7 @@ When ssh exits with code 255 (connection failure), the tab reconnects automatica
 - Open a tab with the "+ claude", "+ pi", or "+ shell" buttons in the tab bar. On Windows, local `claude` and `pi` tabs run through `cmd.exe /d /c`, and shell tabs run `powershell.exe`.
 - Switch tabs by clicking them. Close a tab with its × button or a middle click. Closing a running tab asks for confirmation. For a remote tab, closing it also ends the remote shpool/tmux session.
 - Remove a project with the × next to it in the sidebar. This closes all of its tabs.
+- Open the project's issues panel with Alt+I (or the `+ issues` button). It renders the project's `.dev/` folder: Plane work items and States pulled from Plane, plus any Sentry items pi-todos has pulled. It is the same data pi-todos and dev-hub use, and it writes the same `issues.json`, `plane-states.json` and `plane-labels.json`, so the three always agree. A remote project's `.dev/` is read and written over ssh. Plain keys drive the panel while it is focused (`j`/`k`, `Enter`, `Esc`, `d` state, `l` labels, `s` timer, `n` new, `r` sync, `/` filter).
 - Tab dots show the status: connecting, running, reconnecting, or exited. Press Enter in an exited tab to restart it.
 - A tab that rings the terminal bell while it is hidden is flagged, and its project shows a badge in the sidebar. To get this from Claude Code, set its notification channel to the terminal bell in Claude Code's `/config` (notifications setting).
 
@@ -71,6 +72,8 @@ Layout:
 - `App.tsx`: sidebar, tab bar, terminal host, and the add-project form.
 - `state.ts`: Solid stores for projects, tabs, and live tab status. Loads and debounced-saves the state file.
 - `terms.ts`: one xterm and one PTY per tab. Handles output, resize, reconnect backoff, bell detection, and the WebGL renderer for the visible tab only.
+- `issues.ts`: the `.dev/` store and Plane sync, plus the pure helpers (sort order, State Pill contrast, Slug-ID).
+- `IssuesPanel.tsx`: the issues window: the list, the full-width drill-down, the State Dropdown, labels, and the comment thread.
 - `styles.css`: application styles.
 - `vite-env.d.ts`: Vite type declarations.
 
@@ -79,6 +82,9 @@ Layout:
 - `main.rs`: binary entry point. Hides the console window in Windows release builds.
 - `lib.rs`: Tauri setup. Registers the commands and the shared PTY state.
 - `dirs.rs`: folder listing for the project picker, local or over ssh.
+- `devfs.rs`: `dev_read` / `dev_write` for a project's `.dev/` folder, local or over ssh, with an atomic write.
+- `plane.rs`: the Plane.so REST calls the issues panel needs (sync, set state, set labels, create, comments, asset upload). The token is read from `~/.pi/agent/secrets/plane.json` on the project's host.
+- `remote.rs`: the shared non-interactive ssh command builder used by `dirs.rs` and `devfs.rs`.
 - `pty.rs`: PTY sessions (spawn, output channel, write, resize, kill) and remote session cleanup.
 - `spawn.rs`: builds the program and arguments for local and ssh tabs, including the shpool and tmux fallback. Contains the unit tests and the ignored SSH end-to-end test.
 - `store.rs`: loads and atomically saves `state.json`.

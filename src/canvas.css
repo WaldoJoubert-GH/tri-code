@@ -93,3 +93,236 @@
 }
 
 .page .frame { display: block; width: 100%; height: 100%; border: 0; background: var(--page-bg, #fff); }
+/* Issues window: a view of the project's .dev/ (config.json, issues.json, plane-states.json),
+   the same files pi-todos and dev-hub read and write. Plain HTML, not a terminal, so plain keys drive it. */
+.dot.plane { width: 6px; height: 6px; border-radius: 1px; background: var(--violet); transform: rotate(45deg); }
+.dot.plane.syncing { animation: syncp .7s ease-in-out infinite alternate; }
+@keyframes syncp { to { opacity: .2; } }
+.iss { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
+.itools {
+  height: 32px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.itools .seg { margin: 0 4px 0 0; }
+.itools .seg button { padding: 1px 8px; }
+.isearch {
+  flex: 1; min-width: 40px; margin: 0 4px 0 0; font: 12px var(--mono); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; outline: none; user-select: text;
+}
+.isearch:focus { border-color: var(--accent); }
+.ib { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
+.ib:hover { background: var(--hover); color: var(--text); }
+.ib[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.ib.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.imain { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.win:not(.focused) .imain { opacity: .8; }
+.ilist {
+  overflow: auto; min-height: 0; padding: 4px 0; display: grid; align-content: start;
+  grid-template-columns: 24px auto minmax(0, 1fr) auto auto 1px; column-gap: 9px;
+}
+/* Drill-down: the list fills the window; opening an issue replaces it, Esc goes back */
+.idetail { display: none; overflow: auto; min-height: 0; user-select: text; }
+.iss.detail .ilist, .iss.detail .itools { display: none; }
+.iss.detail .idetail { display: block; }
+.dhead {
+  position: sticky; top: 0; z-index: 1; height: 32px; display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--line); user-select: none;
+}
+.dhead .crumb { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; }
+.dhead .crumb b { color: var(--text); font: 600 11.5px var(--mono); }
+.dhead .pos { font: 11px var(--mono); color: var(--muted); padding: 0 4px; }
+.dbody { padding: 14px 16px 18px; display: grid; gap: 4px 28px; max-width: 980px; }
+.dside { min-width: 0; }
+@container (min-width: 640px) {
+  /* a wide window lays the issue page out in two columns: what it is (and the thread), then what you can do */
+  .dbody { grid-template-columns: minmax(0, 1fr) 230px; padding: 18px 22px 22px; }
+  .dside { grid-row: span 2; align-self: start; position: sticky; top: 50px; border-left: 1px solid var(--line); padding-left: 20px; }
+}
+/* Comments: cached in .dev/plane/comments/<issue>.json, images in .dev/plane/assets/ */
+.dcomments { min-width: 0; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.dcomments h4 { margin: 0 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.cmt { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 9px 0; }
+.cmt + .cmt { border-top: 1px dashed color-mix(in srgb, var(--line) 70%, transparent); }
+.av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 10.5px var(--ui); color: #fff; background: var(--avc); }
+.cmeta { display: flex; gap: 6px; align-items: baseline; font-size: 12px; color: var(--muted); }
+.cmeta b { color: var(--text); font-weight: 600; }
+.ctext { margin: 2px 0 0; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cimgs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.cimgs button { padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--canvas); cursor: zoom-in; }
+.cimgs button:hover { border-color: var(--accent); }
+.cimgs img { display: block; height: 116px; max-width: min(100%, 240px); object-fit: cover; }
+.cnone { padding: 6px 0 2px; color: var(--muted); font-size: 12px; }
+.ccompose { margin-top: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.ccompose:focus-within { border-color: var(--accent); }
+.ccompose.over { border-style: dashed; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--bg)); }
+.ccompose textarea {
+  display: block; width: 100%; min-height: 62px; resize: vertical; border: 0; background: none; outline: none;
+  padding: 8px 10px; color: var(--text); font: 13px/1.45 var(--ui); user-select: text;
+}
+.cattach { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 10px 10px; }
+.cattach span { position: relative; }
+.cattach img { display: block; height: 54px; max-width: 120px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
+.cattach button {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--raised); border: 1px solid var(--line); color: var(--text); font-size: 11px; line-height: 1;
+}
+.cbar { display: flex; align-items: center; gap: 6px; padding: 4px 6px 5px 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.cbar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cbar .post { padding: 3px 12px; border-radius: 5px; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 12px; flex: none; }
+.cbar .post:disabled { opacity: .4; cursor: default; }
+.cc { margin-left: 7px; color: var(--muted); font-size: 11px; }
+.cc::before {
+  content: ""; display: inline-block; width: 8px; height: 6px; margin-right: 3px; vertical-align: 0;
+  border: 1.5px solid currentColor; border-radius: 2px 2px 2px 0;
+}
+.ilight { position: absolute; inset: 0; z-index: 8; display: grid; grid-template-rows: minmax(0, 1fr) auto; padding: 12px; background: rgba(6, 7, 9, .86); }
+.ilight .lwrap { min-height: 0; display: grid; place-items: center; }
+.ilight img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 20px 60px -20px #000; }
+.ilight .cap { display: flex; gap: 10px; align-items: center; justify-content: center; padding-top: 10px; color: #c9ccd3; font-size: 12px; }
+.ilight .cap button { color: #c9ccd3; width: 26px; height: 24px; border-radius: 4px; }
+.ilight .cap button:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.ilight kbd { background: #1c1f26; border-color: #333844; color: #c9ccd3; }
+.irow {
+  grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center;
+  column-gap: 9px; height: 26px; cursor: default;
+}
+/* subgrid rows: edge spacing comes from the outer tracks, not padding */
+.irow > :first-child { justify-self: end; }
+.irow:hover { background: var(--hover); }
+.irow.sel { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 2px 0 var(--accent); }
+.win:not(.focused) .irow.sel { background: var(--hover); box-shadow: inset 2px 0 var(--muted); }
+.sid { font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.irow .t { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.irow .tt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.irow .t .lb, .irow .t .cc, .lbmore { flex: none; }
+/* Labels: Plane's label colour as a dot, the name in a quiet outline chip */
+.lb {
+  display: inline-flex; align-items: center; gap: 4px; height: 17px; padding: 0 6px;
+  border: 1px solid var(--line); border-radius: 9px; font-size: 10.5px; color: var(--muted); white-space: nowrap;
+}
+.lb i { width: 6px; height: 6px; border-radius: 50%; background: var(--lc); }
+.lbmore { font-size: 10.5px; color: var(--muted); }
+@container (max-width: 520px) { .irow .t .lb, .irow .t .lbmore { display: none; } }
+.dlabels { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -2px 0 12px; }
+.dlabels .lb { height: 19px; font-size: 11px; color: var(--text); }
+.lblbtn { height: 19px; padding: 0 8px; border: 1px dashed var(--line); border-radius: 10px; font-size: 11px; color: var(--muted); }
+.lblbtn:hover, .lblbtn[aria-expanded="true"] { border-color: var(--accent); color: var(--text); }
+.ldrop .lb { color: var(--text); }
+.ldrop .lfoot { padding: 6px 6px 2px; font-size: 10.5px; color: var(--muted); }
+.irow.closed .tt { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.irow .pill { justify-self: start; }
+.idate { font: 11px var(--mono); color: var(--muted); white-space: nowrap; text-align: right; }
+.idate.late { color: var(--bad); }
+.irun { font: 600 11px var(--mono); color: var(--accent); white-space: nowrap; text-align: right; }
+@container (max-width: 400px) {
+  .ilist { grid-template-columns: 24px auto minmax(0, 1fr) auto 1px; }
+  .irow .idate, .irow .irun { display: none; }
+}
+/* State Pill: Plane's own State Hex, black or white text by luminance (as in pi-todos) */
+.pill { font: 600 10.5px/17px var(--ui); padding: 0 6px; border-radius: 3px; white-space: nowrap; }
+.pill.ghost { background: var(--raised); color: var(--muted); }
+/* Priority: signal bars in the priority colour; urgent is a filled square */
+.pri { display: inline-flex; align-items: flex-end; gap: 1px; width: 12px; height: 11px; }
+.pri b { width: 3px; border-radius: 1px; background: var(--line); }
+.pri b:nth-child(1) { height: 4px; } .pri b:nth-child(2) { height: 7px; } .pri b:nth-child(3) { height: 11px; }
+.pri b.on { background: color-mix(in oklab, var(--pc) 82%, var(--text)); }
+.pri.none { align-items: center; } .pri.none b { height: 2px !important; }
+.pri.urgent { align-items: center; justify-content: center; border-radius: 3px; background: var(--pc); color: #fff; font: 800 9px/1 var(--ui); }
+.lvl { width: 8px; height: 8px; border-radius: 50%; background: var(--pc); margin-left: 2px; }
+.inew { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; padding: 2px 10px 6px 12px; }
+.inew .pri { flex: none; }
+.inew input {
+  flex: 1; font: 12.5px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 4px 8px; outline: none; user-select: text;
+}
+.iempty { grid-column: 1 / -1; padding: 28px 16px; color: var(--muted); text-align: center; }
+.idetail h3 { margin: 4px 0 8px; font-size: 14px; line-height: 1.35; text-wrap: balance; }
+.ichips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+.ichips span { display: inline-flex; gap: 5px; align-items: center; }
+.idetail p { margin: 0 0 12px; line-height: 1.5; }
+.idetail dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0 0 12px; font-size: 12px; }
+.idetail dt { color: var(--muted); }
+.idetail dd { margin: 0; font: 11.5px var(--mono); }
+.iacts { display: grid; gap: 1px; margin: 0 -6px; }
+.iacts button { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; text-align: left; }
+.iacts button:hover { background: var(--hover); }
+.iacts button:disabled { opacity: .45; cursor: default; background: none; }
+.iacts kbd { min-width: 18px; text-align: center; }
+.iacts button.on { color: var(--accent); }
+.iback { height: 24px; padding: 0 8px 0 6px; border-radius: 4px; color: var(--muted); font-size: 12px; flex: none; }
+.iback:hover { background: var(--hover); color: var(--text); }
+.ihint {
+  height: 22px; flex: none; display: flex; gap: 10px; align-items: center; padding: 0 10px;
+  border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden;
+}
+.ihint span { display: flex; gap: 3px; align-items: center; }
+.ihint kbd { font-size: 10px; padding: 0 3px; }
+.ihint .src { margin-left: auto; font: 10.5px var(--mono); }
+/* The State Pill is the control: it opens the State Dropdown anchored under itself */
+.pillbtn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px 2px 2px; margin-left: -3px;
+  border: 1px solid transparent; border-radius: 5px;
+}
+.pillbtn:hover, .pillbtn[aria-expanded="true"] { border-color: var(--line); background: var(--hover); }
+.pillbtn .caret { font-size: 9px; color: var(--muted); }
+.irow.plane .pill { cursor: pointer; }
+.irow.plane .pill:hover { box-shadow: 0 0 0 2px var(--line); }
+.idrop {
+  position: absolute; top: 0; left: 0; z-index: 5;
+  width: min(220px, calc(100% - 8px)); max-height: calc(100% - 8px); overflow: auto; padding: 6px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 16px 40px -12px var(--shadow);
+}
+.idrop .ttl { padding: 2px 6px 4px; font-size: 12px; color: var(--muted); }
+.idrop h5 { margin: 6px 6px 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.idrop button { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 3px 6px; border-radius: 4px; }
+.idrop button:hover { background: var(--hover); }
+.idrop button.hi { background: var(--hover); box-shadow: inset 0 0 0 1px var(--accent); }
+.idrop .cur { font-size: 11px; color: var(--muted); }
+.isetup { flex: 1; overflow: auto; display: grid; place-items: center; padding: 16px; }
+.isetup form { width: min(340px, 100%); display: grid; gap: 9px; }
+.isetup b { font-size: 14px; }
+.isetup p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.isetup p.ok { color: var(--ok); }
+.isetup code { font: 11px var(--mono); color: var(--text); }
+.isetup label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); }
+.isetup input {
+  font: 12px var(--mono); color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 4px; padding: 5px 8px; outline: none; user-select: text;
+}
+.isetup input:focus { border-color: var(--accent); }
+.isetup .go { justify-self: start; margin-top: 2px; padding: 5px 14px; border-radius: 5px; background: var(--accent); color: var(--bg); font-weight: 600; }
+.isetup .files { font: 10.5px/1.7 var(--mono); color: var(--muted); }
+/* Sidebar: active Plane issues per State, in Plane's colours (the pi-todos widget) */
+.minibar { display: flex; gap: 1px; width: 26px; height: 4px; border-radius: 2px; overflow: hidden; flex: none; }
+.minibar i { height: 100%; }
+.rail .project .minibar { display: none; }
+/* Toolbar: the project's In Progress issues, next to Appearance. One click drills into the issue */
+.prog { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; margin: 0 4px; overflow: hidden; }
+.prog button {
+  display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 260px; height: 22px; padding: 0 8px 0 6px;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--bg); color: var(--text); font-size: 12px; flex: 0 1 auto;
+}
+.prog button:hover { border-color: var(--accent); }
+.prog button.run { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.prog .sd { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.prog .sid { color: var(--muted); font-size: 11px; }
+.prog .pt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog .pe { font: 600 11px var(--mono); color: var(--accent); white-space: nowrap; }
+.prog .pe .rec { margin-right: 4px; }
+.prog .more { color: var(--muted); padding: 0 8px; flex: none; }
+/* only the first chip (the timed or most urgent issue) spends room on its title; the rest show the ID, title on hover */
+.prog button + button { flex: none; }
+.prog button + button .pt { display: none; }
+@media (max-width: 1100px) { .prog .pt { display: none; } }
+.status .timer { flex: none; color: var(--muted); font: 11px var(--mono); }
+.status .timer b { color: var(--accent); font-weight: 600; }
+/* Running Entry marker */
+.rec { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; animation: syncp 1s ease-in-out infinite alternate; }
+
+/* Muted inline text inside the issue detail. */
+.c-m { color: var(--muted); }
+
+/* Overlay layer for the State/Label dropdowns and the image lightbox. */
+.islot { position: absolute; inset: 0; pointer-events: none; }
+.islot > * { pointer-events: auto; }
