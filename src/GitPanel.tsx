@@ -6,7 +6,7 @@ import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMou
 import { type Project, type Tab, isRemote } from "./state";
 import {
   type Change, type CtxId, type Drawer, commit, draftCommit, draftPr, gitOf, isStaged, isUnstaged, linkedIssue, loadPr,
-  merge, openDrawer, openPr, push, refresh, review, select, sendFinding, setField, setOpt, stage, stepOf,
+  merge, openDrawer, openPr, push, refresh, review, select, selectCommit, sendFinding, setField, setOpt, stage, stepOf,
   toggleCtx, unpushed, unstage,
 } from "./git";
 import { openFile } from "./files";
@@ -230,6 +230,32 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     </Show>
   );
 
+  const CommitView = (c: { sha: string }) => (
+    <Show when={!g().commit?.error} fallback={<div class="g-note bad">{g().commit!.error}</div>}>
+      <Show when={g().commit?.detail} fallback={<div class="g-note">Loading commit…</div>}>
+        {(d) => (
+          <>
+            <div class="g-cmsg">
+              <div class="g-crow">
+                <span class="sha">{d().sha.slice(0, 7)}</span>
+                <span class="g-hint">{d().author} · {d().when}</span>
+                <span class="grow" />
+                <button class="g-icon" title="Close the commit" onClick={() => selectCommit(p(), c.sha)}>×</button>
+              </div>
+              <h3>{d().message.split("\n")[0]}</h3>
+              <Show when={d().message.split("\n").slice(1).join("\n").trim()}>
+                <pre class="g-cbody">{d().message.split("\n").slice(1).join("\n").trim()}</pre>
+              </Show>
+              <Show when={d().stat}><pre class="g-cstat">{d().stat}</pre></Show>
+            </div>
+            <div class="g-changes-head">Changes</div>
+            <Diff text={d().diff} />
+          </>
+        )}
+      </Show>
+    </Show>
+  );
+
   const DrawerView = () => {
     const d = () => g().drawer;
     const title = () => (d() === "push" ? "Push" : d() === "pr" ? "Open pull request" : `Merge #${g().pr?.number ?? ""}`);
@@ -407,7 +433,12 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               <div class="g-sec">Commits</div>
               <For each={s()?.commits ?? []}>
                 {(c) => (
-                  <div class="g-commit pad" title={`${c.sha}\n${c.when}`}>
+                  <div
+                    class="g-commit pad"
+                    classList={{ sel: g().commit?.key === c.sha }}
+                    title={`${c.sha}\n${c.when}`}
+                    onClick={() => selectCommit(p(), c.sha)}
+                  >
                     <span class="sha">{c.sha.slice(0, 7)}</span><span class="s">{c.subject}</span>
                     <span class="w">{c.pushed ? c.when : "local"}</span>
                   </div>
@@ -416,12 +447,18 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             </div>
           </div>
           <div class="g-right">
-            <div class="g-diffhead">
-              <b>{g().sel?.path ?? "—"}</b>
-              <span class="grow" />
-              <Show when={g().sel}><span>{g().sel!.staged ? "staged" : "not staged"}</span></Show>
-            </div>
-            <Diff text={g().sel ? g().diff?.text : ""} error={g().diff?.error} />
+            <Show when={g().commit} fallback={
+              <>
+                <div class="g-diffhead">
+                  <b>{g().sel?.path ?? "—"}</b>
+                  <span class="grow" />
+                  <Show when={g().sel}><span>{g().sel!.staged ? "staged" : "not staged"}</span></Show>
+                </div>
+                <Diff text={g().sel ? g().diff?.text : ""} error={g().diff?.error} />
+              </>
+            }>
+              {(c) => <CommitView sha={c().key} />}
+            </Show>
             <DrawerView />
           </div>
         </div>

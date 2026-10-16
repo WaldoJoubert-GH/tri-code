@@ -108,6 +108,9 @@
 .g-st.s-D { color: var(--bad); }
 .g-st.s-R, .g-st.s-C { color: var(--violet); }
 .g-commit { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; white-space: nowrap; }
+.g-commit:hover { background: var(--hover); }
+.g-commit.sel { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 2px 0 var(--accent); }
+.win:not(.focused) .g-commit.sel { background: var(--hover); box-shadow: inset 2px 0 var(--muted); }
 .g-commit .sha { font: 11px var(--mono); color: var(--accent); flex: none; }
 .g-commit .s { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .g-commit .w { margin-left: auto; font-size: 10.5px; color: var(--muted); flex: none; }
@@ -133,6 +136,22 @@
 .g-l.a .g-g { color: var(--ok); }
 .g-l.d { background: color-mix(in srgb, var(--bad) 11%, transparent); }
 .g-l.d .g-g { color: var(--bad); }
+
+/* An opened commit: message at the top, its changes below. */
+.g-cmsg {
+  flex: none; padding: 9px 12px; border-bottom: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 5px; user-select: text;
+}
+.g-crow { display: flex; align-items: center; gap: 8px; }
+.g-crow .sha { font: 11px var(--mono); color: var(--accent); flex: none; }
+.g-cmsg h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.g-cbody { margin: 0; white-space: pre-wrap; font: 11.5px/1.5 var(--mono); color: var(--muted); }
+.g-cstat { margin: 0; white-space: pre-wrap; font: 11px/1.5 var(--mono); color: var(--muted); }
+.g-changes-head {
+  flex: none; display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); background: var(--panel); border-bottom: 1px solid var(--line);
+}
 
 /* Drawer over the diff: push, open PR, merge. */
 .g-drawer {

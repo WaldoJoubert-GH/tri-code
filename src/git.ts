@@ -11,6 +11,9 @@ import { flash } from "./ui";
 
 export type Change = { path: string; x: string; y: string };
 export type Commit = { sha: string; subject: string; when: string; pushed: boolean };
+export type CommitDetail = {
+  sha: string; author: string; when: string; message: string; stat: string; diff: string;
+};
 export type GitStatus = {
   branch: string | null; upstream: string | null; ahead: number; behind: number; base: string;
   files: Change[]; commits: Commit[];
@@ -36,6 +39,8 @@ type GitUi = {
   prError?: string;
   sel?: Sel;
   diff?: { key: string; text?: string; error?: string };
+  /** A commit opened from the Commits list; while set, its detail replaces the file diff. */
+  commit?: { key: string; detail?: CommitDetail; error?: string };
   msg: string;
   /** The text in the box is a ✦ draft the user has not edited yet. */
   msgAi: boolean;
@@ -168,8 +173,27 @@ export async function loadDiff(p: Project): Promise<void> {
 }
 
 export function select(p: Project, sel: Sel): void {
-  set(p, (g) => { g.sel = sel; });
+  set(p, (g) => { g.sel = sel; g.commit = undefined; });
   void loadDiff(p);
+}
+
+/** Open a commit in the diff pane; clicking the one already open goes back to the file diff. */
+export function selectCommit(p: Project, sha: string): void {
+  if (gitOf(p.id).commit?.key === sha) {
+    set(p, (g) => { g.commit = undefined; });
+    return;
+  }
+  void loadCommit(p, sha);
+}
+
+async function loadCommit(p: Project, sha: string): Promise<void> {
+  set(p, (g) => { g.commit = { key: sha }; });
+  try {
+    const detail = await invoke<CommitDetail>("git_show", { ...args(p), sha });
+    set(p, (g) => { if (g.commit?.key === sha) g.commit.detail = detail; });
+  } catch (e) {
+    set(p, (g) => { if (g.commit?.key === sha) g.commit.error = String(e); });
+  }
 }
 
 // ── actions ─────────────────────────────────────────────────────────

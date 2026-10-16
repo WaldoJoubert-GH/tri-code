@@ -53,6 +53,7 @@ pub fn run() {
             git::git_status,
             git::git_diff,
             git::git_range,
+            git::git_show,
             git::git_stage,
             git::git_unstage,
             git::git_commit,

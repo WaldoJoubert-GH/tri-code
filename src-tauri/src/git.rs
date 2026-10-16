@@ -50,6 +50,19 @@ pub struct Range {
     pub diff: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct CommitDetail {
+    pub sha: String,
+    pub author: String,
+    /// Relative commit date, as git prints it.
+    pub when: String,
+    /// Subject, then the body.
+    pub message: String,
+    /// The diffstat, as git prints it.
+    pub stat: String,
+    pub diff: String,
+}
+
 /// git and gh are fast and on every PATH; claude (and gh on some machines) live in a
 /// prefix only the login shell adds, so those go through it.
 fn needs_login(program: &str) -> bool {
@@ -269,6 +282,31 @@ pub async fn git_range(host: String, path: String, base: String) -> Result<Range
     .await
 }
 
+/// One commit: its message, author and full patch. Shown in the diff pane when a commit in
+/// the Commits list is opened.
+#[tauri::command]
+pub async fn git_show(host: String, path: String, sha: String) -> Result<CommitDetail, String> {
+    blocking(move || {
+        let r = multi(&host, &path, &[
+            &["show", "-s", "--no-color", "--format=%H%x1f%an%x1f%cr%x1f%B", &sha],
+            &["show", "--no-color", "--format=", "--stat", &sha],
+            &["show", "--no-color", "--format=", "--patch", &sha],
+        ])?;
+        let head = match r.first() {
+            Some(Ok(s)) => s,
+            _ => return Err(format!("cannot read commit {sha}")),
+        };
+        let mut f = head.splitn(4, '\u{1f}');
+        let sha = f.next().unwrap_or_default().trim().to_string();
+        let author = f.next().unwrap_or_default().to_string();
+        let when = f.next().unwrap_or_default().to_string();
+        let message = f.next().unwrap_or_default().trim_end().to_string();
+        let get = |i: usize| r.get(i).and_then(|x| x.as_ref().ok()).cloned().unwrap_or_default();
+        Ok(CommitDetail { sha, author, when, message, stat: get(1).trim().to_string(), diff: get(2) })
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn git_stage(host: String, path: String, files: Vec<String>) -> Result<(), String> {
     blocking(move || {
@@ -428,6 +466,22 @@ mod tests {
         exec("local", p, "git", &["commit", "-q", "-F", "-"], Some("Add a file\n\nWith a body.\n".into())).unwrap();
         let log = git(&["log", "--format=%s%n%b"]);
         assert_eq!(log.trim(), "Add a file\nWith a body.");
+
+        // What git_show reads back: the header fields and the patch.
+        let r = multi("local", p, &[
+            &["show", "-s", "--no-color", "--format=%H%x1f%an%x1f%cr%x1f%B", "HEAD"],
+            &["show", "--no-color", "--format=", "--stat", "HEAD"],
+            &["show", "--no-color", "--format=", "--patch", "HEAD"],
+        ])
+        .unwrap();
+        let head = r[0].as_ref().unwrap();
+        let mut f = head.splitn(4, '\u{1f}');
+        let (sha, author, _when, message) = (f.next().unwrap(), f.next().unwrap(), f.next().unwrap(), f.next().unwrap());
+        assert_eq!(sha.trim().len(), 40);
+        assert_eq!(author, "T");
+        assert_eq!(message.trim_end(), "Add a file\n\nWith a body.");
+        assert!(r[1].as_ref().unwrap().contains("1 file changed"));
+        assert!(r[2].as_ref().unwrap().contains("+hi"));
 
         // The script a remote project runs over ssh, run here by a real shell.
         let out = Command::new("/bin/sh")
