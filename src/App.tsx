@@ -10,6 +10,7 @@ import ClaudeUsage from "./Usage";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
 import { installHotkeys } from "./hotkeys";
+import { installClipboardFallback } from "./clipboard";
 import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
 import { ensureSession, setLinkHandler } from "./terms";
 import { flash, flashMsg, toast, undoToast } from "./ui";
@@ -23,6 +24,7 @@ export default function App() {
   onMount(async () => {
     installHotkeys();
     startClock();
+    installClipboardFallback();
     setLinkHandler((url, tabId, external) => {
       if (external) {
         openExternal(url);

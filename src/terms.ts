@@ -8,6 +8,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Project, Tab, TabStatus, TerminalKind, TAB_COMMANDS, isRemote, isTerminal, sessionName, setLive } from "./state";
+import { copyText, readText } from "./clipboard";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;
@@ -67,6 +68,8 @@ class TermSession {
   private disposed = false;
   private backoff = 1000;
   private lastSize = "";
+  /** When the last Ctrl+V this class handled happened, so its native paste event is dropped. */
+  private ownPasteAt = Number.NEGATIVE_INFINITY;
   /** Input typed before pty_spawn resolves (e.g. xterm's reply to ConPTY's startup DSR query). */
   private pending: string[] = [];
   private observer = new ResizeObserver(() => this.refit());
@@ -94,6 +97,7 @@ class TermSession {
       linkHandler?.(uri, this.tab.id, event.shiftKey);
     }));
     this.term.open(this.el);
+    this.installClipboard();
 
     this.term.onData((data) => {
       if (this.status === "exited" && data === "\r") return void this.start();
@@ -107,6 +111,56 @@ class TermSession {
 
     this.observer.observe(this.el);
     this.start();
+  }
+
+  /**
+   * Copy and paste for the terminal.
+   *
+   * xterm copies and pastes through the DOM copy/paste events, but on Windows
+   * WebView2 swallows the Ctrl+C / Ctrl+V accelerators before those events fire,
+   * so nothing happens. Handle the keys here and use the Clipboard API directly:
+   * Ctrl+C copies a selection (and still sends SIGINT when there is none) and
+   * Ctrl+V pastes as if typed. Full-screen TUIs such as claude and pi copy
+   * through OSC 52, which xterm core ignores, so forward that too.
+   */
+  private installClipboard() {
+    this.term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== "keydown" || e.altKey) return true;
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.code === "KeyC" && this.term.hasSelection()) {
+        copyText(this.term.getSelection());
+        return false;
+      }
+      if (mod && e.code === "Insert" && this.term.hasSelection()) {
+        copyText(this.term.getSelection());
+        return false;
+      }
+      if ((mod && e.code === "KeyV") || (e.shiftKey && e.code === "Insert")) {
+        // The browser may still fire a paste event for this keystroke. Mark it so
+        // the listener below drops that event instead of pasting twice.
+        this.ownPasteAt = performance.now();
+        readText().then((text) => text && this.term.paste(text));
+        return false;
+      }
+      return true;
+    });
+    // Native paste (context menu, middle click) keeps working; skip only the
+    // event that belongs to a Ctrl+V already handled above.
+    this.el.addEventListener("paste", (e) => {
+      if (performance.now() - this.ownPasteAt > 250) return;
+      this.ownPasteAt = 0;
+      e.preventDefault();
+      e.stopPropagation();
+    }, { capture: true });
+
+    // OSC 52: how a TUI asks the terminal to set the system clipboard.
+    this.term.parser.registerOscHandler(52, (data) => {
+      const sep = data.indexOf(";");
+      if (sep < 0) return false;
+      const payload = data.slice(sep + 1).replace(/\?+$/, "");
+      if (payload) copyText(decodeBase64(payload));
+      return true;
+    });
   }
 
   private update(patch: Partial<{ status: TabStatus; attention: boolean; title: string }>) {
@@ -237,6 +291,12 @@ class TermSession {
     this.term.dispose();
     this.el.remove();
   }
+}
+
+/** OSC 52 payloads are UTF-8 text encoded as base64. */
+function decodeBase64(b64: string): string {
+  const binary = atob(b64);
+  return new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
 }
 
 const sessions = new Map<string, TermSession>();

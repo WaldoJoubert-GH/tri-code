@@ -68,6 +68,15 @@ export function HelpOverlay() {
             <dt><Keys keys={["Alt", "/"]} /></dt>
             <dd>Show or hide this list</dd>
           </dl>
+          <h4>Text</h4>
+          <dl>
+            <dt><Keys keys={["Ctrl", "C"]} /></dt>
+            <dd>Copy the selection (sends Ctrl+C to the app when nothing is selected)</dd>
+            <dt><Keys keys={["Ctrl", "V"]} /></dt>
+            <dd>Paste into the focused window</dd>
+            <dt><Keys keys={["Shift"]} /> + drag</dt>
+            <dd>Select text in claude, pi or any app that captures the mouse</dd>
+          </dl>
         </div>
       </div>
     </Show>
