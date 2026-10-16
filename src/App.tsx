@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onMount, untrack } from "solid-js";
 import {
-  GAPS, SPACES, TabKind, activeProject, addTab, app, focusedTab, goSpace, isRemote, live, loadState,
+  GAPS, SPACES, TabKind, activeProject, addTab, app, focusedTab, goSpace, isRemote, isTerminal, live, loadState,
   persistChanges, setGap, setLayout, space,
 } from "./state";
 import Canvas from "./Canvas";
@@ -13,12 +13,16 @@ import { installHotkeys } from "./hotkeys";
 import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
 import { ensureSession, setLinkHandler } from "./terms";
 import { flash, flashMsg, toast, undoToast } from "./ui";
+import {
+  clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
+} from "./issues";
 
 export default function App() {
   const [ready, setReady] = createSignal(false);
 
   onMount(async () => {
     installHotkeys();
+    startClock();
     setLinkHandler((url, tabId, external) => {
       if (external) {
         openExternal(url);
@@ -48,7 +52,7 @@ export default function App() {
     if (!ready()) return;
     for (const p of app.projects) {
       for (const t of p.tabs) {
-        if (t.kind === "browser" || started.has(t.id)) continue;
+        if (!isTerminal(t) || started.has(t.id)) continue;
         started.add(t.id);
         untrack(() => ensureSession(p, t));
       }
@@ -58,6 +62,13 @@ export default function App() {
   // The accent of the active project drives --accent (see styles.css).
   createEffect(() => {
     document.documentElement.style.setProperty("--accent-raw", activeProject()?.accent ?? "#7aa2f7");
+  });
+
+  // Warm the active project's `.dev/` so the toolbar chips and sidebar bar have data.
+  createEffect(() => {
+    if (!ready()) return;
+    const p = activeProject();
+    if (p && !untrack(() => dev[p.id]?.loaded)) untrack(() => loadDev(p));
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
@@ -107,10 +118,14 @@ function Toolbar() {
         {(p) => (
           <>
             <div class="new">
-              <For each={["claude", "pi", "shell", "browser"] as TabKind[]}>
+              <For each={["claude", "pi", "shell", "browser", "issues"] as TabKind[]}>
                 {(k) => (
                   <button
                     onClick={() => {
+                      if (k === "issues") {
+                        openIssuePanel(p);
+                        return;
+                      }
                       addTab(p.id, k);
                       flash(`new ${k}`);
                     }}
@@ -164,6 +179,7 @@ function Toolbar() {
         )}
       </Show>
       <span class="where">{where()}</span>
+      <InProgressChips />
       <Show when={activeProject()}>
         <button class="tool theme-btn" id="themeBtn" title="Project appearance (Alt+P)" onClick={(e) => toggleAppearance(e.currentTarget)}>
           <i />
@@ -193,10 +209,74 @@ function StatusBar() {
     <div class="status">
       <span class="focus">{info()}</span>
       <span class="flash">{flashMsg()}</span>
+      <StatusTimer />
       <div class="hints">
+        <span><kbd>Alt</kbd><kbd>I</kbd> issues</span>
         <span><kbd>Alt</kbd><kbd>/</kbd> all keys</span>
       </div>
       <ClaudeUsage />
     </div>
+  );
+}
+
+/** The project's "In Progress" issues, next to Appearance. Click a chip to drill in. */
+function InProgressChips() {
+  const p = activeProject();
+  const list = () => (p ? inProgress(p.id) : []);
+  return (
+    <Show when={list().length}>
+      <div class="prog" role="group" aria-label="In Progress issues">
+        <For each={list().slice(0, 2)}>
+          {(i) => {
+            const run = () => runningEntry(p!.id)?.issue_id === i.id;
+            return (
+              <button
+                classList={{ run: run() }}
+                title={`${slugOf(dev[p!.id], i)} · ${i.title} · In Progress${run() ? " · timer running" : ""}. Click to open`}
+                onClick={() => openIssuePanel(p!, i.id)}
+              >
+                <span class="sd" style={{ background: stateOf(dev[p!.id], i)?.color ?? "#f59e0b" }} />
+                <span class="sid">{slugOf(dev[p!.id], i)}</span>
+                <span class="pt">{i.title}</span>
+                <Show when={run()}>
+                  <span class="pe"><i class="rec" />{formatHm(clock() - Date.parse(runningEntry(p!.id)!.started_at))}</span>
+                </Show>
+              </button>
+            );
+          }}
+        </For>
+        <Show when={list().length > 2}>
+          <button class="more" title={`${list().slice(2).map((i) => slugOf(dev[p!.id], i)).join(", ")} · open the list`} onClick={() => openIssuePanel(p!)}>
+            +{list().length - 2}
+          </button>
+        </Show>
+      </div>
+    </Show>
+  );
+}
+
+/** Running Entry and the day's total, in the status line. */
+function StatusTimer() {
+  const p = activeProject();
+  const d = () => (p ? dev[p.id] : undefined);
+  const run = () => (p ? runningEntry(p.id) : null);
+  return (
+    <Show when={d()?.connected}>
+      <span class="timer">
+        <Show when={run()}>
+          {(r) => {
+            const issue = () => d()!.issues.find((i) => issueKey(i) === r().issue_id);
+            return (
+              <>
+                <i class="rec" />
+                <Show when={issue()}>{(x) => <b>{slugOf(d(), x())}</b>}</Show>{" "}
+                {formatHms(clock() - Date.parse(r().started_at))} ·{" "}
+              </>
+            );
+          }}
+        </Show>
+        today {d() ? formatHm(todayTotal(p!.id)) : "0m"}
+      </span>
+    </Show>
   );
 }

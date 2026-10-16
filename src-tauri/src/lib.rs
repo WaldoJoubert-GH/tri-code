@@ -1,7 +1,10 @@
 mod bg;
 mod browser;
+mod devfs;
 mod dirs;
+mod plane;
 mod pty;
+mod remote;
 mod spawn;
 mod store;
 mod usage;
@@ -40,6 +43,16 @@ pub fn run() {
             pty::pty_kill_all,
             pty::remote_kill_session,
             dirs::list_dirs,
+            devfs::dev_read,
+            devfs::dev_write,
+            plane::plane_sync,
+            plane::plane_set_state,
+            plane::plane_set_labels,
+            plane::plane_create_issue,
+            plane::plane_comments,
+            plane::plane_add_comment,
+            plane::plane_upload_asset,
+            plane::plane_check_token,
             store::state_load,
             store::state_save,
             browser::browser_open,

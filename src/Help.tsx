@@ -53,6 +53,8 @@ export function HelpOverlay() {
           </dl>
           <h4>Windows and links</h4>
           <dl>
+            <dt><Keys keys={["Alt", "I"]} /></dt>
+            <dd>Open or focus this project's issues panel (the `.dev/` folder)</dd>
             <dt><Keys keys={["Alt", "Enter"]} /></dt>
             <dd>New window of the focused kind</dd>
             <dt><Keys keys={["Alt", "B"]} /></dt>

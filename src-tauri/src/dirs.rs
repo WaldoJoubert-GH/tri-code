@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 
+use crate::remote;
 use crate::spawn::{expand_home, remote_path, sq};
 
 #[derive(Debug, Serialize)]
@@ -49,21 +50,7 @@ fn remote_script(path: &str) -> String {
 }
 
 fn list_remote(host: &str, path: &str) -> Result<DirList, String> {
-    let mut cmd = std::process::Command::new("ssh");
-    cmd.args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, &remote_script(path)])
-        .stdin(std::process::Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    let out = cmd.output().map_err(|e| format!("ssh: {e}"))?;
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
-        return Err(if err.is_empty() { format!("{host}: cannot open {path}") } else { err });
-    }
-    let text = String::from_utf8_lossy(&out.stdout);
+    let text = remote::run(host, &remote_script(path))?;
     let mut lines = text.lines();
     let path = lines.next().unwrap_or("/").to_string();
     let mut dirs: Vec<String> = lines.map(String::from).collect();
