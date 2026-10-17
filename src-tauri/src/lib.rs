@@ -64,6 +64,7 @@ pub fn run() {
             git::gh_pr_create,
             git::gh_pr_merge,
             git::claude_draft,
+            git::project_files,
             devfs::dev_read,
             devfs::dev_write,
             devfs::save_pasted_image,

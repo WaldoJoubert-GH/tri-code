@@ -49,6 +49,13 @@ _Avoid_: Host group, machine, server.
 The `Alt+O` dialog: Environments on the left (with "New environment"), a Folder Picker on the right. Opening a folder that is already a project focuses it.
 _Avoid_: Add project form, folder browser.
 
+**Go to File**:
+The `Alt+T` box under the toolbar path (a click on the path opens it too). One field that searches the project's File Index by fuzzy match and, when it is empty or ends in `/`, lists that folder. Opens the pick in the project's `file` Window.
+_Avoid_: Quick open, file palette, Ctrl+P.
+
+**File Index**:
+A project's files for Go to File, as relative paths: `git ls-files --cached --others --exclude-standard` on the project's host, or a walk that skips dependency folders when the folder is not a repo. Fetched each time the box opens; the last one shows meanwhile.
+
 **Folder Picker**:
 The path field that is also the folder list: typing filters, `Enter` goes in or opens, `Backspace` on empty goes up, a `~` or `/` path jumps.
 

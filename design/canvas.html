@@ -126,10 +126,64 @@ aside h2 {
 .top .new { display: flex; flex: none; }
 .top .new button, .top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
 .top .new button:hover, .top .tool:hover { color: var(--text); background: var(--hover); }
+/* The project path is the way into Go to File: click it (or Alt+T) to search the project's files or walk its folders */
 .top .where {
-  align-self: center; padding: 0 12px; color: var(--muted); font-size: 11px;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1;
+  align-self: center; display: flex; align-items: center; gap: 6px; height: 24px; margin: 0 6px; padding: 0 8px;
+  color: var(--muted); font-size: 11px; min-width: 120px; flex: 1 1 200px; max-width: 420px; margin-right: auto;
+  border: 1px solid transparent; border-radius: 5px; text-align: left;
 }
+.top .where:hover, .top .where[aria-expanded="true"] { border-color: var(--line); background: var(--bg); color: var(--text); }
+.top .where[aria-expanded="true"] { border-color: var(--accent); }
+.where svg { width: 12px; height: 12px; flex: none; }
+.where .wp { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--mono); direction: rtl; }
+.where .wp bdi { direction: ltr; }
+.where kbd { font-size: 10px; padding: 0 3px; white-space: nowrap; flex: none; margin-left: auto; opacity: 0; transition: opacity 120ms; }
+.where:hover kbd, .where[aria-expanded="true"] kbd { opacity: 1; }
+
+/* Go to File: one box that both searches (fuzzy, over git ls-files) and browses (type or click into folders) */
+.gtf {
+  position: fixed; z-index: 10000; width: 620px; max-width: calc(100vw - 16px); display: flex; flex-direction: column;
+  max-height: min(460px, calc(100vh - 60px)); background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 18px 50px -12px var(--shadow); overflow: hidden;
+}
+.gtf .gin { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.gtf .gin svg { width: 14px; height: 14px; color: var(--muted); flex: none; }
+.gtf .gin input {
+  flex: 1; min-width: 0; font: 13px var(--mono); color: var(--text); background: none; border: 0; outline: none; user-select: text;
+}
+.gtf .gin .scope { font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.gcrumb { display: flex; align-items: center; gap: 2px; padding: 5px 8px; font: 11px var(--mono); color: var(--muted); border-bottom: 1px solid var(--line); overflow: hidden; white-space: nowrap; }
+.gcrumb[hidden] { display: none; }
+.gcrumb button { padding: 1px 4px; border-radius: 3px; color: var(--muted); }
+.gcrumb button:hover { background: var(--hover); color: var(--text); }
+.gcrumb button:last-child { color: var(--text); }
+.gcrumb i { font-style: normal; opacity: .5; }
+.glist { overflow: auto; padding: 4px; min-height: 0; flex: 1; }
+.glist h5 { margin: 6px 6px 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.grow {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 26px; padding: 0 8px; border-radius: 4px; text-align: left; min-width: 0;
+}
+.grow:hover { background: var(--hover); }
+.grow.hi { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 2px 0 var(--accent); }
+.grow .fi { width: 16px; flex: none; text-align: center; font: 600 9px var(--mono); color: var(--fc, var(--muted)); }
+.grow .fn { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grow .fd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 11px var(--mono); direction: rtl; text-align: left; }
+.grow .fd bdi { direction: ltr; }
+.grow mark { background: none; color: var(--accent); font-weight: 700; }
+.grow .open { font-size: 10.5px; color: var(--muted); flex: none; }
+.grow.dir .fn { font-weight: 600; }
+.grow.dir .fn::after { content: "/"; color: var(--muted); font-weight: 400; }
+.gnone { padding: 22px 12px; text-align: center; color: var(--muted); }
+.gfoot {
+  display: flex; gap: 12px; align-items: center; padding: 5px 10px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden;
+}
+.gfoot span { display: flex; gap: 3px; align-items: center; }
+.gfoot kbd { font-size: 10px; padding: 0 3px; }
+.gfoot .src { margin-left: auto; font: 10.5px var(--mono); }
+/* File window: read-only view of one file, like src/FileView.tsx */
+.dot.file { background: var(--violet); border-radius: 2px; }
+.screen .ln { display: inline-block; width: 3ch; margin-right: 1.5ch; text-align: right; color: var(--muted); opacity: .6; }
 .top .sep { width: 1px; background: var(--line); margin: 7px 6px; flex: none; }
 .seg { display: flex; align-self: center; flex: none; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 0 4px; }
 .seg button { padding: 2px 9px; color: var(--muted); font-size: 12px; white-space: nowrap; }
@@ -632,7 +686,7 @@ body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; 
     <label class="gapctl" for="gap">Gap
       <select id="gap"><option>0</option><option>4</option><option>8</option><option selected>12</option><option>16</option><option>24</option><option>32</option></select>
     </label>
-    <span class="where" id="where"></span>
+    <button class="where" id="where" title="Go to file (Alt+T)" aria-haspopup="dialog" aria-expanded="false"></button>
     <div class="prog" id="prog" role="group" aria-label="In Progress issues"></div>
     <button class="tool theme-btn" id="themeBtn" title="Project appearance (Alt+P)"><i></i>Appearance</button>
     <button class="tool" id="helpBtn" title="Hotkeys (Alt+/)">?</button>
@@ -646,6 +700,7 @@ body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; 
     <span class="flash" id="flash"></span>
     <span class="timer" id="timer"></span>
     <div class="hints">
+      <span><kbd>Alt</kbd><kbd>T</kbd> go to file</span>
       <span><kbd>Alt</kbd><kbd>I</kbd> issues</span>
       <span><kbd>Alt</kbd><kbd>1–4</kbd> workspace</span>
       <span><kbd>Alt</kbd><kbd>Shift</kbd><kbd>1–4</kbd> send</span>
@@ -1034,7 +1089,7 @@ function winEl(w) {
     ${body}<div class="tip"></div>`;
   if (w.kind === "browser") wireBrowser(w, el);
   else if (w.kind === "issues") wireIssues(w, el);
-  else el.querySelector(".screen").innerHTML = screenHtml(w);
+  else el.querySelector(".screen").innerHTML = w.kind === "file" ? fileHtml(w) : screenHtml(w);
   el.addEventListener("pointerdown", (e) => { if (!e.target.closest("button")) focus(w.id); });
   el.querySelector(".bar").addEventListener("pointerdown", (e) => !e.target.closest("button") && startDrag(e, w));
   el.querySelector(".bar").addEventListener("dblclick", (e) => !e.target.closest("button") && toggleMax(w));
@@ -1054,7 +1109,7 @@ function renderWin(w) {
   Object.assign(el.style, { left: w.x + "px", top: w.y + "px", width: w.w + "px", height: w.h + "px", zIndex: w.z });
   el.classList.toggle("focused", sp().focus === w.id);
   el.classList.toggle("attention", w.attention);
-  el.querySelector(".dot").className = "dot " + (w.kind === "browser" ? "web" : w.kind === "issues" ? "plane" + (cur.dev?.syncing ? " syncing" : "") : w.status);
+  el.querySelector(".dot").className = "dot " + (w.kind === "browser" ? "web" : w.kind === "file" ? "file" : w.kind === "issues" ? "plane" + (cur.dev?.syncing ? " syncing" : "") : w.status);
   el.querySelector(".kind").textContent = w.kind;
   el.querySelector(".ttl").textContent = w.title;
   el.querySelector(".tip").innerHTML = sizeLabel(w);
@@ -1110,8 +1165,12 @@ function renderSide() {
     switchProject(projects.find((p) => p.id === el.dataset.p));
     if (e.target.closest(".gear")) openTheme(el.querySelector(".gear") ?? el);
   });
-  $("where").textContent = (cur.host !== "local" ? cur.host + ":" : "") + cur.path;
+  $("where").innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>
+    <span class="wp"><bdi>${esc(where())}</bdi></span><kbd>Alt T</kbd>`;
+  $("where").setAttribute("aria-expanded", !!$("gtf"));
+  $("where").title = `${where()} · Go to file (Alt+T)`;
 }
+const where = () => (cur.host !== "local" ? cur.host + ":" : "") + cur.path;
 function renderStatus() {
   const w = focused();
   const where = `${sp().layout === "master" ? `main ${Math.round(sp().ratio * 100)}%` : "grid"} · gap ${gap}`;
@@ -1877,7 +1936,7 @@ function closeWin(w) {
   if (sp().focus === w.id) { const v = vis(); sp().focus = (v.filter((x) => cur.wins.indexOf(x) < i).pop() ?? v[0])?.id ?? null; }
   world.classList.add("anim");
   render();
-  const what = w.kind === "browser" ? "browser" : w.kind === "issues" ? "issues panel (.dev/ is untouched)" : `${w.kind}${w.title ? " · " + w.title : ""}. Its session ends in 5s`;
+  const what = w.kind === "browser" ? "browser" : w.kind === "file" ? w.title : w.kind === "issues" ? "issues panel (.dev/ is untouched)" : `${w.kind}${w.title ? " · " + w.title : ""}. Its session ends in 5s`;
   showToast(`Closed ${esc(what)}.`, () => { cur.wins.splice(i, 0, w); world.classList.add("anim"); focus(w.id); });
 }
 function showToast(msg, onUndo) {
@@ -1925,6 +1984,7 @@ function sendTo(w, i) {
 
 function switchProject(p) {
   if (p === cur) return;
+  closeGtf();
   for (const el of els.values()) el.remove();
   els.clear();
   cur = p;
@@ -1997,6 +2057,7 @@ const DIRS = { KeyH: [-1, 0], ArrowLeft: [-1, 0], KeyL: [1, 0], ArrowRight: [1, 
 const GAPS = [0, 4, 8, 12, 16, 24, 32];
 window.addEventListener("keydown", (e) => {
   if (e.code === "Escape" && $("pop")) return closeTheme();
+  if (e.code === "Escape" && $("gtf")) return closeGtf();
   if (e.code === "Escape" && document.querySelector(".help")) return toggleHelp(false);
   const w = focused();
   if (e.ctrlKey && !e.altKey && e.code === "KeyL" && w?.kind === "browser") {
@@ -2016,6 +2077,7 @@ window.addEventListener("keydown", (e) => {
   else if (e.code === "Enter") newWin(w && w.kind !== "issues" ? w.kind : "shell");
   else if (e.code === "KeyB") newWin("browser");
   else if (e.code === "KeyI") newWin("issues");
+  else if (e.code === "KeyT") toggleGtf();
   else if (e.code === "KeyQ" && w) closeWin(w);
   else if (e.code === "KeyF" && w) toggleMax(w);
   else if (e.code === "KeyM" && w) promote(w);
@@ -2064,6 +2126,7 @@ function toggleHelp(force) {
     <h4>Windows and links</h4><dl>
       <dt>${k("Alt", "Enter")}</dt><dd>New window of the focused kind</dd>
       <dt>${k("Alt", "B")}</dt><dd>New browser window</dd>
+      <dt>${k("Alt", "T")}</dt><dd>Go to file (or click the project path in the toolbar). Type to fuzzy-search the project's files, or type a folder and ${k("/")} to browse it; ${k("Tab")} completes, ${k("Backspace")} after a ${k("/")} goes up a folder. ${k("Enter")} opens it in this workspace's file window, ${k("Ctrl", "Enter")} in a new one, ${k("Shift", "Enter")} types <code>@path</code> into the last claude or pi window</dd>
       <dt>${k("Ctrl", "L")}</dt><dd>Edit the address of the focused browser</dd>
       <dt>${k("Ctrl", "D")}</dt><dd>Favourite the page (or click ☆). Favourites belong to the project: they sit on a bar under the address and on every new tab. Right-click one to rename or remove it, drag to reorder</dd>
       <dt>${k("Ctrl")} + click link</dt><dd>Open it in this project's browser window (one tiles in if needed)</dd>
@@ -2136,6 +2199,195 @@ function closeTheme() { $("pop")?.remove(); }
 document.addEventListener("pointerdown", (e) => {
   if ($("pop") && !e.target.closest("#pop, #themeBtn, .gear, .star")) closeTheme();
 });
+
+/* ---------- go to file ---------- */
+/** The project's file index: git ls-files, run on the project's host (over ssh for remote ones), refreshed when the picker opens. */
+const FILES = {
+  p1: ".cargo/config.toml .github/workflows/release.yml .gitignore .vscode/extensions.json CONTEXT.md README.md assets/icon.svg design/canvas.html design/files.html design/git.html design/mono.html design/projects.html design/tabs.html docs/adr/0001-dev-directory-client.md index.html package.json src-tauri/.gitignore src-tauri/Cargo.toml src-tauri/build.rs src-tauri/capabilities/default.json src-tauri/src/bg.rs src-tauri/src/browser.rs src-tauri/src/devfs.rs src-tauri/src/dirs.rs src-tauri/src/envs.rs src-tauri/src/fs.rs src-tauri/src/git.rs src-tauri/src/lib.rs src-tauri/src/main.rs src-tauri/src/plane.rs src-tauri/src/pty.rs src-tauri/src/remote.rs src-tauri/src/spawn.rs src-tauri/src/store.rs src-tauri/src/usage.rs src-tauri/tauri.conf.json src/App.tsx src/Appearance.tsx src/Canvas.tsx src/FileList.tsx src/FileView.tsx src/GitPanel.tsx src/Help.tsx src/IssuesPanel.tsx src/OpenProject.tsx src/Sidebar.tsx src/Usage.tsx src/browsers.ts src/canvas.css src/clipboard.ts src/code.ts src/favs.tsx src/files.css src/files.ts src/git.css src/git.ts src/hotkeys.ts src/icons.tsx src/index.tsx src/issues.ts src/layout.ts src/markdown.ts src/state.ts src/styles.css src/tabs.tsx src/terms.ts src/ui.ts src/updater.ts src/vite-env.d.ts tsconfig.json tsconfig.node.json vite.config.ts",
+  p2: ".gitconfig .zshrc .zsh/plugins.txt .zsh/aliases.zsh .config/nvim/init.lua .config/nvim/lua/keys.lua .config/wezterm/wezterm.lua bootstrap.sh README.md",
+  p3: "Cargo.toml README.md migrations/0001_init.sql migrations/0002_sessions.sql migrations/0003_uploads.sql src/main.rs src/config.rs src/db/mod.rs src/db/pool.rs src/routes/mod.rs src/routes/auth.rs src/routes/upload.rs src/routes/health.rs src/limit.rs tests/upload.rs openapi/v1.yaml .env.example",
+  p4: "main.tf variables.tf outputs.tf providers.tf modules/vpc/main.tf modules/vpc/variables.tf modules/devbox/main.tf modules/devbox/user-data.sh envs/prod.tfvars envs/staging.tfvars README.md",
+};
+const filesOf = (p) => (FILES[p.id] ?? "").split(" ").filter(Boolean);
+const dirsOf = (p) => [...new Set(filesOf(p).flatMap((f) => f.split("/").slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join("/"))))];
+const RECENT = { p1: ["src/App.tsx", "src/hotkeys.ts", "src-tauri/src/fs.rs"], p3: ["src/routes/upload.rs", "src/limit.rs"] };
+const recentOf = (p) => (RECENT[p.id] ??= []);
+const EXT = {
+  ts: ["TS", "#3178c6"], tsx: ["TS", "#3178c6"], rs: ["RS", "#dea584"], css: ["#", "#a371f7"], html: ["<>", "#e34c26"], md: ["M↓", "var(--muted)"],
+  json: ["{}", "#cbcb41"], toml: ["≡", "#9c4221"], yml: ["≡", "#cb171e"], yaml: ["≡", "#cb171e"], svg: ["◇", "#ffb13b"], sql: ["DB", "#e38c00"],
+  tf: ["TF", "#7b42bc"], tfvars: ["TF", "#7b42bc"], sh: ["$", "#89e051"], lua: ["LU", "#51a0cf"], zsh: ["$", "#89e051"],
+};
+const extOf = (f) => { const b = f.split("/").pop(), k = b.lastIndexOf("."); return k > 0 ? b.slice(k + 1).toLowerCase() : ""; };
+const fileIcon = (f, dir) => {
+  if (dir) return `<span class="fi" style="--fc:var(--accent)">▸</span>`;
+  const [t, c] = EXT[extOf(f)] ?? ["·", "var(--muted)"];
+  return `<span class="fi" style="--fc:${c}">${t}</span>`;
+};
+/** Fuzzy match: the query's letters in order. Runs, word starts and a hit inside the file name score higher. */
+function fuzzy(q, path) {
+  const ql = q.toLowerCase(), pl = path.toLowerCase(), base = path.lastIndexOf("/") + 1;
+  const run = (from) => {
+    const idx = []; let j = from, score = 0, prev = -2;
+    for (const c of ql) {
+      const k = pl.indexOf(c, j);
+      if (k < 0) return null;
+      const start = k === 0 || "/._-".includes(path[k - 1]) || (path[k] !== pl[k] && path[k - 1] === pl[k - 1]);
+      score += 1 + (k === prev + 1 ? 5 : 0) + (start ? 3 : 0);
+      idx.push(k); prev = k; j = k + 1;
+    }
+    return { score: score - path.length * 0.05, idx };
+  };
+  const b = !q.includes("/") && run(base);
+  return b ? { ...b, score: b.score + 10 } : run(0);
+}
+const marked = (s, idx, off) => [...s].map((c, i) => idx.has(i + off) ? `<mark>${esc(c)}</mark>` : esc(c)).join("");
+
+let gtf = null; // { q, hi, items }
+/** What the box shows: browsing a folder (empty, or ending in "/"), else search results. */
+function gtfItems(p, q) {
+  const files = filesOf(p), dirs = dirsOf(p), open = new Set(cur.wins.filter((w) => w.kind === "file").map((w) => w.path));
+  const row = (path, dir, m) => ({ path, dir, m, open: open.has(path) });
+  const dir = q === "" ? "" : q.endsWith("/") && dirs.includes(q.slice(0, -1)) ? q.slice(0, -1) : null;
+  if (dir !== null) {
+    const pre = dir ? dir + "/" : "", kids = (xs) => xs.filter((x) => x.startsWith(pre) && !x.slice(pre.length).includes("/"));
+    const sort = (a, b) => a.path.localeCompare(b.path);
+    const list = [...kids(dirs).map((d) => row(d, true)).sort(sort), ...kids(files).map((f) => row(f, false)).sort(sort)];
+    const rec = dir === "" ? recentOf(p).filter((f) => files.includes(f)).map((f) => ({ ...row(f, false), recent: true })) : [];
+    return { mode: "browse", dir, rec, list };
+  }
+  const hits = [...dirs.map((d) => [d, true]), ...files.map((f) => [f, false])]
+    .map(([path, isDir]) => { const m = fuzzy(q, path); return m && { ...row(path, isDir, m), score: m.score - (isDir ? 2 : 0) + (recentOf(p).includes(path) ? 4 : 0) }; })
+    .filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 60);
+  return { mode: "search", rec: [], list: hits };
+}
+function gtfRow(it, k, browse) {
+  const base = it.path.lastIndexOf("/") + 1, idx = new Set(it.m?.idx ?? []);
+  // browsing a folder, the crumb already says where; Recent and search results carry their folder
+  const name = it.path.slice(base), dir = browse && !it.recent ? "" : it.path.slice(0, Math.max(0, base - 1));
+  return `<button class="grow${it.dir ? " dir" : ""}${k === gtf.hi ? " hi" : ""}" data-k="${k}" role="option" aria-selected="${k === gtf.hi}" title="${esc(it.path)}">
+    ${fileIcon(it.path, it.dir)}<span class="fn">${marked(name, idx, base)}</span>
+    <span class="fd"><bdi>${dir ? marked(dir, idx, 0) : ""}</bdi></span>${it.open ? `<span class="open">open</span>` : ""}</button>`;
+}
+function paintGtf() {
+  const el = $("gtf");
+  if (!el) return;
+  const r = gtfItems(cur, gtf.q);
+  gtf.items = [...r.rec, ...r.list];
+  gtf.hi = Math.min(gtf.hi, Math.max(0, gtf.items.length - 1));
+  const segs = r.mode === "browse" && r.dir ? r.dir.split("/") : [];
+  el.querySelector(".gcrumb").hidden = r.mode !== "browse";
+  el.querySelector(".gcrumb").innerHTML = `<button data-dir="">${esc(cur.name)}</button>` +
+    segs.map((s, i) => `<i>/</i><button data-dir="${esc(segs.slice(0, i + 1).join("/"))}/">${esc(s)}</button>`).join("");
+  let k = 0;
+  const sec = (title, xs) => xs.length ? (title ? `<h5>${title}</h5>` : "") + xs.map((it) => gtfRow(it, k++, r.mode === "browse")).join("") : "";
+  el.querySelector(".glist").innerHTML = (r.mode === "browse"
+    ? sec(r.rec.length ? "Recent" : "", r.rec) + sec(r.rec.length ? esc(cur.name) : "", r.list)
+    : sec("", r.list)) || `<div class="gnone">No file matches “${esc(gtf.q)}”</div>`;
+  el.querySelector(".glist .hi")?.scrollIntoView({ block: "nearest" });
+  const ag = agentFor();
+  el.querySelector(".gfoot").innerHTML = `<span><kbd>↑</kbd><kbd>↓</kbd></span><span><kbd>Enter</kbd> open</span>
+    <span><kbd>Ctrl</kbd><kbd>Enter</kbd> new window</span><span><kbd>Tab</kbd> complete</span>
+    ${ag ? `<span><kbd>Shift</kbd><kbd>Enter</kbd> @ to ${ag.kind}</span>` : ""}
+    <span class="src" title="The index is git ls-files${cur.host !== "local" ? ", run over ssh" : ""}; untracked files you have not added yet are listed too">${filesOf(cur).length} files${cur.host !== "local" ? " on " + esc(cur.host) : ""}</span>`;
+}
+function openGtf() {
+  closeTheme();
+  gtf = { q: "", hi: 0, items: [] };
+  const el = document.createElement("div");
+  el.className = "gtf"; el.id = "gtf";
+  el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Go to file");
+  el.innerHTML = `<div class="gin"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>
+      <input spellcheck="false" autocomplete="off" placeholder="Search ${esc(cur.name)}, or type a folder and /" aria-label="Search files" role="combobox" aria-expanded="true">
+      <span class="scope">${esc(where())}</span></div>
+    <div class="gcrumb"></div><div class="glist" role="listbox"></div><div class="gfoot"></div>`;
+  document.body.appendChild(el);
+  const r = $("where").getBoundingClientRect();
+  Object.assign(el.style, { left: Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8)) + "px", top: r.bottom + 6 + "px" });
+  const input = el.querySelector("input");
+  input.addEventListener("input", () => { gtf.q = input.value; gtf.hi = 0; paintGtf(); });
+  input.addEventListener("keydown", gtfKey);
+  el.addEventListener("click", (e) => {
+    const d = e.target.closest("[data-dir]");
+    if (d) { setQ(d.dataset.dir); return input.focus(); }
+    const b = e.target.closest("[data-k]");
+    if (b) pickGtf(gtf.items[+b.dataset.k], e.ctrlKey || e.metaKey ? "new" : e.shiftKey ? "agent" : "reuse");
+  });
+  el.addEventListener("mousemove", (e) => {
+    const b = e.target.closest("[data-k]");
+    if (b && +b.dataset.k !== gtf.hi) { gtf.hi = +b.dataset.k; el.querySelectorAll(".grow").forEach((x) => x.classList.toggle("hi", x === b)); }
+  });
+  paintGtf(); renderSide();
+  input.focus();
+}
+function closeGtf() { if (!$("gtf")) return; $("gtf").remove(); gtf = null; renderSide(); }
+const toggleGtf = () => $("gtf") ? closeGtf() : openGtf();
+function setQ(q) { gtf.q = q; gtf.hi = 0; const i = $("gtf").querySelector("input"); i.value = q; paintGtf(); }
+function gtfKey(e) {
+  const t = e.target, it = gtf.items[gtf.hi], n = gtf.items.length;
+  const atEnd = t.selectionStart === t.value.length && t.selectionEnd === t.value.length;
+  if (e.key === "ArrowDown" || (e.ctrlKey && e.key === "n")) gtf.hi = n ? (gtf.hi + 1) % n : 0;
+  else if (e.key === "ArrowUp" || (e.ctrlKey && e.key === "p")) gtf.hi = n ? (gtf.hi + n - 1) % n : 0;
+  else if (e.key === "Enter") return e.preventDefault(), it && pickGtf(it, e.ctrlKey || e.metaKey ? "new" : e.shiftKey ? "agent" : "reuse");
+  // Tab completes the highlighted row into the box: a folder becomes "dir/" and lists its contents
+  else if (e.key === "Tab") { e.preventDefault(); if (it) setQ(it.dir ? it.path + "/" : it.path); return; }
+  else if (e.key === "ArrowRight" && atEnd && it?.dir) { e.preventDefault(); return setQ(it.path + "/"); }
+  // Backspace after a "/" climbs a whole folder, not one letter
+  else if ((e.key === "Backspace" || (e.key === "ArrowLeft" && atEnd)) && atEnd && t.value.endsWith("/")) {
+    e.preventDefault(); const up = t.value.slice(0, -1); return setQ(up.includes("/") ? up.slice(0, up.lastIndexOf("/") + 1) : "");
+  }
+  else if (e.key === "Escape" || (e.altKey && e.code === "KeyT")) { e.preventDefault(); return closeGtf(); }
+  else { e.stopPropagation(); return; }
+  e.preventDefault(); e.stopPropagation();
+  paintGtf();
+}
+function pickGtf(it, how) {
+  if (it.dir) return setQ(it.path + "/");
+  const rec = recentOf(cur), at = rec.indexOf(it.path);
+  if (at >= 0) rec.splice(at, 1);
+  rec.unshift(it.path); rec.length = Math.min(rec.length, 5);
+  closeGtf();
+  if (how === "agent") {
+    const ag = agentFor();
+    if (!ag) return flash("open a claude or pi window first (Alt+Enter)");
+    (ag.typed ??= []).push(`@${it.path} `);
+    const ael = els.get(ag.id);
+    if (ael) ael.querySelector(".screen").innerHTML = screenHtml(ag);
+    focus(ag.id);
+    return flash(`typed @${it.path} into ${ag.kind}, not sent`);
+  }
+  openFileWin(it.path, how === "new");
+}
+/** Like a Ctrl+clicked link: reuse the workspace's file window, or tile one in after the focused window. */
+function openFileWin(path, fresh) {
+  let f = !fresh && vis().filter((w) => w.kind === "file").sort((a, c) => c.z - a.z)[0];
+  if (f) {
+    Object.assign(f, { path, title: path });
+    const el = els.get(f.id);
+    if (el) { el.querySelector(".screen").innerHTML = fileHtml(f); el.querySelector(".ttl").textContent = path; }
+  } else {
+    f = W("file", null, { path, title: path, space: cur.ws });
+    const at = focused();
+    cur.wins.splice(at ? cur.wins.indexOf(at) + 1 : cur.wins.length, 0, f);
+    sp().mono = null;
+    world.classList.add("anim");
+  }
+  flash(`open ${path}${cur.host !== "local" ? " · read over ssh" : ""}`);
+  focus(f.id);
+}
+/** Stand-in contents; the real window is src/FileView.tsx (read_file on the project's host, syntax highlighted). */
+function fileHtml(w) {
+  const name = w.path.split("/").pop(), ext = extOf(w.path);
+  const c = (s) => `<span class="c-m">${s}</span>`, k = (s) => `<span class="c-v">${s}</span>`, a = (s) => `<span class="c-a">${s}</span>`, o = (s) => `<span class="c-o">${s}</span>`;
+  const body = {
+    tsx: [`${k("import")} { createSignal } ${k("from")} ${o('"solid-js"')};`, `${k("import")} { app } ${k("from")} ${o('"./state"')};`, "", c(`/** ${name.replace(/\.tsx$/, "")}: stand-in for the real source */`), `${k("export function")} ${a(name.replace(/\.tsx$/, ""))}() {`, `  ${k("const")} [open, setOpen] = createSignal(${k("false")});`, `  ${k("return")} &lt;div class=${o('"top"')}&gt;…&lt;/div&gt;;`, "}"],
+    ts: [`${k("import")} { invoke } ${k("from")} ${o('"@tauri-apps/api/core"')};`, "", c(`// ${w.path}`), `${k("export const")} ${a("load")} = (path: ${k("string")}) =&gt;`, `  invoke(${o('"read_file"')}, { path });`],
+    rs: [c(`//! ${w.path}`), `${k("use")} std::path::Path;`, "", `#[tauri::command]`, `${k("pub async fn")} ${a("list_files")}(host: String, path: String) -&gt; Result&lt;FileList, String&gt; {`, `    ${k("if")} host == ${o('"local"')} { list_local(&amp;path) } ${k("else")} { list_remote(&amp;host, &amp;path) }`, "}"],
+    md: [a(`# ${name.replace(/\.md$/, "")}`), "", "Stand-in Markdown. The real file window renders it.", "", `- ${o("Go to file")}: Alt+T or click the path`],
+  }[ext === "tsx" ? "tsx" : ext] ?? [c(`# ${w.path}`), c("stand-in contents for the prototype")];
+  return body.map((l, i) => `<span class="ln">${i + 1}</span>${l}`).join("\n");
+}
+$("where").onclick = toggleGtf;
+document.addEventListener("pointerdown", (e) => { if ($("gtf") && !e.target.closest("#gtf, #where")) closeGtf(); });
 
 /* ---------- toolbar ---------- */
 $("new").innerHTML = ["claude", "pi", "shell", "browser", "issues"].map((k) => `<button data-k="${k}">+ ${k}</button>`).join("");

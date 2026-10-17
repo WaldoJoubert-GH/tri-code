@@ -145,11 +145,21 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .tabs .tab-add { justify-content: center; width: 30px; padding: 0; font-size: 15px; }
 .top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
 .top .tool:hover { color: var(--text); background: var(--hover); }
+/* The project path is the way into Go to File (GoToFile.tsx): click it, or Alt+T */
 .top .where {
-  align-self: center; padding: 0 12px; color: var(--muted); font-size: 11px;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1;
+  align-self: center; display: flex; align-items: center; gap: 6px; height: 24px; margin: 0 auto 0 6px; padding: 0 8px;
+  color: var(--muted); font-size: 11px; min-width: 120px; flex: 1 1 200px; max-width: 420px;
+  border: 1px solid transparent; border-radius: 5px; text-align: left;
 }
-@container (max-width: 1275px) { .top .where { padding: 0; } }
+.top .where:hover:not(:disabled), .top .where[aria-expanded="true"] { border-color: var(--line); background: var(--bg); color: var(--text); }
+.top .where[aria-expanded="true"] { border-color: var(--accent); }
+.top .where:disabled { cursor: default; }
+.where svg { width: 12px; height: 12px; flex: none; }
+.where .wp { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--mono); direction: rtl; }
+.where .wp bdi { direction: ltr; }
+.where kbd { font-size: 10px; padding: 0 3px; white-space: nowrap; flex: none; margin-left: auto; opacity: 0; transition: opacity 120ms; }
+.where:hover kbd, .where[aria-expanded="true"] kbd { opacity: 1; }
+@container (max-width: 1275px) { .top .where { margin-left: 0; } }
 .top .sep { width: 1px; background: var(--line); margin: 7px 6px; flex: none; }
 .seg { display: flex; align-self: center; flex: none; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 0 4px; }
 .seg button { padding: 2px 9px; color: var(--muted); font-size: 12px; white-space: nowrap; }

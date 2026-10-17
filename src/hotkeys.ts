@@ -15,6 +15,7 @@ import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { openIssuePanel } from "./issues";
 import { openFilesPanel } from "./files";
+import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { flash } from "./ui";
 
@@ -81,6 +82,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
     case "KeyE":
       openFilesPanel(p);
       return true;
+    case "KeyT":
+      toggleGoToFile();
+      return true;
     case "KeyC":
       openGitPanel(p);
       return true;
@@ -145,6 +149,7 @@ function onKey(e: KeyboardEvent) {
     else if (appearanceOpen()) closeAppearance();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
+    else if (goToFileOpen()) closeGoToFile();
     else return;
     e.preventDefault();
     e.stopPropagation();

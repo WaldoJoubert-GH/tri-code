@@ -153,6 +153,53 @@ fn read_remote(host: &str, path: &str) -> Result<FileText, String> {
     })
 }
 
+/// Folders a walk never enters: build output and dependencies, which dwarf the source.
+const SKIP: &[&str] = &[".git", "node_modules", "target", "dist", "build", ".venv", "venv", "__pycache__", ".next", ".cache"];
+
+/// Every file under `path` (relative, `/`-separated) for a project that is not a git repo, up to
+/// `limit`. The second value is true when the limit cut the walk short.
+pub fn walk(host: &str, path: &str, limit: usize) -> Result<(Vec<String>, bool), String> {
+    if !matches!(host, "" | "local") {
+        let out = remote::run(host, &remote_walk_script(path, limit + 1))?;
+        let mut files: Vec<String> = out.lines().map(|l| l.strip_prefix("./").unwrap_or(l).to_string()).filter(|l| !l.is_empty()).collect();
+        let cut = files.len() > limit;
+        files.truncate(limit);
+        return Ok((files, cut));
+    }
+    let root = std::fs::canonicalize(expand_home(path)).map_err(|e| format!("{path}: {e}"))?;
+    let mut files = Vec::new();
+    let mut stack = vec![(root, String::new())];
+    while let Some((dir, rel)) = stack.pop() {
+        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        for e in rd.filter_map(Result::ok) {
+            let Ok(name) = e.file_name().into_string() else { continue };
+            let child = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
+            // file_type does not follow symlinks, so a linked folder is listed, not entered
+            match e.file_type() {
+                Ok(t) if t.is_dir() => {
+                    if !SKIP.contains(&name.as_str()) {
+                        stack.push((e.path(), child));
+                    }
+                }
+                Ok(_) => {
+                    if files.len() == limit {
+                        return Ok((files, true));
+                    }
+                    files.push(child);
+                }
+                Err(_) => {}
+            }
+        }
+    }
+    Ok((files, false))
+}
+
+fn remote_walk_script(path: &str, limit: usize) -> String {
+    let prune = SKIP.iter().map(|n| format!("-name {}", sq(n))).collect::<Vec<_>>().join(" -o ");
+    let inner = format!("cd {} || exit 1; find . \\( {prune} \\) -prune -o \\( -type f -o -type l \\) -print | head -n {limit}", remote_path(path));
+    format!("sh -c {}", sq(&inner))
+}
+
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
@@ -191,6 +238,29 @@ mod tests {
         assert!(b.binary);
         assert_eq!(b.text, None);
         assert_eq!(b.size, 4);
+    }
+
+    #[test]
+    fn walk_skips_dependency_folders_and_stops_at_the_limit() {
+        let root = tmp("walk");
+        std::fs::create_dir_all(root.join("src/deep")).unwrap();
+        std::fs::create_dir_all(root.join("node_modules/x")).unwrap();
+        std::fs::write(root.join("src/deep/a.rs"), "").unwrap();
+        std::fs::write(root.join("node_modules/x/i.js"), "").unwrap();
+        std::fs::write(root.join(".env"), "").unwrap();
+        let p = root.to_string_lossy().to_string();
+        let (mut files, cut) = walk("local", &p, 100).unwrap();
+        files.sort();
+        assert_eq!(files, [".env", "src/deep/a.rs"]);
+        assert!(!cut);
+        assert_eq!(walk("local", &p, 1).unwrap().1, true);
+
+        // the script a remote project runs over ssh, run here by a real shell
+        let out = std::process::Command::new("/bin/sh").arg("-c").arg(remote_walk_script(&p, 100)).output().unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        let mut got: Vec<String> = String::from_utf8_lossy(&out.stdout).lines().map(String::from).collect();
+        got.sort();
+        assert_eq!(got, ["./.env", "./src/deep/a.rs"]);
     }
 
     #[test]

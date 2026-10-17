@@ -20,9 +20,10 @@ const EXT: Record<string, [string, string]> = {
   jpg: ["im", "#a97fd0"], jpeg: ["im", "#a97fd0"], gif: ["im", "#a97fd0"], lock: ["lk", "#8a8f9c"],
 };
 
-function Icon(props: { name: string; dir: boolean }): JSX.Element {
+export function FileIcon(props: { name: string; dir: boolean }): JSX.Element {
   if (props.dir) return <span class="fic dir" />;
-  const ext = props.name.includes(".") ? props.name.split(".").pop()!.toLowerCase() : "";
+  const base = props.name.split("/").pop()!;
+  const ext = base.includes(".") ? base.split(".").pop()!.toLowerCase() : "";
   const [label, color] = EXT[ext] ?? ["··", "#8a8f9c"];
   return <span class="fic" style={{ "--fc": color }}>{label}</span>;
 }
@@ -123,7 +124,7 @@ export default function FileList(props: { project: Project; tab: Tab; focused: b
                 style={{ "padding-left": `${6 + r.depth * 14}px` }}
               >
                 <span class="fchev">{r.dir ? (isOpen(r.path) ? "▾" : "▸") : ""}</span>
-                <Icon name={r.name} dir={r.dir} />
+                <FileIcon name={r.name} dir={r.dir} />
                 <span class="fname">{r.name}</span>
               </div>
             )}

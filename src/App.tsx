@@ -16,6 +16,7 @@ import { installHotkeys } from "./hotkeys";
 import { installClipboardFallback } from "./clipboard";
 import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
 import { FavPopover, favEditOpen } from "./favs";
+import { GoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { ensureSession, setLinkHandler } from "./terms";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { installUpdate, startUpdateChecks, updateReady } from "./updater";
@@ -81,7 +82,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || favEditOpen() || openProjectOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || favEditOpen() || openProjectOpen() || goToFileOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -112,6 +113,7 @@ export default function App() {
       <TabMenu />
       <AppearancePopover />
       <FavPopover />
+      <GoToFile />
       <OpenProjectDialog />
       <HelpOverlay />
     </div>
@@ -176,7 +178,21 @@ function Toolbar() {
           </>
         )}
       </Show>
-      <span class="where">{where()}</span>
+      <button
+        class="where"
+        id="where"
+        title={where() ? `${where()} · Go to file (Alt+T)` : ""}
+        aria-haspopup="dialog"
+        aria-expanded={goToFileOpen()}
+        disabled={!activeProject()}
+        onClick={toggleGoToFile}
+      >
+        <Show when={activeProject()}>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
+          <span class="wp"><bdi>{where()}</bdi></span>
+          <kbd>Alt T</kbd>
+        </Show>
+      </button>
       <InProgressChips />
       <Show when={activeProject()}>
         <button class="tool theme-btn" id="themeBtn" title="Project appearance (Alt+P)" onClick={(e) => toggleAppearance(e.currentTarget)}>

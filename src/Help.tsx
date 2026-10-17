@@ -59,6 +59,12 @@ export function HelpOverlay() {
             <dd>Open or focus this project's issues panel (the `.dev/` folder)</dd>
             <dt><Keys keys={["Alt", "E"]} /></dt>
             <dd>Open or focus this project's files window (the project folder)</dd>
+            <dt><Keys keys={["Alt", "T"]} /></dt>
+            <dd>
+              Go to file (or click the project path in the toolbar). Type to fuzzy-search the project's files, or a folder and <kbd>/</kbd> to
+              browse it: <kbd>Tab</kbd> completes, <kbd>Backspace</kbd> after a <kbd>/</kbd> goes up. <kbd>Enter</kbd> opens the file,
+              <kbd>Ctrl</kbd><kbd>Enter</kbd> in a new window, <kbd>Shift</kbd><kbd>Enter</kbd> types <code>@path</code> into claude or pi
+            </dd>
             <dt><Keys keys={["Alt", "C"]} /></dt>
             <dd>Open or focus this project's git window: stage, commit, push, open a PR and merge, with ✦ drafts</dd>
             <dt><Keys keys={["Alt", "Enter"]} /></dt>

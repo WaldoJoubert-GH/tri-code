@@ -102,9 +102,9 @@ export function openFilesPanel(project: Project): string {
 /** Tabs, by id, ordered most recently opened. Drives `file` window reuse. */
 const lastUsed = new Map<string, number>();
 
-/** Show `path` in the project's `file` window, reusing the most recently used one. */
-export function openFile(project: Project, path: string, fromTabId?: string): void {
-  const target = project.tabs
+/** Show `path` in the project's `file` window, reusing the most recently used one unless `fresh`. */
+export function openFile(project: Project, path: string, fromTabId?: string, fresh = false): void {
+  const target = !fresh && project.tabs
     .filter((t) => t.kind === "file")
     .sort((a, b) => (lastUsed.get(b.id) ?? 0) - (lastUsed.get(a.id) ?? 0))[0];
   if (target) {

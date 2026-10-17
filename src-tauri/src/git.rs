@@ -244,6 +244,39 @@ pub async fn git_status(host: String, path: String) -> Result<Status, String> {
     .await
 }
 
+#[derive(Debug, Serialize)]
+pub struct FileIndex {
+    /// Relative, `/`-separated paths.
+    pub files: Vec<String>,
+    /// From `git ls-files`; false when the folder is not a repo and was walked instead.
+    pub git: bool,
+    /// More files exist than `INDEX_LIMIT`.
+    pub truncated: bool,
+}
+
+const INDEX_LIMIT: usize = 50_000;
+
+/// Go to File's index: tracked plus untracked-but-not-ignored files, so a file you just
+/// created is findable and node_modules is not. A folder that is not a repo is walked.
+#[tauri::command]
+pub async fn project_files(host: String, path: String) -> Result<FileIndex, String> {
+    blocking(move || match exec(&host, &path, "git", &["ls-files", "-z", "--cached", "--others", "--exclude-standard"], None) {
+        Ok(out) => {
+            let mut files: Vec<String> = out.split('\0').filter(|f| !f.is_empty()).map(String::from).collect();
+            // a conflicted file is listed once per merge stage
+            files.dedup();
+            let truncated = files.len() > INDEX_LIMIT;
+            files.truncate(INDEX_LIMIT);
+            Ok(FileIndex { files, git: true, truncated })
+        }
+        Err(_) => {
+            let (files, truncated) = crate::fs::walk(&host, &path, INDEX_LIMIT)?;
+            Ok(FileIndex { files, git: false, truncated })
+        }
+    })
+    .await
+}
+
 /// The diff of one file (or, with no `file`, of everything) in the index or the worktree.
 /// An untracked file is diffed against nothing so it reads as all-added.
 #[tauri::command]
@@ -461,6 +494,16 @@ mod tests {
 
         let diff = run(command("local", p, "git", &["diff", "--no-color", "--no-index", "--", "/dev/null", "it's.txt"]), None, &[1]).unwrap();
         assert!(diff.contains("+hi"));
+
+        // Go to File's index: untracked files count, ignored ones do not
+        std::fs::write(dir.join(".gitignore"), "skip/\n").unwrap();
+        std::fs::create_dir_all(dir.join("skip")).unwrap();
+        std::fs::write(dir.join("skip/x.txt"), "").unwrap();
+        let mut idx: Vec<String> = exec("local", p, "git", &["ls-files", "-z", "--cached", "--others", "--exclude-standard"], None)
+            .unwrap().split('\0').filter(|f| !f.is_empty()).map(String::from).collect();
+        idx.sort();
+        assert_eq!(idx, [".gitignore", "it's.txt"]);
+        std::fs::remove_file(dir.join(".gitignore")).unwrap();
 
         git(&["add", "-A", "--", "it's.txt"]);
         exec("local", p, "git", &["commit", "-q", "-F", "-"], Some("Add a file\n\nWith a body.\n".into())).unwrap();
