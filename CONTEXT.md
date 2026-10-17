@@ -67,7 +67,15 @@ The leftmost toolbar group: the active workspace's Windows in tiling order, the 
 _Avoid_: Tab bar (there is no tab bar), window list, tab buttons.
 
 **New Window Menu**:
-The popup under the Tab Strip's `+`: one row per `TabKind`, each with the key that also opens it (`Alt+Enter`, `Alt+B`, `Alt+I`, `Alt+E`). Issues and Files open or focus their one-per-project Window rather than adding a second one.
+The popup under the Tab Strip's `+`: one row per Agent (with its hotkey), then one per panel kind with the key that also opens it (`Alt+B`, `Alt+I`, `Alt+E`, `Alt+C`, `Alt+;`). Issues, Files, Git and Agents open or focus their one-per-project Window rather than adding a second one.
+
+**Agent**:
+A terminal app the New Window Menu offers: a name, a shell command (empty = the login shell), a lucide icon and an optional Alt hotkey. Global, in `state.json` as `agents`, seeded with claude, pi and shell. A terminal Window (`TabKind` `"term"`) remembers its Agent and the command it was launched with, so editing an Agent changes only new Windows and deleting one leaves its Windows running. "Send to agent" targets terminals with a command, never a plain shell.
+_Avoid_: Terminal kind, profile, preset.
+
+**Agents Window**:
+A canvas Window, one per project, that edits the Agent list as a table; rows save as you type. New `TabKind` `"agents"`, addressed with `Alt+;`. Chosen from design/agents.html (variant B).
+_Avoid_: Settings page, preferences.
 
 **Git Window**:
 A canvas Window, one per project, that takes the current branch from changes to a merged PR: stage, commit, push, open a PR, merge. New `TabKind` `"git"`, addressed with `Alt+C`. Runs git and gh on the project's host. Chosen from design/git.html (variant B).

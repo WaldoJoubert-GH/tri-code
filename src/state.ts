@@ -2,19 +2,33 @@ import { createEffect, on } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 
-export type TabKind = "claude" | "pi" | "shell" | "browser" | "issues" | "files" | "file" | "git";
-export type TerminalKind = Exclude<TabKind, "browser" | "issues" | "files" | "file" | "git">;
-export const TERMINAL_KINDS: TerminalKind[] = ["claude", "pi", "shell"];
+export type TabKind = "term" | "browser" | "issues" | "files" | "file" | "git" | "agents";
 
-export const TAB_COMMANDS: Record<TerminalKind, string | null> = {
-  claude: "claude",
-  pi: "pi",
-  shell: null,
+/** An Alt chord, matched on e.code like every window binding. Alt is implied. */
+export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
+
+/** A terminal app the New Window Menu offers: claude, pi, a shell, lazygit, ... Global, not per project. */
+export type Agent = {
+  id: string;
+  name: string;
+  /** Run in the project folder on the project's host; "" is the login shell. */
+  command: string;
+  /** A lucide icon name, kebab-case. */
+  icon: string;
+  hotkey?: Hotkey;
 };
+
+/** What a new state.json starts with: the three terminals tri-code used to hard-code. */
+const defaultAgents = (): Agent[] => [
+  { id: "claude", name: "claude", command: "claude", icon: "asterisk" },
+  { id: "pi", name: "pi", command: "pi", icon: "pi" },
+  { id: "shell", name: "shell", command: "", icon: "square-terminal" },
+];
 
 /** A window on the canvas. Terminals run a PTY; browsers are native child webviews;
  *  issues panels render the project's `.dev/`; files lists the project folder,
- *  file shows one file and git takes the branch from changes to a merged PR. */
+ *  file shows one file, git takes the branch from changes to a merged PR and
+ *  agents edits the agent list. */
 export type Tab = {
   id: string;
   kind: TabKind;
@@ -24,10 +38,21 @@ export type Tab = {
   url?: string;
   /** `file` tabs only: the path being viewed. */
   path?: string;
+  /** `term` tabs only: the agent it was opened from. The name and icon follow the agent. */
+  agent?: string;
+  /** `term` tabs only: the agent's name at launch, shown once the agent is deleted. */
+  name?: string;
+  /** `term` tabs only: the command it runs ("" = login shell). Kept from launch, so editing an agent only changes new windows. */
+  cmd?: string;
 };
 
-/** Terminals own a PTY; browsers and issues panels do not. */
-export const isTerminal = (t: Tab): t is Tab & { kind: TerminalKind } => t.kind === "claude" || t.kind === "pi" || t.kind === "shell";
+/** Terminals own a PTY; browsers and panels do not. */
+export const isTerminal = (t: Tab) => t.kind === "term";
+
+export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
+
+/** What a window is called in the tab strip, title bar and messages: its agent for terminals, else its kind. */
+export const tabName = (t: Tab) => (t.kind === "term" ? agentOf(t)?.name || t.name || "terminal" : t.kind);
 
 export type Layout = "master" | "grid" | "mono";
 
@@ -87,6 +112,8 @@ type Persisted = {
   /** Most recent first, at most RECENT_MAX. */
   recent: RecentFolder[];
   activeProject?: string;
+  /** In New Window Menu order. */
+  agents: Agent[];
   /** Gap between tiled windows and around the edge, px. */
   gap: number;
   sidebarCollapsed: boolean;
@@ -103,7 +130,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], projects: [], recent: [], gap: 12, sidebarCollapsed: false });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -178,13 +205,15 @@ export function removeProject(id: string) {
 }
 
 /** Add a window on the active workspace and focus it. `after` inserts it right after that tab. */
-export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string } = {}) {
+export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string; agent?: Agent } = {}) {
   const id = newId();
   edit(projectId, (p) => {
+    const a = opts.agent;
     const tab: Tab = {
       id, kind, space: p.ws,
       ...(kind === "browser" ? { url: opts.url ?? "" } : {}),
       ...(kind === "file" ? { path: opts.path ?? "" } : {}),
+      ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "" } : {}),
     };
     const i = opts.after ? p.tabs.findIndex((t) => t.id === opts.after) : -1;
     if (i >= 0) p.tabs.splice(i + 1, 0, tab);
@@ -345,11 +374,52 @@ export function setTabPath(projectId: string, tabId: string, path: string) {
   });
 }
 
+export function addAgent(agent: Agent) {
+  setApp(produce((s) => { s.agents.push(agent); }));
+}
+
+export function updateAgent(id: string, patch: Partial<Omit<Agent, "id">>) {
+  setApp(produce((s) => {
+    const a = s.agents.find((a) => a.id === id);
+    if (a) Object.assign(a, patch);
+  }));
+}
+
+/** Delete an agent. Its open windows keep running under their last name. */
+export function removeAgent(id: string) {
+  setApp(produce((s) => { s.agents = s.agents.filter((a) => a.id !== id); }));
+}
+
+/** Put back an agent removed with removeAgent (undo), at its old index. */
+export function restoreAgent(agent: Agent, index: number) {
+  setApp(produce((s) => { s.agents.splice(Math.min(index, s.agents.length), 0, agent); }));
+}
+
+/** Move agent `id` to just before `before` (the end when `before` is missing). */
+export function moveAgent(id: string, before: string | null) {
+  setApp(produce((s) => {
+    const from = s.agents.findIndex((a) => a.id === id);
+    if (from < 0 || id === before) return;
+    const [a] = s.agents.splice(from, 1);
+    const to = before ? s.agents.findIndex((x) => x.id === before) : -1;
+    s.agents.splice(to < 0 ? s.agents.length : to, 0, a);
+  }));
+}
+
+/** Tabs from before agents: kind was "claude", "pi" or "shell", and the command came from that. */
+function migrateTab(t: any): Tab {
+  const tab = { ...t, space: t.space ?? 0 };
+  if (t.kind === "claude" || t.kind === "pi" || t.kind === "shell") {
+    Object.assign(tab, { kind: "term", agent: t.kind, name: t.kind, cmd: t.kind === "shell" ? "" : t.kind });
+  }
+  return tab;
+}
+
 /** Fill in fields added after the first release so older state.json files keep working. */
 function migrate(raw: any): Persisted {
   const projects: Project[] = (raw.projects ?? []).map((p: any, i: number) => {
     const spaces: Space[] = Array.from({ length: SPACES }, (_, k) => ({ ...newSpace(), ...(p.spaces?.[k] ?? {}) }));
-    const tabs: Tab[] = (p.tabs ?? []).map((t: any) => ({ ...t, space: t.space ?? 0 }));
+    const tabs: Tab[] = (p.tabs ?? []).map(migrateTab);
     if (!p.spaces && p.activeTab) spaces[0].focus = p.activeTab;
     spaces.forEach((sp, k) => {
       if (!tabs.some((t) => t.space === k && t.id === sp.focus)) sp.focus = tabs.find((t) => t.space === k)?.id;
@@ -366,7 +436,7 @@ function migrate(raw: any): Persisted {
   for (const p of projects) if (!environments.includes(p.host)) environments.push(p.host);
   return {
     environments, projects, recent: raw.recent ?? [],
-    activeProject: raw.activeProject, gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
+    activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(), gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
   };
 }
 

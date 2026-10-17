@@ -6,7 +6,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Project, activeProject, focusTab, focusedTab, isRemote, projectById, space } from "./state";
+import { type Project, activeProject, focusTab, focusedTab, isRemote, projectById, space, tabName } from "./state";
+import { agentTarget } from "./agents";
 import { openFile } from "./files";
 import { FileIcon } from "./FileList";
 import { sendText } from "./terms";
@@ -161,10 +162,7 @@ function Box(props: { project: Project }) {
     input.focus();
   };
 
-  const agent = () => {
-    const terms = p.tabs.filter((t) => t.kind === "claude" || t.kind === "pi");
-    return terms.find((t) => t.id === space(p).focus) ?? terms.find((t) => t.space === p.ws) ?? terms[0];
-  };
+  const agent = () => agentTarget(p, space(p).focus);
 
   function pick(it: Item | undefined, how: "reuse" | "new" | "agent") {
     if (!it) return;
@@ -173,10 +171,10 @@ function Box(props: { project: Project }) {
     closeGoToFile();
     if (how === "agent") {
       const t = agent();
-      if (!t) return flash("open a claude or pi window first (Alt+Enter)");
+      if (!t) return flash("open an agent window first (the + menu)");
       sendText(t.id, `@${it.path} `);
       focusTab(p.id, t.id);
-      return flash(`typed @${it.path} into ${t.kind}, not sent`);
+      return flash(`typed @${it.path} into ${tabName(t)}, not sent`);
     }
     openFile(p, join(p.path, it.path), focusedTab(p)?.id, how === "new");
   }

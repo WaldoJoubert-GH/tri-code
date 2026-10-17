@@ -5,30 +5,40 @@
 // was already open.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Project, Tab, TabKind, addTab, focusTab, live, projectById, space, visibleTabs } from "./state";
+import { Project, Tab, TabKind, addTab, agentOf, app, focusTab, live, projectById, space, tabName, visibleTabs } from "./state";
 import { openFilesPanel } from "./files";
 import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
+import { hotkeyProblem, hotkeyText, launchAgent, openAgentsPanel } from "./agents";
+import { Icon } from "./lucide";
 import { flash } from "./ui";
 
-/** Window glyphs. A `file` window shows the file name as its label, so it shares the files glyph. */
-const GLYPH: Record<TabKind, string> = {
-  claude: "✳", pi: "π", shell: "›", browser: "◎", issues: "☑", files: "▤", file: "▤", git: "±",
+/** Glyphs of the windows that aren't terminals (those show their agent's icon). A `file`
+ *  window shows the file name as its label, so it shares the files glyph. */
+const GLYPH: Record<Exclude<TabKind, "term">, string> = {
+  browser: "◎", issues: "☑", files: "▤", file: "▤", git: "±", agents: "⚙",
 };
 
-/** The kinds the New window menu offers, in toolbar order, with the key that also makes one. */
-const NEW_KINDS: { kind: TabKind; key: string }[] = [
-  { kind: "claude", key: "Alt+↵" },
-  { kind: "pi", key: "Alt+↵" },
-  { kind: "shell", key: "Alt+↵" },
+/** The panels the New window menu offers under the agents, with the key that also opens one. */
+const PANELS: { kind: Exclude<TabKind, "term" | "file">; key: string }[] = [
   { kind: "browser", key: "Alt+B" },
   { kind: "issues", key: "Alt+I" },
   { kind: "files", key: "Alt+E" },
   { kind: "git", key: "Alt+C" },
+  { kind: "agents", key: "Alt+;" },
 ];
 
 /** What the strip shows for a window. `file` windows are named by their file. */
-const label = (t: Tab) => (t.kind === "file" ? (t.path ?? "").split("/").pop() || "file" : t.kind);
+const label = (t: Tab) => (t.kind === "file" ? (t.path ?? "").split("/").pop() || "file" : tabName(t));
+
+/** A window's glyph: its agent's lucide icon for a terminal, else the kind's glyph. */
+function Glyph(props: { tab: Tab }) {
+  return (
+    <Show when={props.tab.kind !== "term"} fallback={<Icon name={agentOf(props.tab)?.icon ?? "square-terminal"} size={13} class="glyph" />}>
+      <span class="glyph" aria-hidden="true">{GLYPH[props.tab.kind as Exclude<TabKind, "term">]}</span>
+    </Show>
+  );
+}
 
 /** Tooltip detail: the live process title, the browser address, or the file's path. */
 function hint(t: Tab): string {
@@ -37,11 +47,12 @@ function hint(t: Tab): string {
   return live[t.id]?.title ?? "";
 }
 
-/** Open a new window of `kind`; the singleton panels are opened or focused, never duplicated. */
-function newWindow(p: Project, kind: TabKind) {
+/** Open a panel; the singleton ones are opened or focused, never duplicated. */
+function newPanel(p: Project, kind: (typeof PANELS)[number]["kind"]) {
   if (kind === "issues") return openIssuePanel(p);
   if (kind === "files") return void openFilesPanel(p);
   if (kind === "git") return void openGitPanel(p);
+  if (kind === "agents") return void openAgentsPanel(p);
   addTab(p.id, kind);
   flash(`new ${kind}`);
 }
@@ -83,13 +94,29 @@ export function TabMenu() {
           {(p) => (
             <div class="tabmenu" role="menu" aria-label="New window" ref={(el) => requestAnimationFrame(() => placeMenu(el, m.anchor))}>
               <div class="mt">New window</div>
-              <For each={NEW_KINDS}>
+              <For each={app.agents}>
+                {(a) => (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      closeTabMenu();
+                      launchAgent(p, a);
+                    }}
+                  >
+                    <Icon name={a.icon} size={13} class="glyph" />
+                    {a.name || "untitled"}
+                    <Show when={a.hotkey && !hotkeyProblem(a) && a.hotkey}>{(h) => <kbd>{hotkeyText(h())}</kbd>}</Show>
+                  </button>
+                )}
+              </For>
+              <div class="msep" />
+              <For each={PANELS}>
                 {(k) => (
                   <button
                     role="menuitem"
                     onClick={() => {
                       closeTabMenu();
-                      newWindow(p, k.kind);
+                      newPanel(p, k.kind);
                     }}
                   >
                     <span class="glyph" aria-hidden="true">{GLYPH[k.kind]}</span>
@@ -115,10 +142,10 @@ export function TabStrip(props: { project: Project }) {
           <button
             class="tab"
             aria-pressed={space(props.project).focus === t.id}
-            title={`${t.kind}${hint(t) ? " · " + hint(t) : ""}`}
+            title={`${tabName(t)}${hint(t) ? " · " + hint(t) : ""}`}
             onClick={() => focusTab(props.project.id, t.id)}
           >
-            <span class="glyph" aria-hidden="true">{GLYPH[t.kind]}</span>
+            <Glyph tab={t} />
             {label(t)}
             <Show when={live[t.id]?.attention}>
               <span class="att" title="needs attention" />

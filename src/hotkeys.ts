@@ -3,8 +3,8 @@
 // handled keys never reach the terminal.
 
 import {
-  GAPS, Layout, Project, Tab, activeProject, addTab, app, focusedTab, goSpace, isTerminal, promote, sendTo, setApp, setGap,
-  setLayout, setRatio, space, toggleMono, visibleTabs,
+  GAPS, Layout, Project, Tab, activeProject, addTab, app, focusedTab, goSpace, promote, sendTo, setApp, setGap,
+  setLayout, setRatio, space, tabName, toggleMono, visibleTabs,
 } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
@@ -17,7 +17,24 @@ import { openIssuePanel } from "./issues";
 import { openFilesPanel } from "./files";
 import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
+import { agentForKey, launchAgent, newTerminalLike, openAgentsPanel, recording } from "./agents";
+import { closeIconPicker, iconPickerOpen } from "./lucide";
 import { flash } from "./ui";
+
+/**
+ * Keys `run` binds, with what they do. They are taken with any Shift/Ctrl combination (the
+ * switch below ignores those), so an agent can't be given one; keep in step with `run`.
+ */
+export const RESERVED: Record<string, string> = {
+  KeyH: "focus left", KeyJ: "focus down", KeyK: "focus up", KeyL: "focus right",
+  ArrowLeft: "focus left", ArrowRight: "focus right", ArrowUp: "focus up", ArrowDown: "focus down",
+  Digit1: "workspace 1", Digit2: "workspace 2", Digit3: "workspace 3", Digit4: "workspace 4",
+  Enter: "new terminal like this one", NumpadEnter: "new terminal like this one", KeyB: "new browser",
+  KeyI: "issues", KeyE: "files", KeyT: "go to file", KeyC: "git", KeyQ: "close window", KeyF: "maximize", KeyM: "make main",
+  KeyG: "switch layout", Comma: "less gap", Period: "more gap", Slash: "hotkey help", KeyS: "sidebar",
+  KeyP: "appearance", BracketLeft: "previous project", BracketRight: "next project", KeyO: "open project",
+  Semicolon: "agents",
+};
 
 const DIRS: Record<string, [number, number]> = {
   KeyH: [-1, 0], ArrowLeft: [-1, 0],
@@ -55,7 +72,7 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       else if (f.space === i) flash(`already on workspace ${i + 1}`);
       else {
         sendTo(p.id, f.id, i);
-        flash(`${f.kind} → workspace ${i + 1}`);
+        flash(`${tabName(f)} → workspace ${i + 1}`);
       }
     } else {
       goSpace(p.id, i);
@@ -66,12 +83,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
 
   switch (e.code) {
     case "Enter":
-    case "NumpadEnter": {
-      const kind = f && isTerminal(f) ? f.kind : "shell";
-      addTab(p.id, kind);
-      flash(`new ${kind}`);
+    case "NumpadEnter":
+      newTerminalLike(p, f);
       return true;
-    }
     case "KeyB":
       addTab(p.id, "browser");
       flash("new browser");
@@ -88,6 +102,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
     case "KeyC":
       openGitPanel(p);
       return true;
+    case "Semicolon":
+      openAgentsPanel(p);
+      return true;
     case "KeyQ":
       if (!f) return false;
       requestClose(p.id, f.id);
@@ -102,7 +119,7 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       if (space(p).layout !== "master") flash("promote works in Main + stack");
       else {
         promote(p.id, f.id);
-        flash(`${f.kind} is main`);
+        flash(`${tabName(f)} is main`);
       }
       return true;
     case "KeyG": {
@@ -136,15 +153,22 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       setApp("activeProject", ids[(i + (e.code === "BracketRight" ? 1 : n - 1)) % n]);
       return true;
     }
-    default:
-      return false;
+    default: {
+      const a = agentForKey(e);
+      if (!a) return false;
+      launchAgent(p, a);
+      return true;
+    }
   }
 }
 
 function onKey(e: KeyboardEvent) {
+  // The agents window is recording a hotkey: the chord (and Escape) are its to take.
+  if (recording()) return;
   // Escape closes the overlays first; it is never bound on its own.
   if (e.code === "Escape" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-    if (helpOpen()) setHelpOpen(false);
+    if (iconPickerOpen()) closeIconPicker();
+    else if (helpOpen()) setHelpOpen(false);
     else if (openProjectOpen()) closeOpenProject();
     else if (appearanceOpen()) closeAppearance();
     else if (tabMenuOpen()) closeTabMenu();

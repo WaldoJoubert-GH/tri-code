@@ -63,12 +63,14 @@ export function HelpOverlay() {
             <dd>
               Go to file (or click the project path in the toolbar). Type to fuzzy-search the project's files, or a folder and <kbd>/</kbd> to
               browse it: <kbd>Tab</kbd> completes, <kbd>Backspace</kbd> after a <kbd>/</kbd> goes up. <kbd>Enter</kbd> opens the file,
-              <kbd>Ctrl</kbd><kbd>Enter</kbd> in a new window, <kbd>Shift</kbd><kbd>Enter</kbd> types <code>@path</code> into claude or pi
+              <kbd>Ctrl</kbd><kbd>Enter</kbd> in a new window, <kbd>Shift</kbd><kbd>Enter</kbd> types <code>@path</code> into the agent window
             </dd>
             <dt><Keys keys={["Alt", "C"]} /></dt>
             <dd>Open or focus this project's git window: stage, commit, push, open a PR and merge, with ✦ drafts</dd>
             <dt><Keys keys={["Alt", "Enter"]} /></dt>
-            <dd>New window of the focused kind</dd>
+            <dd>New terminal like the focused one, else a shell</dd>
+            <dt><Keys keys={["Alt", ";"]} /></dt>
+            <dd>Open or focus the agents window: the terminal apps in the + menu, each with a command, an icon and an optional Alt hotkey of its own</dd>
             <dt><Keys keys={["Alt", "B"]} /></dt>
             <dd>New browser window</dd>
             <dt><Keys keys={["Ctrl", "D"]} /></dt>

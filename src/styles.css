@@ -139,6 +139,7 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .tabs { display: flex; align-items: stretch; flex: none; }
 .tabs .tab, .tabs .tab-add { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; box-shadow: inset 0 -2px transparent; }
 .tabs .tab .glyph { font-size: 12.5px; line-height: 1; }
+svg.lucide { flex: none; display: block; }
 .tabs .tab:hover, .tabs .tab-add:hover { color: var(--text); background: var(--hover); }
 .tabs .tab[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
 .tabs .tab .att { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); }
@@ -204,6 +205,8 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .tabmenu button:hover { background: var(--hover); color: var(--text); }
 .tabmenu button .glyph { width: 14px; font-size: 12.5px; line-height: 1; text-align: center; }
 .tabmenu button kbd { margin-left: auto; }
+.tabmenu svg.glyph { width: 14px; flex: none; }
+.tabmenu .msep { height: 1px; margin: 4px 2px; background: var(--line); }
 
 /* Stage: the canvas area the windows are drawn on */
 .stage { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); min-width: 0; min-height: 0; }

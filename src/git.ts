@@ -4,7 +4,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { createStore, produce } from "solid-js/store";
-import { type Project, addTab, focusTab, space } from "./state";
+import { type Project, addTab, focusTab, space, tabName } from "./state";
+import { agentTarget } from "./agents";
 import { devOf, inProgress, slugOf } from "./issues";
 import { sendText } from "./terms";
 import { flash } from "./ui";
@@ -411,17 +412,16 @@ export function review(p: Project): Promise<void> {
   });
 }
 
-/** Type a review finding into the project's claude or pi window (not submitted), as issues do. */
+/** Type a review finding into the project's agent window (not submitted), as issues do. */
 export function sendFinding(p: Project, i: number): void {
   const f = gitOf(p.id).review?.[i];
   if (!f) return;
-  const terms = p.tabs.filter((t) => t.kind === "claude" || t.kind === "pi");
-  const target = terms.find((t) => t.id === space(p).focus) ?? terms.find((t) => t.space === p.ws) ?? terms[0];
-  if (!target) return void flash("open a claude or pi window first (Alt+Enter)");
+  const target = agentTarget(p, space(p).focus);
+  if (!target) return void flash("open an agent window first (the + menu)");
   sendText(target.id, `Review note${f.loc ? ` on ${f.loc}` : ""}: ${f.text}`);
   set(p, (g) => { if (g.review?.[i]) g.review[i].sent = true; });
   focusTab(p.id, target.id);
-  flash(`typed the note into ${target.kind}, not sent`);
+  flash(`typed the note into ${tabName(target)}, not sent`);
 }
 
 /** Open or focus the project's git window. */

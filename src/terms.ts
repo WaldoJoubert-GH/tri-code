@@ -7,7 +7,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { Project, Tab, TabStatus, TerminalKind, TAB_COMMANDS, isRemote, isTerminal, sessionName, setLive } from "./state";
+import { Project, Tab, TabStatus, isRemote, isTerminal, sessionName, setLive } from "./state";
 import { copyText, readImagePng, readText } from "./clipboard";
 
 const SSH_CONNECTION_FAILED = 255;
@@ -213,7 +213,7 @@ class TermSession {
         spec: {
           host: this.project.host,
           cwd: this.project.path,
-          cmd: TAB_COMMANDS[this.tab.kind as TerminalKind],
+          cmd: this.tab.cmd?.trim() || null,
           session: sessionName(this.project, this.tab),
         },
         cols: this.term.cols,

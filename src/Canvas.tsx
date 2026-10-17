@@ -2,7 +2,7 @@ import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import {
   type Project, type Tab, app, focusTab, isTerminal, live, projectById, removeTab, restoreTab,
-  sendTo, setRatio, space, swapTabs, toggleMono, visibleTabs,
+  sendTo, setRatio, space, swapTabs, tabName, toggleMono, visibleTabs,
 } from "./state";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
@@ -12,6 +12,7 @@ import IssuesPanel from "./IssuesPanel";
 import FileList from "./FileList";
 import FileView from "./FileView";
 import GitPanel from "./GitPanel";
+import AgentsPanel from "./AgentsPanel";
 import { gitOf } from "./git";
 import { dev, panelTitle } from "./issues";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
@@ -123,7 +124,8 @@ export default function Canvas(props: { project: Project }) {
     const isFiles = tab.kind === "files";
     const isFile = tab.kind === "file";
     const isGit = tab.kind === "git";
-    const isPanel = isIssues || isFiles || isFile || isGit;
+    const isAgents = tab.kind === "agents";
+    const isPanel = isIssues || isFiles || isFile || isGit || isAgents;
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -169,6 +171,7 @@ export default function Canvas(props: { project: Project }) {
       : isFiles ? `${props.project.name} files`
       : isFile ? ((tab.path ?? "").split("/").pop() ?? "")
       : isGit ? `${props.project.name} · ${gitOf(props.project.id).status?.branch ?? ""}`
+      : isAgents ? "shared by every project"
       : (live[id]?.title ?? "");
 
     const url = () => browserInfo[id]?.url ?? tab.url ?? "";
@@ -284,7 +287,7 @@ export default function Canvas(props: { project: Project }) {
         setDrag(null);
         if (ws !== null) {
           sendTo(pid, id, ws);
-          flash(`${tab.kind} → workspace ${ws + 1}`);
+          flash(`${tabName(tab)} → workspace ${ws + 1}`);
         } else if (dropId !== null) {
           const other = tiling().tabs.find((x) => x.id === dropId);
           swapTabs(pid, id, dropId);
@@ -339,10 +342,11 @@ export default function Canvas(props: { project: Project }) {
               : isIssues ? `plane${dev[props.project.id]?.syncing ? " syncing" : ""}`
               : isFiles || isFile ? "files"
               : isGit ? "git"
+              : isAgents ? "agents"
               : (live[id]?.status ?? "connecting")
             }`}
           />
-          <span class="kind">{tab.kind}</span>
+          <span class="kind">{tabName(tab)}</span>
           <span class="ttl">{title()}</span>
           <button title="Maximize (Alt+F)" onClick={doMax}>▢</button>
           <button title="Close (Alt+Q)" onClick={() => requestClose(props.project.id, id)}>×</button>
@@ -394,6 +398,8 @@ export default function Canvas(props: { project: Project }) {
           <FileView project={props.project} tab={tab} />
         ) : isGit ? (
           <GitPanel project={props.project} tab={tab} focused={focused()} />
+        ) : isAgents ? (
+          <AgentsPanel project={props.project} />
         ) : (
           <div class="body" ref={termEl} />
         )}
@@ -447,7 +453,7 @@ export function swapDir(project: Project, dx: number, dy: number): boolean {
   const n = neighbour(rects, i, dx, dy);
   if (n < 0 || n >= tabs.length) return false;
   swapTabs(project.id, tabs[i].id, tabs[n].id);
-  flash(`swap with ${tabs[n].kind}`);
+  flash(`swap with ${tabName(tabs[n])}`);
   return true;
 }
 
@@ -468,7 +474,7 @@ export function requestClose(projectId: string, tabId: string): void {
   removeTab(projectId, tabId);
   showToast(
     {
-      msg: `Closed ${tab.kind}${title ? " · " + title : ""}.`,
+      msg: `Closed ${tabName(tab)}${title ? " · " + title : ""}.`,
       undo: () => restoreTab(projectId, tab, index),
     },
     () => (tab.kind === "browser" ? closeBrowser(tabId) : isTerminal(tab) ? closeSession(tabId) : undefined),

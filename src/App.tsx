@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onMount, untrack } from "solid-js";
 import {
   GAPS, SPACES, activeProject, app, focusedTab, goSpace, isRemote, isTerminal, live, loadState,
-  persistChanges, setGap, setLayout, space,
+  persistChanges, setGap, setLayout, space, tabName,
 } from "./state";
 import Canvas from "./Canvas";
 import Sidebar from "./Sidebar";
@@ -10,6 +10,7 @@ import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
+import { IconPicker, iconPickerOpen } from "./lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
 import { loadIcons } from "./icons";
 import { installHotkeys } from "./hotkeys";
@@ -82,7 +83,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || favEditOpen() || openProjectOpen() || goToFileOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || goToFileOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -116,6 +117,7 @@ export default function App() {
       <GoToFile />
       <OpenProjectDialog />
       <HelpOverlay />
+      <IconPicker />
     </div>
   );
 }
@@ -145,7 +147,7 @@ function Toolbar() {
                         att: i !== p.ws && inWs().some((t) => live[t.id]?.attention),
                       }}
                       aria-current={p.ws === i}
-                      title={`Workspace ${i + 1}${inWs().length ? ": " + inWs().map((t) => t.kind).join(", ") : " (empty)"} · Alt+${i + 1}`}
+                      title={`Workspace ${i + 1}${inWs().length ? ": " + inWs().map(tabName).join(", ") : " (empty)"} · Alt+${i + 1}`}
                       onClick={() => {
                         goSpace(p.id, i);
                         flash(`workspace ${i + 1}`);
@@ -216,7 +218,7 @@ function StatusBar() {
     const f = focusedTab(p);
     if (!f) return where;
     const title = live[f.id]?.title;
-    return `${f.kind}${title ? " · " + title : ""}  [${where}]`;
+    return `${tabName(f)}${title ? " · " + title : ""}  [${where}]`;
   };
 
   return (

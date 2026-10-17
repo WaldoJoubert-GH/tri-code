@@ -3,7 +3,8 @@
 // terminal, so plain keys drive it while the window is focused.
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
-import { type Project, type Tab, focusTab, space } from "./state";
+import { type Project, type Tab, focusTab, space, tabName } from "./state";
+import { agentTarget } from "./agents";
 import {
   ACTIVE_GROUPS, LEVEL_COLORS, PRIORITY_COLORS, type DevState, type PlaneIssue,
   type PlaneLabel, type PlaneState, type UnifiedIssue, accumulatedMs, addDraftImage, ago, avatarColor,
@@ -178,12 +179,11 @@ export default function IssuesPanel(props: { project: Project; tab: Tab; focused
 
   function sendToAgent(issue: UnifiedIssue) {
     const p = props.project;
-    const terms = p.tabs.filter((t) => t.kind === "claude" || t.kind === "pi");
-    const target = terms.find((t) => t.id === space(p).focus) ?? terms.find((t) => t.space === p.ws) ?? terms[0];
-    if (!target) return void flash("open a claude or pi window first (Alt+Enter)");
+    const target = agentTarget(p, space(p).focus);
+    if (!target) return void flash("open an agent window first (the + menu)");
     sendText(target.id, `${slugOf(state(), issue)}: ${issue.title} ${issue.link}`);
     focusTab(p.id, target.id);
-    flash(`typed ${slugOf(state(), issue)} into ${target.kind}, not sent`);
+    flash(`typed ${slugOf(state(), issue)} into ${tabName(target)}, not sent`);
   }
 
   function openExternal(issue: UnifiedIssue) {
