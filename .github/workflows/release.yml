@@ -2,7 +2,8 @@
 # The release's latest.json is what installed apps poll for updates
 # (plugins.updater.endpoints in src-tauri/tauri.conf.json).
 #
-# Release: `bun pm version patch` (or minor/major), then `git push --follow-tags`.
+# Release: add the version's section to CHANGELOG.md, `bun pm version patch` (or
+# minor/major), then `git push --follow-tags`.
 
 name: Release
 
@@ -35,15 +36,23 @@ jobs:
             exit 1
           fi
 
+      # The notes are this version's section of CHANGELOG.md.
       - name: Create the draft release
         id: create
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          notes=$(awk -v v="${GITHUB_REF_NAME#v}" '/^## / { f = ($2 == v); next } f' CHANGELOG.md)
+          if [ -z "${notes//[[:space:]]/}" ]; then
+            echo "::error::CHANGELOG.md has no section for ${GITHUB_REF_NAME#v}"
+            exit 1
+          fi
           id=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
             -f tag_name="$GITHUB_REF_NAME" \
             -f name="tri-code $GITHUB_REF_NAME" \
-            -f body="Download the installer for your platform below. Installed copies update themselves." \
+            -f body="$notes
+
+          Download the installer for your platform below. Installed copies update themselves." \
             -F draft=true --jq .id)
           echo "id=$id" >> "$GITHUB_OUTPUT"
 

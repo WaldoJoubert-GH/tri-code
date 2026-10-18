@@ -10,6 +10,7 @@ import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
+import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
 import { loadIcons } from "./icons";
@@ -21,7 +22,7 @@ import { GoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { ensureSession, setLinkHandler } from "./terms";
 import { flash, flashMsg, toast, undoToast } from "./ui";
-import { installUpdate, startUpdateChecks, updateReady } from "./updater";
+import { appVersion, installUpdate, startUpdateChecks, updateReady } from "./updater";
 import {
   clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
 } from "./issues";
@@ -84,7 +85,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || goToFileOpen() || paletteOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || goToFileOpen() || paletteOpen() || aboutOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -119,6 +120,7 @@ export default function App() {
       <Palette />
       <OpenProjectDialog />
       <HelpOverlay />
+      <AboutDialog />
       <IconPicker />
     </div>
   );
@@ -244,6 +246,9 @@ function StatusBar() {
           </button>
         )}
       </Show>
+      <button class="ver" title="About tri-code: check for updates, changelog" onClick={() => setAboutOpen(true)}>
+        v{appVersion}
+      </button>
       <ClaudeUsage />
     </div>
   );

@@ -9,6 +9,7 @@ import {
 import { requestClose } from "./Canvas";
 import { toggleAppearance } from "./Appearance";
 import { setHelpOpen } from "./Help";
+import { setAboutOpen } from "./About";
 import { openProjectDialog } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./issues";
@@ -16,7 +17,7 @@ import { openFilesPanel } from "./files";
 import { openGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { hotkeyKeys, hotkeyProblem, launchAgent, newTerminalLike, openAgentsPanel } from "./agents";
-import { installUpdate, updateReady } from "./updater";
+import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
 import { flash } from "./ui";
 
 export type Command = {
@@ -150,6 +151,8 @@ export function commands(): Command[] {
   add({ id: "help", group: "App", title: "Hotkeys", icon: "keyboard", keys: ["Alt", "/"], run: () => setHelpOpen(true) });
   const u = updateReady();
   if (u) add({ id: "update", group: "App", title: `Restart to update to ${u.version}`, icon: "refresh-cw", run: installUpdate });
+  else add({ id: "check-updates", group: "App", title: "Check for updates", hint: `v${appVersion}`, icon: "refresh-cw", run: checkForUpdates });
+  add({ id: "about", group: "App", title: "About tri-code", hint: "version, changelog", icon: "info", run: () => setAboutOpen(true) });
 
   if (p) {
     for (const t of p.tabs) {

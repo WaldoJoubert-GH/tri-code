@@ -6,6 +6,7 @@ import { Project, Tab, activeProject, addTab, focusedTab, setRatio, space, visib
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
 import { helpOpen, setHelpOpen } from "./Help";
+import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
 import { closeTabMenu, tabMenuOpen } from "./tabs";
@@ -145,6 +146,7 @@ function onKey(e: KeyboardEvent) {
     if (iconPickerOpen()) closeIconPicker();
     else if (paletteOpen()) closePalette();
     else if (helpOpen()) setHelpOpen(false);
+    else if (aboutOpen()) setAboutOpen(false);
     else if (openProjectOpen()) closeOpenProject();
     else if (appearanceOpen()) closeAppearance();
     else if (tabMenuOpen()) closeTabMenu();

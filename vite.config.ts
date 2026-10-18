@@ -2,11 +2,14 @@ import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
+import pkg from "./package.json";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [solid()],
+  // The version shown in the status bar and About dialog; package.json is its only home.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

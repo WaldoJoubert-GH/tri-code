@@ -79,12 +79,14 @@ When ssh exits with code 255 (connection failure), the tab reconnects automatica
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the Windows installers (NSIS and MSI) and the macOS apps (Apple Silicon and Intel), signs the update bundles, and publishes them as a GitHub Release. The version lives only in `package.json`; `tauri.conf.json` reads it from there.
 
+First add a `## <version>` section to `CHANGELOG.md`: it becomes the release notes, and the build fails without it.
+
 ```
 bun pm version patch          # or minor, major, or 1.2.3; commits and tags v<version>
 git push --follow-tags
 ```
 
-Installed copies check the latest release's `latest.json` at startup and every 6 hours, download a newer version in the background, and show "↻ Restart to update" in the status bar. Restarting ends local terminal sessions; remote tabs reattach. Dev builds never update.
+Installed copies check the latest release's `latest.json` at startup and every 6 hours, download a newer version in the background, and show "↻ Restart to update" in the status bar. Restarting ends local terminal sessions; remote tabs reattach. Dev builds never update. The window title and the status bar show the running version; click the version (or run "About tri-code" / "Check for updates" from `Alt+X`) to check now and read the changelog.
 
 The updater checks downloads against the public key in `tauri.conf.json`. The matching private key is the `TAURI_SIGNING_PRIVATE_KEY` repository secret (kept outside the repo at `~/.tauri/tri-code.key` on the machine that made it). If the key is lost, installed copies cannot verify new releases and must be reinstalled by hand. The macOS builds are not notarized, so Gatekeeper blocks the first launch: right-click the app and choose Open.
 
@@ -119,7 +121,8 @@ Layout:
 - `terms.ts`: one xterm and one PTY per tab. Handles output, resize, reconnect backoff, bell detection, and the WebGL renderer for the visible tab only.
 - `issues.ts`: the `.dev/` store and Plane sync, plus the pure helpers (sort order, State Pill contrast, Slug-ID).
 - `IssuesPanel.tsx`: the issues window: the list, the full-width drill-down, the State Dropdown, labels, and the comment thread.
-- `updater.ts`: the update check, background download, and "Restart to update".
+- `updater.ts`: the update check (periodic and on demand), background download, and "Restart to update".
+- `About.tsx`: the About dialog: the running version, "Check for updates", and `CHANGELOG.md`.
 - `styles.css`: application styles.
 - `vite-env.d.ts`: Vite type declarations.
 
