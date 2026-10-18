@@ -1,6 +1,7 @@
 <title>tri-code Canvas</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <style>
 /* Layout: the app's sidebar stays; the tab bar becomes a slim toolbar over an auto-tiled area of terminal, browser and issues windows (main + stack or grid, with a gap). The issues window renders the project's .dev/ (Plane + Sentry), the files pi-todos and dev-hub share. Follows the system light/dark setting; the dark palette is the one in src/styles.css. */
 :root {
@@ -84,27 +85,61 @@ aside {
 .side-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
 .collapse { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; font-size: 14px; line-height: 1; }
 .collapse:hover { background: var(--hover); color: var(--text); }
-.rail aside { padding-inline: 6px; }
-.rail .side-head { justify-content: center; padding: 0; }
-.rail .side-head span, .rail .project .name, .rail .project .count, .rail .project .gear { display: none; }
-.rail aside h2 { height: 1px; margin: 8px 6px; background: var(--line); font-size: 0; }
-.rail .project { justify-content: center; padding: 4px 0; position: relative; }
+.rail:not(.peek) aside { padding-inline: 6px; }
+.rail:not(.peek) .side-head { justify-content: center; padding: 0; }
+.rail:not(.peek) .side-head span, .rail:not(.peek) .project .name, .rail:not(.peek) .project .count, .rail:not(.peek) .project .gear { display: none; }
+/* collapsed, an Environment header is just its icon over a divider */
+.rail:not(.peek) aside h2 { justify-content: center; height: auto; margin: 8px 6px 6px; padding-top: 9px; border-top: 1px solid var(--line); }
+.rail:not(.peek) aside h2 .ic svg { width: 14px; height: 14px; }
+.rail:not(.peek) aside h2 :is(.en, .eh, .env-edit) { display: none; }
+.rail:not(.peek) .project { justify-content: center; padding: 4px 0; position: relative; }
 .project .swatch b { display: none; }
-.rail .project .swatch {
+.rail:not(.peek) .project .swatch {
   width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center;
   background: color-mix(in srgb, var(--pa) 22%, var(--raised)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent);
 }
-.rail .project .swatch b { display: block; font-size: 12px; font-weight: 600; color: var(--text); text-transform: uppercase; }
-.rail .project.active { background: none; }
-.rail .project.active .swatch { background: var(--pa); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
-.rail .project.active .swatch b { color: #111; }
-.rail .project .badge { position: absolute; top: 2px; right: 3px; box-shadow: 0 0 0 2px var(--panel); }
-.rail .add { text-align: center; padding: 6px 0; font-size: 15px; }
-.rail .add .label { display: none; }
+.rail:not(.peek) .project .swatch b { display: block; font-size: 12px; font-weight: 600; color: var(--text); text-transform: uppercase; }
+.rail:not(.peek) .project.active { background: none; }
+.rail:not(.peek) .project.active .swatch { background: var(--pa); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
+.rail:not(.peek) .project.active .swatch b { color: #111; }
+.rail:not(.peek) .project .badge { position: absolute; top: 2px; right: 3px; box-shadow: 0 0 0 2px var(--panel); }
+.rail:not(.peek) .add { text-align: center; padding: 6px 0; font-size: 15px; }
+.rail:not(.peek) .add .label { display: none; }
+/* Peek (like Edge's vertical tabs): hovering the rail floats the full list over the canvas without reflowing the tiles; leaving folds it back. The pin keeps it open. */
+.rail aside { position: relative; z-index: 20; width: 48px; transition: width 140ms ease, box-shadow 140ms ease; }
+.rail.peek aside { width: 220px; box-shadow: 12px 0 32px -12px var(--shadow); }
+@media (prefers-reduced-motion: reduce) { .rail aside { transition: none; } }
 aside h2 {
   margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--muted);
+  display: flex; align-items: center; gap: 6px; height: 18px; min-width: 0;
 }
+/* Environment header: its lucide icon, its name, and the host underneath it when the name differs */
+.ic { display: inline-grid; place-items: center; flex: none; }
+.ic svg { width: 13px; height: 13px; stroke-width: 2; display: block; }
+.ic-miss { font: 600 9px var(--mono); }
+aside h2 .en { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+aside h2 .eh { font: 400 10px var(--mono); text-transform: none; letter-spacing: 0; opacity: .7; white-space: nowrap; }
+.env-edit { margin-left: auto; width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; color: var(--muted); opacity: 0; flex: none; }
+aside h2:hover .env-edit, .env-edit:focus-visible, .env-edit[aria-expanded="true"] { opacity: 1; }
+.env-edit:hover { background: var(--hover); color: var(--text); }
+.env-edit svg { width: 12px; height: 12px; }
+/* Environment editor: a label and an icon; the host itself never changes here */
+.pop.envpop { width: 316px; }
+.envpop .namerow { display: flex; gap: 6px; }
+.envpop .namerow .fname { flex: 1; min-width: 0; }
+.envpop .cur { width: 30px; height: 30px; border-radius: 6px; background: var(--raised); color: var(--text); display: grid; place-items: center; flex: none; }
+.envpop .cur svg { width: 16px; height: 16px; }
+.envpop .hostnote { font-size: 11px; color: var(--muted); line-height: 1.45; }
+.envpop .hostnote code { font: 11px var(--mono); color: var(--text); }
+.igrid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; max-height: 196px; overflow-y: auto; }
+.igrid button { display: grid; place-items: center; height: 30px; border-radius: 5px; color: var(--text); }
+.igrid button:hover { background: var(--hover); }
+.igrid button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 22%, var(--raised)); box-shadow: inset 0 0 0 1px var(--accent); }
+.igrid .ic svg { width: 16px; height: 16px; }
+.igrid .none { grid-column: 1 / -1; padding: 10px 4px; color: var(--muted); font-size: 12px; }
+.envpop .imeta { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.envpop .imeta code { font: 11px var(--mono); color: var(--text); }
 .project { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
 .project:hover { background: var(--hover); }
 .project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
@@ -198,7 +233,7 @@ aside h2 {
 
 /* Canvas */
 .viewport {
-  grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas);
+  grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); isolation: isolate;
 }
 .world { position: absolute; inset: 0; }
 .bg { position: absolute; inset: 0; pointer-events: none; transition: background 200ms; }
@@ -578,7 +613,7 @@ body.ctrl .link:hover { color: var(--accent); text-decoration: underline solid; 
 /* Sidebar: active Plane issues per State, in Plane's colours (the pi-todos widget) */
 .minibar { display: flex; gap: 1px; width: 26px; height: 4px; border-radius: 2px; overflow: hidden; flex: none; }
 .minibar i { height: 100%; }
-.rail .project .minibar { display: none; }
+.rail:not(.peek) .project .minibar { display: none; }
 /* Toolbar: the project's In Progress issues, next to Appearance. One click drills into the issue */
 .prog { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; margin: 0 4px; overflow: hidden; }
 .prog button {
@@ -721,6 +756,34 @@ const app = $("app"), vp = $("vp"), world = $("world"), split = $("split");
 const cells = (w, h) => ({ cols: Math.floor((w - PADX * 2 - 2) / CW), rows: Math.floor((h - BAR - PADY * 2 - 2) / LH) });
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 let uid = 100, gap = 12;
+
+/* ---------- environments: a display name and a lucide icon ---------- */
+// Keyed by host (local or the ssh destination). Saved beside the ordered Environment list in state.json;
+// the name is only a label, so projects keep opening on the same host after a rename.
+const L = window.lucide;
+const toKebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/([a-zA-Z])(\d)/g, "$1-$2").toLowerCase();
+const ICONS = {};
+if (L && L.icons) for (const [k, node] of Object.entries(L.icons)) ICONS[toKebab(k)] = node;
+const ICON_NAMES = Object.keys(ICONS).sort();
+const ENV_ICONS = [
+  "laptop", "monitor", "server", "server-cog", "cloud", "container", "box", "boxes", "database", "hard-drive",
+  "cpu", "network", "router", "house", "building-2", "briefcase", "flask-conical", "test-tube", "rocket", "globe",
+  "terminal", "square-terminal", "code", "git-branch", "shield", "lock", "zap", "flame", "leaf", "mountain",
+  "tree-pine", "anchor", "ship", "plane", "moon", "sun", "star", "heart", "cat", "bird", "ghost", "gamepad-2",
+  "wrench", "hammer", "package",
+].filter((n) => ICONS[n] || !L);
+function icon(name) {
+  const node = ICONS[name];
+  if (!node || !L) return `<span class="ic ic-miss" aria-hidden="true">${esc((name || "?").slice(0, 2))}</span>`;
+  const el = L.createElement(node);
+  el.setAttribute("aria-hidden", "true");
+  return `<span class="ic">${el.outerHTML}</span>`;
+}
+let envs = { local: { name: "", icon: "laptop" }, devbox: { name: "", icon: "server" } };
+try { Object.assign(envs, JSON.parse(localStorage.getItem("tri.envs") || "{}")); } catch {}
+const saveEnvs = () => { try { localStorage.setItem("tri.envs", JSON.stringify(envs)); } catch {} };
+const envLabel = (h) => envs[h]?.name || h;
+const envIcon = (h) => envs[h]?.icon || (h === "local" ? "laptop" : "server");
 
 /* ---------- sample screens ---------- */
 const S = {
@@ -1153,14 +1216,16 @@ function render() {
 }
 function renderSide() {
   const hosts = [...new Set(projects.map((p) => p.host))];
-  const rail = app.classList.contains("rail");
+  const rail = app.classList.contains("rail"), peek = app.classList.contains("peek");
   $("side").innerHTML = `<div class="side-head"><span>Projects</span><button class="collapse" id="collapse"
-      title="${rail ? "Expand" : "Collapse"} sidebar (Alt+S)" aria-label="${rail ? "Expand" : "Collapse"} sidebar" aria-expanded="${!rail}">${rail ? "»" : "«"}</button></div>` + hosts.map((h) => `<section><h2>${h}</h2>` + projects.filter((p) => p.host === h).map((p) =>
-    `<div class="project${p === cur ? " active" : ""}" data-p="${p.id}" style="--pa:${p.accent}" title="${rail ? `${p.name} · ${p.host} · ${p.wins.length} window${p.wins.length === 1 ? "" : "s"}` : ""}"><span class="swatch"><b>${p.name[0]}</b></span>
+      title="${peek ? "Keep sidebar open" : rail ? "Expand sidebar" : "Collapse sidebar"} (Alt+S)" aria-label="${peek ? "Keep sidebar open" : rail ? "Expand sidebar" : "Collapse sidebar"}" aria-expanded="${!rail || peek}">${peek ? "⇥" : rail ? "»" : "«"}</button></div>` + hosts.map((h) => `<section><h2 title="${rail && !peek ? esc(envLabel(h) + (envs[h]?.name ? " · " + h : "")) : ""}">${icon(envIcon(h))}<span class="en">${esc(envLabel(h))}</span>${envs[h]?.name && envs[h].name !== h ? `<span class="eh">${esc(h)}</span>` : ""}
+      <button class="env-edit" data-env="${esc(h)}" title="Rename or change icon" aria-label="Edit environment ${esc(envLabel(h))}" aria-haspopup="dialog" aria-expanded="${$("pop")?.dataset.env === h}">${icon("pencil")}</button></h2>` + projects.filter((p) => p.host === h).map((p) =>
+    `<div class="project${p === cur ? " active" : ""}" data-p="${p.id}" style="--pa:${p.accent}" title="${rail && !peek ?`${p.name} · ${envLabel(p.host)} · ${p.wins.length} window${p.wins.length === 1 ? "" : "s"}` : ""}"><span class="swatch"><b>${p.name[0]}</b></span>
      <span class="name">${p.name}</span>${miniBar(p)}${p !== cur && p.wins.some((w) => w.attention) ? '<span class="badge" title="Needs input"></span>' : ""}
      <span class="count">${p.wins.length || ""}</span><button class="gear" title="Appearance" aria-label="Appearance of ${p.name}">◐</button></div>`).join("") + `</section>`).join("") +
     `<button class="add" title="Add project">+<span class="label"> Add project</span></button>`;
   $("collapse").onclick = toggleSidebar;
+  $("side").querySelectorAll(".env-edit").forEach((b) => b.onclick = () => $("pop")?.dataset.env === b.dataset.env ? closeTheme() : openEnv(b.dataset.env, b));
   $("side").querySelectorAll(".project").forEach((el) => el.onclick = (e) => {
     switchProject(projects.find((p) => p.id === el.dataset.p));
     if (e.target.closest(".gear")) openTheme(el.querySelector(".gear") ?? el);
@@ -2121,7 +2186,7 @@ function toggleHelp(force) {
       <dt>${k("Alt", ",")} ${k("Alt", ".")}</dt><dd>Less / more gap between windows</dd>
       <dt>${k("Alt", "F")}</dt><dd>Maximize the focused window, again to restore</dd></dl>
     <h4>Project</h4><dl>
-      <dt>${k("Alt", "S")}</dt><dd>Collapse or expand the sidebar</dd>
+      <dt>${k("Alt", "S")}</dt><dd>Collapse or expand the sidebar · while collapsed, hover the rail to peek at the full list</dd>
       <dt>${k("Alt", "P")}</dt><dd>Change this project's accent colour and background</dd></dl>
     <h4>Windows and links</h4><dl>
       <dt>${k("Alt", "Enter")}</dt><dd>New window of the focused kind</dd>
@@ -2149,6 +2214,8 @@ function toggleHelp(force) {
 
 /* ---------- collapsible sidebar ---------- */
 function toggleSidebar() {
+  clearTimeout(peekT);
+  app.classList.remove("peek");
   const rail = app.classList.toggle("rail");
   try { localStorage.setItem("tri.sidebar", rail ? "rail" : "full"); } catch {}
   closeTheme();
@@ -2156,6 +2223,20 @@ function toggleSidebar() {
   flash(rail ? "sidebar collapsed" : "sidebar expanded");
 }
 try { if (localStorage.getItem("tri.sidebar") === "rail") app.classList.add("rail"); } catch {}
+// hover peek: a short delay on the way in so sweeping past the rail doesn't flicker it open, a shorter one on the way out
+let peekT;
+function setPeek(on) {
+  clearTimeout(peekT);
+  if (!app.classList.contains("rail") || app.classList.contains("peek") === on) return;
+  peekT = setTimeout(() => {
+    // an appearance panel opened from a peeked row holds the sidebar open until it closes
+    if (!on && ($("pop") || $("side").matches(":hover"))) return;
+    app.classList.toggle("peek", on);
+    renderSide();
+  }, on ? 180 : 260);
+}
+$("side").addEventListener("mouseenter", () => setPeek(true));
+$("side").addEventListener("mouseleave", () => setPeek(false));
 
 /* ---------- appearance panel ---------- */
 function openTheme(anchor) {
@@ -2195,10 +2276,58 @@ function openTheme(anchor) {
   Object.assign(pop.style, { left: left + "px", top: Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 8) + "px" });
   if (anchor.closest("aside")) Object.assign(pop.style, { left: r.right + 10 + "px", top: Math.max(8, Math.min(r.top - 10, window.innerHeight - pop.offsetHeight - 8)) + "px" });
 }
-function closeTheme() { $("pop")?.remove(); }
+function closeTheme() { if (!$("pop")) return; const env = $("pop").dataset.env; $("pop").remove(); if (env) renderSide(); if (app.classList.contains("peek")) setPeek(false); }
 document.addEventListener("pointerdown", (e) => {
-  if ($("pop") && !e.target.closest("#pop, #themeBtn, .gear, .star")) closeTheme();
+  if ($("pop") && !e.target.closest("#pop, #themeBtn, .gear, .star, .env-edit")) closeTheme();
 });
+
+function openEnv(host, anchor) {
+  closeTheme();
+  const e = envs[host] ??= { name: "", icon: envIcon(host) };
+  const pop = document.createElement("div");
+  pop.className = "pop envpop"; pop.id = "pop"; pop.dataset.env = host;
+  pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Edit environment");
+  const n = projects.filter((p) => p.host === host).length;
+  pop.innerHTML = `<div class="ttl">Environment <span>${n} project${n === 1 ? "" : "s"}</span></div>
+    <div class="namerow"><span class="cur" id="envCur">${icon(e.icon)}</span>
+      <input class="fname" id="envName" value="${esc(e.name)}" placeholder="${esc(host)}" spellcheck="false" aria-label="Name"></div>
+    <div class="hostnote">${host === "local" ? "Runs on <code>this machine</code>." : `Connects with <code>ssh ${esc(host)}</code>.`} The name is only a label; leave it empty to show the host.</div>
+    <h4>Icon</h4>
+    <input class="fname" id="envQ" placeholder="Search ${ICON_NAMES.length || ""} lucide icons…" spellcheck="false">
+    <div class="igrid" id="envGrid" role="group" aria-label="Icons"></div>
+    <div class="imeta"><span id="envCount"></span><code id="envIc">${esc(e.icon)}</code></div>
+    <div class="acts"><button id="envReset">Reset</button><button class="primary" id="envDone">Done</button></div>`;
+  document.body.appendChild(pop);
+  const grid = $("envGrid");
+  const fill = () => {
+    const q = $("envQ").value.trim().toLowerCase();
+    const names = q ? ICON_NAMES.filter((x) => x.includes(q)) : ENV_ICONS;
+    const shown = names.slice(0, 126);
+    grid.innerHTML = shown.map((x) => `<button data-icon="${x}" title="${x}" aria-label="${x}" aria-pressed="${x === e.icon}">${icon(x)}</button>`).join("")
+      || `<span class="none">${L ? `No icon matches “${esc(q)}”` : "Icons need the network once to load"}</span>`;
+    $("envCount").textContent = q ? `${names.length} match${names.length === 1 ? "" : "es"}${names.length > shown.length ? `, first ${shown.length}` : ""}` : "suggested · type to search";
+  };
+  const apply = () => { saveEnvs(); renderSide(); $("envCur").innerHTML = icon(e.icon); $("envIc").textContent = e.icon; };
+  $("envName").oninput = (ev) => { e.name = ev.target.value.trim(); apply(); };
+  $("envQ").oninput = fill;
+  grid.onclick = (ev) => {
+    const b = ev.target.closest("[data-icon]");
+    if (!b) return;
+    e.icon = b.dataset.icon;
+    grid.querySelectorAll("[aria-pressed]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    apply();
+  };
+  $("envReset").onclick = () => { e.name = ""; e.icon = host === "local" ? "laptop" : "server"; $("envName").value = ""; $("envQ").value = ""; fill(); apply(); };
+  $("envDone").onclick = () => { closeTheme(); flash(`environment ${host} → ${envLabel(host)}`); };
+  pop.onkeydown = (ev) => {
+    if (ev.key === "Escape" || (ev.key === "Enter" && ev.target.id === "envName")) { ev.stopPropagation(); ev.preventDefault(); closeTheme(); }
+  };
+  fill();
+  const r = anchor.getBoundingClientRect();
+  Object.assign(pop.style, { left: r.right + 10 + "px", top: Math.max(8, Math.min(r.top - 10, window.innerHeight - pop.offsetHeight - 8)) + "px" });
+  renderSide();
+  $("envName").focus(); $("envName").select();
+}
 
 /* ---------- go to file ---------- */
 /** The project's file index: git ls-files, run on the project's host (over ssh for remote ones), refreshed when the picker opens. */

@@ -31,6 +31,9 @@ const lastSent = new Map<string, string>();
 /** Last use per tab, to pick the browser that Ctrl+click reuses. */
 const lastUsed = new Map<string, number>();
 let suspended = false;
+/** The peeked sidebar floats over the canvas from the window's left edge to here; webviews reaching under it hide. */
+let coveredTo = 0;
+const covered = (b: Box) => b.x < coveredTo;
 
 const label = (tabId: string) => `browser-${tabId}`;
 const tabIdOf = (lbl: string) => lbl.replace(/^browser-/, "");
@@ -128,12 +131,12 @@ export function placeBrowser(_project: Project, tab: Tab, rect: DOMRect | null):
     send("browser_open", { label: label(id), url, ...b });
     lastSent.set(id, key(b));
     shown.add(id);
-    if (suspended) hide(id);
+    if (suspended || covered(b)) hide(id);
     return;
   }
   if (suspended) return; // remembered; applied when resumed
   syncBounds(id, b);
-  show(id);
+  covered(b) ? hide(id) : show(id);
 }
 
 /** Framed mode: show `url` and record it in the project. */
@@ -203,9 +206,20 @@ export function setBrowsersSuspended(on: boolean): void {
     return;
   }
   for (const [id, b] of latest) {
-    if (!b || !created.has(id)) continue;
+    if (!b || !created.has(id) || covered(b)) continue;
     syncBounds(id, b);
     show(id);
+  }
+}
+
+/** Hide only the webviews under the sidebar's peek (0 when it folds back), so the rest stay live. */
+export function setBrowsersCovered(right: number): void {
+  coveredTo = right;
+  if (suspended) return;
+  for (const [id, b] of latest) {
+    if (!b || !created.has(id)) continue;
+    if (covered(b)) hide(id);
+    else (syncBounds(id, b), show(id));
   }
 }
 

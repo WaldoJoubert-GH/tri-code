@@ -344,7 +344,7 @@
 /* Sidebar: active Plane issues per State, in Plane's colours (the pi-todos widget) */
 .minibar { display: flex; gap: 1px; width: 26px; height: 4px; border-radius: 2px; overflow: hidden; flex: none; }
 .minibar i { height: 100%; }
-.rail .project .minibar { display: none; }
+.rail:not(.peek) .project .minibar { display: none; }
 /* Toolbar: the project's In Progress issues, next to Appearance. One click drills into the issue.
    Never shrinks to nothing: on a narrow toolbar (container query on .top) only the first chip stays, as dot + ID. */
 .prog { display: flex; align-items: center; gap: 4px; flex: none; margin: 0 4px; }

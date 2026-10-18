@@ -1,20 +1,35 @@
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
-  Project, app, isLocalHost, isTerminal, live, removeEnvironment, removeProject, renameProject, setApp, setSidebarCollapsed,
+  Project, app, envIcon, envName, isLocalHost, isTerminal, live, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
+  setSidebarCollapsed,
 } from "./state";
-import { closeBrowser } from "./browsers";
+import { closeBrowser, setBrowsersCovered } from "./browsers";
 import { closeSession } from "./terms";
-import { closeAppearance, forgetBgImage, openAppearance } from "./Appearance";
+import { appearanceOpen, closeAppearance, forgetBgImage, openAppearance } from "./Appearance";
 import { dev, forgetProject, isActive } from "./issues";
 import { IconFace, forgetIcon } from "./icons";
+import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { openProjectDialog } from "./OpenProject";
 import { flash } from "./ui";
+
+/** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
+const FULL = 220;
+
+// Peek (like Edge's vertical tabs): hovering the rail floats the full list over the canvas
+// without reflowing the windows; leaving folds it back.
+const [hover, setHover] = createSignal(false);
+const [peek, setPeek] = createSignal(false);
+export const sidebarPeek = peek;
+/** Something opened from the peeked list (appearance, icon picker, a rename) holds it open until it closes. */
+const [renaming, setRenaming] = createSignal<string | null>(null);
+const held = () => appearanceOpen() || iconPickerOpen() || renaming() !== null;
 
 /** Collapse to the rail, or expand back to the full list. */
 export function toggleSidebar() {
   const collapsed = !app.sidebarCollapsed;
   closeAppearance();
+  setPeek(false);
   setSidebarCollapsed(collapsed);
   flash(collapsed ? "sidebar collapsed" : "sidebar expanded");
 }
@@ -32,17 +47,18 @@ function dropProject(p: Project) {
   removeProject(p.id);
 }
 
-/** Rename in place: Enter or blur saves, Escape cancels, empty falls back to the folder name. */
-function RenameInput(props: { project: Project; done: () => void }) {
+/** Rename in place: Enter or blur saves, Escape cancels. `save` gets the trimmed value, possibly empty. */
+function RenameInput(props: { value: string; placeholder?: string; save: (value: string) => void; done: () => void }) {
   let cancelled = false;
   const save = (value: string) => {
-    if (!cancelled) renameProject(props.project.id, value.trim() || props.project.path.split(/[\\/]/).filter(Boolean).pop() || props.project.name);
+    if (!cancelled) props.save(value.trim());
     props.done();
   };
   return (
     <input
       class="rename"
-      value={props.project.name}
+      value={props.value}
+      placeholder={props.placeholder}
       spellcheck={false}
       ref={(el) => requestAnimationFrame(() => (el.focus(), el.select()))}
       onClick={(e) => e.stopPropagation()}
@@ -57,7 +73,15 @@ function RenameInput(props: { project: Project; done: () => void }) {
 }
 
 export default function Sidebar() {
-  const [renaming, setRenaming] = createSignal<string | null>(null);
+  // A short delay on the way in so sweeping past the rail doesn't flicker it open, a longer one on the way out.
+  let timer: number | undefined;
+  createEffect(() => {
+    const want = app.sidebarCollapsed && (hover() || (peek() && held()));
+    clearTimeout(timer);
+    if (want !== peek()) timer = window.setTimeout(() => setPeek(want), want ? 180 : 260);
+  });
+  createEffect(() => setBrowsersCovered(peek() ? FULL : 0));
+  onCleanup(() => clearTimeout(timer));
 
   const needsAttention = (p: Project) =>
     app.activeProject !== p.id && p.tabs.some((t) => live[t.id]?.attention);
@@ -70,7 +94,7 @@ export default function Sidebar() {
   const removeEnv = (host: string) => {
     const ps = app.projects.filter((p) => p.host === host);
     const tabs = ps.reduce((n, p) => n + p.tabs.length, 0);
-    if (ps.length && !confirm(`Remove environment "${host}", its ${ps.length} project(s) and ${tabs} tab(s)?`)) return;
+    if (ps.length && !confirm(`Remove environment "${envName(host)}", its ${ps.length} project(s) and ${tabs} tab(s)?`)) return;
     ps.forEach(dropProject);
     removeEnvironment(host);
   };
@@ -93,24 +117,42 @@ export default function Sidebar() {
 
 
   return (
-    <aside>
+    <aside onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <div class="side-head">
         <span>Projects</span>
         <button
           class="collapse"
           onClick={toggleSidebar}
-          title={`${app.sidebarCollapsed ? "Expand" : "Collapse"} sidebar (Alt+S)`}
-          aria-label={`${app.sidebarCollapsed ? "Expand" : "Collapse"} sidebar`}
-          aria-expanded={!app.sidebarCollapsed}
+          title={`${peek() ? "Keep sidebar open" : app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} (Alt+S)`}
+          aria-label={peek() ? "Keep sidebar open" : app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!app.sidebarCollapsed || peek()}
         >
-          {app.sidebarCollapsed ? "»" : "«"}
+          {peek() ? "⇥" : app.sidebarCollapsed ? "»" : "«"}
         </button>
       </div>
       <For each={app.environments}>
         {(host) => (
           <section>
-            <h2>
-              <span class="host" title={isLocalHost(host) ? "This machine" : `ssh ${host}`}>{host}</span>
+            <h2 title={app.sidebarCollapsed && !peek() ? (envName(host) === host ? host : `${envName(host)} · ${host}`) : undefined}>
+              <button
+                class="env-icon"
+                title="Change icon"
+                aria-label={`Icon of ${envName(host)}`}
+                onClick={(e) => toggleIconPicker(e.currentTarget, envIcon(host), (icon) => setEnvStyle(host, { icon }))}
+              >
+                <Icon name={envIcon(host)} size={13} />
+              </button>
+              <Show
+                when={renaming() === `env:${host}`}
+                fallback={
+                  <span class="host" title={`${isLocalHost(host) ? "This machine" : `ssh ${host}`} · double-click to rename`} onDblClick={() => setRenaming(`env:${host}`)}>
+                    {envName(host)}
+                    <Show when={envName(host) !== host}><span class="real">{host}</span></Show>
+                  </span>
+                }
+              >
+                <RenameInput value={envName(host)} placeholder={host} save={(name) => setEnvStyle(host, { name })} done={() => setRenaming(null)} />
+              </Show>
               <button class="env-add" title={`Open a project on ${host}`} aria-label={`Open a project on ${host}`} onClick={() => openProjectDialog(host)}>+</button>
               <button class="env-x" title="Remove environment" aria-label={`Remove environment ${host}`} onClick={() => removeEnv(host)}>×</button>
             </h2>
@@ -123,12 +165,16 @@ export default function Sidebar() {
                   class="project"
                   classList={{ active: app.activeProject === p.id }}
                   style={{ "--pa": p.accent }}
-                  title={app.sidebarCollapsed ? `${p.name} · ${p.host} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : undefined}
+                  title={app.sidebarCollapsed && !peek() ? `${p.name} · ${envName(p.host)} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : undefined}
                   onClick={() => setApp("activeProject", p.id)}
                 >
                   <span class="swatch"><IconFace project={p} /></span>
                   <Show when={renaming() === p.id} fallback={<span class="name" title="Double-click to rename" onDblClick={() => setRenaming(p.id)}>{p.name}</span>}>
-                    <RenameInput project={p} done={() => setRenaming(null)} />
+                    <RenameInput
+                      value={p.name}
+                      save={(name) => renameProject(p.id, name || p.path.split(/[\\/]/).filter(Boolean).pop() || p.name)}
+                      done={() => setRenaming(null)}
+                    />
                   </Show>
                   <Show when={miniBar(p).length}>
                     <span class="minibar" title={miniBar(p).map((c) => `${c.n} ${c.name}`).join(" · ")}>

@@ -5,7 +5,7 @@ import {
   persistChanges, setGap, setLayout, space, tabName,
 } from "./state";
 import Canvas from "./Canvas";
-import Sidebar from "./Sidebar";
+import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
@@ -92,7 +92,7 @@ export default function App() {
   };
 
   return (
-    <div class="app" classList={{ rail: app.sidebarCollapsed }}>
+    <div class="app" classList={{ rail: app.sidebarCollapsed, peek: sidebarPeek() }}>
       <Sidebar />
       <Toolbar />
       <div class="stage">

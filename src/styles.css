@@ -81,25 +81,34 @@ aside {
 .side-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
 .collapse { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; font-size: 14px; line-height: 1; }
 .collapse:hover { background: var(--hover); color: var(--text); }
-.rail aside { padding-inline: 6px; }
-.rail .side-head { justify-content: center; padding: 0; }
-.rail .side-head span, .rail .project .name, .rail .project .rename, .rail .project .count, .rail .project .gear, .rail .project .x { display: none; }
-.rail aside h2 { height: 1px; margin: 8px 6px; padding: 0; background: var(--line); font-size: 0; }
-.rail aside h2 > *, .rail .env-empty { display: none; }
-.rail .project { justify-content: center; padding: 4px 0; position: relative; }
-.rail .project .swatch { width: 28px; height: 28px; border-radius: 7px; font-size: 13px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent); }
-.rail .project.active { background: none; }
-.rail .project.active .swatch { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
-.rail .project .badge { position: absolute; top: 2px; right: 3px; box-shadow: 0 0 0 2px var(--panel); }
-.rail .add { text-align: center; padding: 6px 0; font-size: 15px; }
-.rail .add .label { display: none; }
+.rail:not(.peek) aside { padding-inline: 6px; }
+.rail:not(.peek) .side-head { justify-content: center; padding: 0; }
+.rail:not(.peek) .side-head span, .rail:not(.peek) .project .name, .rail:not(.peek) .project .rename, .rail:not(.peek) .project .count, .rail:not(.peek) .project .gear, .rail:not(.peek) .project .x { display: none; }
+/* collapsed, an Environment header is just its icon under a divider */
+.rail:not(.peek) aside h2 { justify-content: center; height: auto; margin: 8px 6px 6px; padding: 9px 0 0; border-top: 1px solid var(--line); }
+.rail:not(.peek) aside h2 > :not(.env-icon), .rail:not(.peek) .env-empty { display: none; }
+.rail:not(.peek) aside h2 .env-icon { width: auto; height: auto; }
+.rail:not(.peek) aside h2 .env-icon svg { width: 14px; height: 14px; }
+.rail:not(.peek) .project { justify-content: center; padding: 4px 0; position: relative; }
+.rail:not(.peek) .project .swatch { width: 28px; height: 28px; border-radius: 7px; font-size: 13px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent); }
+.rail:not(.peek) .project.active { background: none; }
+.rail:not(.peek) .project.active .swatch { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
+.rail:not(.peek) .project .badge { position: absolute; top: 2px; right: 3px; box-shadow: 0 0 0 2px var(--panel); }
+.rail:not(.peek) .add { text-align: center; padding: 6px 0; font-size: 15px; }
+.rail:not(.peek) .add .label { display: none; }
+/* Peek: hovering the rail floats the full list over the canvas without reflowing the windows; leaving folds it back */
+.rail aside { position: relative; z-index: 20; width: 48px; transition: width 140ms ease, box-shadow 140ms ease; }
+.rail.peek aside { width: 220px; box-shadow: 12px 0 32px -12px var(--shadow); }
 aside h2 {
   display: flex; align-items: center; gap: 2px; margin: 10px 0 3px; padding: 0 4px 0 8px; height: 20px;
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
 }
 aside h2 .host { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+aside h2 .host .real { margin-left: 6px; font: 400 10px var(--mono); text-transform: none; letter-spacing: 0; opacity: .7; }
+aside h2 .rename { flex: 1; min-width: 0; height: 18px; font: inherit; text-transform: none; letter-spacing: 0; color: var(--text); background: var(--bg); border: 1px solid var(--accent); border-radius: 4px; padding: 0 5px; outline: none; }
 aside h2 button { width: 20px; height: 20px; border-radius: 4px; color: var(--muted); font-size: 13px; line-height: 1; opacity: 0; flex: none; }
-aside h2:hover button, aside h2 button:focus-visible { opacity: 1; }
+aside h2:hover button, aside h2 button:focus-visible, aside h2 .env-icon { opacity: 1; }
+aside h2 .env-icon { display: grid; place-items: center; margin-left: -4px; margin-right: 2px; }
 aside h2 button:hover { background: var(--hover); color: var(--text); }
 .env-empty { display: block; width: 100%; padding: 3px 8px 3px 30px; text-align: left; color: var(--muted); font-size: 12px; border-radius: 5px; }
 .env-empty:hover { background: var(--hover); color: var(--text); }
@@ -128,7 +137,7 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .add { display: flex; align-items: center; gap: 4px; width: 100%; white-space: nowrap; padding: 6px 8px; text-align: left; color: var(--muted); border-radius: 5px; }
 .add:hover { background: var(--hover); color: var(--text); }
 .add kbd { margin-left: auto; font-size: 10px; color: var(--muted); }
-.rail .add { justify-content: center; }
+.rail:not(.peek) .add { justify-content: center; }
 
 /* Toolbar */
 .top {
@@ -209,7 +218,7 @@ svg.lucide { flex: none; display: block; }
 .tabmenu .msep { height: 1px; margin: 4px 2px; background: var(--line); }
 
 /* Stage: the canvas area the windows are drawn on */
-.stage { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); min-width: 0; min-height: 0; }
+.stage { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); min-width: 0; min-height: 0; isolation: isolate; }
 .bg { position: absolute; inset: 0; pointer-events: none; transition: background 200ms; }
 .bg::after { content: ""; position: absolute; inset: 0; background: var(--canvas); opacity: var(--dim, 0); }
 .stage .empty { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center; color: var(--muted); }
@@ -421,6 +430,6 @@ svg.lucide { flex: none; display: block; }
   .top { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .app { transition: none; }
+  .app, .rail aside { transition: none; }
   .bg { transition: none; }
 }

@@ -6,7 +6,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, on, onMount } from "solid-js";
-import { addEnvironment, addProject, app, isLocalHost, setApp } from "./state";
+import { addEnvironment, addProject, app, envIcon, envName, isLocalHost, setApp } from "./state";
+import { Icon } from "./lucide";
 import { autoIcon } from "./icons";
 import { flash } from "./ui";
 
@@ -58,7 +59,8 @@ export function OpenProjectDialog() {
               <For each={app.environments}>
                 {(h) => (
                   <button type="button" class="env" aria-pressed={sel() === h} onClick={() => setSelected(h)}>
-                    <span class="nm">{h}</span>
+                    <Icon name={envIcon(h)} size={13} />
+                    <span class="nm" title={envName(h) !== h ? h : undefined}>{envName(h)}</span>
                     <span class="kind">{isLocalHost(h) ? "local" : "ssh"}</span>
                   </button>
                 )}

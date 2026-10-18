@@ -105,9 +105,13 @@ export type Project = {
   icon?: ProjectIcon;
 };
 
+export type EnvStyle = { name?: string; icon?: string };
+
 type Persisted = {
   /** Environments in sidebar order: "local" or an ssh destination. Each project's host is one of them. */
   environments: string[];
+  /** Per environment, by host: a display name and a lucide icon. The host stays the key, so a rename never changes where projects run. */
+  envStyles: Record<string, EnvStyle>;
   projects: Project[];
   /** Most recent first, at most RECENT_MAX. */
   recent: RecentFolder[];
@@ -130,7 +134,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -194,6 +198,20 @@ export function addEnvironment(host: string) {
 export function removeEnvironment(host: string) {
   setApp(produce((s) => {
     s.environments = s.environments.filter((h) => h !== host);
+    delete s.envStyles[host];
+  }));
+}
+
+/** The environment's display name: the one given, else the host. */
+export const envName = (host: string) => app.envStyles[host]?.name || host;
+export const envIcon = (host: string) => app.envStyles[host]?.icon || (isLocalHost(host) ? "laptop" : "server");
+
+/** An empty name (or the host itself) goes back to showing the host. */
+export function setEnvStyle(host: string, patch: EnvStyle) {
+  setApp(produce((s) => {
+    const next = { ...s.envStyles[host], ...patch };
+    if (next.name === host) next.name = "";
+    s.envStyles[host] = next;
   }));
 }
 
@@ -435,7 +453,7 @@ function migrate(raw: any): Persisted {
   const environments: string[] = raw.environments ?? ["local"];
   for (const p of projects) if (!environments.includes(p.host)) environments.push(p.host);
   return {
-    environments, projects, recent: raw.recent ?? [],
+    environments, envStyles: raw.envStyles ?? {}, projects, recent: raw.recent ?? [],
     activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(), gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
   };
 }
