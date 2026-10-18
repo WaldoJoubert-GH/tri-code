@@ -53,6 +53,10 @@ _Avoid_: Add project form, folder browser.
 The `Alt+T` box under the toolbar path (a click on the path opens it too). One field that searches the project's File Index by fuzzy match and, when it is empty or ends in `/`, lists that folder. Opens the pick in the project's `file` Window.
 _Avoid_: Quick open, file palette, Ctrl+P.
 
+**Command Palette**:
+The `Alt+X` box under the toolbar that runs any Command by name. The empty box lists recent picks, then every Command by group; typing fuzzy-matches titles (as Go to File does). Built from `commands.ts` each time it opens, so it only offers what applies now (no "Make main" outside Main + stack). A Command with a hotkey runs the same function the hotkey does.
+_Avoid_: Command menu, launcher, Ctrl+Shift+P (tri-code binds only Alt chords).
+
 **File Index**:
 A project's files for Go to File, as relative paths: `git ls-files --cached --others --exclude-standard` on the project's host, or a walk that skips dependency folders when the folder is not a repo. Fetched each time the box opens; the last one shows meanwhile.
 

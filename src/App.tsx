@@ -10,7 +10,7 @@ import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
-import { IconPicker, iconPickerOpen } from "./lucide";
+import { Icon, IconPicker, iconPickerOpen } from "./lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
 import { loadIcons } from "./icons";
 import { installHotkeys } from "./hotkeys";
@@ -18,6 +18,7 @@ import { installClipboardFallback } from "./clipboard";
 import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
 import { FavPopover, favEditOpen } from "./favs";
 import { GoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
+import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { ensureSession, setLinkHandler } from "./terms";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { installUpdate, startUpdateChecks, updateReady } from "./updater";
@@ -83,7 +84,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || goToFileOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || goToFileOpen() || paletteOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -115,6 +116,7 @@ export default function App() {
       <AppearancePopover />
       <FavPopover />
       <GoToFile />
+      <Palette />
       <OpenProjectDialog />
       <HelpOverlay />
       <IconPicker />
@@ -202,6 +204,9 @@ function Toolbar() {
           Appearance
         </button>
       </Show>
+      <button class="tool" title="Command palette (Alt+X)" aria-label="Command palette" onClick={togglePalette}>
+        <Icon name="square-chevron-right" size={14} />
+      </button>
       <button class="tool" title="Hotkeys (Alt+/)" onClick={() => setHelpOpen(!helpOpen())}>
         ?
       </button>
@@ -227,6 +232,7 @@ function StatusBar() {
       <span class="flash">{flashMsg()}</span>
       <StatusTimer />
       <div class="hints">
+        <span><kbd>Alt</kbd><kbd>X</kbd> commands</span>
         <span><kbd>Alt</kbd><kbd>I</kbd> issues</span>
         <span><kbd>Alt</kbd><kbd>E</kbd> files</span>
         <span><kbd>Alt</kbd><kbd>/</kbd> all keys</span>

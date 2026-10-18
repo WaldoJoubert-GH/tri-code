@@ -118,3 +118,13 @@
 .gfoot span { display: flex; gap: 3px; align-items: center; }
 .gfoot kbd { font-size: 10px; padding: 0 3px; }
 .gfoot .src { margin-left: auto; font: 10.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+
+/* Command Palette (Palette.tsx): the Go to File box, centered under the toolbar */
+.gtf.pal { left: 50%; top: 52px; transform: translateX(-50%); width: 640px; }
+.prow .pg { flex: none; width: 14px; text-align: center; color: var(--muted); font-size: 12px; }
+.prow.hi .pg { color: var(--accent); }
+.prow .gn { max-width: 55%; }
+.prow .ph { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11.5px; }
+.prow .ph b { font-weight: 600; }
+.prow .pk { flex: none; display: flex; gap: 3px; }
+.prow .pk kbd { font-size: 10px; padding: 0 4px; }

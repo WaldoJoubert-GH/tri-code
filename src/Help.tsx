@@ -81,6 +81,8 @@ export function HelpOverlay() {
             <dd>Open it in the system browser</dd>
             <dt><Keys keys={["Alt", "Q"]} /></dt>
             <dd>Close the focused window (undo for 5s)</dd>
+            <dt><Keys keys={["Alt", "X"]} /></dt>
+            <dd>Command palette: type to run any command, go to a window on any workspace, or switch project (or the prompt button next to ? in the toolbar)</dd>
             <dt><Keys keys={["Alt", "/"]} /></dt>
             <dd>Show or hide this list</dd>
           </dl>

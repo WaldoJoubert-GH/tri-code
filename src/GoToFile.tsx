@@ -57,10 +57,10 @@ const relTo = (p: Project, abs: string) => {
   return abs.startsWith(root) ? abs.slice(root.length) : null;
 };
 
-type Match = { score: number; idx: number[] };
+export type Match = { score: number; idx: number[] };
 
 /** The query's letters in order. Runs, word starts and a hit inside the file name score higher. */
-function fuzzy(q: string, path: string): Match | null {
+export function fuzzy(q: string, path: string): Match | null {
   const ql = q.toLowerCase(), pl = path.toLowerCase(), base = path.lastIndexOf("/") + 1;
   const run = (from: number): Match | null => {
     const idx: number[] = [];

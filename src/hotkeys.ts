@@ -2,10 +2,7 @@
 // Ctrl chords and terminal input keep reaching xterm. Listens in the capture phase so
 // handled keys never reach the terminal.
 
-import {
-  GAPS, Layout, Project, Tab, activeProject, addTab, app, focusedTab, goSpace, promote, sendTo, setApp, setGap,
-  setLayout, setRatio, space, tabName, toggleMono, visibleTabs,
-} from "./state";
+import { Project, Tab, activeProject, addTab, focusedTab, setRatio, space, visibleTabs } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
 import { helpOpen, setHelpOpen } from "./Help";
@@ -19,6 +16,8 @@ import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { agentForKey, launchAgent, newTerminalLike, openAgentsPanel, recording } from "./agents";
 import { closeIconPicker, iconPickerOpen } from "./lucide";
+import { closePalette, paletteOpen, togglePalette } from "./Palette";
+import { cycleLayout, makeMain, maximize, sendWindow, stepGap, stepProject, workspace } from "./commands";
 import { flash } from "./ui";
 
 /**
@@ -33,7 +32,7 @@ export const RESERVED: Record<string, string> = {
   KeyI: "issues", KeyE: "files", KeyT: "go to file", KeyC: "git", KeyQ: "close window", KeyF: "maximize", KeyM: "make main",
   KeyG: "switch layout", Comma: "less gap", Period: "more gap", Slash: "hotkey help", KeyS: "sidebar",
   KeyP: "appearance", BracketLeft: "previous project", BracketRight: "next project", KeyO: "open project",
-  Semicolon: "agents",
+  Semicolon: "agents", KeyX: "command palette",
 };
 
 const DIRS: Record<string, [number, number]> = {
@@ -67,17 +66,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
 
   if (/^Digit[1-4]$/.test(e.code)) {
     const i = Number(e.code.slice(5)) - 1;
-    if (e.shiftKey) {
-      if (!f) flash("no window to send");
-      else if (f.space === i) flash(`already on workspace ${i + 1}`);
-      else {
-        sendTo(p.id, f.id, i);
-        flash(`${tabName(f)} → workspace ${i + 1}`);
-      }
-    } else {
-      goSpace(p.id, i);
-      flash(`workspace ${i + 1}`);
-    }
+    if (!e.shiftKey) workspace(p, i);
+    else if (!f) flash("no window to send");
+    else sendWindow(p, f, i);
     return true;
   }
 
@@ -111,32 +102,19 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       return true;
     case "KeyF":
       if (!f) return false;
-      toggleMono(p.id, f.id);
-      flash(space(p).mono ? "maximize" : "restore");
+      maximize(p, f);
       return true;
     case "KeyM":
       if (!f) return false;
-      if (space(p).layout !== "master") flash("promote works in Main + stack");
-      else {
-        promote(p.id, f.id);
-        flash(`${tabName(f)} is main`);
-      }
+      makeMain(p, f);
       return true;
-    case "KeyG": {
-      const order: Layout[] = ["master", "grid", "mono"];
-      const next = order[(order.indexOf(space(p).layout) + 1) % order.length];
-      setLayout(p.id, next);
-      flash(next === "master" ? "main + stack" : next);
+    case "KeyG":
+      cycleLayout(p);
       return true;
-    }
     case "Comma":
-    case "Period": {
-      const i = GAPS.indexOf(app.gap) + (e.code === "Period" ? 1 : -1);
-      const gap = GAPS[Math.min(GAPS.length - 1, Math.max(0, i))];
-      setGap(gap);
-      flash(`gap ${gap}px`);
+    case "Period":
+      stepGap(e.code === "Period" ? 1 : -1);
       return true;
-    }
     case "Slash":
       setHelpOpen(!helpOpen());
       return true;
@@ -147,12 +125,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
       toggleAppearance();
       return true;
     case "BracketLeft":
-    case "BracketRight": {
-      const ids = app.projects.map((x) => x.id);
-      const n = ids.length, i = ids.indexOf(p.id);
-      setApp("activeProject", ids[(i + (e.code === "BracketRight" ? 1 : n - 1)) % n]);
+    case "BracketRight":
+      stepProject(p, e.code === "BracketRight" ? 1 : -1);
       return true;
-    }
     default: {
       const a = agentForKey(e);
       if (!a) return false;
@@ -168,6 +143,7 @@ function onKey(e: KeyboardEvent) {
   // Escape closes the overlays first; it is never bound on its own.
   if (e.code === "Escape" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     if (iconPickerOpen()) closeIconPicker();
+    else if (paletteOpen()) closePalette();
     else if (helpOpen()) setHelpOpen(false);
     else if (openProjectOpen()) closeOpenProject();
     else if (appearanceOpen()) closeAppearance();
@@ -181,9 +157,10 @@ function onKey(e: KeyboardEvent) {
   }
 
   if (!e.altKey) return;
-  // Alt+O works with no project yet: it is how the first one is opened.
-  if (e.code === "KeyO" && !e.ctrlKey && !e.shiftKey) {
-    if (openProjectOpen()) closeOpenProject();
+  // Alt+O and Alt+X work with no project yet: they are how the first one is opened.
+  if ((e.code === "KeyO" || e.code === "KeyX") && !e.ctrlKey && !e.shiftKey) {
+    if (e.code === "KeyX") togglePalette();
+    else if (openProjectOpen()) closeOpenProject();
     else openProjectDialog();
     e.preventDefault();
     e.stopPropagation();
