@@ -3,7 +3,7 @@
 // hotkeys.ts run the same code and flash the same message.
 
 import {
-  GAPS, Layout, Project, SPACES, Tab, activeProject, addTab, agentOf, app, focusTab, focusedTab, goSpace, isRemote, live,
+  GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, agentOf, app, focusTab, focusedTab, goSpace, isRemote, live,
   promote, sendTo, setApp, setGap, setLayout, space, tabName, toggleMono,
 } from "./state";
 import { requestClose } from "./Canvas";
@@ -157,7 +157,7 @@ export function commands(): Command[] {
   if (p) {
     for (const t of p.tabs) {
       if (t.id === space(p).focus && t.space === p.ws) continue;
-      const detail = t.kind === "file" ? t.path : t.kind === "browser" ? t.url : live[t.id]?.title;
+      const detail = t.kind === "file" ? t.path : t.kind === "browser" ? activePage(t)?.url : live[t.id]?.title;
       add({
         id: `tab:${t.id}`, group: "Go to window", title: windowTitle(t), icon: tabIcon(t),
         hint: [t.space === p.ws ? "" : `workspace ${t.space + 1}`, detail].filter(Boolean).join(" · ") || undefined,

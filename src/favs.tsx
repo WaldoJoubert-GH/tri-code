@@ -43,13 +43,13 @@ export function openFavEdit(projectId: string, url: string, anchor: HTMLElement,
 }
 
 /** The star (or Ctrl+D): favourite the page if it isn't one yet, then show the editor either way. */
-export function starPage(projectId: string, tabId: string, url: string, anchor: HTMLElement) {
+export function starPage(projectId: string, pageId: string, url: string, anchor: HTMLElement) {
   const p = projectById(projectId);
   if (!p) return;
   if (!url || url === "about:blank") return flash("nothing to favourite on a new tab");
   const added = !p.favs.some((f) => f.url === url);
   if (added) {
-    const title = browserInfo[tabId]?.title ?? "";
+    const title = browserInfo[pageId]?.title ?? "";
     const name = (title && title !== "New tab" ? title : hostOf(url)).slice(0, 40);
     addFav(projectId, { url, name });
   }

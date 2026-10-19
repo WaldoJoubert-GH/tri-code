@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.12 — 2026-10-19
+
+- Browser windows have tabs. Ctrl+click or middle-click a link to open it in a background tab; `target=_blank` links open a tab and show it. The tabs sit in the window's title bar once there are two; `+` adds a blank one.
+- Ctrl+click on a link in a terminal opens a new tab in the browser window instead of replacing its page.
+- Sign-in and payment popups open in their own window, so signing in with GitHub and the like works.
+
 ## 0.1.11 — 2026-10-19
 
 - The sidebar's project tiles and environment icons are the same size open or collapsed, and nothing shifts when it collapses, expands or peeks.

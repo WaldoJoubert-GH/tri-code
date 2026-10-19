@@ -1,12 +1,15 @@
 import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import {
-  type Project, type Tab, app, focusTab, isTerminal, live, projectById, removeTab, restoreTab,
-  sendTo, setRatio, space, swapTabs, tabName, toggleMono, visibleTabs,
+  type Page, type Project, type Tab, activePage, addPage, app, focusTab, isTerminal, live, projectById, removePage,
+  removeTab, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabName, toggleMono, visibleTabs,
 } from "./state";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
-import { browserInfo, nativeBrowsers, closeBrowser, browserBack, browserForward, browserReload, navigateBrowser, normalizeUrl, openExternal, placeBrowser, setBrowsersSuspended } from "./browsers";
+import {
+  browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
+  normalizeUrl, openExternal, placeBrowser, setBrowsersSuspended,
+} from "./browsers";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
 import IssuesPanel from "./IssuesPanel";
 import FileList from "./FileList";
@@ -166,7 +169,7 @@ export default function Canvas(props: { project: Project }) {
     };
 
     const title = () =>
-      isBrowser ? (browserInfo[id]?.title ?? "")
+      isBrowser ? (browserInfo[pageId()]?.title ?? "")
       : isIssues ? panelTitle(props.project)
       : isFiles ? `${props.project.name} files`
       : isFile ? ((tab.path ?? "").split("/").pop() ?? "")
@@ -174,7 +177,18 @@ export default function Canvas(props: { project: Project }) {
       : isAgents ? "shared by every project"
       : (live[id]?.title ?? "");
 
-    const url = () => browserInfo[id]?.url ?? tab.url ?? "";
+    /** Browser windows: the shown page. Back, reload, the address and the star act on it. */
+    const page = () => activePage(tab);
+    const pageId = () => page()?.id ?? "";
+    const url = () => browserInfo[pageId()]?.url ?? page()?.url ?? "";
+    const pageTitle = (pg: Page) => browserInfo[pg.id]?.title || (pg.url ? pg.url.replace(/^https?:\/\//, "") : "New tab");
+    /** Close one page; closing the last one closes the window. */
+    const closeTabPage = (pg: string) => {
+      if ((tab.pages?.length ?? 0) < 2) return requestClose(props.project.id, id);
+      removePage(props.project.id, id, pg);
+      closePage(pg);
+    };
+    const newPage = () => addPage(props.project.id, id, "", { show: true });
 
     const blank = () => !url() || url() === "about:blank";
     const isFav = () => !blank() && props.project.favs.some((f) => f.url === url());
@@ -209,7 +223,7 @@ export default function Canvas(props: { project: Project }) {
     });
 
     if (isBrowser) {
-      createEffect(on([rect, anyDrag, blank], () => follow(), { defer: true }));
+      createEffect(on([rect, anyDrag, blank, pageId], () => follow(), { defer: true }));
     } else if (!isPanel) {
       createEffect(() => {
         // after mount, so the session element is attached and visible when it takes focus
@@ -228,13 +242,13 @@ export default function Canvas(props: { project: Project }) {
     const star = () => {
       const s = favEditFor();
       if (s?.anchor === starEl) closeFavEdit();
-      else starPage(props.project.id, id, url(), starEl);
+      else starPage(props.project.id, pageId(), url(), starEl);
     };
-    const open = (u: string) => navigateBrowser(id, u);
+    const open = (u: string) => navigateBrowser(pageId(), u);
 
     const onUrlKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
-        navigateBrowser(id, normalizeUrl(inputEl.value));
+        navigateBrowser(pageId(), normalizeUrl(inputEl.value));
         inputEl.blur();
       } else if (e.key === "Escape") {
         inputEl.value = url();
@@ -243,7 +257,7 @@ export default function Canvas(props: { project: Project }) {
     };
 
     const startDrag = (e: PointerEvent) => {
-      if (e.button !== 0 || (e.target as Element).closest("button")) return;
+      if (e.button !== 0 || (e.target as Element).closest("button, .ptab")) return;
       if (!rectById().get(id)) return;
       e.preventDefault();
       const pid = props.project.id;
@@ -333,7 +347,7 @@ export default function Canvas(props: { project: Project }) {
           ref={barEl}
           onPointerDown={startDrag}
           onDblClick={(e) => {
-            if (!(e.target as Element).closest("button")) doMax();
+            if (!(e.target as Element).closest("button, .ptab")) doMax();
           }}
         >
           <span
@@ -347,16 +361,39 @@ export default function Canvas(props: { project: Project }) {
             }`}
           />
           <span class="kind">{tabName(tab)}</span>
-          <span class="ttl">{title()}</span>
+          <Show when={isBrowser && (tab.pages?.length ?? 0) > 1} fallback={<span class="ttl">{title()}</span>}>
+            <div class="ptabs" role="tablist">
+              <For each={tab.pages}>
+                {(pg) => (
+                  <div
+                    class="ptab"
+                    role="tab"
+                    classList={{ on: pg.id === pageId() }}
+                    aria-selected={pg.id === pageId()}
+                    title={browserInfo[pg.id]?.url || pg.url}
+                    onClick={() => showPage(props.project.id, id, pg.id)}
+                    onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+                    onAuxClick={(e) => e.button === 1 && closeTabPage(pg.id)}
+                  >
+                    <span>{pageTitle(pg)}</span>
+                    <button title="Close tab" onClick={(e) => { e.stopPropagation(); closeTabPage(pg.id); }}>×</button>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
+          <Show when={isBrowser}>
+            <button title="New tab" onClick={newPage}>+</button>
+          </Show>
           <button title="Maximize (Alt+F)" onClick={doMax}>▢</button>
           <button title="Close (Alt+Q)" onClick={() => requestClose(props.project.id, id)}>×</button>
         </div>
         {isBrowser ? (
           <>
             <div class="nav">
-              <button title="Back" onClick={() => browserBack(id)}>←</button>
-              <button title="Forward" onClick={() => browserForward(id)}>→</button>
-              <button title="Reload" onClick={() => browserReload(id)}>↻</button>
+              <button title="Back" onClick={() => browserBack(pageId())}>←</button>
+              <button title="Forward" onClick={() => browserForward(pageId())}>→</button>
+              <button title="Reload" onClick={() => browserReload(pageId())}>↻</button>
               <span class="addr">
                 <input
                   class="url"
@@ -385,8 +422,8 @@ export default function Canvas(props: { project: Project }) {
                 <StartPage favs={props.project.favs} onOpen={open} />
               </Show>
               {/* Linux has no positionable native webviews, so the page is framed here instead. */}
-              <Show when={!nativeBrowsers && url() ? `${browserInfo[id]?.rev ?? 0}|${url()}` : false} keyed>
-                {(k) => <iframe class="frame" src={k.slice(k.indexOf("|") + 1)} title={tab.url} />}
+              <Show when={!nativeBrowsers && url() ? `${pageId()}|${browserInfo[pageId()]?.rev ?? 0}|${url()}` : false} keyed>
+                {(k) => <iframe class="frame" src={k.split("|").slice(2).join("|")} title={url()} />}
               </Show>
             </div>
           </>
@@ -462,10 +499,10 @@ export function requestClose(projectId: string, tabId: string): void {
   const p = projectById(projectId);
   const index = p ? p.tabs.findIndex((t) => t.id === tabId) : -1;
   if (!p || index < 0) return;
-  const tab: Tab = { ...p.tabs[index] };
+  const tab: Tab = { ...p.tabs[index], pages: p.tabs[index].pages?.map((pg) => ({ ...pg })) };
   // Read the title first: removeTab drops the live entry.
   const title =
-    tab.kind === "browser" ? browserInfo[tabId]?.title
+    tab.kind === "browser" ? browserInfo[activePage(tab)?.id ?? ""]?.title
     : tab.kind === "file" ? tab.path
     : tab.kind === "files" ? `${p.name} files`
     : tab.kind === "git" ? `${p.name} git`
@@ -477,6 +514,6 @@ export function requestClose(projectId: string, tabId: string): void {
       msg: `Closed ${tabName(tab)}${title ? " · " + title : ""}.`,
       undo: () => restoreTab(projectId, tab, index),
     },
-    () => (tab.kind === "browser" ? closeBrowser(tabId) : isTerminal(tab) ? closeSession(tabId) : undefined),
+    () => (tab.kind === "browser" ? closeBrowser(tab) : isTerminal(tab) ? closeSession(tabId) : undefined),
   );
 }

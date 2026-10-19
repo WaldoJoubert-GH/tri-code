@@ -37,7 +37,7 @@ export function toggleSidebar() {
 /** End a project's windows and drop everything stored for it. */
 function dropProject(p: Project) {
   for (const t of p.tabs) {
-    if (t.kind === "browser") closeBrowser(t.id);
+    if (t.kind === "browser") closeBrowser(t);
     else if (isTerminal(t)) closeSession(t.id);
   }
   invoke("bg_delete", { projectId: p.id }).catch((e) => console.error("bg_delete failed:", e));

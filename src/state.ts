@@ -25,6 +25,16 @@ const defaultAgents = (): Agent[] => [
   { id: "shell", name: "shell", command: "", icon: "square-terminal" },
 ];
 
+/** A page of a browser window, shown as a tab in its title bar once there are two. Each page
+ *  has its own native webview, so a page in the background keeps its state. */
+export type Page = {
+  id: string;
+  /** The current address ("" for a blank page). */
+  url: string;
+  /** The page it was opened from, so links opened from one page line up after it in order. */
+  opener?: string;
+};
+
 /** A window on the canvas. Terminals run a PTY; browsers are native child webviews;
  *  issues panels render the project's `.dev/`; files lists the project folder,
  *  file shows one file, git takes the branch from changes to a merged PR and
@@ -34,8 +44,10 @@ export type Tab = {
   kind: TabKind;
   /** Workspace index, 0..SPACES-1. */
   space: number;
-  /** Browser tabs only: the current address ("" for a new, blank browser). */
-  url?: string;
+  /** Browser tabs only: its pages in tab order, at least one. */
+  pages?: Page[];
+  /** Browser tabs only: the id of the page that is shown. */
+  page?: string;
   /** `file` tabs only: the path being viewed. */
   path?: string;
   /** `term` tabs only: the agent it was opened from. The name and icon follow the agent. */
@@ -45,6 +57,9 @@ export type Tab = {
   /** `term` tabs only: the command it runs ("" = login shell). Kept from launch, so editing an agent only changes new windows. */
   cmd?: string;
 };
+
+/** The page a browser window shows. */
+export const activePage = (t: Tab): Page | undefined => t.pages?.find((p) => p.id === t.page) ?? t.pages?.[0];
 
 /** Terminals own a PTY; browsers and panels do not. */
 export const isTerminal = (t: Tab) => t.kind === "term";
@@ -229,7 +244,7 @@ export function addTab(projectId: string, kind: TabKind, opts: { url?: string; p
     const a = opts.agent;
     const tab: Tab = {
       id, kind, space: p.ws,
-      ...(kind === "browser" ? { url: opts.url ?? "" } : {}),
+      ...(kind === "browser" ? newPages(opts.url ?? "") : {}),
       ...(kind === "file" ? { path: opts.path ?? "" } : {}),
       ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "" } : {}),
     };
@@ -348,10 +363,54 @@ export function setAppearance(projectId: string, patch: Partial<Pick<Project, "a
   edit(projectId, (p) => Object.assign(p, patch));
 }
 
-export function setTabUrl(projectId: string, tabId: string, url: string) {
+function newPages(url: string): Pick<Tab, "pages" | "page"> {
+  const id = newId();
+  return { pages: [{ id, url }], page: id };
+}
+
+function editTab(projectId: string, tabId: string, fn: (t: Tab) => void) {
   edit(projectId, (p) => {
     const t = p.tabs.find((t) => t.id === tabId);
-    if (t) t.url = url;
+    if (t) fn(t);
+  });
+}
+
+export function setPageUrl(projectId: string, tabId: string, pageId: string, url: string) {
+  editTab(projectId, tabId, (t) => {
+    const pg = t.pages?.find((x) => x.id === pageId);
+    if (pg) pg.url = url;
+  });
+}
+
+/**
+ * Add a page to a browser window, after `opener` and the pages it already opened (so several
+ * Ctrl+clicks line up in click order), or at the end. `show` makes it the shown page.
+ */
+export function addPage(projectId: string, tabId: string, url: string, opts: { opener?: string; show?: boolean } = {}) {
+  const id = newId();
+  editTab(projectId, tabId, (t) => {
+    const pages = (t.pages ??= []);
+    let at = opts.opener ? pages.findIndex((x) => x.id === opts.opener) : -1;
+    if (at < 0) at = pages.length - 1;
+    else while (pages[at + 1]?.opener === opts.opener) at++;
+    pages.splice(at + 1, 0, { id, url, ...(opts.opener ? { opener: opts.opener } : {}) });
+    if (opts.show || !t.page) t.page = id;
+  });
+  return id;
+}
+
+export function showPage(projectId: string, tabId: string, pageId: string) {
+  editTab(projectId, tabId, (t) => { t.page = pageId; });
+}
+
+/** Remove a page; the next one to the right is shown, else the one to the left. The caller closes the window instead of removing its last page. */
+export function removePage(projectId: string, tabId: string, pageId: string) {
+  editTab(projectId, tabId, (t) => {
+    const pages = t.pages ?? [];
+    const i = pages.findIndex((x) => x.id === pageId);
+    if (i < 0 || pages.length < 2) return;
+    pages.splice(i, 1);
+    if (t.page === pageId) t.page = (pages[i] ?? pages[i - 1]).id;
   });
 }
 
@@ -429,6 +488,11 @@ function migrateTab(t: any): Tab {
   const tab = { ...t, space: t.space ?? 0 };
   if (t.kind === "claude" || t.kind === "pi" || t.kind === "shell") {
     Object.assign(tab, { kind: "term", agent: t.kind, name: t.kind, cmd: t.kind === "shell" ? "" : t.kind });
+  }
+  // Browser windows had one address before they had pages.
+  if (t.kind === "browser" && !t.pages) {
+    Object.assign(tab, { pages: [{ id: t.id, url: t.url ?? "" }], page: t.id });
+    delete tab.url;
   }
   return tab;
 }

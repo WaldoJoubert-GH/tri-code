@@ -5,7 +5,7 @@
 // was already open.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Project, Tab, TabKind, addTab, agentOf, app, focusTab, live, projectById, space, tabName, visibleTabs } from "./state";
+import { Project, Tab, TabKind, activePage, addTab, agentOf, app, focusTab, live, projectById, space, tabName, visibleTabs } from "./state";
 import { openFilesPanel } from "./files";
 import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
@@ -43,7 +43,7 @@ function Glyph(props: { tab: Tab }) {
 /** Tooltip detail: the live process title, the browser address, or the file's path. */
 function hint(t: Tab): string {
   if (t.kind === "file") return t.path ?? "";
-  if (t.kind === "browser") return t.url ?? "";
+  if (t.kind === "browser") return activePage(t)?.url ?? "";
   return live[t.id]?.title ?? "";
 }
 

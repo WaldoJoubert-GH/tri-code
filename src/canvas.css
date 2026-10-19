@@ -34,6 +34,17 @@
 .bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
 .bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); line-height: 1; flex: none; }
 .bar button:hover { background: var(--hover); color: var(--text); }
+/* A browser window with two or more pages: its pages as tabs in place of the title. */
+.ptabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; }
+.ptab {
+  height: 22px; flex: 0 1 170px; min-width: 48px; display: flex; align-items: center; gap: 4px;
+  padding: 0 2px 0 8px; border-radius: 4px; color: var(--muted); font-size: 12px; cursor: default;
+}
+.ptab:hover { background: var(--hover); }
+.ptab.on { background: var(--raised); color: var(--text); }
+.ptab span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptab button { width: 18px; height: 18px; opacity: 0; }
+.ptab:hover button, .ptab.on button { opacity: 1; }
 
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
 .dot.running { background: var(--ok); }
