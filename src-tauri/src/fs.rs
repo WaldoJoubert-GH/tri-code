@@ -10,6 +10,8 @@ use crate::spawn::{expand_home, remote_path, sq};
 
 /// Largest file read into a pane. Bigger files are truncated.
 const LIMIT: u64 = 1_000_000;
+/// Largest image inlined into a Markdown preview.
+const IMAGE_LIMIT: u64 = 10_000_000;
 
 #[derive(Debug, Serialize)]
 pub struct Entry {
@@ -56,6 +58,63 @@ pub async fn read_file(host: String, path: String) -> Result<FileText, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// An image as a `data:` URL, for a Markdown preview's relative `<img>`s. The webview
+/// cannot load the project's files itself (and a remote project's not at all).
+#[tauri::command]
+pub async fn read_image(host: String, path: String) -> Result<String, String> {
+    use base64::Engine as _;
+    tauri::async_runtime::spawn_blocking(move || {
+        let b64 = match host.as_str() {
+            "" | "local" => {
+                let p = expand_home(&path);
+                let meta = std::fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?;
+                if meta.len() > IMAGE_LIMIT {
+                    return Err(format!("{path}: image too large"));
+                }
+                base64::engine::general_purpose::STANDARD.encode(std::fs::read(&p).map_err(|e| format!("{path}: {e}"))?)
+            }
+            _ => {
+                let inner = format!(
+                    "p={}; [ -f \"$p\" ] || exit 2; [ $(wc -c < \"$p\") -le {IMAGE_LIMIT} ] || exit 3; base64 < \"$p\"",
+                    remote_path(&path)
+                );
+                remote::run(&host, &format!("sh -c {}", sq(&inner)))?.split_whitespace().collect()
+            }
+        };
+        Ok(format!("data:{};base64,{b64}", image_mime(&path)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Overwrite a text file from the file window's editor. Written in place, not via a
+/// temp file and rename, so the file keeps its permissions and a symlink stays a link.
+#[tauri::command]
+pub async fn write_file(host: String, path: String, contents: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || match host.as_str() {
+        "" | "local" => std::fs::write(expand_home(&path), contents).map_err(|e| format!("{path}: {e}")),
+        _ => {
+            let inner = format!("p={}; [ -f \"$p\" ] || exit 2; cat > \"$p\"", remote_path(&path));
+            remote::run_stdin(&host, &format!("sh -c {}", sq(&inner)), contents.as_bytes()).map(|_| ())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn image_mime(path: &str) -> &'static str {
+    match path.rsplit('.').next().unwrap_or("").to_ascii_lowercase().as_str() {
+        "svg" => "image/svg+xml",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "avif" => "image/avif",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        _ => "image/png",
+    }
 }
 
 fn sort_entries(entries: &mut [Entry]) {
@@ -238,6 +297,21 @@ mod tests {
         assert!(b.binary);
         assert_eq!(b.text, None);
         assert_eq!(b.size, 4);
+    }
+
+    #[test]
+    fn local_write_keeps_the_file_and_images_read_as_data_urls() {
+        let root = tmp("write");
+        let f = root.join("a.md");
+        std::fs::write(&f, "old").unwrap();
+        std::fs::write(root.join("i.svg"), "<svg/>").unwrap();
+        let p = f.to_string_lossy().to_string();
+        tauri::async_runtime::block_on(write_file("local".into(), p.clone(), "new".into())).unwrap();
+        let img = tauri::async_runtime::block_on(read_image("local".into(), root.join("i.svg").to_string_lossy().into())).unwrap();
+        let text = std::fs::read_to_string(&f).unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(text, "new");
+        assert_eq!(img, "data:image/svg+xml;base64,PHN2Zy8+");
     }
 
     #[test]

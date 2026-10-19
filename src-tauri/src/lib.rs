@@ -52,6 +52,8 @@ pub fn run() {
             envs::scan_logos,
             fs::list_files,
             fs::read_file,
+            fs::read_image,
+            fs::write_file,
             git::git_status,
             git::git_diff,
             git::git_range,

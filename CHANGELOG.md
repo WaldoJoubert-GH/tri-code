@@ -2,6 +2,11 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.10 — 2026-10-19
+
+- Edit any text file in its file window: Edit, then Save (or Ctrl+S); Revert discards. Preview shows unsaved edits.
+- Markdown preview: relative images load, links to other files open them, `#heading` links scroll, and the scrollbar sits at the window edge.
+
 ## 0.1.9 — 2026-10-18
 
 - The window title and the status bar show the running version.

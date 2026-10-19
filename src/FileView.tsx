@@ -1,12 +1,12 @@
-// The file window: one file, as source or — for Markdown and HTML — a rendered
-// preview. The mode toggle only appears for files that can preview. The body is
-// a memo so switching Preview/Source swaps the DOM.
+// The file window: one file, as source, in an editor, or — for Markdown and HTML —
+// a rendered preview. Unsaved edits are a draft that every mode shows, so Preview
+// reflects them before Save. The body is a memo so switching modes swaps the DOM.
 
 import { Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js";
 import { type Project, type Tab } from "./state";
-import { loadText, reloadText, textState } from "./files";
+import { loadImage, loadText, openFile, reloadText, saveText, textState } from "./files";
 import { codeHtml } from "./code";
-import { renderMarkdown } from "./markdown";
+import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { openExternal, openUrlInProject } from "./browsers";
 import { flash } from "./ui";
 import "./files.css";
@@ -26,25 +26,71 @@ const bytes = (n: number) =>
 export default function FileView(props: { project: Project; tab: Tab }): JSX.Element {
   const path = () => props.tab.path ?? "";
   const state = () => textState(props.project, path());
-  const [mode, setMode] = createSignal<"auto" | "preview" | "source">("auto");
+  const [mode, setMode] = createSignal<"auto" | "preview" | "source" | "edit">("auto");
+  /** Unsaved text, or null when the editor matches the file. */
+  const [draft, setDraft] = createSignal<string | null>(null);
+  const [saving, setSaving] = createSignal(false);
 
   createEffect(() => {
     if (path()) loadText(props.project, path());
   });
   // A reused window gets a new path: start it in the default mode again.
-  createEffect(on(path, () => setMode("auto"), { defer: true }));
+  createEffect(on(path, () => { setMode("auto"); setDraft(null); }, { defer: true }));
 
   const kind = () => previewKind(path());
-  const previewing = () => !!kind() && mode() !== "source";
+  const previewing = () => !!kind() && (mode() === "auto" || mode() === "preview");
+  /** Only a whole text file can be edited: saving a truncated one would cut it short. */
+  const editable = () => {
+    const f = state()?.file;
+    return !!f && !f.binary && !f.truncated;
+  };
+  const text = () => draft() ?? state()?.file?.text ?? "";
+
+  const save = async () => {
+    const d = draft();
+    if (d === null || saving()) return;
+    setSaving(true);
+    try {
+      await saveText(props.project, path(), d);
+      setDraft(null);
+      flash("saved");
+    } catch (e) {
+      flash(`save failed: ${e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const reload = () => { setDraft(null); reloadText(props.project, path()); };
+
+  const onEditKey = (e: KeyboardEvent) => {
+    const ta = e.currentTarget as HTMLTextAreaElement;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      save();
+    } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+      e.preventDefault();
+      ta.setRangeText("\t", ta.selectionStart, ta.selectionEnd, "end");
+      setDraft(ta.value);
+    }
+  };
 
   const openLink = (e: MouseEvent) => {
     const a = (e.target as HTMLElement).closest("a");
     if (!a) return;
     e.preventDefault();
     const href = a.getAttribute("href") ?? "";
-    if (!href || href.startsWith("#")) return;
-    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) openExternal(href);
-    else flash(`relative link: ${href}`);
+    if (!href) return;
+    if (hasScheme(href)) return openExternal(href);
+    const hash = href.includes("#") ? href.slice(href.indexOf("#") + 1) : "";
+    const target = href.startsWith("#") ? path() : resolvePath(path(), props.project.path, href);
+    if (target !== path()) return openFile(props.project, target, props.tab.id);
+    if (!hash) return;
+    let id = hash;
+    try { id = decodeURIComponent(hash); } catch { /* keep it as written */ }
+    const root = e.currentTarget as HTMLElement;
+    const el = root.querySelector(`[id="${CSS.escape(id)}"]`) ?? root.querySelector(`[id="${CSS.escape(id.toLowerCase())}"]`);
+    if (el) el.scrollIntoView({ block: "start" });
+    else flash(`no heading #${id}`);
   };
 
   /** Best-effort `file://` URL for the local HTML "open in a browser window" button. */
@@ -56,29 +102,62 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
     return `file://${s.startsWith("/") ? "" : "/"}${s}`;
   };
 
+  const markdown = (src: string) => {
+    const el = (<div class="md" innerHTML={renderMarkdown(src)} />) as HTMLElement;
+    enhance(el, (src) => loadImage(props.project, resolvePath(path(), props.project.path, src)));
+    return <div class="mdscroll" onClick={openLink}>{el}</div>;
+  };
+
   const body = createMemo<JSX.Element>(() => {
     const st = state();
     if (st?.error) return <div class="fnote bad">{st.error}</div>;
     const f = st?.file;
     if (!f) return <div class="fnote">{st?.loading ? "Loading…" : "No file."}</div>;
     if (f.binary) return <div class="fnote">Binary file · {bytes(f.size)}</div>;
-    const text = f.text ?? "";
-    if (!text) return <div class="fnote">Empty file.</div>;
-    if (previewing() && kind() === "md") return <div class="md" innerHTML={renderMarkdown(text)} onClick={openLink} />;
+    if (mode() === "edit" && editable())
+      return (
+        <textarea
+          class="fedit"
+          spellcheck={false}
+          value={text()}
+          onInput={(e) => setDraft(e.currentTarget.value === f.text ? null : e.currentTarget.value)}
+          onKeyDown={onEditKey}
+          ref={(el) => queueMicrotask(() => el.focus())}
+        />
+      );
+    const t = text();
+    if (!t) return <div class="fnote">Empty file.</div>;
+    if (previewing() && kind() === "md") return markdown(t);
     if (previewing() && kind() === "html")
-      return <iframe class="htm" sandbox="allow-scripts allow-forms allow-modals" srcdoc={text} title={path()} />;
-    return <pre class="code" innerHTML={codeHtml(text)} />;
+      return <iframe class="htm" sandbox="allow-scripts allow-forms allow-modals" srcdoc={t} title={path()} />;
+    return <pre class="code" innerHTML={codeHtml(t)} />;
   });
 
   return (
     <div class="filev">
       <div class="fbar">
         <span class="path" title={path()}>{path()}</span>
-        <Show when={state()?.file}>{(f) => <span class="fmeta">{bytes(f().size)}{f().truncated ? " · truncated" : ""}</span>}</Show>
-        <Show when={kind()}>
+        <Show when={state()?.file}>
+          {(f) => (
+            <span class="fmeta">
+              {bytes(f().size)}{f().truncated ? " · truncated" : ""}
+              <Show when={draft() !== null}><b class="fdirty"> · modified</b></Show>
+            </span>
+          )}
+        </Show>
+        <Show when={draft() !== null}>
+          <button class="fsave" title="Save (Ctrl+S)" disabled={saving()} onClick={save}>{saving() ? "Saving…" : "Save"}</button>
+          <button title="Discard changes" onClick={() => setDraft(null)}>Revert</button>
+        </Show>
+        <Show when={kind() || editable()}>
           <div class="seg" role="group" aria-label="View mode">
-            <button aria-pressed={mode() !== "source"} onClick={() => setMode("preview")}>Preview</button>
-            <button aria-pressed={mode() === "source"} onClick={() => setMode("source")}>Source</button>
+            <Show when={kind()}>
+              <button aria-pressed={previewing()} onClick={() => setMode("preview")}>Preview</button>
+            </Show>
+            <button aria-pressed={!previewing() && mode() !== "edit"} onClick={() => setMode("source")}>Source</button>
+            <Show when={editable()}>
+              <button aria-pressed={mode() === "edit"} onClick={() => setMode("edit")}>Edit</button>
+            </Show>
           </div>
         </Show>
         <Show when={kind() === "html" && props.project.host === "local" && fileUrl()}>
@@ -89,7 +168,7 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
             Open ↗
           </button>
         </Show>
-        <button title="Reload" onClick={() => reloadText(props.project, path())}>⟳</button>
+        <button title={draft() !== null ? "Reload (discards changes)" : "Reload"} onClick={reload}>⟳</button>
       </div>
       {body()}
     </div>

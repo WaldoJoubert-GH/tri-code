@@ -88,6 +88,18 @@ export function reloadText(project: Project, path: string): void {
     .catch((e) => setTexts(k, { loading: false, error: String(e) }));
 }
 
+/** Write `text` over the file on disk and make it the cached body. */
+export async function saveText(project: Project, path: string, text: string): Promise<void> {
+  await invoke("write_file", { host: project.host, path, contents: text });
+  const k = key(project.host, path);
+  const file = texts[k]?.file;
+  const size = new TextEncoder().encode(text).length;
+  if (file) setTexts(k, "file", { ...file, text, size });
+}
+
+/** A repo image as a `data:` URL, for the Markdown preview. */
+export const loadImage = (project: Project, path: string) => invoke<string>("read_image", { host: project.host, path });
+
 export const dirState = (project: Project, path: string): DirState | undefined => dirs[key(project.host, full(project, path))];
 export const textState = (project: Project, path: string): TextState | undefined => texts[key(project.host, path)];
 
