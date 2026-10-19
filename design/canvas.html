@@ -88,35 +88,32 @@ aside {
 .rail:not(.peek) aside { padding-inline: 6px; }
 .rail:not(.peek) .side-head { justify-content: center; padding: 0; }
 .rail:not(.peek) .side-head span, .rail:not(.peek) .project .name, .rail:not(.peek) .project .count, .rail:not(.peek) .project .gear { display: none; }
-/* collapsed, an Environment header is just its icon over a divider */
-.rail:not(.peek) aside h2 { justify-content: center; height: auto; margin: 8px 6px 6px; padding-top: 9px; border-top: 1px solid var(--line); }
-.rail:not(.peek) aside h2 .ic svg { width: 14px; height: 14px; }
+/* collapsed, an Environment header is just its icon over a divider: the same box as the open header,
+   the divider drawn in its top margin, so nothing below moves when the rail opens */
+.rail:not(.peek) aside h2 { justify-content: center; margin-inline: 6px; position: relative; }
+.rail:not(.peek) aside h2::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; border-top: 1px solid var(--line); }
 .rail:not(.peek) aside h2 :is(.en, .eh, .env-edit) { display: none; }
 .rail:not(.peek) .project { justify-content: center; padding: 4px 0; position: relative; }
-.project .swatch b { display: none; }
-.rail:not(.peek) .project .swatch {
-  width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center;
-  background: color-mix(in srgb, var(--pa) 22%, var(--raised)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent);
-}
-.rail:not(.peek) .project .swatch b { display: block; font-size: 12px; font-weight: 600; color: var(--text); text-transform: uppercase; }
+.rail:not(.peek) aside h2 .ic { width: auto; margin: 0; }
 .rail:not(.peek) .project.active { background: none; }
-.rail:not(.peek) .project.active .swatch { background: var(--pa); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
-.rail:not(.peek) .project.active .swatch b { color: #111; }
+.rail:not(.peek) .project.active .swatch { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
 .rail:not(.peek) .project .badge { position: absolute; top: 2px; right: 3px; box-shadow: 0 0 0 2px var(--panel); }
-.rail:not(.peek) .add { text-align: center; padding: 6px 0; font-size: 15px; }
+.rail:not(.peek) .add { padding: 6px 0; justify-content: center; }
 .rail:not(.peek) .add .label { display: none; }
 /* Peek (like Edge's vertical tabs): hovering the rail floats the full list over the canvas without reflowing the tiles; leaving folds it back. The pin keeps it open. */
 .rail aside { position: relative; z-index: 20; width: 48px; transition: width 140ms ease, box-shadow 140ms ease; }
 .rail.peek aside { width: 220px; box-shadow: 12px 0 32px -12px var(--shadow); }
 @media (prefers-reduced-motion: reduce) { .rail aside { transition: none; } }
 aside h2 {
-  margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  margin: 10px 4px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--muted);
   display: flex; align-items: center; gap: 6px; height: 18px; min-width: 0;
 }
 /* Environment header: its lucide icon, its name, and the host underneath it when the name differs */
 .ic { display: inline-grid; place-items: center; flex: none; }
-.ic svg { width: 13px; height: 13px; stroke-width: 2; display: block; }
+.ic svg { width: 14px; height: 14px; stroke-width: 2; display: block; }
+/* the Environment icon sits in a tile-wide box so it lines up over the project tiles, collapsed or not */
+aside h2 > .ic { width: 28px; margin-right: 2px; }
 .ic-miss { font: 600 9px var(--mono); }
 aside h2 .en { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 aside h2 .eh { font: 400 10px var(--mono); text-transform: none; letter-spacing: 0; opacity: .7; white-space: nowrap; }
@@ -140,17 +137,25 @@ aside h2:hover .env-edit, .env-edit:focus-visible, .env-edit[aria-expanded="true
 .igrid .none { grid-column: 1 / -1; padding: 10px 4px; color: var(--muted); font-size: 12px; }
 .envpop .imeta { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
 .envpop .imeta code { font: 11px var(--mono); color: var(--text); }
-.project { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.project { display: flex; align-items: center; gap: 8px; padding: 4px; border-radius: 6px; cursor: pointer; }
 .project:hover { background: var(--hover); }
 .project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
-.project .swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--pa); flex: none; }
+/* one tile size whether the sidebar is open or collapsed, so peeking never resizes it */
+.project .swatch {
+  width: 28px; height: 28px; border-radius: 7px; flex: none; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--pa) 22%, var(--raised)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent);
+}
+.project .swatch b { font-size: 13px; font-weight: 600; color: var(--text); text-transform: uppercase; }
+.project.active .swatch { background: var(--pa); }
+.project.active .swatch b { color: #111; }
 .project .gear { opacity: 0; color: var(--muted); padding: 0 2px; font-size: 12px; }
 .project:hover .gear, .project .gear:focus-visible { opacity: 1; }
 .project .gear:hover { color: var(--text); }
 .project .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project .count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .badge { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
-.add { width: 100%; margin-top: 10px; white-space: nowrap; padding: 6px 8px; text-align: left; color: var(--muted); border-radius: 5px; }
+.add { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 10px; white-space: nowrap; padding: 6px 4px; text-align: left; color: var(--muted); border-radius: 6px; }
+.add .glyph { width: 28px; flex: none; text-align: center; font-size: 15px; line-height: 18px; }
 .add:hover { background: var(--hover); color: var(--text); }
 
 /* Toolbar */
@@ -1223,7 +1228,7 @@ function renderSide() {
     `<div class="project${p === cur ? " active" : ""}" data-p="${p.id}" style="--pa:${p.accent}" title="${rail && !peek ?`${p.name} · ${envLabel(p.host)} · ${p.wins.length} window${p.wins.length === 1 ? "" : "s"}` : ""}"><span class="swatch"><b>${p.name[0]}</b></span>
      <span class="name">${p.name}</span>${miniBar(p)}${p !== cur && p.wins.some((w) => w.attention) ? '<span class="badge" title="Needs input"></span>' : ""}
      <span class="count">${p.wins.length || ""}</span><button class="gear" title="Appearance" aria-label="Appearance of ${p.name}">◐</button></div>`).join("") + `</section>`).join("") +
-    `<button class="add" title="Add project">+<span class="label"> Add project</span></button>`;
+    `<button class="add" title="Add project"><span class="glyph">+</span><span class="label">Add project</span></button>`;
   $("collapse").onclick = toggleSidebar;
   $("side").querySelectorAll(".env-edit").forEach((b) => b.onclick = () => $("pop")?.dataset.env === b.dataset.env ? closeTheme() : openEnv(b.dataset.env, b));
   $("side").querySelectorAll(".project").forEach((el) => el.onclick = (e) => {

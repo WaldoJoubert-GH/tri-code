@@ -84,23 +84,25 @@ aside {
 .rail:not(.peek) aside { padding-inline: 6px; }
 .rail:not(.peek) .side-head { justify-content: center; padding: 0; }
 .rail:not(.peek) .side-head span, .rail:not(.peek) .project .name, .rail:not(.peek) .project .rename, .rail:not(.peek) .project .count, .rail:not(.peek) .project .gear, .rail:not(.peek) .project .x { display: none; }
-/* collapsed, an Environment header is just its icon under a divider */
-.rail:not(.peek) aside h2 { justify-content: center; height: auto; margin: 8px 6px 6px; padding: 9px 0 0; border-top: 1px solid var(--line); }
-.rail:not(.peek) aside h2 > :not(.env-icon), .rail:not(.peek) .env-empty { display: none; }
-.rail:not(.peek) aside h2 .env-icon { width: auto; height: auto; }
-.rail:not(.peek) aside h2 .env-icon svg { width: 14px; height: 14px; }
+/* collapsed, an Environment header is just its icon under a divider: the same box as the open header,
+   the divider drawn in its top margin, so nothing below moves when the rail opens */
+.rail:not(.peek) aside h2 { justify-content: center; margin-inline: 6px; padding: 0; position: relative; }
+.rail:not(.peek) aside h2::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; border-top: 1px solid var(--line); }
+.rail:not(.peek) aside h2 > :not(.env-icon) { display: none; }
+/* hidden, not removed, so the rows under an empty Environment keep their place when the rail opens */
+.rail:not(.peek) .env-empty { visibility: hidden; }
+.rail:not(.peek) aside h2 .env-icon { width: auto; margin: 0; }
 .rail:not(.peek) .project { justify-content: center; padding: 4px 0; position: relative; }
-.rail:not(.peek) .project .swatch { width: 28px; height: 28px; border-radius: 7px; font-size: 13px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent); }
 .rail:not(.peek) .project.active { background: none; }
 .rail:not(.peek) .project.active .swatch { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
 .rail:not(.peek) .project .badge { position: absolute; top: 2px; right: 3px; box-shadow: 0 0 0 2px var(--panel); }
-.rail:not(.peek) .add { text-align: center; padding: 6px 0; font-size: 15px; }
+.rail:not(.peek) .add { padding: 6px 0; }
 .rail:not(.peek) .add .label { display: none; }
 /* Peek: hovering the rail floats the full list over the canvas without reflowing the windows; leaving folds it back */
 .rail aside { position: relative; z-index: 20; width: 48px; transition: width 140ms ease, box-shadow 140ms ease; }
 .rail.peek aside { width: 220px; box-shadow: 12px 0 32px -12px var(--shadow); }
 aside h2 {
-  display: flex; align-items: center; gap: 2px; margin: 10px 0 3px; padding: 0 4px 0 8px; height: 20px;
+  display: flex; align-items: center; gap: 2px; margin: 10px 0 3px; padding: 0 4px; height: 20px;
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
 }
 aside h2 .host { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -108,11 +110,12 @@ aside h2 .host .real { margin-left: 6px; font: 400 10px var(--mono); text-transf
 aside h2 .rename { flex: 1; min-width: 0; height: 18px; font: inherit; text-transform: none; letter-spacing: 0; color: var(--text); background: var(--bg); border: 1px solid var(--accent); border-radius: 4px; padding: 0 5px; outline: none; }
 aside h2 button { width: 20px; height: 20px; border-radius: 4px; color: var(--muted); font-size: 13px; line-height: 1; opacity: 0; flex: none; }
 aside h2:hover button, aside h2 button:focus-visible, aside h2 .env-icon { opacity: 1; }
-aside h2 .env-icon { display: grid; place-items: center; margin-left: -4px; margin-right: 2px; }
+/* the icon sits in a tile-wide box so it lines up over the project tiles, collapsed or not */
+aside h2 .env-icon { display: grid; place-items: center; width: 28px; margin-right: 6px; }
 aside h2 button:hover { background: var(--hover); color: var(--text); }
-.env-empty { display: block; width: 100%; padding: 3px 8px 3px 30px; text-align: left; color: var(--muted); font-size: 12px; border-radius: 5px; }
+.env-empty { display: block; width: 100%; padding: 3px 8px 3px 40px; text-align: left; color: var(--muted); font-size: 12px; border-radius: 5px; }
 .env-empty:hover { background: var(--hover); color: var(--text); }
-.project { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.project { display: flex; align-items: center; gap: 8px; padding: 4px; border-radius: 6px; cursor: pointer; }
 .project:hover { background: var(--hover); }
 .project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
 /* Project icon tile: a logo or uploaded <img>, a glyph <i>, or the letter <b> */
@@ -120,6 +123,8 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
   width: 18px; height: 18px; border-radius: 4px; flex: none; display: grid; place-items: center; overflow: hidden;
   background: color-mix(in srgb, var(--pa) 22%, var(--raised)); color: var(--text); font-size: 11px; line-height: 1;
 }
+/* one tile size whether the sidebar is open or collapsed, so peeking never resizes it */
+.project .swatch { width: 28px; height: 28px; border-radius: 7px; font-size: 13px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent); }
 .project .swatch img, .pop .icon-now .tile img { width: 100%; height: 100%; object-fit: contain; }
 .project .swatch b, .pop .icon-now .tile b { font-weight: 600; }
 .project .swatch i, .pop .icon-now .tile i { font-style: normal; }
@@ -134,7 +139,8 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .project .x:hover { color: var(--text); }
 .badge { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
 .side-actions { margin-top: 10px; }
-.add { display: flex; align-items: center; gap: 4px; width: 100%; white-space: nowrap; padding: 6px 8px; text-align: left; color: var(--muted); border-radius: 5px; }
+.add { display: flex; align-items: center; gap: 8px; width: 100%; white-space: nowrap; padding: 6px 4px; text-align: left; color: var(--muted); border-radius: 6px; }
+.add .glyph { width: 28px; flex: none; text-align: center; font-size: 15px; line-height: 18px; }
 .add:hover { background: var(--hover); color: var(--text); }
 .add kbd { margin-left: auto; font-size: 10px; color: var(--muted); }
 .rail:not(.peek) .add { justify-content: center; }

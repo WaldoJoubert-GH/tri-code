@@ -140,7 +140,7 @@ export default function Sidebar() {
                 aria-label={`Icon of ${envName(host)}`}
                 onClick={(e) => toggleIconPicker(e.currentTarget, envIcon(host), (icon) => setEnvStyle(host, { icon }))}
               >
-                <Icon name={envIcon(host)} size={13} />
+                <Icon name={envIcon(host)} size={14} />
               </button>
               <Show
                 when={renaming() === `env:${host}`}
@@ -204,10 +204,10 @@ export default function Sidebar() {
       </For>
       <div class="side-actions">
         <button class="add" title="Open project (Alt+O)" onClick={() => openProjectDialog()}>
-          +<span class="label"> Open project</span><kbd class="label">Alt O</kbd>
+          <span class="glyph">+</span><span class="label">Open project</span><kbd class="label">Alt O</kbd>
         </button>
         <button class="add env" title="Add environment" onClick={() => openProjectDialog(undefined, true)}>
-          ⇄<span class="label"> Add environment</span>
+          <span class="glyph">⇄</span><span class="label">Add environment</span>
         </button>
       </div>
     </aside>
