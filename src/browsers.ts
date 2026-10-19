@@ -8,7 +8,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { createStore, produce } from "solid-js/store";
-import { activePage, addPage, addTab, app, focusTab, Page, Project, projectById, setPageUrl, Tab, visibleTabs } from "./state";
+import { activePage, addPage, addTab, app, focusTab, Page, Project, projectById, setPageUrl, space, Tab, tabName, visibleTabs } from "./state";
+import { agentTarget } from "./agents";
+import { pasteText, sendText } from "./terms";
 import { flash } from "./ui";
 
 export type BrowserInfo = { url: string; title: string; loading: boolean; /** framed mode: bumped to reload */ rev?: number };
@@ -115,6 +117,19 @@ listen<{ label: string; url: string; background: boolean }>("browser-open", (e) 
   if (background) flash(`opened ${hostOf(url)} in a background tab`);
 }).catch((e) => console.warn("listen browser-open failed:", e));
 
+// Select element finished in a page: type its description into the project's agent window.
+listen<{ label: string; text: string; send: boolean }>("browser-pick", (e) => {
+  const { label: lbl, text, send: submit } = e.payload;
+  const o = ownerOf(pageIdOf(lbl));
+  if (!o || !text) return;
+  const target = agentTarget(o.project, space(o.project).focus);
+  if (!target || !pasteText(target.id, text)) return flash("open an agent window first (the + menu)");
+  // After the paste has landed, so the agent reads Enter as submit rather than as part of it.
+  if (submit) setTimeout(() => sendText(target.id, "\r"), 150);
+  focusTab(o.project.id, target.id);
+  flash(submit ? `sent the selection to ${tabName(target)}` : `typed the selection into ${tabName(target)}, not sent`);
+}).catch((e) => console.warn("listen browser-pick failed:", e));
+
 /** Normalise an address typed by the user: add a scheme when missing. */
 export function normalizeUrl(s: string): string {
   const t = s.trim();
@@ -206,6 +221,14 @@ export function navigateBrowser(pageId: string, url: string): void {
     return;
   }
   send("browser_navigate", { label: label(pageId), url });
+}
+
+/** Start Select element in a page; the result goes to the agent window "send to agent" would use. */
+export function pickElement(project: Project, pageId: string): void {
+  if (!created.has(pageId)) return;
+  const agent = agentTarget(project, space(project).focus);
+  send("browser_pick", { label: label(pageId), agent: agent ? tabName(agent) : "", accent: project.accent });
+  flash("select element · Esc to stop");
 }
 
 /** Framed mode: step through our own history. */

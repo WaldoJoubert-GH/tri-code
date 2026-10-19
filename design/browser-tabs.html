@@ -22,7 +22,9 @@
   OUTCOME (settled): variant B, tabs in the title bar. It shipped in src/Canvas.tsx (.ptabs), with
   pages in state.ts (Tab.pages / Tab.page), one webview per page in src/browsers.ts, and the
   new-window handling in src-tauri/src/browser.rs (on_new_window + LINK_SCRIPT). A terminal's
-  Ctrl+click now adds a page instead of replacing the shown one. Select element is not built yet.
+  Ctrl+click now adds a page instead of replacing the shown one. Select element shipped next, in
+  src-tauri/src/pick.js (browser_pick, the "browser-pick" event): text only, no screenshot yet;
+  the composer is docked at the bottom of the page, not under the selection.
 
   A  New Windows        every new page is its own canvas Window, after the opener
   B  Tabs in the bar    a Window holds pages; its title bar becomes the page tabs (>1 page)

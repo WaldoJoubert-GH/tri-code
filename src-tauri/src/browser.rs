@@ -21,14 +21,27 @@ struct OpenPayload {
 }
 
 #[derive(Clone, Serialize)]
+struct PickPayload {
+    label: String,
+    /// The selection described for the agent, ready to type.
+    text: String,
+    /// Ctrl+Enter: type and submit.
+    send: bool,
+}
+
+#[derive(Clone, Serialize)]
 struct TitlePayload {
     label: String,
     title: String,
 }
 
 /// Ctrl/Cmd+click and middle-click reach on_new_window looking the same as target=_blank, so
-/// the page reports them as a navigation to this host instead, which on_navigation cancels.
+/// the page reports them as a navigation to this host instead, which on_navigation cancels:
+/// `/open?u=` for a background page, `/pick?send=&d=` for a Select element result.
 const BG_HOST: &str = "tricode.invalid";
+
+/// Select element: dormant until browser_pick starts it.
+const PICK_SCRIPT: &str = include_str!("pick.js");
 
 /// Injected into every page: turns a modified or middle click on a link into a BG_HOST navigation.
 const LINK_SCRIPT: &str = r#"(() => {
@@ -92,14 +105,26 @@ pub async fn browser_open(
     let (new_app, new_label) = (app.clone(), label.clone());
     let builder = WebviewBuilder::new(&label, WebviewUrl::External(url))
         .initialization_script(LINK_SCRIPT)
+        .initialization_script(PICK_SCRIPT)
         .on_navigation(move |url| {
             if url.host_str() != Some(BG_HOST) {
                 return true;
             }
-            let target = url
-                .query_pairs()
-                .find(|(k, _)| k == "u")
-                .and_then(|(_, u)| Url::parse(&u).ok());
+            let param = |name: &str| {
+                url.query_pairs().find(|(k, _)| k == name).map(|(_, v)| v.into_owned())
+            };
+            if url.path() == "/pick" {
+                let _ = bg_app.emit(
+                    "browser-pick",
+                    PickPayload {
+                        label: bg_label.clone(),
+                        text: param("d").unwrap_or_default(),
+                        send: param("send").as_deref() == Some("1"),
+                    },
+                );
+                return false;
+            }
+            let target = param("u").and_then(|u| Url::parse(&u).ok());
             if let Some(target) = target.filter(is_web) {
                 let _ = bg_app.emit(
                     "browser-open",
@@ -187,6 +212,23 @@ pub async fn browser_close(app: AppHandle, label: String) -> Result<(), String> 
 pub async fn browser_navigate(app: AppHandle, label: String, url: String) -> Result<(), String> {
     let url = parse_url(&url)?;
     find(&app, &label)?.navigate(url).map_err(|e| e.to_string())
+}
+
+/// Starts Select element in a page and gives it the keyboard. `agent` names the window the
+/// result is typed into ("" when there is none); `accent` colours the overlay.
+#[tauri::command]
+pub async fn browser_pick(
+    app: AppHandle,
+    label: String,
+    agent: String,
+    accent: String,
+) -> Result<(), String> {
+    let webview = find(&app, &label)?;
+    let opts = serde_json::json!({ "agent": agent, "accent": accent });
+    webview
+        .eval(format!("window.__tricodePick && window.__tricodePick({opts})"))
+        .map_err(|e| e.to_string())?;
+    webview.set_focus().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

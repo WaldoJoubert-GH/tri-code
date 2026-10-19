@@ -8,8 +8,9 @@ import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
-  normalizeUrl, openExternal, placeBrowser, setBrowsersSuspended,
+  normalizeUrl, openExternal, pickElement, placeBrowser, setBrowsersSuspended,
 } from "./browsers";
+import { Icon } from "./lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
 import IssuesPanel from "./IssuesPanel";
 import FileList from "./FileList";
@@ -414,6 +415,11 @@ export default function Canvas(props: { project: Project }) {
                   {isFav() ? "★" : "☆"}
                 </button>
               </span>
+              <Show when={nativeBrowsers && !blank()}>
+                <button title="Select element for the agent" onClick={() => pickElement(props.project, pageId())}>
+                  <Icon name="crosshair" size={14} />
+                </button>
+              </Show>
               <button title="Open in system browser" onClick={() => openExternal(url())}>↗</button>
             </div>
             <FavBar projectId={props.project.id} favs={props.project.favs} url={url()} onOpen={open} />

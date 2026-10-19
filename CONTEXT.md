@@ -98,6 +98,10 @@ A Draft over the whole branch diff before merging: findings as `fix`, `note` or 
 One page of a browser window, with its own native webview so it keeps its state while hidden. Stored on the browser Tab as `pages` and the shown `page`. With two or more, the window's title bar shows them as tabs. A page's Ctrl+click or middle-click opens a background Page after it; `target=_blank` and `window.open` open one and show it; a sized `window.open` (a sign-in popup) is a real OS window instead, so `window.opener` works. A terminal's Ctrl+click adds a Page to the project's last-used browser window.
 _Avoid_: Browser tab (a Tab is a canvas window), sub-tab.
 
+**Select element**:
+Pointing an agent at part of a Page: an overlay that `src-tauri/src/pick.js` draws inside the page (tri-code's own HTML cannot paint over a native webview). The picked elements and areas, with the user's comment, become text pasted into the project's agent window (the one "send to agent" uses); Ctrl+Enter also submits it. Text only for now: no screenshot.
+_Avoid_: Inspector, element picker (in UI text).
+
 **Favourite**:
 A page a project keeps for its browser windows: a URL and a name, in `state.json` under the project (`favs`). The star in a browser's address field (or `Ctrl+D`) adds one; they show on the bar under the address and as tiles on a blank browser window. Per project, not global, since each project has its own dev server and tracker.
 _Avoid_: Bookmark.

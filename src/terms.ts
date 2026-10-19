@@ -276,6 +276,12 @@ class TermSession {
     this.term.focus();
   }
 
+  /** Paste `text` as the terminal would (bracketed when the app asks), so its newlines do not submit. */
+  paste(text: string) {
+    // Without bracketed paste every newline would arrive as Enter, so keep it to one line.
+    this.term.paste(this.term.modes.bracketedPasteMode ? text : text.replace(/\s*\n\s*/g, " "));
+  }
+
   /** Type `text` into the terminal without submitting (used by "send to agent"). */
   sendText(text: string) {
     if (this.ptyId !== undefined) call("pty_write", { id: this.ptyId, data: text });
@@ -371,6 +377,14 @@ export function sendText(tabId: string, text: string): boolean {
   const s = sessions.get(tabId);
   if (!s) return false;
   s.sendText(text);
+  return true;
+}
+
+/** Paste multi-line text into a terminal without submitting it. */
+export function pasteText(tabId: string, text: string): boolean {
+  const s = sessions.get(tabId);
+  if (!s) return false;
+  s.paste(text);
   return true;
 }
 

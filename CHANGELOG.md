@@ -2,6 +2,10 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.13 — 2026-10-19
+
+- Select element: the crosshair in a browser window's address row lets you click elements (Shift adds more) or drag an area, describe the change, and type it into your agent window with Enter, or send it with Ctrl+Enter. The agent gets each element's selector, HTML, main styles and text, and its component and source file when the dev build has them.
+
 ## 0.1.12 — 2026-10-19
 
 - Browser windows have tabs. Ctrl+click or middle-click a link to open it in a background tab; `target=_blank` links open a tab and show it. The tabs sit in the window's title bar once there are two; `+` adds a blank one.
