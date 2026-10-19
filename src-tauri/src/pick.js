@@ -20,7 +20,8 @@
     const host = document.createElement("div");
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none";
     const root = host.attachShadow({ mode: "closed" });
-    root.innerHTML = `<style>
+    // Constructed sheets rather than <style>: a page's CSP (claude.ai, GitHub) blocks inline styles.
+    adopt(root, `
       :host { all: initial; }
       * { box-sizing: border-box; font-family: system-ui, "Segoe UI", sans-serif; }
       .box { position: fixed; pointer-events: none; border: 1.5px solid ${accent}; border-radius: 2px;
@@ -62,8 +63,8 @@
         button:hover { background: #232733; }
         .chip { background: #232733; }
         textarea, .row button { border-color: #2c3039; }
-      }
-    </style>
+      }`);
+    root.innerHTML = `
     <div class="card bar"><span>Click an element · drag an area · <b>Shift</b> adds</span><button data-a="end">Esc</button></div>
     <div class="card composer">
       <div class="chips"></div>
@@ -76,9 +77,8 @@
     const chips = root.querySelector(".chips");
     const comment = root.querySelector("textarea");
     root.querySelector(".to").innerHTML = agent ? `→ <b>${esc(agent)}</b>` : "no agent window open";
-    const cursor = document.createElement("style");
-    cursor.textContent = "html, html * { cursor: crosshair !important; }";
-    document.documentElement.append(host, cursor);
+    const cursor = adopt(document, "html, html * { cursor: crosshair !important; }");
+    document.documentElement.append(host);
 
     /** Elements, or areas with the elements inside them, in pick order. */
     let sel = [];
@@ -237,6 +237,21 @@
     };
     walk(document.body);
     return out;
+  }
+
+  /** Adds `css` to a document or shadow root; returns { remove }. */
+  function adopt(target, css) {
+    try {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(css);
+      target.adoptedStyleSheets = [...target.adoptedStyleSheets, sheet];
+      return { remove: () => (target.adoptedStyleSheets = target.adoptedStyleSheets.filter((s) => s !== sheet)) };
+    } catch {
+      const style = document.createElement("style");
+      style.textContent = css;
+      (target === document ? document.documentElement : target).append(style);
+      return style;
+    }
   }
 
   function esc(s) {
