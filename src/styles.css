@@ -183,7 +183,7 @@ svg.lucide { flex: none; display: block; }
 .seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
 .seg button svg { width: 15px; height: 15px; display: block; }
-.gapctl { align-self: center; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 6px; flex: none; }
+.gapctl { display: flex; gap: 5px; align-items: center; color: var(--muted); font: 11px var(--mono); flex: none; }
 .gapctl select {
   font: 11px var(--mono); color: var(--text); background: var(--bg);
   border: 1px solid var(--line); border-radius: 4px; padding: 1px 2px; outline: none;

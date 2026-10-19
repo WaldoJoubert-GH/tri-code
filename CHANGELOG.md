@@ -2,6 +2,10 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.15 — 2026-10-19
+
+- The toolbar starts with the workspaces, then the layout buttons, then the window tabs. The gap setting moved to the bottom-left of the status bar.
+
 ## 0.1.14 — 2026-10-19
 
 - Select element works on sites that block inline styles, such as claude.ai and GitHub; its bar, boxes and composer showed up unstyled there.

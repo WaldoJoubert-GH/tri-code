@@ -137,8 +137,6 @@ function Toolbar() {
       <Show when={activeProject()} keyed>
         {(p) => (
           <>
-            <TabStrip project={p} />
-            <div class="sep" />
             <div class="spaces" id="spaces" role="group" aria-label="Workspaces">
               <For each={Array.from({ length: SPACES }, (_, i) => i)}>
                 {(i) => {
@@ -175,12 +173,8 @@ function Toolbar() {
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="11" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="5.75" y="2.5" width="4.5" height="11" rx="1.2" /></svg>
               </button>
             </div>
-            <label class="gapctl">
-              Gap
-              <select value={String(app.gap)} onChange={(e) => setGap(+e.currentTarget.value)}>
-                <For each={GAPS}>{(g) => <option value={String(g)} selected={app.gap === g}>{g}</option>}</For>
-              </select>
-            </label>
+            <div class="sep" />
+            <TabStrip project={p} />
           </>
         )}
       </Show>
@@ -221,7 +215,7 @@ function StatusBar() {
     const p = activeProject();
     if (!p) return "";
     const sp = space(p);
-    const where = `${sp.layout === "master" ? `main ${Math.round(sp.ratio * 100)}%` : sp.layout} · gap ${app.gap}`;
+    const where = sp.layout === "master" ? `main ${Math.round(sp.ratio * 100)}%` : sp.layout;
     const f = focusedTab(p);
     if (!f) return where;
     const title = live[f.id]?.title;
@@ -230,6 +224,12 @@ function StatusBar() {
 
   return (
     <div class="status">
+      <label class="gapctl" title="Gap between windows (Alt+, / Alt+.)">
+        gap
+        <select value={String(app.gap)} onChange={(e) => setGap(+e.currentTarget.value)}>
+          <For each={GAPS}>{(g) => <option value={String(g)} selected={app.gap === g}>{g}</option>}</For>
+        </select>
+      </label>
       <span class="focus">{info()}</span>
       <span class="flash">{flashMsg()}</span>
       <StatusTimer />
