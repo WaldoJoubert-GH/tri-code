@@ -1,4 +1,4 @@
-//! Project background and icon images, stored as data URL text outside state.json.
+//! Project background and icon images, and uploaded signal sounds, stored as data URL text outside state.json.
 
 use std::path::PathBuf;
 
@@ -68,4 +68,20 @@ pub async fn icon_load(app: AppHandle, project_id: String) -> Result<Option<Stri
 #[tauri::command]
 pub async fn icon_delete(app: AppHandle, project_id: String) -> Result<(), String> {
     delete(image_file(&app, "icons", &project_id)?)
+}
+
+/// A project's uploaded sound for one agent signal. `key` is `<project_id>-<event>`.
+#[tauri::command]
+pub async fn sound_save(app: AppHandle, key: String, data_url: String) -> Result<(), String> {
+    save(image_file(&app, "sounds", &key)?, data_url)
+}
+
+#[tauri::command]
+pub async fn sound_load(app: AppHandle, key: String) -> Result<Option<String>, String> {
+    load(image_file(&app, "sounds", &key)?)
+}
+
+#[tauri::command]
+pub async fn sound_delete(app: AppHandle, key: String) -> Result<(), String> {
+    delete(image_file(&app, "sounds", &key)?)
 }

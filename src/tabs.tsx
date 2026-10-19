@@ -11,6 +11,7 @@ import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
 import { hotkeyProblem, hotkeyText, launchAgent, openAgentsPanel } from "./agents";
 import { Icon } from "./lucide";
+import { SIG_TEXT, sigOf } from "./signals";
 import { flash } from "./ui";
 
 /** Glyphs of the windows that aren't terminals (those show their agent's icon). A `file`
@@ -142,14 +143,12 @@ export function TabStrip(props: { project: Project }) {
           <button
             class="tab"
             aria-pressed={space(props.project).focus === t.id}
-            title={`${tabName(t)}${hint(t) ? " · " + hint(t) : ""}`}
+            title={`${tabName(t)}${hint(t) ? " · " + hint(t) : ""}${sigOf(t) ? " · " + SIG_TEXT[sigOf(t)!] : ""}`}
             onClick={() => focusTab(props.project.id, t.id)}
           >
             <Glyph tab={t} />
             {label(t)}
-            <Show when={live[t.id]?.attention}>
-              <span class="att" title="needs attention" />
-            </Show>
+            <Show when={sigOf(t)}>{(s) => <span class={`sg s-${s()}`} aria-hidden="true" />}</Show>
           </button>
         )}
       </For>

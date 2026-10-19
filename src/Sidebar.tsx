@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
-  Project, app, envIcon, envName, isLocalHost, isTerminal, live, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
+  Project, app, envIcon, envName, isLocalHost, isTerminal, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
   setSidebarCollapsed,
 } from "./state";
 import { closeBrowser, setBrowsersCovered } from "./browsers";
@@ -11,6 +11,7 @@ import { dev, forgetProject, isActive } from "./issues";
 import { IconFace, forgetIcon } from "./icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { openProjectDialog } from "./OpenProject";
+import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
 import { flash } from "./ui";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
@@ -44,6 +45,7 @@ function dropProject(p: Project) {
   forgetBgImage(p.id);
   forgetIcon(p.id);
   forgetProject(p.id);
+  forgetSounds(p.id);
   removeProject(p.id);
 }
 
@@ -83,8 +85,11 @@ export default function Sidebar() {
   createEffect(() => setBrowsersCovered(peek() ? FULL : 0));
   onCleanup(() => clearTimeout(timer));
 
-  const needsAttention = (p: Project) =>
-    app.activeProject !== p.id && p.tabs.some((t) => live[t.id]?.attention);
+  /** The loudest signal among another project's windows, and how many windows share it. */
+  const badge = (p: Project) => {
+    const s = app.activeProject === p.id ? null : topSig(p.tabs);
+    return s ? { s, n: p.tabs.filter((t) => sigOf(t) === s).length } : null;
+  };
 
   const remove = (p: Project) => {
     if (!confirm(`Remove "${p.name}" and end its ${p.tabs.length} tab(s)?`)) return;
@@ -165,10 +170,13 @@ export default function Sidebar() {
                   class="project"
                   classList={{ active: app.activeProject === p.id }}
                   style={{ "--pa": p.accent }}
-                  title={app.sidebarCollapsed && !peek() ? `${p.name} · ${envName(p.host)} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : undefined}
+                  title={[app.sidebarCollapsed && !peek() ? `${p.name} · ${envName(p.host)} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : "", sigSummary(p)].filter(Boolean).join("\n") || undefined}
                   onClick={() => setApp("activeProject", p.id)}
                 >
                   <span class="swatch"><IconFace project={p} /></span>
+                  <Show when={badge(p)}>
+                    {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
+                  </Show>
                   <Show when={renaming() === p.id} fallback={<span class="name" title="Double-click to rename" onDblClick={() => setRenaming(p.id)}>{p.name}</span>}>
                     <RenameInput
                       value={p.name}
@@ -181,7 +189,6 @@ export default function Sidebar() {
                       <For each={miniBar(p)}>{(c) => <i style={{ flex: String(c.n), background: c.color }} />}</For>
                     </span>
                   </Show>
-                  <Show when={needsAttention(p)}><span class="badge" title="Needs input" /></Show>
                   <span class="count">{p.tabs.length || ""}</span>
                   <button
                     class="gear"

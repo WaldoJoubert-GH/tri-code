@@ -118,7 +118,24 @@ export type Project = {
   /** Favourite pages, in bar order; shared by every browser window of the project. */
   favs: Fav[];
   icon?: ProjectIcon;
+  /** Sounds and alerts for agent signals; a missing field follows the app-wide `notify`. */
+  notify?: ProjectNotify;
 };
+
+/** The signals that alert. `working` only badges. */
+export type SoundEvent = "blocked" | "done" | "error";
+/** When a signal plays its sound and shows a desktop notification: only while you aren't looking at that window, always, or never (badges only). */
+export type AlertMode = "away" | "always" | "badge";
+/** A sound per signal: a built-in name (see SOUNDS in signals.ts), "off", or "custom" for a project's uploaded file. */
+export type NotifySettings = Record<SoundEvent, string> & { alert: AlertMode; desktop: boolean; volume: number; dnd: boolean };
+export type ProjectNotify = Partial<Record<SoundEvent, string>> & {
+  alert?: AlertMode;
+  desktop?: boolean;
+  /** The uploaded file's name per signal, shown in the picker while that signal's sound is "custom". */
+  files?: Partial<Record<SoundEvent, string>>;
+};
+
+const defaultNotify = (): NotifySettings => ({ blocked: "chime", done: "soft", error: "knock", alert: "away", desktop: true, volume: 70, dnd: false });
 
 export type EnvStyle = { name?: string; icon?: string };
 
@@ -136,12 +153,19 @@ type Persisted = {
   /** Gap between tiled windows and around the edge, px. */
   gap: number;
   sidebarCollapsed: boolean;
+  /** App-wide sounds and alerts for agent signals (the bell in the status line). */
+  notify: NotifySettings;
 };
 
 export type TabStatus = "connecting" | "running" | "reconnecting" | "exited";
 
-/** Runtime-only info about live tabs; never persisted. */
-export type Live = { status: TabStatus; attention: boolean; title: string };
+/** An agent's state as it reports it over OSC 7501 (the Program Status Protocol). */
+export type AgentState = "working" | "blocked" | "done" | "error";
+/** The last report; `seen` once its window was on screen after a done or error. */
+export type AgentReport = { state: AgentState; msg: string; at: number; seen: boolean };
+
+/** Runtime-only info about live tabs; never persisted. `attention` is the terminal bell. */
+export type Live = { status: TabStatus; attention: boolean; title: string; agent?: AgentReport };
 
 export const SPACES = 4;
 export const GAPS = [0, 4, 8, 12, 16, 24, 32];
@@ -149,7 +173,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false, notify: defaultNotify() });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -359,6 +383,21 @@ export function setSidebarCollapsed(collapsed: boolean) {
   setApp("sidebarCollapsed", collapsed);
 }
 
+export function setNotify(patch: Partial<NotifySettings>) {
+  setApp(produce((s) => Object.assign(s.notify, patch)));
+}
+
+/** Change a project's signal settings; an undefined value goes back to the app-wide default. */
+export function setProjectNotify(projectId: string, patch: ProjectNotify) {
+  edit(projectId, (p) => {
+    const n = (p.notify ??= {}) as Record<string, unknown>;
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) delete n[k];
+      else n[k] = v;
+    }
+  });
+}
+
 export function setAppearance(projectId: string, patch: Partial<Pick<Project, "accent" | "bg" | "dim">>) {
   edit(projectId, (p) => Object.assign(p, patch));
 }
@@ -510,7 +549,7 @@ function migrate(raw: any): Persisted {
       id: p.id, name: p.name, host: p.host || "local", path: p.path, tabs,
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
-      favs: p.favs ?? [], icon: p.icon,
+      favs: p.favs ?? [], icon: p.icon, notify: p.notify,
     };
   });
   // Before environments existed, hosts only came from projects.
@@ -519,6 +558,7 @@ function migrate(raw: any): Persisted {
   return {
     environments, envStyles: raw.envStyles ?? {}, projects, recent: raw.recent ?? [],
     activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(), gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
+    notify: { ...defaultNotify(), ...raw.notify },
   };
 }
 

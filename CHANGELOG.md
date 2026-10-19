@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.16 — 2026-10-19
+
+- Agent signals. claude and pi now tell tri-code whether they are working, waiting for you, done or failed, with no setup on their side. A dot on the project's icon, its workspace number and the window's tab shows it, and the title bar says it in words ("needs you · 2m ago"). The status line counts them across every project; click the counts or press `Alt+U` to go to the next agent that needs you.
+- When an agent you aren't looking at needs input, finishes or fails, tri-code plays a sound and shows a desktop notification. The bell in the status line sets a sound for each, when to alert (when away, always, or badge only), volume, and Do not disturb. Appearance › Signals overrides them per project, and you can upload your own sound.
+- Works locally and over ssh or shpool; tmux drops the signals, so remote sessions running inside tmux only get the terminal bell.
+
 ## 0.1.15 — 2026-10-19
 
 - The toolbar starts with the workspaces, then the layout buttons, then the window tabs. The gap setting moved to the bottom-left of the status bar.

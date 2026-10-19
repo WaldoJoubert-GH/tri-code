@@ -4,6 +4,8 @@ import {
   GAPS, SPACES, activeProject, app, focusedTab, goSpace, isRemote, isTerminal, live, loadState,
   persistChanges, setGap, setLayout, space, tabName,
 } from "./state";
+import { SIG_TEXT, nextSignal, sigOf, topSig } from "./signals";
+import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
@@ -85,7 +87,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || goToFileOpen() || paletteOpen() || aboutOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -121,6 +123,7 @@ export default function App() {
       <OpenProjectDialog />
       <HelpOverlay />
       <AboutDialog />
+      <SignalsPopover />
       <IconPicker />
     </div>
   );
@@ -141,15 +144,13 @@ function Toolbar() {
               <For each={Array.from({ length: SPACES }, (_, i) => i)}>
                 {(i) => {
                   const inWs = () => p.tabs.filter((t) => t.space === i);
+                  const sig = () => (i === p.ws ? null : topSig(inWs()));
                   return (
                     <button
                       data-ws={i}
-                      classList={{
-                        used: inWs().length > 0,
-                        att: i !== p.ws && inWs().some((t) => live[t.id]?.attention),
-                      }}
+                      classList={{ used: inWs().length > 0, att: !!sig(), [`s-${sig()}`]: !!sig() }}
                       aria-current={p.ws === i}
-                      title={`Workspace ${i + 1}${inWs().length ? ": " + inWs().map(tabName).join(", ") : " (empty)"} · Alt+${i + 1}`}
+                      title={`Workspace ${i + 1}${inWs().length ? ": " + inWs().map((t) => tabName(t) + (sigOf(t) ? ` (${SIG_TEXT[sigOf(t)!]})` : "")).join(", ") : " (empty)"} · Alt+${i + 1}`}
                       onClick={() => {
                         goSpace(p.id, i);
                         flash(`workspace ${i + 1}`);
@@ -233,6 +234,7 @@ function StatusBar() {
       <span class="focus">{info()}</span>
       <span class="flash">{flashMsg()}</span>
       <StatusTimer />
+      <SignalCounts />
       <div class="hints">
         <span><kbd>Alt</kbd><kbd>X</kbd> commands</span>
         <span><kbd>Alt</kbd><kbd>I</kbd> issues</span>
@@ -246,11 +248,41 @@ function StatusBar() {
           </button>
         )}
       </Show>
+      <button
+        class="bellbtn"
+        id="bellBtn"
+        classList={{ dnd: app.notify.dnd }}
+        title={app.notify.dnd ? "Do not disturb is on · signals and sounds for every project" : "Signals and sounds for every project"}
+        aria-label="Signals and sounds"
+        aria-haspopup="dialog"
+        aria-expanded={signalsOpen()}
+        onClick={(e) => toggleSignals(e.currentTarget)}
+      >
+        <Icon name={app.notify.dnd ? "bell-off" : "bell"} size={13} />
+      </button>
       <button class="ver" title="About tri-code: check for updates, changelog" onClick={() => setAboutOpen(true)}>
         v{appVersion}
       </button>
       <ClaudeUsage />
     </div>
+  );
+}
+
+/** What the agents are doing across every project. A click goes to the next one that needs you (Alt+U). */
+function SignalCounts() {
+  const count = (s: string) => app.projects.reduce((n, p) => n + p.tabs.filter((t) => sigOf(t) === s).length, 0);
+  const parts = () =>
+    (["blocked", "error", "done", "working"] as const)
+      .map((s) => ({ s, n: count(s) }))
+      .filter((x) => x.n);
+  const label = (s: string, n: number) =>
+    s === "blocked" ? `${n} need${n === 1 ? "s" : ""} you` : s === "error" ? `${n} error${n === 1 ? "" : "s"}` : `${n} ${s}`;
+  return (
+    <Show when={parts().length}>
+      <button class="sigs" title={parts().some((x) => x.s !== "working") ? "Go to the next agent that needs you (Alt+U)" : "Agents at work"} onClick={nextSignal}>
+        <For each={parts()}>{(x) => <span class={`s-${x.s}`}><span class={`sg s-${x.s}`} />{label(x.s, x.n)}</span>}</For>
+      </button>
+    </Show>
   );
 }
 

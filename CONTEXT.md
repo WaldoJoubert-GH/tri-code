@@ -102,6 +102,14 @@ _Avoid_: Browser tab (a Tab is a canvas window), sub-tab.
 Pointing an agent at part of a Page: an overlay that `src-tauri/src/pick.js` draws inside the page (tri-code's own HTML cannot paint over a native webview). The picked elements and areas, with the user's comment, become text pasted into the project's agent window (the one "send to agent" uses); Ctrl+Enter also submits it. Text only for now: no screenshot.
 _Avoid_: Inspector, element picker (in UI text).
 
+**Agent Signal**:
+What an agent says it is doing: `working`, `blocked` (needs you), `done` or `error`, reported over OSC 7501 (the Program Status Protocol) and kept on the tab's live state. tri-code answers the probe claude and pi send at startup; they report nothing until it does. A `done` or `error` stays until its window has been on screen in a focused app; `blocked` stays until the agent reports something else. The loudest signal (blocked, then error, then done) marks the project's icon and the workspace number; the tab and title bar also show `working`. A terminal bell from any other app counts as `blocked`.
+_Avoid_: Notification (that is the desktop popup), attention, status (a tab's status is its connection).
+
+**Alert**:
+What a signal does beyond its badges: the project's sound for it and a desktop notification. When to alert is "away" (only while you aren't looking at that window), "always" or "badge only". App-wide settings sit behind the bell in the status line (`app.notify`); a project overrides any of them in Appearance › Signals (`project.notify`), and Do not disturb makes every project badge only.
+_Avoid_: Notification settings, ping.
+
 **Favourite**:
 A page a project keeps for its browser windows: a URL and a name, in `state.json` under the project (`favs`). The star in a browser's address field (or `Ctrl+D`) adds one; they show on the bar under the address and as tiles on a blank browser window. Per project, not global, since each project has its own dev server and tracker.
 _Avoid_: Bookmark.

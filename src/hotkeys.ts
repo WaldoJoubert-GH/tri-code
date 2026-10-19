@@ -19,6 +19,8 @@ import { agentForKey, launchAgent, newTerminalLike, openAgentsPanel, recording }
 import { closeIconPicker, iconPickerOpen } from "./lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";
 import { cycleLayout, makeMain, maximize, sendWindow, stepGap, stepProject, workspace } from "./commands";
+import { nextSignal } from "./signals";
+import { closeSignals, signalsOpen } from "./SignalSettings";
 import { flash } from "./ui";
 
 /**
@@ -33,7 +35,7 @@ export const RESERVED: Record<string, string> = {
   KeyI: "issues", KeyE: "files", KeyT: "go to file", KeyC: "git", KeyQ: "close window", KeyF: "maximize", KeyM: "make main",
   KeyG: "switch layout", Comma: "less gap", Period: "more gap", Slash: "hotkey help", KeyS: "sidebar",
   KeyP: "appearance", BracketLeft: "previous project", BracketRight: "next project", KeyO: "open project",
-  Semicolon: "agents", KeyX: "command palette",
+  Semicolon: "agents", KeyX: "command palette", KeyU: "next agent that needs you",
 };
 
 const DIRS: Record<string, [number, number]> = {
@@ -125,6 +127,9 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
     case "KeyP":
       toggleAppearance();
       return true;
+    case "KeyU":
+      nextSignal();
+      return true;
     case "BracketLeft":
     case "BracketRight":
       stepProject(p, e.code === "BracketRight" ? 1 : -1);
@@ -149,6 +154,7 @@ function onKey(e: KeyboardEvent) {
     else if (aboutOpen()) setAboutOpen(false);
     else if (openProjectOpen()) closeOpenProject();
     else if (appearanceOpen()) closeAppearance();
+    else if (signalsOpen()) closeSignals();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
     else if (goToFileOpen()) closeGoToFile();

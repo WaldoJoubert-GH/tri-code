@@ -7,7 +7,9 @@ import {
   promote, sendTo, setApp, setGap, setLayout, space, tabName, toggleMono,
 } from "./state";
 import { requestClose } from "./Canvas";
-import { toggleAppearance } from "./Appearance";
+import { openAppearance, toggleAppearance } from "./Appearance";
+import { nextSignal, toggleDnd } from "./signals";
+import { toggleSignals } from "./SignalSettings";
 import { setHelpOpen } from "./Help";
 import { setAboutOpen } from "./About";
 import { openProjectDialog } from "./OpenProject";
@@ -24,7 +26,7 @@ export type Command = {
   /** Stable across openings, so the palette can remember recent picks. */
   id: string;
   title: string;
-  group: "New" | "Window" | "Layout" | "Project" | "Go to window" | "Switch project" | "App";
+  group: "New" | "Window" | "Layout" | "Project" | "Signals" | "Go to window" | "Switch project" | "App";
   /** The chord that also runs it, as <kbd> labels. */
   keys?: string[];
   /** Muted text after the title: a workspace, a process title, a host. */
@@ -147,6 +149,10 @@ export function commands(): Command[] {
     add({ id: "project-prev", group: "Project", title: "Previous project", icon: "chevron-up", keys: ["Alt", "["], run: () => stepProject(p, -1) });
     add({ id: "project-next", group: "Project", title: "Next project", icon: "chevron-down", keys: ["Alt", "]"], run: () => stepProject(p, 1) });
   }
+  add({ id: "next-signal", group: "Signals", title: "Go to the next agent that needs you", icon: "bell-ring", keys: ["Alt", "U"], run: nextSignal });
+  if (p) add({ id: "signals", group: "Signals", title: `Signals and sounds for ${p.name}`, hint: "a sound per signal, when to alert", icon: "bell", run: () => openAppearance(null, p.id, "signals") });
+  add({ id: "bell", group: "Signals", title: "Signals and sounds for every project", icon: "bell-dot", run: () => toggleSignals() });
+  add({ id: "dnd", group: "Signals", title: app.notify.dnd ? "Turn off Do not disturb" : "Do not disturb", hint: "badges only", icon: app.notify.dnd ? "bell" : "bell-off", run: toggleDnd });
   add({ id: "sidebar", group: "App", title: app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar", icon: "panel-left-close", keys: ["Alt", "S"], run: toggleSidebar });
   add({ id: "help", group: "App", title: "Hotkeys", icon: "keyboard", keys: ["Alt", "/"], run: () => setHelpOpen(true) });
   const u = updateReady();

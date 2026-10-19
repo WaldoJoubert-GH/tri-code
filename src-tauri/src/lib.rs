@@ -20,6 +20,7 @@ use tauri::{LogicalPosition, Manager, WebviewBuilder, WebviewUrl};
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(Arc::new(pty::Ptys::default()))
@@ -96,6 +97,9 @@ pub fn run() {
             bg::icon_save,
             bg::icon_load,
             bg::icon_delete,
+            bg::sound_save,
+            bg::sound_load,
+            bg::sound_delete,
             usage::claude_usage,
         ])
         .build(tauri::generate_context!())

@@ -75,7 +75,7 @@ When ssh exits with code 255 (connection failure), the tab reconnects automatica
 - The ✦ buttons in the git window write a draft for you to edit: the commit message, the PR title and body, and a review of the whole branch before merging. They run `claude -p` in the project folder on the project's host, so they use your own Claude Code login. The chips under "✦ reads" are what the draft is given: the diff, the In Progress issue (the one named in the branch, else the first), the last commit subjects (for the style) and `CONTEXT.md`. Click one to leave it out. "Send to claude" on a review note types it into the project's agent window (any terminal with a command, not a plain shell) without sending it.
 - Tab dots show the status: connecting, running, reconnecting, or exited. Press Enter in an exited tab to restart it.
 - Ctrl+C copies the terminal selection and still sends SIGINT when nothing is selected; Ctrl+V pastes. Full-screen apps such as claude and pi capture the mouse, so hold Shift while dragging to select their text. To make a plain drag select in Claude Code's fullscreen mode, set `CLAUDE_CODE_DISABLE_MOUSE=1` (it then scrolls with PgUp/PgDn instead of the wheel).
-- A tab that rings the terminal bell while it is hidden is flagged, and its project shows a badge in the sidebar. To get this from Claude Code, set its notification channel to the terminal bell in Claude Code's `/config` (notifications setting).
+- Agent signals: claude and pi report whether they are working, waiting for you, done or failed (the Program Status Protocol, OSC 7501), and tri-code shows it as a dot on the project's icon, its workspace number, the window's tab and a chip in its title bar. The status line counts them across every project; click the counts, or press `Alt+U`, to go to the next agent that needs you. When an agent you aren't looking at needs input, finishes or fails, tri-code plays a sound and shows a desktop notification. The bell in the status line sets the sound for each signal, when to alert (when away, always, or badge only), desktop notifications, volume and Do not disturb; Appearance › Signals overrides them per project, including a sound file of your own. No setup is needed in claude or pi. It works locally and over ssh or shpool, but not through tmux, which drops the sequences. A terminal bell from any other app still flags its tab.
 
 ## Releases and updates
 
@@ -118,9 +118,11 @@ Layout:
 - `OpenProject.tsx`: the Open project dialog (`Alt+O`): environments, the folder picker, and the New environment form.
 - `icons.tsx`: project icons: logo scan, auto pick, upload, and the icon face drawn in the sidebar.
 - `GoToFile.tsx`: Go to File (`Alt+T`): the fuzzy search and folder browser under the toolbar path.
-- `Appearance.tsx`: the Appearance panel: name, icon, accent, background, dim.
+- `Appearance.tsx`: the Appearance panel: name, icon, accent, background, dim, and the project's Signals tab.
+- `signals.ts`: agent signals: what each window signals, the sounds (synthesized, or a project's uploaded file), desktop notifications, and `Alt+U`.
+- `SignalSettings.tsx`: the signals form, shared by the status line's bell (every project) and Appearance › Signals (one project).
 - `state.ts`: Solid stores for projects, tabs, and live tab status. Loads and debounced-saves the state file.
-- `terms.ts`: one xterm and one PTY per tab. Handles output, resize, reconnect backoff, bell detection, and the WebGL renderer for the visible tab only.
+- `terms.ts`: one xterm and one PTY per tab. Handles output, resize, reconnect backoff, bell detection, OSC 7501 agent status (answering the probe, keeping the last report), and the WebGL renderer for the visible tab only.
 - `issues.ts`: the `.dev/` store and Plane sync, plus the pure helpers (sort order, State Pill contrast, Slug-ID).
 - `IssuesPanel.tsx`: the issues window: the list, the full-width drill-down, the State Dropdown, labels, and the comment thread.
 - `updater.ts`: the update check (periodic and on demand), background download, and "Restart to update".

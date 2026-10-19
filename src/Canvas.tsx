@@ -18,8 +18,15 @@ import FileView from "./FileView";
 import GitPanel from "./GitPanel";
 import AgentsPanel from "./AgentsPanel";
 import { gitOf } from "./git";
-import { dev, panelTitle } from "./issues";
+import { clock, dev, panelTitle } from "./issues";
+import { SIG_TEXT, sigOf } from "./signals";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
+
+/** "just now", "4m ago", "2h ago": how long an agent has been in its state. */
+const ago = (ms: number) => {
+  const m = Math.floor(ms / 60000);
+  return m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`;
+};
 
 const BAR = 28;
 const NAV = 32;
@@ -320,7 +327,9 @@ export default function Canvas(props: { project: Project }) {
         class="win"
         classList={{
           focused: focused(),
-          attention: !!live[id]?.attention,
+          "sig-blocked": sigOf(tab) === "blocked",
+          "sig-error": sigOf(tab) === "error",
+          "sig-done": sigOf(tab) === "done",
           floating: dragging(),
           drop: dropping(),
           sizing: sized() === id,
@@ -362,6 +371,15 @@ export default function Canvas(props: { project: Project }) {
             }`}
           />
           <span class="kind">{tabName(tab)}</span>
+          <Show when={live[id]?.agent}>
+            {(a) => (
+              <span class="ast" classList={{ [`s-${a().state}`]: true, seen: sigOf(tab) !== a().state }} title={a().msg}>
+                <span class={`sg s-${a().state}`} />
+                {SIG_TEXT[a().state]}
+                {a().state === "working" ? "" : ` · ${ago(clock() - a().at)}`}
+              </span>
+            )}
+          </Show>
           <Show when={isBrowser && (tab.pages?.length ?? 0) > 1} fallback={<span class="ttl">{title()}</span>}>
             <div class="ptabs" role="tablist">
               <For each={tab.pages}>

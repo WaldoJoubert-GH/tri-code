@@ -95,7 +95,6 @@ aside {
 .rail:not(.peek) .project { justify-content: center; padding: 4px 0; position: relative; }
 .rail:not(.peek) .project.active { background: none; }
 .rail:not(.peek) .project.active .swatch { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--pa); }
-.rail:not(.peek) .project .badge { position: absolute; top: 2px; right: 3px; box-shadow: 0 0 0 2px var(--panel); }
 .rail:not(.peek) .add { padding: 6px 0; }
 .rail:not(.peek) .add .label { display: none; }
 /* Peek: hovering the rail floats the full list over the canvas without reflowing the windows; leaving folds it back */
@@ -137,7 +136,20 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .project .x { opacity: 0; color: var(--muted); padding: 0 2px; }
 .project:hover .x, .project .x:focus-visible { opacity: 1; }
 .project .x:hover { color: var(--text); }
-.badge { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+/* Agent signals (signals.ts): one colour per state, a dot, and a spinner while working */
+.s-working { --sc: var(--accent); } .s-blocked { --sc: var(--warn); } .s-done { --sc: var(--ok); } .s-error { --sc: var(--bad); }
+.sg { width: 7px; height: 7px; border-radius: 50%; background: var(--sc); flex: none; }
+.sg.s-working { width: 9px; height: 9px; background: none; border: 1.5px solid var(--sc); border-right-color: transparent; animation: spin .9s linear infinite; }
+/* The project icon's badge: the loudest signal among its windows, a count when several share it.
+   On the row rather than the tile (which clips), at the tile's top-right corner open or collapsed. */
+.project { position: relative; }
+.project > .sb {
+  position: absolute; left: 24px; top: 0; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px;
+  background: var(--sc); box-shadow: 0 0 0 2px var(--panel); color: var(--bg); font: 700 9px/14px var(--ui); text-align: center;
+}
+.project > .sb:empty { min-width: 0; width: 10px; height: 10px; padding: 0; left: 26px; top: 1px; }
+.project > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
+@keyframes sbp { 50% { box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px color-mix(in srgb, var(--sc) 28%, transparent); } }
 .side-actions { margin-top: 10px; }
 .add { display: flex; align-items: center; gap: 8px; width: 100%; white-space: nowrap; padding: 6px 4px; text-align: left; color: var(--muted); border-radius: 6px; }
 .add .glyph { width: 28px; flex: none; text-align: center; font-size: 15px; line-height: 18px; }
@@ -157,7 +169,8 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 svg.lucide { flex: none; display: block; }
 .tabs .tab:hover, .tabs .tab-add:hover { color: var(--text); background: var(--hover); }
 .tabs .tab[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
-.tabs .tab .att { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); }
+.tabs .tab .sg { width: 6px; height: 6px; }
+.tabs .tab .sg.s-working { width: 8px; height: 8px; }
 .tabs .tab-add { justify-content: center; width: 30px; padding: 0; font-size: 15px; }
 .top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
 .top .tool:hover { color: var(--text); background: var(--hover); }
@@ -203,7 +216,7 @@ svg.lucide { flex: none; display: block; }
 .spaces button[aria-current="true"]::after { background: var(--accent); }
 .spaces button.att::before {
   content: ""; position: absolute; top: -2px; right: -2px; width: 7px; height: 7px; border-radius: 50%;
-  background: var(--warn); box-shadow: 0 0 0 2px var(--panel);
+  background: var(--sc, var(--warn)); box-shadow: 0 0 0 2px var(--panel);
 }
 .spaces button.target { background: color-mix(in srgb, var(--accent) 35%, var(--raised)); color: var(--text); outline: 2px dashed var(--accent); }
 .theme-btn { display: flex; align-items: center; gap: 6px; }
@@ -323,6 +336,28 @@ svg.lucide { flex: none; display: block; }
 .status .update:hover { background: var(--hover); }
 .status .ver { flex: none; color: var(--muted); font: 11px var(--mono); padding: 1px 4px; border-radius: 4px; }
 .status .ver:hover { background: var(--hover); color: var(--text); }
+/* What the agents are doing across every project (a click: the next one that needs you), and the bell */
+.status .sigs { flex: none; display: flex; align-items: center; gap: 10px; padding: 1px 6px; border-radius: 4px; font: 11px var(--mono); }
+.status .sigs:hover { background: var(--hover); }
+.status .sigs > span { display: flex; align-items: center; gap: 5px; color: var(--sc); }
+.status .sigs > .s-working { color: var(--muted); }
+.status .bellbtn { flex: none; display: grid; place-items: center; width: 24px; height: 20px; border-radius: 4px; color: var(--muted); }
+.status .bellbtn:hover, .status .bellbtn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+.status .bellbtn.dnd { color: var(--warn); }
+/* Signals settings: Appearance › Signals and the bell's popover */
+.pop .seg.wide { margin: 0; align-self: stretch; }
+.pop .seg.wide button { flex: 1; padding: 3px 6px; }
+.sgrid { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; font-size: 12px; }
+.sgrid .lbl { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.sgrid select { min-width: 0; height: 26px; padding: 0 4px; font: 12px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; outline: none; }
+.sgrid select:focus { border-color: var(--accent); }
+.sgrid .play { width: 26px; height: 26px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); display: grid; place-items: center; }
+.sgrid .play:hover { background: var(--hover); color: var(--text); }
+.pop .chk { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.pop .chk input { margin: 0; accent-color: var(--accent); }
+.pop .muted { color: var(--muted); }
+.pop .snote { margin: 2px 0 0; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.pop .snote code { font: 11px var(--mono); color: var(--text); }
 .usage {
   flex: none; display: flex; align-items: center; gap: 12px; height: 100%; padding: 0 2px;
   color: var(--muted); font-variant-numeric: tabular-nums;

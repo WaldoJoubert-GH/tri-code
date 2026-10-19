@@ -1,4 +1,5 @@
-// Per-project appearance: name, icon, accent colour, background preset or uploaded image, and dim.
+// Per-project appearance: name, icon, accent colour, background preset or uploaded image, and dim;
+// and on its Signals tab, the project's sounds and alerts for agent signals.
 // The popover is anchored under the toolbar button, or beside a sidebar gear.
 
 import { invoke } from "@tauri-apps/api/core";
@@ -6,6 +7,7 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { ACCENTS, Project, activeProject, projectById, renameProject, setAppearance, setIcon } from "./state";
 import { GLYPHS, IconFace, Logo, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
+import { SignalsForm } from "./SignalSettings";
 import { flash } from "./ui";
 
 const tint = (a: string, p: number) => `color-mix(in srgb, ${a} ${p}%, transparent)`;
@@ -50,17 +52,18 @@ export function backgroundCss(p: Project): string {
   return (BACKGROUNDS[p.bg] ?? BACKGROUNDS.none).css(p.accent);
 }
 
-type PopState = { projectId: string; anchor: HTMLElement };
+export type AppearanceSection = "look" | "signals";
+type PopState = { projectId: string; anchor: HTMLElement; section: AppearanceSection };
 const [pop, setPop] = createSignal<PopState | null>(null);
 
 export const appearanceOpen = () => pop() !== null;
 
 /** Open the popover for a project (default: the active one), anchored under `anchor` (default: the toolbar button). */
-export function openAppearance(anchor?: HTMLElement | null, projectId?: string) {
+export function openAppearance(anchor?: HTMLElement | null, projectId?: string, section: AppearanceSection = "look") {
   const pid = projectId ?? activeProject()?.id;
   const a = anchor ?? document.getElementById("themeBtn");
   if (!pid || !a) return;
-  setPop({ projectId: pid, anchor: a });
+  setPop({ projectId: pid, anchor: a, section });
 }
 
 export function closeAppearance() {
@@ -137,63 +140,70 @@ export function AppearancePopover() {
                       else if (e.key === "Escape") (e.currentTarget.value = p.name), e.currentTarget.blur();
                     }}
                   />
-                  <span>appearance</span>
+                  <span>{s.section === "look" ? "appearance" : "signals"}</span>
                 </div>
-                <IconSection project={p} />
-                <h4>Accent</h4>
-                <div class="swatches">
-                  <For each={ACCENTS}>
-                    {(a) => (
-                      <button
-                        type="button"
-                        style={{ background: a }}
-                        aria-label={`Accent ${a}`}
-                        aria-pressed={p.accent === a}
-                        onClick={() => setAppearance(p.id, { accent: a })}
-                      />
-                    )}
-                  </For>
-                  <label title="Custom colour">
-                    +
-                    <input type="color" value={p.accent} onInput={(e) => setAppearance(p.id, { accent: e.currentTarget.value })} />
-                  </label>
+                <div class="seg wide" role="group" aria-label="Section">
+                  <button type="button" aria-pressed={s.section === "look"} onClick={() => setPop({ ...s, section: "look" })}>Appearance</button>
+                  <button type="button" aria-pressed={s.section === "signals"} onClick={() => setPop({ ...s, section: "signals" })}>Signals</button>
                 </div>
-                <h4>Background</h4>
-                <div class="bgs">
-                  <For each={Object.entries(BACKGROUNDS)}>
-                    {([key, b]) => (
-                      <button
-                        type="button"
-                        style={{ background: b.css(p.accent) }}
-                        aria-pressed={p.bg === key}
-                        onClick={() => setAppearance(p.id, { bg: key })}
-                      >
-                        {b.name}
-                      </button>
-                    )}
-                  </For>
-                  <Show when={bgImages[p.id]} keyed>
-                    {(url) => (
-                      <button
-                        type="button"
-                        style={{ background: `center / cover no-repeat url("${url}")` }}
-                        aria-pressed={p.bg === "image"}
-                        onClick={() => setAppearance(p.id, { bg: "image" })}
-                      >
-                        Your image
-                      </button>
-                    )}
-                  </Show>
-                  <label class="upload" role="button" tabindex="0" onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), fileEl?.click())}>
-                    Upload image…
-                    <input ref={fileEl} type="file" accept="image/*" hidden onChange={onFile} />
-                  </label>
-                </div>
-                <div class="row">
-                  Dim
-                  <input type="range" min="0" max="85" step="5" value={String(p.dim)} onInput={(e) => setAppearance(p.id, { dim: +e.currentTarget.value })} />
-                  <span class="val">{p.dim}%</span>
-                </div>
+                <Show when={s.section === "signals"}><SignalsForm project={p} /></Show>
+                <Show when={s.section === "look"}>
+                  <IconSection project={p} />
+                  <h4>Accent</h4>
+                  <div class="swatches">
+                    <For each={ACCENTS}>
+                      {(a) => (
+                        <button
+                          type="button"
+                          style={{ background: a }}
+                          aria-label={`Accent ${a}`}
+                          aria-pressed={p.accent === a}
+                          onClick={() => setAppearance(p.id, { accent: a })}
+                        />
+                      )}
+                    </For>
+                    <label title="Custom colour">
+                      +
+                      <input type="color" value={p.accent} onInput={(e) => setAppearance(p.id, { accent: e.currentTarget.value })} />
+                    </label>
+                  </div>
+                  <h4>Background</h4>
+                  <div class="bgs">
+                    <For each={Object.entries(BACKGROUNDS)}>
+                      {([key, b]) => (
+                        <button
+                          type="button"
+                          style={{ background: b.css(p.accent) }}
+                          aria-pressed={p.bg === key}
+                          onClick={() => setAppearance(p.id, { bg: key })}
+                        >
+                          {b.name}
+                        </button>
+                      )}
+                    </For>
+                    <Show when={bgImages[p.id]} keyed>
+                      {(url) => (
+                        <button
+                          type="button"
+                          style={{ background: `center / cover no-repeat url("${url}")` }}
+                          aria-pressed={p.bg === "image"}
+                          onClick={() => setAppearance(p.id, { bg: "image" })}
+                        >
+                          Your image
+                        </button>
+                      )}
+                    </Show>
+                    <label class="upload" role="button" tabindex="0" onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), fileEl?.click())}>
+                      Upload image…
+                      <input ref={fileEl} type="file" accept="image/*" hidden onChange={onFile} />
+                    </label>
+                  </div>
+                  <div class="row">
+                    Dim
+                    <input type="range" min="0" max="85" step="5" value={String(p.dim)} onInput={(e) => setAppearance(p.id, { dim: +e.currentTarget.value })} />
+                    <span class="val">{p.dim}%</span>
+                  </div>
+                </Show>
               </div>
             );
           }}

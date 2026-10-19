@@ -86,6 +86,13 @@ export function HelpOverlay() {
             <dt><Keys keys={["Alt", "/"]} /></dt>
             <dd>Show or hide this list</dd>
           </dl>
+          <h4>Signals</h4>
+          <dl>
+            <dt><Keys keys={["Alt", "U"]} /></dt>
+            <dd>Go to the next agent that needs you: waiting for input first, then errors, then finished work. The same dot marks its project icon, workspace number, tab and title bar</dd>
+            <dt>🔔 in the status line</dt>
+            <dd>A sound per signal, when to alert, desktop notifications and Do not disturb, for every project. Appearance › Signals sets them per project</dd>
+          </dl>
           <h4>Text</h4>
           <dl>
             <dt><Keys keys={["Ctrl", "C"]} /></dt>

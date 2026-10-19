@@ -7,7 +7,8 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { Project, Tab, TabStatus, isRemote, isTerminal, sessionName, setLive } from "./state";
+import { AgentState, Live, Project, Tab, TabStatus, isRemote, isTerminal, live, sessionName, setLive } from "./state";
+import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
 
 const SSH_CONNECTION_FAILED = 255;
@@ -73,6 +74,8 @@ class TermSession {
   /** Input typed before pty_spawn resolves (e.g. xterm's reply to ConPTY's startup DSR query). */
   private pending: string[] = [];
   private observer = new ResizeObserver(() => this.refit());
+  /** PTY writes in order: pty_write is async, and the reply to a program's probe must reach it before xterm's DA1 reply. */
+  private writes: Promise<unknown> = Promise.resolve();
 
   constructor(private project: Project, private tab: Tab) {
     this.el.className = "term";
@@ -98,11 +101,11 @@ class TermSession {
     }));
     this.term.open(this.el);
     this.installClipboard();
+    this.installProgramStatus();
 
     this.term.onData((data) => {
       if (this.status === "exited" && data === "\r") return void this.start();
-      if (this.ptyId !== undefined) call("pty_write", { id: this.ptyId, data });
-      else if (this.status !== "exited") this.pending.push(data);
+      this.write(data);
     });
     this.term.onBell(() => {
       if (!this.visible || !document.hasFocus()) this.update({ attention: true });
@@ -185,7 +188,57 @@ class TermSession {
     }
   }
 
-  private update(patch: Partial<{ status: TabStatus; attention: boolean; title: string }>) {
+  private write(data: string) {
+    const id = this.ptyId;
+    if (id !== undefined) this.writes = this.writes.then(() => call("pty_write", { id, data }));
+    else if (this.status !== "exited") this.pending.push(data);
+  }
+
+  /**
+   * OSC 7501, the Program Status Protocol: claude and pi send `ESC ] 7501 ; ? ST` at startup and
+   * report their state only once the terminal echoes it. Reports are `state=working:app=pi:msg=<base64>`;
+   * records with an `id` describe sub-tasks, so only the root one (no id) is kept.
+   */
+  private installProgramStatus() {
+    this.term.parser.registerOscHandler(7501, (data) => {
+      if (data.startsWith("?")) {
+        this.term.input("\x1b]7501;?\x1b\\", false);
+        return true;
+      }
+      const f = Object.fromEntries(data.split(":").map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)]));
+      if (f.id !== undefined) return true;
+      let msg = "";
+      try {
+        msg = f.msg ? decodeBase64(f.msg) : "";
+      } catch {
+        msg = "";
+      }
+      this.report(f.state, msg);
+      return true;
+    });
+  }
+
+  /** Store a report; a change of state may sound and notify. idle and clear drop it. */
+  private report(state: string, msg: string) {
+    const prev = live[this.tab.id]?.agent;
+    if (state !== "working" && state !== "blocked" && state !== "done" && state !== "error") {
+      if (prev) this.update({ agent: undefined });
+      return;
+    }
+    const looking = this.visible && document.hasFocus();
+    this.update({ agent: { state: state as AgentState, msg, at: prev?.state === state ? prev.at : Date.now(), seen: looking } });
+    if (prev?.state !== state) onSignal(this.project.id, this.tab, state as AgentState, msg, looking);
+  }
+
+  /** On screen in a focused app: a bell or a finished report has been seen. */
+  see() {
+    if (!this.visible || !document.hasFocus()) return;
+    const l = live[this.tab.id];
+    if (l?.attention) this.update({ attention: false });
+    if (l?.agent && !l.agent.seen) this.update({ agent: { ...l.agent, seen: true } });
+  }
+
+  private update(patch: Partial<Live>) {
     if (this.disposed) return;
     if (patch.status) this.status = patch.status;
     setLive(this.tab.id, (prev) => ({ ...{ status: this.status, attention: false, title: "" }, ...prev, ...patch }));
@@ -226,7 +279,7 @@ class TermSession {
       // until xterm answers its cursor-position query, so flush that now.
       const queued = this.pending.join("");
       this.pending = [];
-      if (queued) call("pty_write", { id: this.ptyId, data: queued });
+      if (queued) this.write(queued);
     } catch (e) {
       this.term.write(`\r\n\x1b[31m${e}\x1b[0m\r\n`);
       this.exited(-1);
@@ -245,7 +298,7 @@ class TermSession {
       return;
     }
     this.term.write(`\r\n\x1b[90m[exited with code ${code}, press Enter to restart]\x1b[0m\r\n`);
-    this.update({ status: "exited" });
+    this.update({ status: "exited", agent: undefined });
   }
 
   setVisible(visible: boolean) {
@@ -266,7 +319,7 @@ class TermSession {
       this.refit();
       // output written while parked (display:none) is in the buffer but was never painted
       this.term.refresh(0, this.term.rows - 1);
-      this.update({ attention: false });
+      this.see();
     } else {
       this.dropWebgl();
     }
@@ -284,8 +337,7 @@ class TermSession {
 
   /** Type `text` into the terminal without submitting (used by "send to agent"). */
   sendText(text: string) {
-    if (this.ptyId !== undefined) call("pty_write", { id: this.ptyId, data: text });
-    else if (this.status !== "exited") this.pending.push(text);
+    this.write(text);
   }
 
   applyTheme() {
@@ -340,6 +392,11 @@ function parkElement() {
   }
   return park;
 }
+
+// Coming back to tri-code counts as looking at the windows on screen.
+window.addEventListener("focus", () => {
+  for (const s of sessions.values()) s.see();
+});
 
 // One listener for the whole app: follow the OS light/dark setting live.
 darkQuery.addEventListener("change", () => {
