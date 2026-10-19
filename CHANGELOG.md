@@ -2,6 +2,10 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.17 — 2026-10-19
+
+- Agent signals work on Windows. tri-code now ships Windows Terminal's ConPTY, which passes agents' status reports through to the terminal; the one built into Windows dropped them, so no badges, sounds or notifications showed up.
+
 ## 0.1.16 — 2026-10-19
 
 - Agent signals. claude and pi now tell tri-code whether they are working, waiting for you, done or failed, with no setup on their side. A dot on the project's icon, its workspace number and the window's tab shows it, and the title bar says it in words ("needs you · 2m ago"). The status line counts them across every project; click the counts or press `Alt+U` to go to the next agent that needs you.
