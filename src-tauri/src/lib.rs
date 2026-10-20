@@ -54,6 +54,7 @@ pub fn run() {
             fs::list_files,
             fs::read_file,
             fs::read_image,
+            fs::read_media,
             fs::write_file,
             git::git_status,
             git::git_diff,

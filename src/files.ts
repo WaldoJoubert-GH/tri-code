@@ -100,7 +100,31 @@ export async function saveText(project: Project, path: string, text: string): Pr
 /** A repo image as a `data:` URL, for the Markdown preview. */
 export const loadImage = (project: Project, path: string) => invoke<string>("read_image", { host: project.host, path });
 
-export const dirState = (project: Project, path: string): DirState | undefined => dirs[key(project.host, full(project, path))];
+export type Media = "image" | "video" | "audio";
+
+const MEDIA: Record<string, [Media, string]> = {
+  png: ["image", "image/png"], jpg: ["image", "image/jpeg"], jpeg: ["image", "image/jpeg"],
+  gif: ["image", "image/gif"], webp: ["image", "image/webp"], avif: ["image", "image/avif"],
+  bmp: ["image", "image/bmp"], ico: ["image", "image/x-icon"],
+  mp4: ["video", "video/mp4"], m4v: ["video", "video/mp4"], webm: ["video", "video/webm"],
+  mov: ["video", "video/quicktime"], ogv: ["video", "video/ogg"],
+  mp3: ["audio", "audio/mpeg"], wav: ["audio", "audio/wav"], ogg: ["audio", "audio/ogg"],
+  m4a: ["audio", "audio/mp4"], flac: ["audio", "audio/flac"],
+};
+
+/** The media kind and mime type a file window shows `path` as, by extension. */
+export function mediaType(path: string): [Media, string] | null {
+  const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
+  return MEDIA[ext] ?? null;
+}
+
+/** A media file as a blob URL; the caller revokes it. */
+export async function loadMedia(project: Project, path: string, mime: string): Promise<string> {
+  const buf = await invoke<ArrayBuffer>("read_media", { host: project.host, path });
+  return URL.createObjectURL(new Blob([buf], { type: mime }));
+}
+
+export const dirState =(project: Project, path: string): DirState | undefined => dirs[key(project.host, full(project, path))];
 export const textState = (project: Project, path: string): TextState | undefined => texts[key(project.host, path)];
 
 /** Open or focus the project's files window. */

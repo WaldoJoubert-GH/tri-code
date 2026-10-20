@@ -2,26 +2,59 @@
 // a rendered preview. Unsaved edits are a draft that every mode shows, so Preview
 // reflects them before Save. The body is a memo so switching modes swaps the DOM.
 
-import { Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js";
+import { Show, createEffect, createMemo, createResource, createSignal, on, onCleanup, type JSX } from "solid-js";
 import { type Project, type Tab } from "./state";
-import { loadImage, loadText, openFile, reloadText, saveText, textState } from "./files";
+import { type Media, loadImage, loadMedia, loadText, mediaType, openFile, reloadText, saveText, textState } from "./files";
 import { codeHtml } from "./code";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { openExternal, openUrlInProject } from "./browsers";
 import { flash } from "./ui";
 import "./files.css";
 
-type Preview = "md" | "html";
+type Preview = "md" | "html" | "svg";
 
 function previewKind(path: string): Preview | null {
   const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
   if (ext === "md" || ext === "markdown") return "md";
   if (ext === "html" || ext === "htm") return "html";
+  if (ext === "svg") return "svg";
   return null;
 }
 
 const bytes = (n: number) =>
   n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
+
+/** An image, video or audio file, played from a blob URL that is revoked when replaced or closed. */
+function MediaView(props: { project: Project; path: string; media: Media; mime: string; reloads: number }): JSX.Element {
+  const [url] = createResource(
+    () => ({ path: props.path, mime: props.mime, n: props.reloads }),
+    (s) => loadMedia(props.project, s.path, s.mime),
+  );
+  createEffect(() => {
+    const u = url.latest;
+    if (u) onCleanup(() => URL.revokeObjectURL(u));
+  });
+  const failed = () => {
+    flash(`can't play ${props.path}`);
+  };
+  return (
+    <Show when={!url.error} fallback={<div class="fnote bad">{String(url.error)}</div>}>
+      <Show when={url.latest} fallback={<div class="fnote">Loading…</div>}>
+        {(u) => (
+          <div class="fmedia">
+            {props.media === "image" ? (
+              <img src={u()} alt={props.path} />
+            ) : props.media === "video" ? (
+              <video src={u()} controls onError={failed} />
+            ) : (
+              <audio src={u()} controls onError={failed} />
+            )}
+          </div>
+        )}
+      </Show>
+    </Show>
+  );
+}
 
 export default function FileView(props: { project: Project; tab: Tab }): JSX.Element {
   const path = () => props.tab.path ?? "";
@@ -30,9 +63,12 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
   /** Unsaved text, or null when the editor matches the file. */
   const [draft, setDraft] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
+  /** Bumped by Reload so a media file is read again. */
+  const [reloads, setReloads] = createSignal(0);
+  const media = () => mediaType(path());
 
   createEffect(() => {
-    if (path()) loadText(props.project, path());
+    if (path() && !media()) loadText(props.project, path());
   });
   // A reused window gets a new path: start it in the default mode again.
   createEffect(on(path, () => { setMode("auto"); setDraft(null); }, { defer: true }));
@@ -60,7 +96,11 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
       setSaving(false);
     }
   };
-  const reload = () => { setDraft(null); reloadText(props.project, path()); };
+  const reload = () => {
+    if (media()) return setReloads((n) => n + 1);
+    setDraft(null);
+    reloadText(props.project, path());
+  };
 
   const onEditKey = (e: KeyboardEvent) => {
     const ta = e.currentTarget as HTMLTextAreaElement;
@@ -130,6 +170,8 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
     if (previewing() && kind() === "md") return markdown(t);
     if (previewing() && kind() === "html")
       return <iframe class="htm" sandbox="allow-scripts allow-forms allow-modals" srcdoc={t} title={path()} />;
+    if (previewing() && kind() === "svg")
+      return <div class="fmedia"><img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(t)}`} alt={path()} /></div>;
     return <pre class="code" innerHTML={codeHtml(t)} />;
   });
 
@@ -170,7 +212,9 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
         </Show>
         <button title={draft() !== null ? "Reload (discards changes)" : "Reload"} onClick={reload}>⟳</button>
       </div>
-      {body()}
+      <Show when={media()} fallback={body()}>
+        {(m) => <MediaView project={props.project} path={path()} media={m()[0]} mime={m()[1]} reloads={reloads()} />}
+      </Show>
     </div>
   );
 }

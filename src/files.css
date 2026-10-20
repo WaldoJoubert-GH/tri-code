@@ -140,3 +140,11 @@
 .prow .ph b { font-weight: 600; }
 .prow .pk { flex: none; display: flex; gap: 3px; }
 .prow .pk kbd { font-size: 10px; padding: 0 4px; }
+
+/* Image, video and audio, centred and scaled down to fit. A checkerboard shows transparency. */
+.fmedia {
+  flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 12px;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--muted) 14%, transparent) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+}
+.fmedia img, .fmedia video { max-width: 100%; max-height: 100%; object-fit: contain; }
+.fmedia audio { width: min(480px, 100%); }

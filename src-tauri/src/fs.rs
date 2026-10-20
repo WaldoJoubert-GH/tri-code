@@ -12,6 +12,8 @@ use crate::spawn::{expand_home, remote_path, sq};
 const LIMIT: u64 = 1_000_000;
 /// Largest image inlined into a Markdown preview.
 const IMAGE_LIMIT: u64 = 10_000_000;
+/// Largest image or video shown in a file window.
+const MEDIA_LIMIT: u64 = 500_000_000;
 
 #[derive(Debug, Serialize)]
 pub struct Entry {
@@ -84,6 +86,34 @@ pub async fn read_image(host: String, path: String) -> Result<String, String> {
             }
         };
         Ok(format!("data:{};base64,{b64}", image_mime(&path)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// An image, video or audio file's raw bytes for the file window, which plays them from a
+/// blob URL. Bytes cross the IPC as-is: a base64 `data:` URL of a video would be huge.
+#[tauri::command]
+pub async fn read_media(host: String, path: String) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = match host.as_str() {
+            "" | "local" => {
+                let p = expand_home(&path);
+                let meta = std::fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?;
+                if meta.len() > MEDIA_LIMIT {
+                    return Err(format!("{path}: too large to show ({} MB)", meta.len() / 1_000_000));
+                }
+                std::fs::read(&p).map_err(|e| format!("{path}: {e}"))?
+            }
+            _ => {
+                let inner = format!(
+                    "p={}; [ -f \"$p\" ] || exit 2; [ $(wc -c < \"$p\") -le {MEDIA_LIMIT} ] || exit 3; cat \"$p\"",
+                    remote_path(&path)
+                );
+                remote::run_bytes(&host, &format!("sh -c {}", sq(&inner)))?
+            }
+        };
+        Ok(tauri::ipc::Response::new(bytes))
     })
     .await
     .map_err(|e| e.to_string())?
