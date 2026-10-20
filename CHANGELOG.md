@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.22 — 2026-10-20
+
+- A tour for new users. The first launch opens a sample project with claude part-way through a task, a dev server, the files window and pi waiting on workspace 2, and walks through eight stops: projects, workspaces, windows, Go to File, agent signals, the status line, Appearance and the Command Palette. Most stops have something to try and tick once you have; pi asks you something on cue so you can see a signal arrive and jump to it with `Alt+U`. The sample agents are recordings, so nothing runs. Close the `tour` project when you're done, and replay it any time from `Alt+X` › Take the tour.
+- Web apps: set up a browser window like an agent. In the agents window (`Alt+;`), type an address where the command goes and the row becomes a web app, with its own name, icon, `Alt` hotkey and place in the `+` menu. Its windows open at that address and carry its name and icon. "app" mode hides the address and favourites bars (⋯ in the title bar shows them). Your project's favourites are offered as web apps to add.
+- Minimise a window: the – in its title bar or `Alt+N` takes it off the canvas without closing it, and the others tile into its space. Its tab stays in the toolbar, dimmed; click it, or focus it any other way, to bring it back where it was. `Alt+Shift+N` brings back the last one. The session keeps running, and a signal still shows on the dimmed tab.
+
 ## 0.1.21 — 2026-10-20
 
 - The file window shows images, and plays video and audio (mp4, webm, mp3 and more), locally and over ssh, instead of saying "Binary file". SVGs get a Preview next to Source and Edit.
