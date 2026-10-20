@@ -59,6 +59,7 @@ When ssh exits with code 255 (connection failure), the tab reconnects automatica
 
 ## Usage
 
+- The first launch opens a tour: a sample project with claude at work, a dev server, the files window and pi waiting on workspace 2, and a spotlight that walks through eight stops (projects, workspaces, windows, Go to File, agent signals, the status line, Appearance and the Command Palette). Most stops have something to try, and tick once you have. Its agents are recordings played into the terminal, so nothing runs; the folder is `tour/` in the app config directory. Close the `tour` project with its ×, and replay the tour from `Alt+X` › Take the tour.
 - The sidebar groups projects by environment: `local`, or an ssh destination. Add one with "⇄ Add environment": pick an alias from `~/.ssh/config` or type `user@host`. The connection is tested before the environment is added (remote hosts are listed over ssh, so key auth must work).
 - Open a project with "+ Open project" or `Alt+O` (or the `+` on an environment's header). Pick the environment on the left and the folder on the right. Type to filter the folder list; `Enter` goes into the highlighted folder, or opens the folder you are in when the filter is empty; `Backspace` on an empty filter goes up; `Ctrl+Enter` opens the highlighted folder; a path starting with `~` or `/` jumps there. Git repositories are marked. Recent folders for the environment are listed above the picker.
 - A new project is named after its folder and gets its icon from a logo file in it (`logo.svg`, `favicon.*`, `public/…`, `assets/…`, `src-tauri/icons/icon.png` and similar, with any SVG or favicon named logo/icon/brand/mark found up to four folders deep), or its first letter. Rename it by double-clicking its name, or in the Appearance panel (◐ or `Alt+P`), which also overrides the icon: another logo from the project, an uploaded image, a glyph or the letter.
@@ -131,6 +132,8 @@ Layout:
 - `IssuesPanel.tsx`: the issues window: the list, the full-width drill-down, the State Dropdown, labels, and the comment thread.
 - `updater.ts`: the update check (periodic and on demand), background download, and "Restart to update".
 - `About.tsx`: the About dialog: the running version, "Check for updates", and `CHANGELOG.md`.
+- `Tour.tsx`: the tour: its eight stops, the spotlight and card, the try-it checks, and the closing card.
+- `demo.ts`: the tour's scripted terminals (claude, pi, a dev server), played into xterm in place of a PTY, with real OSC 7501 reports.
 - `styles.css`: application styles.
 - `vite-env.d.ts`: Vite type declarations.
 
@@ -147,3 +150,4 @@ Layout:
 - `pty.rs`: PTY sessions (spawn, output channel, write, resize, kill) and remote session cleanup.
 - `spawn.rs`: builds the program and arguments for local and ssh tabs, including the shpool and tmux fallback. Contains the unit tests and the ignored SSH end-to-end test.
 - `store.rs`: loads and atomically saves `state.json`.
+- `tour.rs`: `tour_folder` writes the tour's sample files (from `src-tauri/tour/`) into the app config directory.

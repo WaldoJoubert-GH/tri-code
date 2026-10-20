@@ -561,3 +561,34 @@ svg.lucide { flex: none; display: block; }
   .app, .rail aside { transition: none; }
   .bg { transition: none; }
 }
+
+/* Tour (src/Tour.tsx, design/onboarding.html variant D): a spotlight over the app and a card
+   beside it. Under the popovers (10000) and dialogs (9999), so the ones a stop opens stay usable;
+   the spotlight lets clicks through, so you can try each stop while it is up. */
+.tour-spot {
+  position: fixed; z-index: 9990; border-radius: 8px; pointer-events: none;
+  box-shadow: 0 0 0 9999px var(--scrim), 0 0 0 2px var(--accent); transition: all 200ms ease;
+}
+.tour-card {
+  position: fixed; z-index: 9991; width: 330px; padding: 14px 16px 12px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 24px 60px -16px var(--shadow);
+  transition: left 200ms ease, top 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) { .tour-spot, .tour-card { transition: none; } }
+.tour-card .tn { font: 600 10.5px var(--mono); color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+.tour-card h4 { margin: 4px 0 6px; font-size: 14px; }
+.tour-card p, .tour-end p { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.tour-card p b, .tour-end p b { color: var(--text); }
+.tour-card .try { margin: 0 0 10px; padding: 7px 9px; border-radius: 6px; font-size: 12px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.tour-card .try.did { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.tour-card .row, .tour-end .row { display: flex; align-items: center; gap: 6px; }
+.tour-card .dots { display: flex; gap: 4px; margin-right: auto; }
+.tour-card .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+.tour-card .dots i.on { background: var(--accent); }
+.tour-card .quiet, .tour-end .quiet { border-color: transparent; background: none; color: var(--muted); }
+.tour-card .quiet:hover, .tour-end .quiet:hover { color: var(--text); }
+.tour-end { width: min(460px, calc(100% - 32px)); padding: 20px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow); }
+.tour-end h3 { margin: 0 0 6px; font-size: 16px; }
+.tour-end .row { justify-content: flex-end; }
+.project .sample { font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
+.rail:not(.peek) .project .sample { display: none; }

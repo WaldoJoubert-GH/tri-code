@@ -10,6 +10,7 @@ mod pty;
 mod remote;
 mod spawn;
 mod store;
+mod tour;
 mod usage;
 
 use std::sync::Arc;
@@ -87,6 +88,7 @@ pub fn run() {
             plane::plane_check_token,
             store::state_load,
             store::state_save,
+            tour::tour_folder,
             browser::browser_open,
             browser::browser_bounds,
             browser::browser_show,

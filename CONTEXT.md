@@ -49,6 +49,13 @@ _Avoid_: Host group, machine, server.
 The `Alt+O` dialog: Environments on the left (with "New environment"), a Folder Picker on the right. Opening a folder that is already a project focuses it.
 _Avoid_: Add project form, folder browser.
 
+**Tour**:
+The first-launch walkthrough (`Tour.tsx`): a spotlight over the real app and a card with eight stops, most with something to try that ticks once done. Runs in the Sample Project. `toured` in `state.json` records that it was finished or skipped; a state file from before the tour counts as toured. Chosen from design/onboarding.html (variant D).
+_Avoid_: Onboarding wizard, coach marks.
+
+**Sample Project**:
+The `tour` project (`sample: true`), in `tour/` under the app config dir. Its terminals are Demo Tabs: scripted sessions (`demo.ts`) that write OSC 7501 reports into xterm, so signals, badges and notifications behave as for a real agent. Not added to Recent; closing it loses nothing.
+
 **Go to File**:
 The `Alt+T` box under the toolbar path (a click on the path opens it too). One field that searches the project's File Index by fuzzy match and, when it is empty or ends in `/`, lists that folder. Opens the pick in the project's `file` Window.
 _Avoid_: Quick open, file palette, Ctrl+P.

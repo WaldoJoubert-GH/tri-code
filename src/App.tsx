@@ -24,6 +24,7 @@ import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers
 import { FavPopover, favEditOpen } from "./favs";
 import { GoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
+import { Tour, startTour, tourOpen } from "./Tour";
 import { ensureSession, setLinkHandler } from "./terms";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { appVersion, installUpdate, startUpdateChecks, updateReady } from "./updater";
@@ -60,6 +61,8 @@ export default function App() {
     loadIcons();
     setReady(true);
     startUpdateChecks();
+    // A first launch (or one that quit mid-tour) opens the tour's sample project.
+    if (!app.toured) void startTour();
   });
   persistChanges(ready);
 
@@ -90,7 +93,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen() || tourOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -130,6 +133,7 @@ export default function App() {
       <AboutDialog />
       <SignalsPopover />
       <IconPicker />
+      <Tour />
     </div>
   );
 }
@@ -206,7 +210,7 @@ function Toolbar() {
           Appearance
         </button>
       </Show>
-      <button class="tool" title="Command palette (Alt+X)" aria-label="Command palette" onClick={togglePalette}>
+      <button class="tool" id="palBtn" title="Command palette (Alt+X)" aria-label="Command palette" onClick={togglePalette}>
         <Icon name="square-chevron-right" size={14} />
       </button>
       <button class="tool" title="Hotkeys (Alt+/)" onClick={() => setHelpOpen(!helpOpen())}>

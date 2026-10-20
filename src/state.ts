@@ -63,7 +63,12 @@ export type Tab = {
   cmd?: string;
   /** Minimised: when (ms), so Alt+Shift+N brings back the latest. Off the canvas but still in the Tab Strip. */
   min?: number;
+  /** `term` tabs of the tour's sample project only: a scripted session played in place of a PTY (see demo.ts). */
+  demo?: DemoKind;
 };
+
+/** The tour's scripted terminals: claude at work, pi waiting to ask, a dev server. */
+export type DemoKind = "claude" | "pi" | "server";
 
 /** The page a browser window shows. */
 export const activePage = (t: Tab): Page | undefined => t.pages?.find((p) => p.id === t.page) ?? t.pages?.[0];
@@ -141,6 +146,8 @@ export type Project = {
   branch?: string;
   /** A Worktree only: the Slug-ID of the issue it was made for, if any. */
   issue?: string;
+  /** The tour's sample project: its terminals are scripted, and it can be closed with nothing lost. */
+  sample?: boolean;
 };
 
 /** The signals that alert. `working` only badges. */
@@ -176,6 +183,8 @@ type Persisted = {
   sidebarCollapsed: boolean;
   /** App-wide sounds and alerts for agent signals (the bell in the status line). */
   notify: NotifySettings;
+  /** The tour was finished or skipped, so a launch with no projects no longer starts it. */
+  toured: boolean;
 };
 
 export type TabStatus = "connecting" | "running" | "reconnecting" | "exited";
@@ -194,7 +203,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false, notify: defaultNotify() });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -244,6 +253,26 @@ export function addProject(name: string, host: string, path: string): string {
     s.activeProject = id;
     if (!s.environments.includes(host)) s.environments.push(host);
     s.recent = [{ host, path }, ...s.recent.filter((r) => r.host !== host || r.path !== path)].slice(0, RECENT_MAX);
+  }));
+  return id;
+}
+
+/**
+ * Add the tour's sample project at `path` and make it active: claude at work, a dev server and
+ * the files window on workspace 1, pi on workspace 2. Not added to Recent. Returns its id.
+ */
+export function addSampleProject(path: string): string {
+  const id = newId();
+  const agent = (a: string) => app.agents.find((x) => x.id === a);
+  const term = (space: number, demo: DemoKind, a: string, name: string, cmd: string): Tab =>
+    ({ id: newId(), kind: "term", space, demo, agent: agent(a)?.id, name, cmd });
+  const tabs = [term(0, "claude", "claude", "claude", "claude"), term(0, "server", "shell", "shell", ""), { id: newId(), kind: "files", space: 0 } as Tab, term(1, "pi", "pi", "pi", "pi")];
+  const spaces = Array.from({ length: SPACES }, newSpace);
+  spaces[0].focus = tabs[0].id;
+  spaces[1].focus = tabs[3].id;
+  setApp(produce((s) => {
+    s.projects.push({ id, name: "tour", host: "local", path, tabs, ws: 0, spaces, accent: "#bb9af7", bg: "none", dim: 0, favs: [], sample: true });
+    s.activeProject = id;
   }));
   return id;
 }
@@ -622,6 +651,7 @@ function migrate(raw: any): Persisted {
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
       favs: p.favs ?? [], icon: p.icon, notify: p.notify,
       ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue } : {}),
+      ...(p.sample ? { sample: true } : {}),
     };
   });
   // A Worktree whose repo project is gone stands on its own.
@@ -633,12 +663,18 @@ function migrate(raw: any): Persisted {
     environments, envStyles: raw.envStyles ?? {}, projects, recent: raw.recent ?? [],
     activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(), gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
     notify: { ...defaultNotify(), ...raw.notify },
+    // Anyone with a state file from before the tour already knows their way around.
+    toured: raw.toured ?? true,
   };
 }
 
 export async function loadState() {
   const json = await invoke<string | null>("state_load");
   if (json) setApp(migrate(JSON.parse(json)));
+}
+
+export function setToured() {
+  setApp("toured", true);
 }
 
 /** Debounced save on any change. Call inside a component, after loadState. */

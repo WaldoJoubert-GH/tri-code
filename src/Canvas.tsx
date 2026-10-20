@@ -330,6 +330,7 @@ export default function Canvas(props: { project: Project }) {
     return (
       <div
         class="win"
+        data-tab={id}
         classList={{
           focused: focused(),
           "sig-blocked": sigOf(tab) === "blocked",

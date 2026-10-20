@@ -1,0 +1,12 @@
+{
+  "name": "tour",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.3"
+  }
+}

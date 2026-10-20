@@ -10,6 +10,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { AgentState, Live, Project, Tab, TabStatus, isRemote, isTerminal, live, sessionName, setLive } from "./state";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
+import { Demo, playDemo } from "./demo";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;
@@ -76,6 +77,8 @@ class TermSession {
   private observer = new ResizeObserver(() => this.refit());
   /** PTY writes in order: pty_write is async, and the reply to a program's probe must reach it before xterm's DA1 reply. */
   private writes: Promise<unknown> = Promise.resolve();
+  /** The tour's sample project: a scripted session in place of the PTY. */
+  private demo?: Demo;
 
   constructor(private project: Project, private tab: Tab) {
     this.el.className = "term";
@@ -104,6 +107,7 @@ class TermSession {
     this.installProgramStatus();
 
     this.term.onData((data) => {
+      if (this.demo) return this.demo.input(data);
       if (this.status === "exited" && data === "\r") return void this.start();
       this.write(data);
     });
@@ -246,6 +250,11 @@ class TermSession {
 
   private async start() {
     if (this.disposed) return;
+    if (this.tab.demo) {
+      this.demo = playDemo(this.tab.demo, this.project.path, (s) => this.term.write(s));
+      this.update({ status: "running" });
+      return;
+    }
     this.pending = [];
     this.update({ status: this.status === "reconnecting" ? "reconnecting" : "connecting" });
 
@@ -329,6 +338,10 @@ class TermSession {
     this.term.focus();
   }
 
+  askDemo() {
+    this.demo?.ask();
+  }
+
   /** Paste `text` as the terminal would (bracketed when the app asks), so its newlines do not submit. */
   paste(text: string) {
     // Without bracketed paste every newline would arrive as Enter, so keep it to one line.
@@ -363,6 +376,7 @@ class TermSession {
     this.disposed = true;
     this.visible = false;
     this.observer.disconnect();
+    this.demo?.stop();
     if (this.ptyId !== undefined) call("pty_kill", { id: this.ptyId });
     if (isRemote(this.project)) {
       call("remote_kill_session", { host: this.project.host, session: sessionName(this.project, this.tab) });
@@ -443,6 +457,11 @@ export function pasteText(tabId: string, text: string): boolean {
   if (!s) return false;
   s.paste(text);
   return true;
+}
+
+/** The tour: make a scripted pi stop and ask for permission. */
+export function askDemo(tabId: string) {
+  sessions.get(tabId)?.askDemo();
 }
 
 export function closeSession(tabId: string) {

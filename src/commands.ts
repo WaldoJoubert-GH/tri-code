@@ -21,6 +21,7 @@ import { openGitPanel } from "./git";
 import { branchOf, openNewWorktree, removeWorktree } from "./worktrees";
 import { hotkeyKeys, hotkeyProblem, launchAgent, newTerminalLike, openAgentsPanel } from "./agents";
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
+import { startTour } from "./Tour";
 import { flash } from "./ui";
 
 export type Command = {
@@ -174,6 +175,7 @@ export function commands(): Command[] {
   add({ id: "bell", group: "Signals", title: "Signals and sounds for every project", icon: "bell-dot", run: () => toggleSignals() });
   add({ id: "dnd", group: "Signals", title: app.notify.dnd ? "Turn off Do not disturb" : "Do not disturb", hint: "badges only", icon: app.notify.dnd ? "bell" : "bell-off", run: toggleDnd });
   add({ id: "sidebar", group: "App", title: app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar", icon: "panel-left-close", keys: ["Alt", "S"], run: toggleSidebar });
+  add({ id: "tour", group: "App", title: "Take the tour", hint: "a sample project and eight stops", icon: "map", run: () => void startTour() });
   add({ id: "help", group: "App", title: "Hotkeys", icon: "keyboard", keys: ["Alt", "/"], run: () => setHelpOpen(true) });
   const u = updateReady();
   if (u) add({ id: "update", group: "App", title: `Restart to update to ${u.version}`, icon: "refresh-cw", run: installUpdate });

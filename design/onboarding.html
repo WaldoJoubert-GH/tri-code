@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tri-code · onboarding prototype</title>
+<!--
+  PROTOTYPE: throwaway. Not imported by the app; open this file directly in a browser.
+  Question: "What should a new user's first minutes in tri-code look like?"
+
+  Today (v0.1.21) a first launch shows an empty canvas with one line, "Open a project (Alt+O) to
+  get started.", and an empty LOCAL group in the sidebar. Nothing checks that claude or pi is
+  installed, nothing explains environments, workspaces, the tab strip or agent signals, and
+  desktop notifications are never asked for up front.
+
+  OUTCOME (picked 2026-10-20): variant D, the guided tour, with two more stops added: Go to File
+  (Alt+T, after the windows stop) and Appearance (Alt+P, before the palette). Eight stops in all.
+  Built in src/Tour.tsx (stops, spotlight, try-it checks), src/demo.ts (scripted terminals in place
+  of a PTY), addSampleProject in src/state.ts and src-tauri/src/tour.rs (the sample folder). The pi
+  window lives on workspace 2, so "make an agent ask" shows the workspace badge and Alt+U jumps there.
+
+  Four structurally different answers, switchable from the floating bar (also ← / →). Switching
+  resets to a first launch. URL keeps the choice: onboarding.html?variant=B (served) or #B (file://).
+    A · Start page: the empty canvas becomes a welcome page: git repos found under ~/code, ssh
+        hosts from ~/.ssh/config, the agents found on PATH, four hotkeys. One click opens a
+        project with an agent. Nothing is modal, and nothing shows once a project is open.
+    B · Setup wizard: a four-step dialog before the app (agents, environments, first project,
+        signals). Everything is checked and configured up front; you land on a working canvas.
+    C · Checklist: the app as it is today, plus a "Getting started" card under the sidebar.
+        Its six items tick themselves as you do them in the real UI; "show me" points at the control.
+    D · Guided tour: the first launch opens a sample project with windows already tiled and an
+        agent mid-task. A spotlight walks through eight stops, then hands over to Open project.
+
+  All four drive the same in-memory app (projects, windows, workspaces, signals). The "state"
+  button on the bar shows what each variant would persist in state.json and what it would detect
+  on the host, and has toggles for the machine: is claude / pi on PATH, are there ssh aliases.
+  Nothing is detected for real; nothing persists.
+-->
+<style>
+/* ---- palette: copied from design/canvas.html, which mirrors src/styles.css ---- */
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --violet: #7c4dbd; --scrim: rgba(30,34,44,.35); --shadow: rgba(30,34,44,.22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --violet: #bb9af7; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+    --accent: var(--accent-raw);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+  --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+  --bad: #f7768e; --violet: #bb9af7; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+  --accent: var(--accent-raw);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 var(--ui); overflow: hidden; user-select: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+button:disabled { opacity: .45; cursor: default; }
+kbd { font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; color: var(--text); background: var(--panel); }
+code { font: 11.5px var(--mono); }
+
+/* ---- app chrome (from design/canvas.html) ---- */
+.app { display: grid; height: 100%; grid-template-columns: 220px 1fr; grid-template-rows: 34px 1fr 26px; grid-template-areas: "side top" "side canvas" "side status"; }
+aside { grid-area: side; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 6px 8px; overflow-y: auto; overflow-x: hidden; min-width: 0; display: flex; flex-direction: column; }
+.side-head { display: flex; align-items: center; justify-content: space-between; height: 26px; padding-left: 8px; flex: none; }
+.side-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.collapse { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+aside h2 { margin: 10px 4px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; align-items: center; gap: 6px; height: 18px; }
+aside h2 .ic { width: 28px; text-align: center; font-size: 12px; }
+.project { display: flex; align-items: center; gap: 8px; padding: 4px; border-radius: 6px; cursor: pointer; position: relative; }
+.project:hover { background: var(--hover); }
+.project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
+.project .swatch { width: 28px; height: 28px; border-radius: 7px; flex: none; display: grid; place-items: center; position: relative; background: color-mix(in srgb, var(--pa) 22%, var(--raised)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pa) 45%, transparent); }
+.project .swatch b { font-size: 13px; font-weight: 600; text-transform: uppercase; }
+.project.active .swatch { background: var(--pa); }
+.project.active .swatch b { color: #111; }
+.project .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project .count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.project .sample { font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
+.swatch .sb { position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--panel); }
+.env-empty { display: block; padding: 4px 4px 4px 40px; color: var(--muted); font-size: 12px; text-align: left; }
+.env-empty:hover { color: var(--text); }
+.add { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 10px; white-space: nowrap; padding: 6px 4px; text-align: left; color: var(--muted); border-radius: 6px; }
+.add + .add { margin-top: 0; }
+.add .glyph { width: 28px; flex: none; text-align: center; font-size: 15px; line-height: 18px; }
+.add kbd { margin-left: auto; font-size: 10px; }
+.add:hover { background: var(--hover); color: var(--text); }
+
+.top { grid-area: top; display: flex; align-items: stretch; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; overflow: hidden; }
+.spaces { display: flex; align-self: center; gap: 2px; margin: 0 6px; flex: none; }
+.spaces button { width: 26px; height: 22px; border-radius: 4px; color: var(--muted); font: 600 11px var(--mono); border: 1px solid transparent; position: relative; }
+.spaces button.used { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.spaces button[aria-current="true"] { background: color-mix(in srgb, var(--accent) 22%, var(--raised)); border-color: var(--accent); color: var(--text); }
+.spaces button .sb { position: absolute; top: 1px; right: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+.sep { width: 1px; background: var(--line); margin: 7px 4px; flex: none; }
+.tabs { display: flex; align-items: stretch; flex: none; }
+.tabs .tab, .tabs .tab-add { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); white-space: nowrap; box-shadow: inset 0 -2px transparent; }
+.tabs .tab:hover, .tabs .tab-add:hover { color: var(--text); background: var(--hover); }
+.tabs .tab[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.tabs .tab .att { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); }
+.tabs .tab-add { justify-content: center; width: 30px; padding: 0; font-size: 15px; }
+.where { align-self: center; height: 24px; margin: 0 6px; padding: 0 8px; color: var(--muted); font: 11px var(--mono); flex: 1 1 200px; max-width: 420px; margin-right: auto; text-align: left; border: 1px solid transparent; border-radius: 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.where:hover { border-color: var(--line); background: var(--bg); color: var(--text); }
+.tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
+.tool:hover { color: var(--text); background: var(--hover); }
+
+.viewport { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); }
+.world { position: absolute; inset: 0; padding: 12px; display: grid; gap: 12px; grid-template-columns: minmax(0, 58fr) minmax(0, 42fr); }
+.world.one { grid-template-columns: minmax(0, 1fr); }
+.world > .win:first-child { grid-row: 1 / -1; }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 8px; color: var(--muted); text-align: center; }
+.empty b { color: var(--text); font-weight: 600; }
+
+.win { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; cursor: default; }
+.win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.win.sig-blocked:not(.focused) { border-color: var(--warn); }
+.bar { height: 28px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); }
+.win.focused .bar { color: var(--text); }
+.bar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.bar .dot.exited { background: var(--bad); }
+.bar .kind { font-weight: 600; }
+.bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.bar .x { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); }
+.bar .x:hover { background: var(--hover); color: var(--text); }
+.chip { font: 600 10.5px var(--mono); padding: 1px 7px; border-radius: 999px; }
+.chip.working { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.chip.blocked { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.chip.done { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.screen { flex: 1; margin: 0; padding: 8px 10px; overflow: hidden; white-space: pre-wrap; font: 12.5px/17px var(--mono); user-select: text; }
+.win:not(.focused) .screen { opacity: .72; }
+.cursor { background: var(--text); color: var(--bg); }
+.c-a { color: var(--accent); } .c-m { color: var(--muted); } .c-o { color: var(--ok); } .c-w { color: var(--warn); } .c-v { color: var(--violet); } .c-b { color: var(--bad); }
+.page { flex: 1; display: grid; grid-template-rows: 32px 1fr; }
+.page .addr { display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
+.page .blank { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+
+.status { grid-area: status; display: flex; align-items: center; gap: 14px; padding: 0 10px; background: var(--panel); border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; }
+.status .focus { color: var(--text); font: 11px var(--mono); }
+.status .flash { color: var(--accent); font: 11px var(--mono); }
+.status .sigs { font: 11px var(--mono); color: var(--warn); padding: 1px 4px; border-radius: 4px; }
+.status .sigs:hover { background: var(--hover); }
+.status .hints { display: flex; gap: 12px; margin-left: auto; overflow: hidden; }
+.status .hints span { display: flex; gap: 4px; align-items: center; }
+.status .ver { font: 11px var(--mono); }
+
+/* ---- shared overlays: Open project, New window menu, palette ---- */
+.scrim { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; background: var(--scrim); }
+.dlg { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow); overflow: hidden; }
+.dlg > header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.dlg > header button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); font-size: 15px; }
+.open-dlg { width: min(720px, calc(100% - 32px)); height: min(460px, calc(100% - 32px)); display: grid; grid-template-columns: 190px 1fr; grid-template-rows: auto 1fr; }
+.open-dlg > header { grid-column: 1 / -1; }
+.open-dlg nav { display: flex; flex-direction: column; gap: 1px; padding: 8px 6px; border-right: 1px solid var(--line); }
+.open-dlg nav .mt { padding: 4px 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.env { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 5px; text-align: left; }
+.env:hover { background: var(--hover); }
+.env[aria-pressed="true"] { background: var(--raised); }
+.env .nm { flex: 1; }
+.env .kindt { font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
+.open-dlg .pane { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; padding: 10px; }
+.picker { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.picker .crumbs { padding: 6px 8px; font: 11.5px var(--mono); color: var(--muted); border-bottom: 1px solid var(--line); }
+.picker .crumbs button { color: var(--muted); padding: 0 2px; border-radius: 3px; }
+.picker .crumbs button:hover { color: var(--text); background: var(--hover); }
+.picker .list { flex: 1; overflow-y: auto; font-size: 12.5px; }
+.prow { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
+.prow:hover { background: var(--hover); }
+.prow.sel { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+.prow .pi { width: 12px; color: var(--muted); }
+.git { font: 10px var(--mono); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent); border-radius: 3px; padding: 0 3px; }
+.prow .use { margin-left: auto; color: var(--accent); font-size: 11.5px; visibility: hidden; }
+.prow.sel .use, .prow:hover .use { visibility: visible; }
+.picker .pfoot { display: flex; align-items: center; gap: 6px; padding: 6px; border-top: 1px solid var(--line); }
+.picker .pfoot .here { flex: 1; font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.btn { padding: 5px 12px; border-radius: 5px; border: 1px solid var(--line); color: var(--text); white-space: nowrap; }
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, var(--text)); }
+.btn.quiet { border-color: transparent; color: var(--muted); }
+.btn.quiet:hover { color: var(--text); }
+.menu { position: fixed; z-index: 850; min-width: 200px; padding: 4px; display: grid; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px -12px var(--shadow); }
+.menu .mt { padding: 5px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.menu button { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; color: var(--muted); font-size: 12.5px; text-align: left; }
+.menu button:hover { background: var(--hover); color: var(--text); }
+.menu button kbd { margin-left: auto; }
+.menu button .miss { margin-left: auto; font-size: 10.5px; color: var(--warn); }
+.menu .msep { height: 1px; margin: 4px 2px; background: var(--line); }
+.pal { position: fixed; z-index: 850; top: 44px; left: 50%; transform: translateX(-50%); width: min(520px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px -12px var(--shadow); overflow: hidden; }
+.pal input { width: 100%; padding: 9px 12px; border: 0; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--text); font: 13px var(--mono); outline: none; }
+.pal button { display: flex; width: 100%; gap: 8px; padding: 6px 12px; text-align: left; color: var(--muted); }
+.pal button:hover, .pal button.hi { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); }
+.pal button kbd { margin-left: auto; }
+.toastn { position: fixed; z-index: 700; right: 16px; top: 16px; width: 300px; padding: 10px 12px; border-radius: 10px; background: var(--raised); border: 1px solid var(--line); box-shadow: 0 18px 50px -12px var(--shadow); font-size: 12px; }
+.toastn b { display: block; margin-bottom: 2px; }
+.pulse { animation: pulse 1s ease-in-out 3; position: relative; z-index: 50; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 70%, transparent); } }
+
+.goto { position: fixed; z-index: 850; width: 440px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px -12px var(--shadow); overflow: hidden; }
+.goto input { width: 100%; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--text); font: 12.5px var(--mono); outline: none; }
+.goto .gl { max-height: 260px; overflow-y: auto; padding: 4px; }
+.goto .gr { display: block; width: 100%; padding: 5px 8px; border-radius: 5px; text-align: left; font: 12px var(--mono); color: var(--text); }
+.goto .gr:hover, .goto .gr.hi { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.goto .gr .dir { color: var(--muted); }
+.goto .gr b { color: var(--accent); font-weight: 600; }
+.goto .gh { padding: 6px 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; display: flex; gap: 12px; }
+.apop { position: fixed; z-index: 850; width: 280px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px -12px var(--shadow); display: grid; gap: 10px; }
+.apop .al { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.apop .nm { display: flex; gap: 8px; align-items: center; }
+.apop .nm input { flex: 1; padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; }
+.apop .sw { display: flex; gap: 6px; flex-wrap: wrap; }
+.apop .sw button { width: 24px; height: 24px; border-radius: 6px; background: var(--c); }
+.apop .sw button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--c); }
+.apop .icons { display: flex; gap: 6px; }
+.apop .icons span { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; background: var(--raised); font-weight: 600; }
+.apop .icons span.on { background: var(--pa); color: #111; }
+.code { flex: 1; margin: 0; padding: 8px 0; overflow: hidden; font: 12px/17px var(--mono); white-space: pre; }
+.code .ln { display: inline-block; width: 36px; padding-right: 10px; text-align: right; color: var(--muted); opacity: .7; }
+
+/* ---- shared bits for onboarding UI ---- */
+.ok { color: var(--ok); } .warnc { color: var(--warn); } .bad { color: var(--bad); } .mut { color: var(--muted); }
+.pill { font: 10.5px var(--mono); padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.pill.warnc { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.pill.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.copy { display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 3px 4px 3px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; font: 11px var(--mono); color: var(--text); }
+.copy span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
+.copy button { font: 11px var(--ui); color: var(--accent); padding: 1px 6px; border-radius: 4px; }
+.copy button:hover { background: var(--hover); }
+.aglyph { width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center; background: var(--raised); font: 600 11px var(--mono); flex: none; }
+
+/* ---- A · Start page ---- */
+.start { position: absolute; inset: 0; overflow-y: auto; padding: 40px 32px 90px; }
+.start-in { max-width: 860px; margin: 0 auto; }
+.start h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.start .lede { margin: 6px 0 26px; color: var(--muted); max-width: 64ch; }
+.start-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; }
+.start h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.start h3 .src { text-transform: none; letter-spacing: 0; font: 400 10.5px var(--mono); }
+.start section + section { margin-top: 24px; }
+.repo { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 6px; text-align: left; }
+.repo:hover { background: color-mix(in srgb, var(--panel) 70%, var(--hover)); }
+.repo .ri { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-weight: 600; text-transform: uppercase; background: color-mix(in srgb, var(--pa) 25%, var(--raised)); flex: none; }
+.repo .rn { font-weight: 600; }
+.repo .rp { color: var(--muted); font: 11px var(--mono); }
+.repo .go { margin-left: auto; color: var(--accent); font-size: 12px; opacity: 0; display: flex; gap: 6px; align-items: center; }
+.repo:hover .go { opacity: 1; }
+.linkrow { display: flex; gap: 8px; margin-top: 8px; }
+.host { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; }
+.host .hn { font: 600 12.5px var(--mono); }
+.host .hs { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.agent { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; }
+.agent + .agent { border-top: 1px solid var(--line); }
+.agent .ab { flex: 1; min-width: 0; }
+.agent .an { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.agent .ad { color: var(--muted); font-size: 11.5px; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; align-items: center; font-size: 12.5px; }
+.keys dt { display: flex; gap: 3px; }
+.keys dd { margin: 0; color: var(--muted); }
+.start .foot { margin-top: 28px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+
+/* ---- B · Wizard ---- */
+.wiz { width: min(680px, calc(100% - 32px)); height: min(540px, calc(100% - 32px)); display: grid; grid-template-rows: auto auto 1fr auto; }
+.wiz > header { font-weight: 600; }
+.steps { display: flex; gap: 0; padding: 0 14px; border-bottom: 1px solid var(--line); }
+.steps button { display: flex; align-items: center; gap: 7px; padding: 10px 12px 9px; color: var(--muted); font-size: 12px; box-shadow: inset 0 -2px transparent; }
+.steps button .n { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 600 10px var(--mono); border: 1px solid var(--line); }
+.steps button.done .n { background: var(--ok); border-color: var(--ok); color: var(--bg); }
+.steps button[aria-current="step"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.steps button[aria-current="step"] .n { border-color: var(--accent); color: var(--accent); }
+.wbody { overflow-y: auto; padding: 18px 22px; }
+.wbody h2 { margin: 0 0 4px; font-size: 16px; }
+.wbody .sub { margin: 0 0 16px; color: var(--muted); max-width: 62ch; }
+.wfoot { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.wfoot .sp { flex: 1; }
+.wfoot .note { color: var(--muted); font-size: 11.5px; }
+.wlist { display: grid; gap: 8px; }
+.wrow { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.wrow .wb { flex: 1; min-width: 0; }
+.wrow .wt { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.wrow .wd { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.wrow.choose { cursor: pointer; }
+.wrow.choose:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.wrow.picked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.wsplit { display: grid; grid-template-columns: 170px 1fr; gap: 12px; height: 270px; }
+.wsplit nav { display: flex; flex-direction: column; gap: 1px; }
+.agents-pick { display: flex; gap: 6px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+.agents-pick .lab { color: var(--muted); font-size: 12px; margin-right: 4px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { padding: 4px 10px; color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.notif-demo { display: flex; gap: 12px; align-items: center; margin-top: 4px; }
+.sigrow { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+
+/* ---- C · Checklist ---- */
+.gs { margin-top: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; flex: none; }
+.gs-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; font-weight: 600; font-size: 12px; }
+.gs-head .prog { margin-left: auto; font: 11px var(--mono); color: var(--muted); }
+.gs-bar { height: 3px; background: var(--line); }
+.gs-bar i { display: block; height: 100%; background: var(--ok); transition: width 300ms ease; }
+.gs ol { list-style: none; margin: 0; padding: 4px 0; }
+.gs li { display: grid; grid-template-columns: 18px 1fr; gap: 0 8px; padding: 6px 10px; font-size: 12px; }
+.gs li .ck { width: 14px; height: 14px; margin-top: 1px; border-radius: 50%; border: 1.5px solid var(--muted); display: grid; place-items: center; font-size: 9px; color: var(--bg); }
+.gs li.done .ck { background: var(--ok); border-color: var(--ok); }
+.gs li.done .t { color: var(--muted); text-decoration: line-through; }
+.gs li.next { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.gs li .d { grid-column: 2; color: var(--muted); font-size: 11px; margin-top: 2px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.gs li .d kbd { font-size: 10px; }
+.gs li .show { color: var(--accent); font-size: 11px; padding: 0 2px; }
+.gs-foot { display: flex; justify-content: space-between; padding: 6px 10px; border-top: 1px solid var(--line); font-size: 11px; }
+.gs-foot button { color: var(--muted); } .gs-foot button:hover { color: var(--text); }
+.gs-done { padding: 10px; font-size: 12px; color: var(--muted); }
+.gs-done b { color: var(--ok); }
+
+/* ---- D · Tour ---- */
+.spot { position: fixed; z-index: 800; border-radius: 8px; box-shadow: 0 0 0 9999px var(--scrim), 0 0 0 2px var(--accent); pointer-events: none; transition: all 220ms ease; }
+.coach { position: fixed; z-index: 801; width: 320px; padding: 14px 16px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 24px 60px -16px var(--shadow); transition: top 220ms ease, left 220ms ease; }
+.coach .cn { font: 600 10.5px var(--mono); color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+.coach h4 { margin: 4px 0 6px; font-size: 14px; }
+.coach p { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
+.coach p kbd { font-size: 10.5px; }
+.coach .try { margin: -2px 0 10px; padding: 7px 9px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 10%, transparent); font-size: 12px; }
+.coach .try.did { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.coach .row { display: flex; align-items: center; gap: 6px; }
+.coach .dots { display: flex; gap: 4px; margin-right: auto; }
+.coach .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+.coach .dots i.on { background: var(--accent); }
+.tour-end { width: min(440px, calc(100% - 32px)); padding: 20px 22px; }
+.tour-end h2 { margin: 0 0 6px; font-size: 16px; }
+.tour-end p { margin: 0 0 14px; color: var(--muted); }
+.tour-end .row { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ---- prototype switcher + state drawer (throwaway, sit above everything) ---- */
+.proto-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px; padding: 7px 8px; background: #14161cf2; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px; box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); font: 12px/1.35 var(--ui); }
+.proto-bar .tag { font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; border: 1px solid #3a3f4d; border-radius: 999px; padding: 4px 7px; }
+.proto-bar button { color: #cfd5e4; }
+.proto-bar .arrow { width: 26px; height: 26px; border-radius: 7px; font-size: 15px; }
+.proto-bar .arrow:hover, .proto-bar .pb:hover { background: #262b36; color: #fff; }
+.proto-bar .cur { min-width: 270px; }
+.proto-bar .cur b { font: 600 12px var(--mono); color: #fff; }
+.proto-bar .cur span { display: block; color: #9aa3b8; font-size: 11px; }
+.proto-bar .pb { white-space: nowrap; padding: 4px 9px; border-radius: 7px; border: 1px solid #3a3f4d; font-size: 11.5px; }
+.drawer { position: fixed; right: 16px; bottom: 72px; z-index: 9999; width: 360px; max-height: calc(100% - 100px); overflow: auto; padding: 12px; background: #14161cf7; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px; font: 12px/1.4 var(--ui); box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); }
+.drawer h5 { margin: 0 0 6px; font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; }
+.drawer label { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+.drawer pre { margin: 8px 0 0; padding: 8px; background: #0b0c10; border-radius: 6px; font: 11px/1.45 var(--mono); white-space: pre-wrap; color: #c9d1e3; user-select: text; }
+.drawer .dbtn { margin-top: 8px; padding: 4px 9px; border-radius: 6px; border: 1px solid #3a3f4d; color: #cfd5e4; }
+.drawer .dbtn:hover { background: #262b36; }
+.drawer .row { display: flex; gap: 6px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="layer"></div>
+
+<div class="proto-bar">
+  <span class="tag">prototype</span>
+  <button class="arrow" id="prev" title="Previous variant (←)">‹</button>
+  <div class="cur"><b id="vlabel"></b><span id="vdesc"></span></div>
+  <button class="arrow" id="next" title="Next variant (→)">›</button>
+  <button class="pb" id="replay" title="Back to a first launch">↺ first launch</button>
+  <button class="pb" id="stateBtn">state</button>
+</div>
+<div class="drawer" id="drawer" hidden></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+/* ---------- the machine (what tri-code would detect; toggled in the state drawer) ---------- */
+const machine = { claude: true, pi: false, ssh: true, notifPermission: "default" };
+const AGENTS = [
+  { id: "claude", glyph: "✱", cmd: "claude", what: "Claude Code", install: "npm install -g @anthropic-ai/claude-code", ver: "2.3.1" },
+  { id: "pi", glyph: "π", cmd: "pi", what: "pi coding agent", install: "npm install -g @mariozechner/pi-coding-agent", ver: "0.41.0" },
+  { id: "shell", glyph: ">_", cmd: "", what: "your login shell", install: null, ver: null },
+];
+const has = (id) => id === "shell" || machine[id];
+const SSH = { devbox: { backend: "shpool", note: "shpool 0.8 · sessions survive restarts" }, pi5: { backend: "tmux", note: "no shpool, falls back to tmux: agent signals don't pass through tmux" } };
+const sshHosts = () => machine.ssh ? Object.keys(SSH) : [];
+const FOLDERS = {
+  local: { "~": ["code", "Documents", "Downloads"], "~/code": ["tri-code", "dotfiles", "api-server", "notes", "playground"] },
+  devbox: { "~": ["src", "deploy"], "~/src": ["infra", "api-server", "ml-jobs"] },
+  pi5: { "~": ["projects"], "~/projects": ["home-assistant", "sensors"] },
+};
+const REPOS = new Set(["~/code/tri-code", "~/code/dotfiles", "~/code/api-server", "~/code/playground", "~/src/infra", "~/src/api-server", "~/src/ml-jobs", "~/projects/home-assistant"]);
+const FOUND = [ // git repos under ~/code, newest commit first (what the Start page would scan)
+  { path: "~/code/tri-code", when: "2 hours ago" }, { path: "~/code/api-server", when: "yesterday" },
+  { path: "~/code/dotfiles", when: "3 weeks ago" }, { path: "~/code/playground", when: "2 months ago" },
+];
+const ACCENTS = ["#7aa2f7", "#9ece6a", "#ff9e64", "#bb9af7", "#f7768e", "#2ac3de"];
+
+/* ---------- the app model ---------- */
+let S, uid = 1;
+function fresh() {
+  return {
+    projects: [], active: null, envs: ["local"], menu: null, pal: false, goto: null, appear: false, open: null, notif: null, flash: "",
+    // variant state
+    startOnLaunch: true,
+    wiz: { step: 0, envTest: {}, host: "local", dir: "~/code", sel: null, agent: null, alert: "away", notif: machine.notifPermission, done: false },
+    check: { open: true, hidden: false, did: {} },
+    tour: { step: 0, active: false, end: false, did: {} },
+  };
+}
+const proj = () => S.projects.find((p) => p.id === S.active);
+const winsOn = (p) => p.wins.filter((w) => w.ws === p.ws);
+function addProject(host, path, agent, extra = {}) {
+  const ex = S.projects.find((p) => p.host === host && p.path === path);
+  if (ex) { S.active = ex.id; return ex; }
+  if (!S.envs.includes(host)) S.envs.push(host);
+  const p = { id: "p" + uid++, name: path.split("/").pop(), host, path, accent: ACCENTS[S.projects.length % ACCENTS.length], wins: [], ws: 0, focus: null, ...extra };
+  S.projects.push(p); S.active = p.id;
+  if (agent) addWin(p, agent);
+  tick("open");
+  return p;
+}
+function addWin(p, kind, opts = {}) {
+  const w = { id: "w" + uid++, kind, ws: p.ws, sig: null, exited: AGENTS.some((a) => a.id === kind) && !has(kind), ...opts };
+  p.wins.push(w); p.focus = w.id;
+  if (["claude", "pi", "shell"].includes(kind)) tick("agent");
+  if (winsOn(p).length >= 2) tick("second");
+  return w;
+}
+function setWs(n) { const p = proj(); if (!p) return; p.ws = n; p.focus = winsOn(p)[0]?.id ?? null; if (n > 0) tick("ws"); }
+function closeWin(id) { const p = proj(); p.wins = p.wins.filter((w) => w.id !== id); if (p.focus === id) p.focus = winsOn(p)[0]?.id ?? null; }
+function flash(msg) { S.flash = msg; clearTimeout(flash.t); flash.t = setTimeout(() => { S.flash = ""; render(); }, 2600); }
+
+/* simulate an agent stopping to ask you something (OSC 7501 "blocked") */
+function raiseSignal() {
+  const all = S.projects.flatMap((p) => p.wins.filter((w) => (w.kind === "claude" || w.kind === "pi") && !w.exited).map((w) => [p, w]));
+  const pick = all.find(([p, w]) => !(p.id === S.active && p.focus === w.id && p.ws === w.ws)) ?? all[0];
+  if (!pick) { flash("no running agent to signal: start claude or pi first"); return render(); }
+  pick[1].sig = "blocked";
+  const seen = pick[0].id === S.active && pick[0].focus === pick[1].id;
+  if (!seen && (S.wiz.notif === "granted" || machine.notifPermission === "granted")) { S.notif = { title: `${pick[0].name} · ${pick[1].kind} needs you`, body: "Allow edit to src/App.tsx?" }; setTimeout(() => { S.notif = null; render(); }, 3500); }
+  flash(`${pick[1].kind} in ${pick[0].name} needs you`);
+  render();
+}
+function nextSignal() {
+  for (const p of S.projects) for (const w of p.wins) if (w.sig === "blocked") {
+    S.active = p.id; p.ws = w.ws; p.focus = w.id; w.sig = null; tick("signal"); flash(`jumped to ${w.kind} in ${p.name}`); return render();
+  }
+  flash("no agent needs you"); render();
+}
+const sigCount = () => S.projects.reduce((n, p) => n + p.wins.filter((w) => w.sig === "blocked").length, 0);
+
+/* checklist (C) and tour (D) both listen to what you do */
+function tick(key) { S.check.did[key] = true; S.tour.did[key] = true; }
+
+/* ---------- screens ---------- */
+function screen(p, w) {
+  const cwd = `${p.host === "local" ? "" : p.host + ":"}${p.path}`;
+  if (w.exited) return `<span class="c-m">${esc(cwd)} $</span> ${w.kind}\n<span class="c-b">${w.kind}: command not found</span>\n\n<span class="c-m">[exited 127 · press Enter to restart]</span>`;
+  if (w.kind === "claude") {
+    if (w.demo) return `<span class="c-v">✻</span> Welcome to <b>Claude Code</b>\n  <span class="c-m">cwd: ${esc(cwd)}</span>\n\n<span class="c-a">&gt;</span> add a dark theme toggle to the settings page\n\n<span class="c-o">●</span> Read(src/Settings.tsx)\n  <span class="c-m">└ Read 142 lines</span>\n<span class="c-o">●</span> Update(src/Settings.tsx)\n  <span class="c-m">└ 18 additions, 2 removals</span>\n\n<span class="c-w">✻ Running tests…</span> <span class="c-m">(esc to interrupt)</span>`;
+    return `<span class="c-v">✻</span> Welcome to <b>Claude Code</b> <span class="c-m">v${AGENTS[0].ver}</span>\n  <span class="c-m">cwd: ${esc(cwd)}</span>\n\n<span class="c-a">&gt;</span> <span class="cursor"> </span>`;
+  }
+  if (w.kind === "pi") return `<span class="c-a">pi</span> <span class="c-m">v${AGENTS[1].ver} · ${esc(cwd)}</span>\n\n<span class="c-a">›</span> <span class="cursor"> </span>`;
+  if (w.demo) return `<span class="c-m">${esc(cwd)} $</span> bun dev\n  <span class="c-o">VITE v8.0.16</span>  ready in 312 ms\n  ➜  Local:   <span class="c-a">http://localhost:5173/</span>\n`;
+  return `<span class="c-m">${esc(cwd)} $</span> <span class="cursor"> </span>`;
+}
+function winHtml(p, w) {
+  const f = p.focus === w.id;
+  const chip = w.sig === "blocked" ? `<span class="chip blocked">needs you</span>` : w.demo && w.kind === "claude" ? `<span class="chip working">working</span>` : "";
+  const body = w.kind === "file" ? `<pre class="code">${fileText(w.path)}</pre>` : w.kind === "browser"
+    ? `<div class="page"><div class="addr">http://localhost:5173/</div><div class="blank">your dev server, live</div></div>`
+    : `<pre class="screen">${screen(p, w)}</pre>`;
+  return `<div class="win${f ? " focused" : ""}${w.sig ? " sig-" + w.sig : ""}" data-win="${w.id}">
+    <div class="bar"><span class="dot${w.exited ? " exited" : ""}"></span><span class="kind">${w.kind}</span>${chip}<span class="ttl">${esc(w.kind === "file" ? w.path : p.path)}</span><button class="x" data-close="${w.id}" title="Close (Alt+Q)">×</button></div>${body}</div>`;
+}
+
+/* ---------- chrome ---------- */
+function sidebar() {
+  const envs = S.envs.map((h) => {
+    const ps = S.projects.filter((p) => p.host === h);
+    return `<h2><span class="ic">${h === "local" ? "▭" : "⇄"}</span>${esc(h)}</h2>` + (ps.length ? ps.map((p) => {
+      const blocked = p.wins.some((w) => w.sig === "blocked");
+      return `<div class="project${p.id === S.active ? " active" : ""}" style="--pa:${p.accent}" data-proj="${p.id}"><span class="swatch"><b>${esc(p.name[0])}</b>${blocked ? `<i class="sb"></i>` : ""}</span><span class="name">${esc(p.name)}</span>${p.sample ? `<span class="sample">sample</span>` : ""}<span class="count">${p.wins.length}</span></div>`;
+    }).join("") : `<button class="env-empty" data-act="open">No projects · open one</button>`);
+  }).join("");
+  return `<aside id="side"><div class="side-head"><span>Projects</span><button class="collapse">«</button></div>${envs}
+    <button class="add" id="openBtn" data-act="open"><span class="glyph">+</span>Open project<kbd>Alt O</kbd></button>
+    <button class="add" data-act="addenv"><span class="glyph">⇄</span>Add environment</button>
+    ${S.v === "C" ? checklistHtml() : ""}</aside>`;
+}
+function toolbar() {
+  const p = proj();
+  if (!p) return `<div class="top"><span class="where"></span><button class="tool" id="palBtn" data-act="pal" title="Commands (Alt+X)">⌘</button><button class="tool">?</button></div>`;
+  const spaces = [0, 1, 2, 3].map((i) => {
+    const used = p.wins.some((w) => w.ws === i), sig = p.wins.some((w) => w.ws === i && w.sig === "blocked");
+    return `<button data-ws="${i}" class="${used ? "used" : ""}" aria-current="${p.ws === i}" title="Workspace ${i + 1} · Alt+${i + 1}">${i + 1}${sig ? `<i class="sb"></i>` : ""}</button>`;
+  }).join("");
+  const tabs = winsOn(p).map((w) => `<button class="tab" data-focus="${w.id}" aria-pressed="${p.focus === w.id}">${w.kind}${w.sig ? `<i class="att"></i>` : ""}</button>`).join("");
+  return `<div class="top"><div class="spaces" id="spaces">${spaces}</div><div class="sep"></div>
+    <div class="tabs" id="tabs">${tabs}<button class="tab-add" id="addBtn" data-act="menu" title="New window">+</button></div>
+    <button class="where" id="where" data-act="goto" title="Go to file (Alt+T)">${esc((p.host === "local" ? "" : p.host + ":") + p.path)}</button>
+    <button class="tool" id="palBtn" data-act="pal" title="Commands (Alt+X)">⌘</button><button class="tool" id="appBtn" data-act="appear" title="Project appearance (Alt+P)">◐ Appearance</button><button class="tool">?</button></div>`;
+}
+function stage() {
+  const p = proj();
+  if (!p) {
+    if (S.v === "A" && S.startOnLaunch !== "off") return startPage();
+    return `<div class="empty">Open a project (Alt+O) to get started.</div>`;
+  }
+  const ws = winsOn(p);
+  if (!ws.length) return `<div class="empty"><b>Workspace ${p.ws + 1} of ${esc(p.name)} is empty</b><span>+ in the toolbar, or <kbd>Alt</kbd><kbd>Enter</kbd> for a terminal</span></div>`;
+  return `<div class="world${ws.length === 1 ? " one" : ""}" style="grid-template-rows:repeat(${Math.max(1, ws.length - 1)}, minmax(0,1fr))">${ws.map((w) => winHtml(p, w)).join("")}</div>`;
+}
+function statusbar() {
+  const p = proj(), w = p && p.wins.find((x) => x.id === p.focus), n = sigCount();
+  return `<div class="status"><span class="focus">${w ? `${w.kind} · ${esc(p.name)}` : ""}</span>
+    ${n ? `<button class="sigs" id="sigs" data-act="nextsig" title="Go to the next agent that needs you (Alt+U)">● ${n} needs you</button>` : `<span id="sigs" class="mut" style="font:11px var(--mono)">${p ? "○ no signals" : ""}</span>`}
+    <span class="flash">${esc(S.flash)}</span>
+    <div class="hints"><span><kbd>Alt</kbd><kbd>X</kbd> commands</span><span><kbd>Alt</kbd><kbd>/</kbd> all keys</span></div><span title="Signals and sounds"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span><span class="ver">v0.1.21</span></div>`;
+}
+
+/* ---------- A · Start page ---------- */
+function startPage() {
+  const def = machine.claude ? "claude" : machine.pi ? "pi" : "shell";
+  const repos = FOUND.map((r, i) => {
+    const name = r.path.split("/").pop();
+    return `<button class="repo" style="--pa:${ACCENTS[i]}" data-quick="local|${r.path}|${def}"><span class="ri">${name[0]}</span><span><span class="rn">${esc(name)}</span><br><span class="rp">${r.path} · ${r.when}</span></span><span class="go">open with ${def} →</span></button>`;
+  }).join("");
+  const hosts = sshHosts().map((h) => {
+    const t = S.wiz.envTest[h];
+    const st = !t ? `<button class="btn" data-test="${h}">Test</button>`
+      : t === "testing" ? `<span class="mut">testing ssh…</span>`
+      : `<span class="pill ${SSH[h].backend === "shpool" ? "ok" : "warnc"}">${SSH[h].backend}</span><button class="btn" data-openhost="${h}">Browse</button>`;
+    return `<div class="host"><span class="aglyph">⇄</span><span><span class="hn">${h}</span>${t && t !== "testing" ? `<br><span class="mut" style="font-size:11px">${SSH[h].note}</span>` : ""}</span><span class="hs">${st}</span></div>`;
+  }).join("") || `<div class="mut" style="padding:6px 8px">No hosts in ~/.ssh/config. <button class="btn quiet" data-act="addenv">Add user@host…</button></div>`;
+  const agents = AGENTS.map((a) => {
+    const ok = has(a.id);
+    return `<div class="agent"><span class="aglyph">${a.glyph}</span><div class="ab"><div class="an">${a.id}${ok ? `<span class="pill ok">${a.ver ? "v" + a.ver : "ready"}</span>` : `<span class="pill bad">not on PATH</span>`}</div>
+      <div class="ad">${a.what}${ok && a.cmd ? ` · <code>${a.cmd}</code>` : ""}</div>${ok || !a.install ? "" : `<div class="copy"><span>${esc(a.install)}</span><button data-copy="${esc(a.install)}">Copy</button><button data-recheck>Recheck</button></div>`}</div></div>`;
+  }).join("");
+  return `<div class="start"><div class="start-in">
+    <h1>Welcome to tri-code</h1>
+    <p class="lede">Each project is a folder, here or on a server over ssh. Open one and its agents, shells and browser windows tile side by side. They keep running while you're in another project, and tri-code tells you when one needs you.</p>
+    <div class="start-grid">
+      <div>
+        <section><h3>Open a repo <span class="src">git repos in ~/code</span></h3>${repos}
+          <div class="linkrow"><button class="btn" data-act="open">Open another folder… <kbd>Alt O</kbd></button></div></section>
+        <section><h3>On a server <span class="src">from ~/.ssh/config</span></h3>${hosts}</section>
+      </div>
+      <div>
+        <section><h3>Agents <span class="src">found on PATH</span></h3><div class="card">${agents}
+          <div class="ad mut" style="font-size:11.5px;margin-top:8px">Add your own (aider, codex, a REPL…) in the agents window, <kbd>Alt</kbd><kbd>;</kbd></div></div></section>
+        <section><h3>Four keys to start with</h3><dl class="keys">
+          <dt><kbd>Alt</kbd><kbd>Enter</kbd></dt><dd>another terminal like this one</dd>
+          <dt><kbd>Alt</kbd><kbd>1–4</kbd></dt><dd>switch workspace</dd>
+          <dt><kbd>Alt</kbd><kbd>U</kbd></dt><dd>jump to the agent that needs you</dd>
+          <dt><kbd>Alt</kbd><kbd>X</kbd></dt><dd>run any command by name</dd></dl></section>
+      </div>
+    </div>
+    <div class="foot"><label><input type="checkbox" data-act="startToggle" ${S.startOnLaunch === "off" ? "" : "checked"}> Show this page when no project is open</label></div>
+  </div></div>`;
+}
+
+/* ---------- B · Wizard ---------- */
+const WSTEPS = ["Agents", "Where your code lives", "First project", "Signals"];
+function wizard() {
+  const z = S.wiz, step = z.step;
+  const stepper = WSTEPS.map((t, i) => `<button data-wstep="${i}" class="${i < step ? "done" : ""}" aria-current="${i === step ? "step" : "false"}"><span class="n">${i < step ? "✓" : i + 1}</span>${t}</button>`).join("");
+  let body = "", next = "Continue", nextOk = true, note = "";
+  if (step === 0) {
+    const n = AGENTS.filter((a) => has(a.id)).length;
+    body = `<h2>Agents</h2><p class="sub">The terminal apps tri-code starts for you. We looked on your PATH. You need at least one agent; a shell always works.</p><div class="wlist">` +
+      AGENTS.map((a) => {
+        const ok = has(a.id);
+        return `<div class="wrow"><span class="aglyph">${a.glyph}</span><div class="wb"><div class="wt">${a.id}${ok ? `<span class="pill ok">✓ ${a.ver ? "v" + a.ver : "ready"}</span>` : `<span class="pill bad">not found</span>`}</div>
+          <div class="wd">${a.what}${a.cmd ? ` · runs <code>${a.cmd}</code> in the project folder` : " · for anything else"}</div>
+          ${ok || !a.install ? "" : `<div class="copy"><span>${esc(a.install)}</span><button data-copy="${esc(a.install)}">Copy</button><button data-recheck>Recheck</button></div>`}</div></div>`;
+      }).join("") + `</div>`;
+    note = n === 1 ? `<span class="warnc">No agent found. You can still continue with a shell.</span>` : `${n - 1} agent${n > 2 ? "s" : ""} ready`;
+  } else if (step === 1) {
+    const hosts = sshHosts();
+    body = `<h2>Where your code lives</h2><p class="sub">An environment is a machine tri-code runs agents on. Local is always there. Remote hosts need key-based ssh; tri-code keeps their sessions alive with shpool (or tmux) so agents survive a dropped connection or an app restart.</p><div class="wlist">
+      <div class="wrow"><span class="aglyph">▭</span><div class="wb"><div class="wt">local<span class="pill ok">✓</span></div><div class="wd">this computer</div></div></div>` +
+      hosts.map((h) => {
+        const t = z.envTest[h], on = S.envs.includes(h);
+        const right = !t ? `<button class="btn" data-test="${h}">Test & add</button>` : t === "testing" ? `<span class="mut">ssh ${h} …</span>` : on ? `<button class="btn quiet" data-unenv="${h}">Remove</button>` : `<button class="btn" data-test="${h}">Add</button>`;
+        return `<div class="wrow"><span class="aglyph">⇄</span><div class="wb"><div class="wt">${h}${t && t !== "testing" ? `<span class="pill ok">ssh ✓</span><span class="pill ${SSH[h].backend === "shpool" ? "ok" : "warnc"}">${SSH[h].backend}</span>` : `<span class="pill">~/.ssh/config</span>`}</div>
+          <div class="wd">${t && t !== "testing" ? SSH[h].note : "found in ~/.ssh/config, not tested yet"}</div></div>${right}</div>`;
+      }).join("") +
+      `<div class="wrow"><span class="aglyph">+</span><div class="wb"><div class="wt">Another host</div><div class="wd">user@host or an alias. You can add it later from the sidebar.</div></div><button class="btn" data-act="addenv">Add…</button></div></div>`;
+    note = `${S.envs.length} environment${S.envs.length > 1 ? "s" : ""}`;
+  } else if (step === 2) {
+    if (!z.agent) z.agent = machine.claude ? "claude" : machine.pi ? "pi" : "shell";
+    const dirs = FOLDERS[z.host]?.[z.dir] ?? [];
+    const segs = z.dir.split("/");
+    body = `<h2>Open your first project</h2><p class="sub">A project is one folder. Pick it and the agent to start in it. You can open more any time with <kbd>Alt</kbd><kbd>O</kbd>.</p>
+      <div class="wsplit"><nav>${S.envs.map((h) => `<button class="env" data-whost="${h}" aria-pressed="${z.host === h}"><span class="nm">${h}</span><span class="kindt">${h === "local" ? "local" : "ssh"}</span></button>`).join("")}</nav>
+      <div class="picker"><div class="crumbs">${segs.map((s, i) => `<button data-wdir="${segs.slice(0, i + 1).join("/")}">${s}</button>`).join("/")}</div><div class="list">` +
+      dirs.map((n) => { const path = `${z.dir}/${n}`; return `<div class="prow${z.sel === path ? " sel" : ""}" data-wsel="${path}"><span class="pi">▸</span>${n}${REPOS.has(path) ? ` <span class="git">git</span>` : ""}</div>`; }).join("") +
+      `</div></div></div><div class="agents-pick"><span class="lab">Start with</span><div class="seg">${AGENTS.map((a) => `<button data-wagent="${a.id}" aria-pressed="${z.agent === a.id}" ${has(a.id) ? "" : "disabled title='not installed'"}>${a.glyph} ${a.id}</button>`).join("")}</div></div>`;
+    nextOk = !!z.sel; note = z.sel ? `<code>${z.host === "local" ? "" : z.host + ":"}${z.sel}</code>` : "double-click a folder to go into it";
+  } else {
+    body = `<h2>Signals</h2><p class="sub">claude and pi tell tri-code when they're working, need you, finish or fail. You see it as a dot on the project, its workspace and its window. When an agent you're not looking at needs you, tri-code can play a sound and show a notification.</p>
+      <div class="sigrow"><b>needs you</b><span class="mut">"Allow edit to src/App.tsx?"</span><span class="chip blocked">needs you</span></div>
+      <div class="sigrow"><b>done</b><span class="mut">the task finished</span><span class="chip done">done</span></div>
+      <div class="sigrow"><b>error</b><span class="mut">the agent hit an error</span><span class="pill bad">error</span></div>
+      <div style="margin-top:16px;display:grid;gap:12px">
+        <div class="agents-pick" style="margin:0"><span class="lab">Alert me</span><div class="seg">${[["away", "when I'm away"], ["always", "always"], ["badge", "badge only"]].map(([k, l]) => `<button data-walert="${k}" aria-pressed="${z.alert === k}">${l}</button>`).join("")}</div><button class="btn quiet" data-act="sound">▶ hear it</button></div>
+        <div class="notif-demo">${z.notif === "granted" ? `<span class="pill ok">✓ desktop notifications on</span>` : z.notif === "denied" ? `<span class="pill warnc">notifications blocked by the OS</span><span class="mut" style="font-size:11.5px">turn them on in system settings, or keep sound + badges</span>` : `<button class="btn" data-act="notif">Allow desktop notifications</button><span class="mut" style="font-size:11.5px">The OS asks once.</span>`}</div>
+      </div>`;
+    next = "Open tri-code"; note = "change any of this from the bell in the status line";
+  }
+  const back = step > 0 ? `<button class="btn quiet" data-act="wback">Back</button>` : `<button class="btn quiet" data-act="wskip">Skip setup</button>`;
+  return `<div class="scrim"><div class="dlg wiz" role="dialog" aria-label="Set up tri-code"><header><span>Set up tri-code</span><span class="mut" style="font-weight:400;font-size:12px">${step + 1} of 4</span></header>
+    <div class="steps">${stepper}</div><div class="wbody">${body}</div>
+    <div class="wfoot">${back}<span class="note">${note}</span><span class="sp"></span><button class="btn primary" data-act="wnext" ${nextOk ? "" : "disabled"}>${next}</button></div></div></div>`;
+}
+function wizFinish() {
+  const z = S.wiz; z.done = true;
+  machine.notifPermission = z.notif;
+  if (z.sel) addProject(z.host, z.sel, z.agent);
+}
+
+/* ---------- C · Checklist ---------- */
+const CHECK = [
+  { k: "open", t: "Open a project", d: `<kbd>Alt</kbd><kbd>O</kbd> pick a folder, here or over ssh`, target: "#openBtn" },
+  { k: "agent", t: "Start an agent", d: `+ in the toolbar → claude, pi or shell`, target: "#addBtn" },
+  { k: "second", t: "Put a second window beside it", d: `<kbd>Alt</kbd><kbd>Enter</kbd>: windows tile themselves`, target: "#addBtn" },
+  { k: "ws", t: "Try another workspace", d: `<kbd>Alt</kbd><kbd>2</kbd>: a clean canvas in the same project`, target: "#spaces" },
+  { k: "palette", t: "Run a command by name", d: `<kbd>Alt</kbd><kbd>X</kbd> lists everything a key can do`, target: "#palBtn" },
+  { k: "signal", t: "Answer an agent that needs you", d: `<kbd>Alt</kbd><kbd>U</kbd> jumps to it from anywhere`, target: "#sigs", sim: true },
+];
+function checklistHtml() {
+  const c = S.check;
+  if (c.hidden) return "";
+  const n = CHECK.filter((x) => c.did[x.k]).length;
+  const nextK = CHECK.find((x) => !c.did[x.k])?.k;
+  if (n === CHECK.length) return `<div class="gs"><div class="gs-bar"><i style="width:100%"></i></div><div class="gs-done"><b>✓ You're set.</b> Everything else is in <kbd>Alt</kbd><kbd>/</kbd>.<div class="gs-foot" style="border:0;padding:6px 0 0"><span></span><button data-act="ckhide">Dismiss</button></div></div></div>`;
+  return `<div class="gs"><div class="gs-bar"><i style="width:${n / CHECK.length * 100}%"></i></div>
+    <button class="gs-head" data-act="cktoggle">Getting started<span class="prog">${n}/${CHECK.length} ${c.open ? "▾" : "▸"}</span></button>
+    ${c.open ? `<ol>${CHECK.map((x) => `<li class="${c.did[x.k] ? "done" : ""}${x.k === nextK ? " next" : ""}"><span class="ck">${c.did[x.k] ? "✓" : ""}</span><span class="t">${x.t}</span>${x.k === nextK ? `<span class="d">${x.d}<button class="show" data-show="${x.k}">show me</button>${x.sim ? `<button class="show" data-act="raise">simulate</button>` : ""}</span>` : ""}</li>`).join("")}</ol>
+    <div class="gs-foot"><span class="mut">ticks itself as you go</span><button data-act="ckhide">Hide</button></div>` : ""}</div>`;
+}
+function showMe(k) {
+  const x = CHECK.find((c) => c.k === k);
+  let el = document.querySelector(x.target);
+  if (!el && (k === "agent" || k === "second" || k === "ws")) el = $("openBtn");
+  if (!el) return;
+  el.classList.add("pulse"); setTimeout(() => el.classList.remove("pulse"), 3100);
+}
+
+/* ---------- D · Tour ---------- */
+const TOUR = [
+  { sel: "#side", t: "Projects, grouped by machine", p: `Every folder you open sits under its environment: <b>local</b>, or a server you reach over ssh. Agents keep running when you switch away, and a dot on the tile tells you which project wants you.`, side: "right" },
+  { sel: "#spaces", t: "Four workspaces per project", p: `Each is its own canvas of windows. Keep agents on 1 and a browser and shell on 2.`, try: [`Press <kbd>Alt</kbd><kbd>2</kbd>, then <kbd>Alt</kbd><kbd>1</kbd> to come back`, "ws"], side: "below" },
+  { sel: "#tabs", t: "Windows tile themselves", p: `The tabs are the windows on this workspace. <b>+</b> opens claude, pi, a shell, a browser, files, git or issues. No dragging needed.`, try: [`Press <kbd>Alt</kbd><kbd>Enter</kbd> for another terminal`, "second"], side: "below" },
+  { sel: "#where", t: "Find any file", p: `Click the project path, or press <kbd>Alt</kbd><kbd>T</kbd>, and type a few letters of a file name. <kbd>Enter</kbd> opens it in a file window; <kbd>Shift</kbd><kbd>Enter</kbd> hands <code>@path</code> to the agent instead.`, try: [`Press <kbd>Alt</kbd><kbd>T</kbd> and open <code>Settings.tsx</code>`, "goto"], side: "below", dy: 156 },
+  { sel: ".win .bar", t: "Agents report what they're doing", p: `claude and pi say when they're <span class="chip working">working</span>, <span class="chip blocked">need you</span> or are <span class="chip done">done</span>. It shows here, on the tab, the workspace and the project.`, side: "below" },
+  { sel: "#sigs", t: "Never miss one waiting on you", p: `The status line counts agents that need you across every project. You get a sound and a notification when you're looking elsewhere.`, try: [`<button class="btn" data-act="raise" style="padding:2px 8px">Make an agent ask</button> then press <kbd>Alt</kbd><kbd>U</kbd>`, "signal"], side: "above" },
+  { sel: "#appBtn", t: "Make each project yours", p: `Give a project its own name, icon, accent colour and background, so you can tell them apart at a glance. tri-code starts with the project's own logo when it finds one.`, try: [`Press <kbd>Alt</kbd><kbd>P</kbd> and pick a colour`, "appear"], side: "below-left", dx: -296 },
+  { sel: "#palBtn", t: "Everything has a name", p: `<kbd>Alt</kbd><kbd>X</kbd> runs any command by name: new windows, layouts, projects, worktrees. <kbd>Alt</kbd><kbd>/</kbd> lists every key.`, try: [`Press <kbd>Alt</kbd><kbd>X</kbd>`, "palette"], side: "below-left" },
+];
+function startTour() {
+  const p = addProject("local", "~/.tri-code/tour", null, { name: "tour", sample: true, accent: "#bb9af7" });
+  addWin(p, "claude", { demo: true, exited: false }); addWin(p, "shell", { demo: true }); addWin(p, "browser");
+  p.focus = p.wins[0].id;
+  S.tour = { step: 0, active: true, end: false, did: {} };
+  S.check.did = {};
+}
+function tourLayer() {
+  const t = S.tour;
+  if (t.end) return `<div class="scrim"><div class="dlg tour-end"><h2>Now open your own</h2><p>The tour project stays in the sidebar until you close it with ×. Pick a folder on this computer or a server, and tri-code starts ${machine.claude ? "claude" : machine.pi ? "pi" : "a shell"} in it.${machine.claude || machine.pi ? "" : ` <span class="warnc">No agent is on your PATH yet: install claude or pi first.</span>`}</p>
+    <div class="row"><button class="btn quiet" data-act="tourRemove">Remove the tour</button><button class="btn" data-act="tourAgain">Replay</button><button class="btn primary" data-act="tourOpen">Open project <kbd>Alt O</kbd></button></div></div></div>`;
+  if (!t.active) return "";
+  const s = TOUR[t.step], did = s.try && t.did[s.try[1]];
+  return `<div class="spot" id="spot"></div><div class="coach" id="coach" role="dialog"><div class="cn">${t.step + 1} of ${TOUR.length}</div><h4>${s.t}</h4><p>${s.p}</p>
+    ${s.try ? `<div class="try${did ? " did" : ""}">${did ? "✓ That's it." : "Try it: " + s.try[0]}</div>` : ""}
+    <div class="row"><span class="dots">${TOUR.map((_, i) => `<i class="${i === t.step ? "on" : ""}"></i>`).join("")}</span><button class="btn quiet" data-act="tourSkip">Skip tour</button>${t.step ? `<button class="btn" data-act="tourBack">Back</button>` : ""}<button class="btn primary" data-act="tourNext">${t.step === TOUR.length - 1 ? "Finish" : "Next"}</button></div></div>`;
+}
+function placeSpot() {
+  const spot = $("spot"), coach = $("coach");
+  if (!spot) return;
+  const s = TOUR[S.tour.step], el = document.querySelector(s.sel);
+  if (!el) return;
+  const r = el.getBoundingClientRect(), pad = 4;
+  Object.assign(spot.style, { left: r.left - pad + "px", top: r.top - pad + "px", width: r.width + pad * 2 + "px", height: r.height + pad * 2 + "px" });
+  const cw = coach.offsetWidth, ch = coach.offsetHeight, W = innerWidth, H = innerHeight;
+  let x, y;
+  if (s.side === "right") { x = r.right + 16; y = r.top + 60; }
+  else if (s.side === "above") { x = r.left; y = r.top - ch - 16; }
+  else if (s.side === "below-left") { x = r.right - cw; y = r.bottom + 14; }
+  else { x = r.left; y = r.bottom + 14; }
+  x += s.dx ?? 0; y += s.dy ?? 0; // clear of the popover this stop opens
+  coach.style.left = Math.max(12, Math.min(W - cw - 12, x)) + "px";
+  coach.style.top = Math.max(12, Math.min(H - ch - 80, y)) + "px";
+}
+
+/* ---------- overlays shared by every variant ---------- */
+function openDialog() {
+  const o = S.open, dirs = FOLDERS[o.host]?.[o.dir] ?? [], segs = o.dir.split("/");
+  if (o.addEnv) return `<div class="scrim" data-scrim><div class="dlg open-dlg"><header><span>Add environment</span><button data-act="closeOpen">×</button></header>
+    <div class="pane" style="grid-column:1/-1;padding:18px"><p class="mut" style="margin:0">A machine you reach with ssh: an alias from ~/.ssh/config, or user@host. Key-based login must work without a password prompt.</p>
+    <div class="wlist">${Object.keys(SSH).map((h) => `<div class="wrow choose" data-test="${h}" data-andopen="1"><span class="aglyph">⇄</span><div class="wb"><div class="wt">${h}</div><div class="wd">${machine.ssh ? "from ~/.ssh/config" : "type it"}</div></div></div>`).join("")}</div></div></div></div>`;
+  return `<div class="scrim" data-scrim><div class="dlg open-dlg" role="dialog" aria-label="Open project"><header><span>Open project</span><button data-act="closeOpen">×</button></header>
+    <nav><div class="mt">Environments</div>${S.envs.map((h) => `<button class="env" data-ohost="${h}" aria-pressed="${o.host === h}"><span class="nm">${h}</span><span class="kindt">${h === "local" ? "local" : "ssh"}</span></button>`).join("")}<button class="env" style="color:var(--accent)" data-act="openAddEnv">＋ Add environment</button></nav>
+    <div class="pane"><div class="picker"><div class="crumbs">${segs.map((s, i) => `<button data-odir="${segs.slice(0, i + 1).join("/")}">${s}</button>`).join("/")}</div><div class="list">${dirs.map((n) => { const path = `${o.dir}/${n}`; return `<div class="prow${o.sel === path ? " sel" : ""}" data-osel="${path}"><span class="pi">▸</span>${n}${REPOS.has(path) ? ` <span class="git">git</span>` : ""}<span class="use" data-ouse="${path}">Open</span></div>`; }).join("")}</div>
+    <div class="pfoot"><span class="here">${o.host === "local" ? "" : o.host + ":"}${o.sel ?? o.dir}</span><button class="btn primary" data-act="doOpen">Open</button></div></div></div></div></div>`;
+}
+function menuHtml() {
+  const r = $("addBtn")?.getBoundingClientRect(); if (!r) return "";
+  return `<div class="menu" style="left:${r.left}px;top:${r.bottom + 4}px"><div class="mt">Agents</div>${AGENTS.map((a, i) => `<button data-new="${a.id}">${a.glyph} ${a.id}${has(a.id) ? (i === 0 ? `<kbd>Alt+Enter</kbd>` : "") : `<span class="miss">not installed</span>`}</button>`).join("")}
+    <div class="msep"></div><button data-new="browser">◎ browser<kbd>Alt+B</kbd></button><button data-new="shell">☑ issues<kbd>Alt+I</kbd></button><button data-new="shell">▤ files<kbd>Alt+E</kbd></button></div>`;
+}
+const FILES = ["README.md", "package.json", "index.html", "src/App.tsx", "src/Settings.tsx", "src/main.tsx", "src/theme.ts", "src/components/Toggle.tsx", "tests/settings.test.ts"];
+function fuzzy(q, f) { // subsequence match; returns f with matched letters bolded and its folder dimmed, or null
+  const hit = new Set();
+  let i = 0;
+  [...f].forEach((c, j) => { if (i < q.length && c.toLowerCase() === q[i].toLowerCase()) { hit.add(j); i++; } });
+  if (i < q.length) return null;
+  const cut = f.lastIndexOf("/") + 1;
+  const run = (a, b) => [...f.slice(a, b)].map((c, k) => hit.has(a + k) ? `<b>${esc(c)}</b>` : esc(c)).join("");
+  return (cut ? `<span class="dir">${run(0, cut)}</span>` : "") + run(cut, f.length);
+}
+function gotoList() {
+  const q = S.goto.q.trim();
+  const hits = FILES.map((f) => [f, fuzzy(q, f)]).filter(([, m]) => m !== null).sort((a, b) => a[0].length - b[0].length);
+  S.goto.hits = hits.map(([f]) => f);
+  return hits.map(([f, m], i) => { return `<button class="gr${i === 0 ? " hi" : ""}" data-gfile="${f}">${m}</button>`; }).join("") || `<div class="mut" style="padding:8px">No file matches “${esc(q)}”</div>`;
+}
+function gotoHtml() {
+  const r = $("where")?.getBoundingClientRect(); if (!r) return "";
+  return `<div class="goto" style="left:${r.left}px;top:${r.bottom + 4}px"><input id="gotoq" placeholder="Go to file" autocomplete="off" spellcheck="false" value="${esc(S.goto.q)}"><div class="gl" id="gotol">${gotoList()}</div>
+    <div class="gh"><span><kbd>Enter</kbd> open</span><span><kbd>Shift</kbd><kbd>Enter</kbd> @path to agent</span><span><kbd>Esc</kbd> close</span></div></div>`;
+}
+function openFile(f, toAgent) {
+  const p = proj(); S.goto = null; tick("goto");
+  if (toAgent) { flash(`typed @${f} into claude`); return render(); }
+  const ex = p.wins.find((w) => w.kind === "file" && w.ws === p.ws);
+  if (ex) { ex.path = f; p.focus = ex.id; } else addWin(p, "file", { path: f });
+  render();
+}
+function fileText(f) {
+  const body = f === "src/Settings.tsx"
+    ? `import { createSignal } from "solid-js";\nimport { Toggle } from "./components/Toggle";\nimport { theme, setTheme } from "./theme";\n\nexport function Settings() {\n  const [saved, setSaved] = createSignal(false);\n  return (\n    <section class="settings">\n      <h2>Settings</h2>\n      <Toggle\n        label="Dark theme"\n        on={theme() === "dark"}\n        onChange={(on) => setTheme(on ? "dark" : "light")}\n      />\n    </section>\n  );\n}`
+    : f.endsWith(".md") ? `# tour\n\nA sample project for the tri-code tour.\nClose it from the sidebar when you're done.` : `// ${f}\n// (sample file)`;
+  return body.split("\n").map((l, i) => `<span class="ln">${i + 1}</span>${esc(l)}`).join("\n");
+}
+function appearHtml() {
+  const r = $("appBtn")?.getBoundingClientRect(), p = proj(); if (!r || !p) return "";
+  return `<div class="apop" style="left:${Math.max(8, r.right - 280)}px;top:${r.bottom + 4}px;--pa:${p.accent}"><div class="al">Name</div><div class="nm"><input value="${esc(p.name)}" spellcheck="false"></div>
+    <div class="al">Icon</div><div class="icons"><span class="on">${esc(p.name[0].toUpperCase())}</span><span>◆</span><span>✦</span><span>λ</span><span>⚙</span></div>
+    <div class="al">Accent</div><div class="sw">${ACCENTS.concat(["#e0af68", "#73daca"]).map((c) => `<button style="--c:${c}" data-accent="${c}" aria-pressed="${p.accent === c}"></button>`).join("")}</div>
+    <div class="mut" style="font-size:11.5px">Background and signal sounds are in the full panel.</div></div>`;
+}
+const PAL = ["New claude window", "New browser window", "Next agent that needs you", "Layout: grid", "Open project…", "New worktree…", "Appearance", "Go to file…"];
+function palHtml() { return `<div class="pal"><input id="palq" placeholder="Run a command…" autocomplete="off">${PAL.map((c, i) => `<button class="${i === 0 ? "hi" : ""}" data-pal="${i}">${c}</button>`).join("")}</div>`; }
+
+/* ---------- render ---------- */
+function render() {
+  $("root").innerHTML = `<div class="app"${proj() ? ` style="--accent-raw:${proj().accent}"` : ""}>${sidebar()}${toolbar()}<div class="viewport" id="vp">${stage()}</div>${statusbar()}</div>`;
+  let layer = "";
+  if (S.v === "B" && !S.wiz.done) layer += wizard();
+  if (S.v === "D") layer += tourLayer();
+  if (S.open) layer += openDialog();
+  if (S.menu) layer += menuHtml();
+  if (S.pal) layer += palHtml();
+  if (S.goto) layer += gotoHtml();
+  if (S.appear) layer += appearHtml();
+  if (S.notif) layer += `<div class="toastn"><b>${esc(S.notif.title)}</b><span class="mut">${esc(S.notif.body)}</span></div>`;
+  $("layer").innerHTML = layer;
+  if (S.pal) $("palq")?.focus();
+  if (S.goto) { const i = $("gotoq"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  placeSpot();
+  vlabel.textContent = `${S.v} · ${NAMES[S.v]}`; vdesc.textContent = DESC[S.v];
+  if (!$("drawer").hidden) drawer();
+}
+
+/* ---------- state drawer: what would persist, what would be detected ---------- */
+function drawer() {
+  const persisted = {
+    A: { onboarding: { startPage: S.startOnLaunch !== "off" } },
+    B: { onboarding: { wizardDone: S.wiz.done, step: S.wiz.step }, signals: { alert: S.wiz.alert, desktop: S.wiz.notif === "granted" } },
+    C: { onboarding: { checklist: Object.keys(S.check.did).filter((k) => CHECK.some((c) => c.k === k)), hidden: S.check.hidden } },
+    D: { onboarding: { tourDone: S.tour.end || (!S.tour.active && S.projects.length > 0), step: S.tour.step } },
+  }[S.v];
+  const out = {
+    "state.json (new keys)": persisted,
+    projects: S.projects.map((p) => `${p.host}:${p.path} (${p.wins.length} window${p.wins.length === 1 ? "" : "s"})${p.sample ? " sample" : ""}`),
+    environments: S.envs,
+    "detected on host": { claude: machine.claude ? `v${AGENTS[0].ver}` : null, pi: machine.pi ? `v${AGENTS[1].ver}` : null, sshAliases: sshHosts(), notifications: machine.notifPermission },
+  };
+  $("drawer").innerHTML = `<h5>The machine</h5>
+    <label><input type="checkbox" data-m="claude" ${machine.claude ? "checked" : ""}> claude on PATH</label>
+    <label><input type="checkbox" data-m="pi" ${machine.pi ? "checked" : ""}> pi on PATH</label>
+    <label><input type="checkbox" data-m="ssh" ${machine.ssh ? "checked" : ""}> ~/.ssh/config has hosts (devbox, pi5)</label>
+    <div class="row"><button class="dbtn" data-act="raise">Simulate: an agent needs you</button><button class="dbtn" data-act="replay">↺ first launch</button></div>
+    <pre>${esc(JSON.stringify(out, null, 2))}</pre>`;
+}
+
+/* ---------- variants ---------- */
+const ORDER = ["A", "B", "C", "D"];
+const NAMES = { A: "Start page", B: "Setup wizard", C: "Checklist", D: "Guided tour" };
+const DESC = {
+  A: "The empty canvas becomes a welcome page: repos, servers, agents, four keys",
+  B: "Four steps before the app: agents, environments, first project, signals",
+  C: "Today's app plus a self-ticking Getting started card in the sidebar",
+  D: "A sample project, already running, with an eight-stop spotlight tour",
+};
+const vlabel = $("vlabel"), vdesc = $("vdesc");
+function reset() {
+  S = { ...fresh(), v: S?.v ?? "A" };
+  if (S.v === "D") startTour();
+}
+function setVariant(v, push) {
+  if (!ORDER.includes(v)) v = "A";
+  machine.notifPermission = "default";
+  S = { v }; reset();
+  if (push) {
+    try {
+      if (location.protocol === "file:") history.replaceState(null, "", "#" + v);
+      else { const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null, "", u); }
+    } catch { /* ignore */ }
+  }
+  render();
+}
+function cycle(d) { setVariant(ORDER[(ORDER.indexOf(S.v) + d + ORDER.length) % ORDER.length], true); }
+
+/* ---------- events ---------- */
+function testHost(h, then) {
+  S.wiz.envTest[h] = "testing"; render();
+  setTimeout(() => { S.wiz.envTest[h] = "ok"; if (!S.envs.includes(h)) S.envs.push(h); flash(`added ${h} · ${SSH[h].backend}`); then?.(); render(); }, 700);
+}
+function act(a, el) {
+  const p = proj();
+  switch (a) {
+    case "open": S.open = { host: "local", dir: "~/code", sel: null }; S.menu = null; break;
+    case "addenv": S.open = { host: "local", dir: "~", sel: null, addEnv: true }; break;
+    case "openAddEnv": S.open.addEnv = true; break;
+    case "closeOpen": S.open = null; break;
+    case "doOpen": if (S.open.sel || S.open.dir !== "~") { addProject(S.open.host, S.open.sel ?? S.open.dir, null); S.open = null; flash("opened: + in the toolbar starts an agent"); } break;
+    case "menu": S.menu = !S.menu; break;
+    case "pal": S.pal = !S.pal; if (S.pal) tick("palette"); break;
+    case "goto": if (!p) return; S.goto = S.goto ? null : { q: "" }; S.appear = false; break;
+    case "appear": if (!p) return; S.appear = !S.appear; S.goto = null; break;
+    case "raise": raiseSignal(); return;
+    case "nextsig": nextSignal(); return;
+    case "replay": reset(); break;
+    case "startToggle": S.startOnLaunch = el.checked ? true : "off"; break;
+    case "recheck": break;
+    case "sound": flash("♪ two-note chime (the needs-you sound)"); break;
+    case "notif": S.wiz.notif = "granted"; machine.notifPermission = "granted"; flash("the OS asked; you allowed it"); break;
+    case "wnext": if (S.wiz.step < 3) S.wiz.step++; else wizFinish(); break;
+    case "wback": S.wiz.step = Math.max(0, S.wiz.step - 1); break;
+    case "wskip": S.wiz.done = true; flash("setup skipped: run it again from Alt+X › Set up tri-code"); break;
+    case "cktoggle": S.check.open = !S.check.open; break;
+    case "ckhide": S.check.hidden = true; flash("checklist hidden: bring it back from Alt+X › Getting started"); break;
+    case "tourNext": if (S.tour.step < TOUR.length - 1) S.tour.step++; else { S.tour.active = false; S.tour.end = true; } break;
+    case "tourBack": S.tour.step = Math.max(0, S.tour.step - 1); break;
+    case "tourSkip": S.tour.active = false; S.tour.end = true; break;
+    case "tourAgain": startTourAgain(); break;
+    case "tourRemove": S.projects = S.projects.filter((x) => !x.sample); S.active = S.projects[0]?.id ?? null; S.tour.end = false; break;
+    case "tourOpen": S.tour.end = false; S.open = { host: "local", dir: "~/code", sel: null }; break;
+  }
+  render();
+}
+function startTourAgain() { const p = S.projects.find((x) => x.sample); if (p) { S.active = p.id; p.ws = 0; p.focus = p.wins[0]?.id; } S.tour = { step: 0, active: true, end: false, did: {} }; }
+
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.closest(".proto-bar, .drawer")) {
+    if (t.closest("[data-act]") && t.closest(".drawer")) act(t.closest("[data-act]").dataset.act);
+    return;
+  }
+  if (S.menu && !t.closest(".menu") && !t.closest("#addBtn")) { S.menu = null; render(); }
+  if (S.pal && !t.closest(".pal") && !t.closest("#palBtn")) { S.pal = false; render(); }
+  if (S.goto && !t.closest(".goto") && !t.closest("#where")) { S.goto = null; render(); }
+  if (S.appear && !t.closest(".apop") && !t.closest("#appBtn")) { S.appear = false; render(); }
+  if (t.matches("[data-scrim]")) { S.open = null; return render(); }
+  const g = (sel) => t.closest(sel);
+  let el;
+  if ((el = g("[data-copy]"))) { navigator.clipboard?.writeText(el.dataset.copy).catch(() => {}); flash("copied: paste it in a terminal, then Recheck"); return render(); }
+  if (g("[data-recheck]")) { flash(`rechecked PATH: ${AGENTS.filter((a) => has(a.id)).map((a) => a.id).join(", ")}`); return render(); }
+  if ((el = g("[data-test]"))) { const h = el.dataset.test; const andOpen = el.dataset.andopen; testHost(h, andOpen ? () => { S.open = { host: h, dir: "~", sel: null }; } : null); return; }
+  if ((el = g("[data-unenv]"))) { S.envs = S.envs.filter((h) => h !== el.dataset.unenv); delete S.wiz.envTest[el.dataset.unenv]; return render(); }
+  if ((el = g("[data-openhost]"))) { S.open = { host: el.dataset.openhost, dir: "~", sel: null }; return render(); }
+  if ((el = g("[data-quick]"))) { const [h, path, ag] = el.dataset.quick.split("|"); addProject(h, path, ag); flash(`opened ${path} with ${ag}`); return render(); }
+  if ((el = g("[data-act]"))) return act(el.dataset.act, el);
+  if ((el = g("[data-wstep]"))) { const n = +el.dataset.wstep; if (n <= S.wiz.step || (n === 3 && S.wiz.sel) || n < 2) S.wiz.step = n; return render(); }
+  if ((el = g("[data-whost]"))) { Object.assign(S.wiz, { host: el.dataset.whost, dir: FOLDERS[el.dataset.whost]?.["~/code"] ? "~/code" : "~", sel: null }); return render(); }
+  if ((el = g("[data-wdir]"))) { Object.assign(S.wiz, { dir: el.dataset.wdir, sel: null }); return render(); }
+  if ((el = g("[data-wsel]"))) { const path = el.dataset.wsel; if (e.detail > 1 && FOLDERS[S.wiz.host]?.[path]) Object.assign(S.wiz, { dir: path, sel: null }); else S.wiz.sel = path; return render(); }
+  if ((el = g("[data-wagent]"))) { S.wiz.agent = el.dataset.wagent; return render(); }
+  if ((el = g("[data-walert]"))) { S.wiz.alert = el.dataset.walert; return render(); }
+  if ((el = g("[data-ohost]"))) { Object.assign(S.open, { host: el.dataset.ohost, dir: "~", sel: null }); return render(); }
+  if ((el = g("[data-odir]"))) { Object.assign(S.open, { dir: el.dataset.odir, sel: null }); return render(); }
+  if ((el = g("[data-ouse]"))) { addProject(S.open.host, el.dataset.ouse, null); S.open = null; flash("opened: + in the toolbar starts an agent"); return render(); }
+  if ((el = g("[data-osel]"))) { const path = el.dataset.osel; if (e.detail > 1 && FOLDERS[S.open.host]?.[path]) Object.assign(S.open, { dir: path, sel: null }); else S.open.sel = path; return render(); }
+  if ((el = g("[data-new]"))) { const k = el.dataset.new; S.menu = null; const pr = proj(); if (pr) addWin(pr, k); return render(); }
+  if ((el = g("[data-pal]"))) { S.pal = false; flash(`ran “${PAL[+el.dataset.pal]}”`); if (+el.dataset.pal === 2) return nextSignal(); return render(); }
+  if ((el = g("[data-close]"))) { closeWin(el.dataset.close); return render(); }
+  if ((el = g("[data-ws]"))) { setWs(+el.dataset.ws); return render(); }
+  if ((el = g("[data-focus]"))) { proj().focus = el.dataset.focus; return render(); }
+  if ((el = g("[data-win]"))) { const pr = proj(); const w = pr.wins.find((x) => x.id === el.dataset.win); pr.focus = w.id; if (w.sig) { w.sig = null; tick("signal"); } return render(); }
+  if ((el = g("[data-proj]"))) { S.active = el.dataset.proj; return render(); }
+  if ((el = g("[data-gfile]"))) return openFile(el.dataset.gfile, e.shiftKey);
+  if ((el = g("[data-accent]"))) { proj().accent = el.dataset.accent; tick("appear"); return render(); }
+  if ((el = g("[data-show]"))) { showMe(el.dataset.show); return; }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "gotoq") return;
+  S.goto.q = e.target.value; $("gotol").innerHTML = gotoList();
+});
+document.addEventListener("change", (e) => {
+  const m = e.target.dataset?.m;
+  if (m) { machine[m] = e.target.checked; render(); }
+  if (e.target.dataset?.act === "startToggle") act("startToggle", e.target);
+});
+
+addEventListener("keydown", (e) => {
+  const t = document.activeElement;
+  const typing = t && (t.tagName === "INPUT" && t.type !== "checkbox" || t.tagName === "TEXTAREA" || t.isContentEditable);
+  if (e.key === "Escape") { S.open = null; S.menu = null; S.pal = false; S.goto = null; S.appear = false; return render(); }
+  if (typing && t.id === "gotoq" && e.key === "Enter") { e.preventDefault(); const f = S.goto.hits?.[0]; if (f) openFile(f, e.shiftKey); return; }
+  if (typing) { if (e.key === "Enter" && t.id === "palq") { S.pal = false; flash(`ran “${PAL[0]}”`); render(); } return; }
+  if (e.altKey) {
+    const k = e.key.toLowerCase(), p = proj();
+    if (k === "o") { e.preventDefault(); return act("open"); }
+    if (k === "x") { e.preventDefault(); return act("pal"); }
+    if (k === "t") { e.preventDefault(); return act("goto"); }
+    if (k === "p") { e.preventDefault(); return act("appear"); }
+    if (k === "u") { e.preventDefault(); return nextSignal(); }
+    if (k === "enter" && p) { e.preventDefault(); const f = p.wins.find((w) => w.id === p.focus); addWin(p, f && f.kind !== "browser" ? f.kind : "shell"); return render(); }
+    if (k === "b" && p) { e.preventDefault(); addWin(p, "browser"); return render(); }
+    if (/^[1-4]$/.test(k) && p) { e.preventDefault(); setWs(+k - 1); return render(); }
+    if (k === "q" && p && p.focus) { e.preventDefault(); closeWin(p.focus); return render(); }
+    return;
+  }
+  if (e.key === "ArrowLeft") cycle(-1);
+  else if (e.key === "ArrowRight") cycle(1);
+});
+addEventListener("resize", placeSpot);
+$("prev").onclick = () => cycle(-1);
+$("next").onclick = () => cycle(1);
+$("replay").onclick = () => act("replay");
+$("stateBtn").onclick = () => { $("drawer").hidden = !$("drawer").hidden; render(); };
+
+const initial = (new URLSearchParams(location.search).get("variant") || location.hash.replace(/^#/, "") || "A").toUpperCase();
+setVariant(ORDER.includes(initial) ? initial : "A", false);
+addEventListener("hashchange", () => setVariant((location.hash.replace(/^#/, "") || "A").toUpperCase(), false));
+</script>
+</body>
+</html>

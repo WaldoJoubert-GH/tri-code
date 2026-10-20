@@ -204,20 +204,25 @@ export default function Sidebar() {
                       done={() => setRenaming(null)}
                     />
                   </Show>
+                  <Show when={p.sample}>
+                    <span class="sample" title="The tour's sample project: its agents are recordings. Close it with × when you're done.">sample</span>
+                  </Show>
                   <Show when={miniBar(p).length}>
                     <span class="minibar" title={miniBar(p).map((c) => `${c.n} ${c.name}`).join(" · ")}>
                       <For each={miniBar(p)}>{(c) => <i style={{ flex: String(c.n), background: c.color }} />}</For>
                     </span>
                   </Show>
                   <span class="count">{worktreesOf(p.id).length ? "" : p.tabs.length || ""}</span>
-                  <button
-                    class="gear"
-                    title="New worktree (Alt+W)"
-                    aria-label={`New worktree of ${p.name}`}
-                    onClick={(e) => (e.stopPropagation(), openNewWorktree(p))}
-                  >
-                    <Icon name="git-branch-plus" size={13} />
-                  </button>
+                  <Show when={!p.sample}>
+                    <button
+                      class="gear"
+                      title="New worktree (Alt+W)"
+                      aria-label={`New worktree of ${p.name}`}
+                      onClick={(e) => (e.stopPropagation(), openNewWorktree(p))}
+                    >
+                      <Icon name="git-branch-plus" size={13} />
+                    </button>
+                  </Show>
                   <button
                     class="gear"
                     title="Appearance"
