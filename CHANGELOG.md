@@ -2,6 +2,10 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.20 — 2026-10-20
+
+- Each review note in the git window has a Copy button in place of "Send to claude"; it puts the note on the clipboard, ready to paste wherever you want it.
+
 ## 0.1.19 — 2026-10-20
 
 - Typing an address into a new browser window or tab and pressing Enter loads it the first time; before, it opened a blank page and needed a second Enter.
