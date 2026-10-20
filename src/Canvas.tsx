@@ -2,7 +2,7 @@ import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import {
   type Page, type Project, type Tab, activePage, addPage, app, focusTab, isTerminal, live, projectById, removePage,
-  removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabName, toggleMono, visibleTabs,
+  canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabName, toggleMono, visibleTabs,
 } from "./state";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
@@ -37,9 +37,9 @@ const px = (n: number) => `${Math.round(n)}px`;
 let lastW = 0;
 let lastH = 0;
 
-/** Tiling of a project's active workspace at a given viewport size. */
+/** Tiling of a project's active workspace at a given viewport size. Minimised tabs are left out. */
 function layoutOf(p: Project, w: number, h: number) {
-  const tabs = visibleTabs(p);
+  const tabs = canvasTabs(p);
   const sp = space(p);
   const mono = tabs.findIndex((t) => t.id === sp.mono);
   const focus = tabs.findIndex((t) => t.id === sp.focus);
@@ -404,6 +404,7 @@ export default function Canvas(props: { project: Project }) {
           <Show when={isBrowser}>
             <button title="New tab" onClick={newPage}>+</button>
           </Show>
+          <button class="mn" title="Minimise (Alt+N)" onClick={() => minimiseTab(props.project.id, id)}>–</button>
           <button title="Maximize (Alt+F)" onClick={doMax}>▢</button>
           <button title="Close (Alt+Q)" onClick={() => requestClose(props.project.id, id)}>×</button>
         </div>
@@ -486,11 +487,24 @@ export default function Canvas(props: { project: Project }) {
         </Show>
       </div>
       <Show when={tiling().tabs.length === 0}>
-        <div class="empty">
-          <b>Workspace {props.project.ws + 1} of {props.project.name} is empty</b>
-          <div><kbd>Alt</kbd><kbd>Enter</kbd> opens a shell here</div>
-          <div><kbd>Alt</kbd><kbd>Shift</kbd><kbd>{props.project.ws + 1}</kbd> sends the focused window here</div>
-        </div>
+        <Show
+          when={visibleTabs(props.project).length}
+          fallback={
+            <div class="empty">
+              <b>Workspace {props.project.ws + 1} of {props.project.name} is empty</b>
+              <div><kbd>Alt</kbd><kbd>Enter</kbd> opens a shell here</div>
+              <div><kbd>Alt</kbd><kbd>Shift</kbd><kbd>{props.project.ws + 1}</kbd> sends the focused window here</div>
+            </div>
+          }
+        >
+          {(n) => (
+            <div class="empty">
+              <b>{n() === 1 ? "The window here is" : `All ${n()} windows here are`} minimised</b>
+              <div>Click a dimmed tab in the toolbar to bring one back</div>
+              <div><kbd>Alt</kbd><kbd>Shift</kbd><kbd>N</kbd> brings back the last one</div>
+            </div>
+          )}
+        </Show>
       </Show>
     </div>
   );

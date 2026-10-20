@@ -67,8 +67,12 @@ The path field that is also the folder list: typing filters, `Enter` goes in or 
 What the sidebar draws for a project: a logo file from the project, an uploaded image, a glyph or the first letter. **Auto** is tri-code's pick (the first logo found, else the letter); any other choice in the Appearance panel is an override until "reset to auto".
 
 **Tab Strip**:
-The leftmost toolbar group: the active workspace's Windows in tiling order, the focused one underlined, then `+`. A strip tab only focuses a Window that already exists, so nothing is created or moved by clicking one; Windows on other workspaces are not listed.
+The leftmost toolbar group: the active workspace's Windows in tiling order, the focused one underlined, then `+`. A strip tab only focuses a Window that already exists (bringing back a Minimised one), so nothing is created or moved by clicking one; Windows on other workspaces are not listed.
 _Avoid_: Tab bar (there is no tab bar), window list, tab buttons.
+
+**Minimised Window**:
+A Window taken off the canvas with – or `Alt+N`. It keeps its place in tiling order and its tab in the Tab Strip, dimmed; the tiler, the mono carousel and `Alt+H/J/K/L` skip it. Focusing it in any way (its tab, the palette, `Alt+U`, `Alt+Shift+N`) brings it back. Stored as `min` (when) on the Tab. Chosen from design/minimise.html (variant A, "strip").
+_Avoid_: Hidden window, docked, collapsed.
 
 **New Window Menu**:
 The popup under the Tab Strip's `+`: one row per Agent (with its hotkey), then one per panel kind with the key that also opens it (`Alt+B`, `Alt+I`, `Alt+E`, `Alt+C`, `Alt+;`). Issues, Files, Git and Agents open or focus their one-per-project Window rather than adding a second one.

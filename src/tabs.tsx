@@ -142,8 +142,9 @@ export function TabStrip(props: { project: Project }) {
         {(t) => (
           <button
             class="tab"
-            aria-pressed={space(props.project).focus === t.id}
-            title={`${tabName(t)}${hint(t) ? " · " + hint(t) : ""}${sigOf(t) ? " · " + SIG_TEXT[sigOf(t)!] : ""}`}
+            classList={{ min: !!t.min }}
+            aria-pressed={!t.min && space(props.project).focus === t.id}
+            title={`${tabName(t)}${hint(t) ? " · " + hint(t) : ""}${sigOf(t) ? " · " + SIG_TEXT[sigOf(t)!] : ""}${t.min ? " · minimised, click to bring back" : ""}`}
             onClick={() => focusTab(props.project.id, t.id)}
           >
             <Glyph tab={t} />

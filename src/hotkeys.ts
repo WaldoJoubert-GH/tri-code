@@ -2,7 +2,7 @@
 // Ctrl chords and terminal input keep reaching xterm. Listens in the capture phase so
 // handled keys never reach the terminal.
 
-import { Project, Tab, activeProject, addTab, focusedTab, setRatio, space, visibleTabs } from "./state";
+import { Project, Tab, activeProject, addTab, canvasTabs, focusedTab, setRatio, space } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
 import { helpOpen, setHelpOpen } from "./Help";
@@ -19,7 +19,7 @@ import { openGitPanel } from "./git";
 import { agentForKey, launchAgent, newTerminalLike, openAgentsPanel, recording } from "./agents";
 import { closeIconPicker, iconPickerOpen } from "./lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";
-import { cycleLayout, makeMain, maximize, sendWindow, stepGap, stepProject, workspace } from "./commands";
+import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, stepGap, stepProject, workspace } from "./commands";
 import { nextSignal } from "./signals";
 import { closeSignals, signalsOpen } from "./SignalSettings";
 import { flash } from "./ui";
@@ -33,7 +33,7 @@ export const RESERVED: Record<string, string> = {
   ArrowLeft: "focus left", ArrowRight: "focus right", ArrowUp: "focus up", ArrowDown: "focus down",
   Digit1: "workspace 1", Digit2: "workspace 2", Digit3: "workspace 3", Digit4: "workspace 4",
   Enter: "new terminal like this one", NumpadEnter: "new terminal like this one", KeyB: "new browser",
-  KeyI: "issues", KeyE: "files", KeyT: "go to file", KeyC: "git", KeyQ: "close window", KeyF: "maximize", KeyM: "make main",
+  KeyI: "issues", KeyE: "files", KeyT: "go to file", KeyC: "git", KeyQ: "close window", KeyF: "maximize", KeyN: "minimise", KeyM: "make main",
   KeyG: "switch layout", Comma: "less gap", Period: "more gap", Slash: "hotkey help", KeyS: "sidebar",
   KeyP: "appearance", BracketLeft: "previous project", BracketRight: "next project", KeyO: "open project",
   Semicolon: "agents", KeyX: "command palette", KeyU: "next agent that needs you", KeyW: "new worktree",
@@ -53,7 +53,7 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
     if (e.ctrlKey) {
       if (d[0] === 0) {
         flash("stack windows share height equally");
-      } else if (space(p).layout !== "master" || visibleTabs(p).length < 2) {
+      } else if (space(p).layout !== "master" || canvasTabs(p).length < 2) {
         flash("only Main + stack has a resizable split");
       } else {
         const ratio = Math.min(0.8, Math.max(0.2, space(p).ratio + d[0] * 0.05));
@@ -107,6 +107,11 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
     case "KeyF":
       if (!f) return false;
       maximize(p, f);
+      return true;
+    case "KeyN":
+      if (e.shiftKey) restoreLast(p);
+      else if (!f) return false;
+      else minimise(p, f);
       return true;
     case "KeyM":
       if (!f) return false;

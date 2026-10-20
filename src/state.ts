@@ -56,6 +56,8 @@ export type Tab = {
   name?: string;
   /** `term` tabs only: the command it runs ("" = login shell). Kept from launch, so editing an agent only changes new windows. */
   cmd?: string;
+  /** Minimised: when (ms), so Alt+Shift+N brings back the latest. Off the canvas but still in the Tab Strip. */
+  min?: number;
 };
 
 /** The page a browser window shows. */
@@ -204,7 +206,9 @@ export const projectById = (id: string) => app.projects.find((p) => p.id === id)
 export const space = (p: Project) => p.spaces[p.ws];
 /** Tabs on the project's active workspace, in tiling order. */
 export const visibleTabs = (p: Project) => p.tabs.filter((t) => t.space === p.ws);
-export const focusedTab = (p: Project) => visibleTabs(p).find((t) => t.id === space(p).focus);
+/** Tabs on the active workspace that are tiled: the visible ones that are not minimised. */
+export const canvasTabs = (p: Project) => visibleTabs(p).filter((t) => !t.min);
+export const focusedTab = (p: Project) => canvasTabs(p).find((t) => t.id === space(p).focus);
 
 /** Run a mutation against one project inside a single store update. */
 function edit(projectId: string, fn: (p: Project, s: Persisted) => void) {
@@ -323,7 +327,7 @@ export function removeTab(projectId: string, tabId: string) {
     const sp = p.spaces[tab.space];
     if (sp.mono === tabId) sp.mono = undefined;
     if (sp.focus === tabId) {
-      const same = p.tabs.filter((t) => t.space === tab.space);
+      const same = p.tabs.filter((t) => t.space === tab.space && !t.min);
       const before = same.filter((t) => p.tabs.indexOf(t) < i).pop();
       sp.focus = (before ?? same[0])?.id;
     }
@@ -340,11 +344,12 @@ export function restoreTab(projectId: string, tab: Tab, index: number) {
   });
 }
 
-/** Focus a tab, switching to its project and workspace if needed. */
+/** Focus a tab, switching to its project and workspace if needed. A minimised tab comes back. */
 export function focusTab(projectId: string, tabId: string) {
   edit(projectId, (p, s) => {
     const t = p.tabs.find((t) => t.id === tabId);
     if (!t) return;
+    delete t.min;
     s.activeProject = projectId;
     p.ws = t.space;
     p.spaces[t.space].focus = tabId;
@@ -356,7 +361,7 @@ export function goSpace(projectId: string, i: number) {
   edit(projectId, (p) => {
     p.ws = i;
     const sp = p.spaces[i];
-    if (!p.tabs.some((t) => t.space === i && t.id === sp.focus)) sp.focus = p.tabs.find((t) => t.space === i)?.id;
+    if (!p.tabs.some((t) => t.space === i && !t.min && t.id === sp.focus)) sp.focus = p.tabs.find((t) => t.space === i && !t.min)?.id;
   });
 }
 
@@ -368,8 +373,8 @@ export function sendTo(projectId: string, tabId: string, i: number) {
     const fromIndex = t.space, from = p.spaces[fromIndex];
     t.space = i;
     if (from.mono === tabId) from.mono = undefined;
-    if (from.focus === tabId) from.focus = p.tabs.find((x) => x.space === fromIndex)?.id;
-    p.spaces[i].focus = tabId;
+    if (from.focus === tabId) from.focus = p.tabs.find((x) => x.space === fromIndex && !x.min)?.id;
+    if (!t.min) p.spaces[i].focus = tabId;
   });
 }
 
@@ -392,6 +397,26 @@ export function promote(projectId: string, tabId: string) {
     p.spaces[t.space].mono = undefined;
   });
 }
+
+/** Take a tab off the canvas, keeping its place in tiling order; focus moves to the open tab before it. */
+export function minimiseTab(projectId: string, tabId: string) {
+  edit(projectId, (p) => {
+    const i = p.tabs.findIndex((t) => t.id === tabId);
+    const t = p.tabs[i];
+    if (!t || t.min) return;
+    t.min = Date.now();
+    const sp = p.spaces[t.space];
+    if (sp.mono === tabId) sp.mono = undefined;
+    if (sp.focus === tabId) {
+      const open = p.tabs.filter((x) => x.space === t.space && !x.min);
+      sp.focus = (open.filter((x) => p.tabs.indexOf(x) < i).pop() ?? open[0])?.id;
+    }
+  });
+}
+
+/** The active workspace's most recently minimised tab, if any. */
+export const lastMinimised = (p: Project) =>
+  visibleTabs(p).filter((t) => t.min).sort((a, b) => b.min! - a.min!)[0];
 
 export function setLayout(projectId: string, layout: Layout) {
   edit(projectId, (p) => { p.spaces[p.ws].layout = layout; p.spaces[p.ws].mono = undefined; });

@@ -43,6 +43,10 @@ export function HelpOverlay() {
             <dd>Less / more gap between windows</dd>
             <dt><Keys keys={["Alt", "F"]} /></dt>
             <dd>Maximize the focused window, again to restore</dd>
+            <dt><Keys keys={["Alt", "N"]} /></dt>
+            <dd>Minimise the focused window: it leaves the canvas and its tab dims; click the tab to bring it back</dd>
+            <dt><Keys keys={["Alt", "Shift", "N"]} /></dt>
+            <dd>Bring back the window minimised last</dd>
           </dl>
           <h4>Project</h4>
           <dl>

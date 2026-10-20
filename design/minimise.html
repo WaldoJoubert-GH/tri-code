@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tri-code · minimise prototype</title>
+<!--
+  PROTOTYPE — throwaway. Not imported by the app; open this file directly in a browser.
+  Question: "Where does a minimised canvas Window go, and how do you get it back?"
+
+  OUTCOME (settled 2026-10-20): variant A, "strip". A minimised window leaves the canvas and stays
+  in the Tab Strip, dimmed, until its tab (or anything that focuses it) brings it back. Shipped as
+  `Tab.min` + minimiseTab/canvasTabs in state.ts, the – button in Canvas.tsx, `.tab.min` in the
+  strip, and Alt+N / Alt+Shift+N in hotkeys.ts and commands.ts.
+  Windows already have maximise (▢, Alt+F) and close (×, Alt+Q); this adds – (Alt+N here,
+  since Alt+M is "make main"). Alt+Shift+N brings back the last one minimised.
+
+  Four structurally different answers, switchable from the floating bar (also ← / →).
+  URL keeps the choice: minimise.html?variant=B (served) or minimise.html#B (file://).
+    A · Strip    — a minimised window leaves the canvas but stays in the Tab Strip, dimmed.
+                   Clicking its tab brings it back. No new chrome.
+    B · Shelf    — a taskbar along the bottom of the canvas, only there while something is
+                   minimised: one chip per window with its signal and last output line.
+    C · Drawer   — one toolbar counter ("3 minimised") with the loudest signal; it opens a
+                   popover of thumbnails. The Tab Strip lists only what is on the canvas.
+    D · Shade    — the window rolls up to its 28px title bar in its own slot; its column
+                   neighbours take the height. Nothing leaves the canvas. In grid a shaded
+                   cell has no column-mate to hand its height to, so it leaves a gap.
+
+  All variants share one in-memory model. Minimised windows keep their place in tiling order,
+  so restoring the main window makes it main again. The tiler skips them (A–C), Alt+H/J/K/L
+  skips them, and so does the mono carousel. The "state" drawer shows the model and lets you
+  fire Agent Signals at any window, to see how a minimised agent that needs you gets noticed.
+-->
+<style>
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --shadow: rgba(30,34,44,.22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --shadow: rgba(0,0,0,.8); --accent: var(--accent-raw);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 var(--ui); overflow: hidden; user-select: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+kbd { font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--panel); }
+
+.app { display: grid; height: 100%; grid-template-columns: 200px 1fr; grid-template-rows: 34px 1fr 26px;
+  grid-template-areas: "side top" "side canvas" "side status"; }
+aside { grid-area: side; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 6px; }
+aside h2 { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.project { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 5px; position: relative; }
+.project.active { background: color-mix(in srgb, var(--accent-raw) 16%, var(--raised)); }
+.project .ic { width: 18px; height: 18px; border-radius: 4px; background: var(--pa); color: #111; font: 700 11px/18px var(--ui); text-align: center; }
+.project .badge { position: absolute; left: 20px; top: 2px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px var(--panel); }
+
+.top { grid-area: top; display: flex; align-items: stretch; background: var(--panel); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; align-items: stretch; }
+.tab, .tab-add { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); white-space: nowrap; box-shadow: inset 0 -2px transparent; }
+.tab:hover, .tab-add:hover { color: var(--text); background: var(--hover); }
+.tab[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.tab .glyph { font: 12.5px var(--mono); }
+.tab-add { width: 30px; justify-content: center; font-size: 15px; }
+/* A: a minimised window's tab */
+.tab.min { opacity: .5; font-style: italic; }
+.tab.min .glyph::after { content: "–"; font-style: normal; margin-left: 2px; }
+.tab.min:hover { opacity: .85; }
+.tab.min.has-sig { opacity: 1; }
+.spacer { flex: 1; }
+.tool { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); font-size: 12px; }
+.tool:hover { background: var(--hover); color: var(--text); }
+.tool[aria-pressed="true"] { color: var(--text); }
+.layouts { display: flex; align-items: center; gap: 2px; padding: 0 8px; border-left: 1px solid var(--line); }
+.layouts button { padding: 3px 8px; border-radius: 4px; color: var(--muted); font-size: 12px; }
+.layouts button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+/* C: the counter */
+.mincount { position: relative; border-left: 1px solid var(--line); }
+.mincount b { font: 600 11px var(--mono); min-width: 18px; height: 16px; line-height: 16px; border-radius: 8px; background: var(--raised); color: var(--text); text-align: center; padding: 0 4px; }
+
+.canvas { grid-area: canvas; position: relative; background: var(--canvas); overflow: hidden; display: flex; flex-direction: column; }
+.world { position: relative; flex: 1; min-height: 0; }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; }
+
+.win { position: absolute; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+  transition: left .18s, top .18s, width .18s, height .18s, opacity .18s; }
+.win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.win.peek { opacity: .5; filter: saturate(.5); }
+.win.sig-blocked:not(.focused) { border-color: var(--warn); animation: bell 1.6s ease-in-out infinite; }
+.win.sig-done:not(.focused) { border-color: color-mix(in srgb, var(--ok) 70%, var(--line)); }
+@keyframes bell { 50% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--warn) 40%, transparent); } }
+.bar { height: 28px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); }
+.win.focused .bar { color: var(--text); }
+.bar .kind { font-weight: 600; }
+.bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); line-height: 1; flex: none; }
+.bar button:hover { background: var(--hover); color: var(--text); }
+.bar button.mn { font-weight: 700; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.dot.web { background: var(--accent); border-radius: 2px; }
+.dot.git { background: #e0794a; }
+.sg { width: 7px; height: 7px; border-radius: 50%; flex: none; display: inline-block; }
+.s-working { background: var(--accent); animation: pulse 1.2s infinite; }
+.s-blocked { background: var(--warn); }
+.s-done { background: var(--ok); }
+.s-error { background: var(--bad); }
+@keyframes pulse { 50% { opacity: .35; } }
+.ast { font-size: 11.5px; display: flex; align-items: center; gap: 5px; color: var(--muted); }
+.body { flex: 1; min-height: 0; overflow: hidden; padding: 6px 10px; font: 12px/1.5 var(--mono); white-space: pre; color: var(--muted); }
+.body .hl { color: var(--text); }
+.body.web { white-space: normal; font-family: var(--ui); display: grid; place-items: center; color: var(--muted); }
+/* D: a shaded window is only its bar */
+.win.shaded { border-style: dashed; }
+.win.shaded .bar { border-bottom: 0; }
+.win.shaded .body { display: none; }
+
+/* B: the shelf */
+.shelf { flex: none; height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-top: 1px solid var(--line); background: var(--panel); overflow-x: auto; }
+.shelf .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-right: 2px; }
+.chip { display: flex; align-items: center; gap: 6px; height: 24px; max-width: 230px; padding: 0 4px 0 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); flex: none; }
+.chip:hover { border-color: var(--accent); }
+.chip .nm { font-weight: 600; }
+.chip .tail { color: var(--muted); font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chip .x { width: 18px; height: 18px; border-radius: 3px; color: var(--muted); opacity: 0; }
+.chip:hover .x { opacity: 1; }
+.chip .x:hover { background: var(--hover); }
+.chip.sig-blocked { border-color: var(--warn); animation: bell 1.6s ease-in-out infinite; }
+
+/* C: the drawer popover */
+.drawer { position: absolute; top: 38px; right: 8px; z-index: 40; width: 460px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 14px 40px -10px var(--shadow); padding: 8px; }
+.drawer .hd { display: flex; justify-content: space-between; padding: 0 2px 6px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.drawer .hd button { text-transform: none; letter-spacing: 0; color: var(--accent); }
+.thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.thumb { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); text-align: left; display: flex; flex-direction: column; height: 112px; }
+.thumb:hover { border-color: var(--accent); }
+.thumb.sig-blocked { border-color: var(--warn); }
+.thumb .bar { height: 22px; font-size: 12px; }
+.thumb .body { font-size: 9px; line-height: 1.35; padding: 4px 6px; }
+
+.status { grid-area: status; display: flex; align-items: center; gap: 14px; padding: 0 10px; background: var(--panel); border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; }
+.status .flash { color: var(--text); }
+.status .hints { margin-left: auto; display: flex; gap: 12px; }
+
+/* state drawer */
+.state { position: fixed; right: 12px; bottom: 122px; width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 140px); z-index: 60;
+  background: #14161cf5; color: #d8dce6; border: 1px solid #3a3f4d; border-radius: 10px; box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); display: flex; flex-direction: column; overflow: hidden; }
+.state[hidden] { display: none; }
+.state h4 { margin: 0; padding: 8px 12px; font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; border-bottom: 1px solid #2a2f3b; }
+.state pre { margin: 0; padding: 8px 12px; font: 11px/1.45 var(--mono); white-space: pre-wrap; overflow: auto; user-select: text; flex: 1; }
+.sim { padding: 6px 12px; display: grid; grid-template-columns: 1fr auto auto auto auto; gap: 4px 6px; align-items: center; font: 11px var(--mono); border-bottom: 1px solid #2a2f3b; }
+.sim button { border: 1px solid #3a3f4d; border-radius: 5px; padding: 2px 6px; color: #cfd5e4; }
+.sim button:hover { background: #262b36; }
+
+.proto-bar { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 8px;
+  background: #14161cf2; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px; box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); font: 12px/1.35 var(--ui); }
+.proto-bar .tag { font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; border: 1px solid #3a3f4d; border-radius: 999px; padding: 4px 7px; }
+.proto-bar button { color: #cfd5e4; border-radius: 7px; }
+.proto-bar button.arrow { width: 26px; height: 26px; font-size: 15px; }
+.proto-bar button:hover { background: #262b36; color: #fff; }
+.proto-bar .cur { width: 330px; }
+.proto-bar .cur b { font: 600 12px var(--mono); color: #fff; }
+.proto-bar .cur span { display: block; color: #9aa3b8; font-size: 11px; }
+.proto-bar .st { padding: 4px 9px; border: 1px solid #3a3f4d; font: 11px var(--mono); }
+.proto-bar .st[aria-pressed="true"] { border-color: #7aa2f7; color: #fff; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="side"></aside>
+  <div class="top" id="top"></div>
+  <div class="canvas"><div class="world" id="world"></div><div id="shelf"></div></div>
+  <div class="status" id="status"></div>
+</div>
+<div class="state" id="state" hidden>
+  <h4>fire an agent signal</h4><div class="sim" id="sim"></div>
+  <h4>model (tiling order)</h4><pre id="model"></pre>
+</div>
+<div class="proto-bar">
+  <span class="tag">prototype</span>
+  <button class="arrow" id="prev" title="Previous variant (←)">‹</button>
+  <div class="cur"><b id="vlabel"></b><span id="vdesc"></span></div>
+  <button class="arrow" id="next" title="Next variant (→)">›</button>
+  <button class="st" id="stBtn" aria-pressed="false" title="Show state (S)">state</button>
+  <button class="st" id="resetBtn" title="Reset the sample">reset</button>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+const VARIANTS = {
+  A: ["A · Strip", "minimised windows stay in the Tab Strip, dimmed"],
+  B: ["B · Shelf", "a taskbar along the canvas bottom while any are minimised"],
+  C: ["C · Drawer", "one toolbar counter that opens thumbnails"],
+  D: ["D · Shade", "roll up to the title bar in place"],
+};
+const ORDER = Object.keys(VARIANTS);
+const SIG_TEXT = { working: "working", blocked: "needs you", done: "done", error: "error" };
+const LOUD = ["blocked", "error", "done", "working"];
+const BAR = 28;
+
+let st;
+function reset() {
+  st = {
+    v: st?.v ?? "A", layout: "master", ratio: 0.58, gap: 8, focus: "w1", mono: null,
+    seq: 0, showState: st?.showState ?? false, drawer: false, flash: "",
+    wins: [
+      { id: "w1", kind: "claude", glyph: "✦", title: "~/tri-code", sig: "working",
+        lines: ["> add a minimise button to canvas windows", "", "● Reading src/Canvas.tsx", "● Reading src/layout.ts", "  tile() skips zero-size rects…", "● Editing src/state.ts"] },
+      { id: "w2", kind: "pi", glyph: "π", title: "~/tri-code", sig: null,
+        lines: ["pi › review the worktree branch", "", "  3 findings, 1 fix", "  src/worktrees.ts:41  fix  path not quoted"] },
+      { id: "w3", kind: "browser", glyph: "◍", title: "localhost:1420", sig: null, web: true,
+        lines: ["tri-code dev server"] },
+      { id: "w4", kind: "shell", glyph: "$", title: "~/tri-code", sig: null,
+        lines: ["$ bun run dev", "  VITE v8.0.16  ready in 412 ms", "  ➜  Local:   http://localhost:1420/", "  ➜  press h + enter to show help"] },
+      { id: "w5", kind: "git", glyph: "±", title: "main · 2 changed", sig: null,
+        lines: ["M  src/Canvas.tsx", "M  src/state.ts", "", "✦ Add a minimise button to windows"] },
+    ].map((w) => ({ ...w, min: false, minAt: 0 })),
+  };
+}
+reset();
+
+const win = (id) => st.wins.find((w) => w.id === id);
+/** Windows the tiler places: A–C drop minimised ones; D keeps them (shaded) in their slot. */
+const onCanvas = () => st.v === "D" ? st.wins : st.wins.filter((w) => !w.min);
+const minimised = () => st.wins.filter((w) => w.min).sort((a, b) => b.minAt - a.minAt);
+const loudest = (ws) => LOUD.find((s) => s !== "working" && ws.some((w) => w.sig === s));
+
+/* ---------- tiling (layout.ts, copied) ---------- */
+function tile(n, layout, ratio, width, height, g, mono, focus) {
+  const ax = g, ay = g, aw = Math.max(0, width - 2 * g), ah = Math.max(0, height - 2 * g);
+  const r = (x, y, w, h) => ({ x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
+  const rects = [];
+  if (!n) return rects;
+  if (layout === "mono") {
+    const f = focus >= 0 && focus < n ? focus : 0;
+    const cw = Math.min(aw * 0.62, 1024), x0 = ax + (aw - cw) / 2, gut = x0 - ax;
+    for (let i = 0; i < n; i++) rects.push(r(0, 0, 0, 0));
+    rects[f] = r(x0, ay, cw, ah);
+    if (n > 1 && gut >= 120) {
+      const pw = gut - g, ph = Math.max(0, ah - 88), prev = (f - 1 + n) % n, next = (f + 1) % n;
+      rects[prev] = r(ax, ay + 44, pw, ph);
+      rects[next] = r(x0 + cw + g, ay + 44, pw, ph);
+    }
+  } else if (layout === "master" && n > 1) {
+    const mw = (aw - g) * ratio, k = n - 1, sh = (ah - g * (k - 1)) / k;
+    rects.push(r(ax, ay, mw, ah));
+    for (let i = 0; i < k; i++) rects.push(r(ax + mw + g, ay + i * (sh + g), aw - mw - g, sh));
+  } else {
+    const cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols), th = (ah - g * (rows - 1)) / rows;
+    for (let i = 0; i < n; i++) {
+      const row = Math.floor(i / cols), inRow = row < rows - 1 ? cols : n - cols * (rows - 1), c = i - row * cols;
+      const tw = (aw - g * (inRow - 1)) / inRow;
+      rects.push(r(ax + c * (tw + g), ay + row * (th + g), tw, th));
+    }
+  }
+  if (mono >= 0 && mono < n) rects[mono] = r(ax, ay, aw, ah);
+  return rects;
+}
+
+/**
+ * D: shade. Windows that share a column (same x and width) re-split its height: a shaded
+ * one gets BAR px, the open ones share the rest. A column of only shaded windows (a shaded
+ * main) narrows to a strip of bars and gives its width to the next column.
+ */
+function shade(ws, rects, g) {
+  const cols = new Map();
+  rects.forEach((r, i) => { if (r.w > 0) { const k = r.x + ":" + r.w; (cols.get(k) ?? cols.set(k, []).get(k)).push(i); } });
+  for (const idx of cols.values()) {
+    idx.sort((a, b) => rects[a].y - rects[b].y);
+    const top = rects[idx[0]].y, bottom = Math.max(...idx.map((i) => rects[i].y + rects[i].h));
+    const open = idx.filter((i) => !ws[i].min).length, nShut = idx.length - open;
+    const each = open ? (bottom - top - nShut * BAR - g * (idx.length - 1)) / open : 0;
+    let y = top;
+    for (const i of idx) { const h = ws[i].min ? BAR : each; rects[i] = { ...rects[i], y, h }; y += h + g; }
+  }
+  // A main column (master, leftmost) that is all bars: narrow it to 220px, widen its neighbours.
+  if (st.layout === "master" && ws.length > 1 && ws[0].min && rects[0].h === BAR) {
+    const was = rects[0].w, now = 220, d = was - now;
+    rects[0] = { ...rects[0], w: now };
+    for (let i = 1; i < rects.length; i++) rects[i] = { ...rects[i], x: rects[i].x - d, w: rects[i].w + d };
+  }
+  return rects;
+}
+
+function layoutNow() {
+  const el = $("world"), W = el.clientWidth, H = el.clientHeight;
+  const ws = onCanvas();
+  const open = st.v === "D" ? ws.filter((w) => !w.min) : ws;
+  // In mono, the carousel only turns through open windows.
+  if (st.layout === "mono") {
+    const fi = open.findIndex((w) => w.id === st.focus);
+    const rs = tile(open.length, "mono", st.ratio, W, H, st.gap, open.findIndex((w) => w.id === st.mono), fi);
+    const m = new Map(open.map((w, i) => [w.id, rs[i]]));
+    return ws.map((w) => ({ w, r: m.get(w.id) ?? { x: 0, y: 0, w: 0, h: 0 }, peek: m.has(w.id) && w.id !== st.focus && rs[open.indexOf(w)].w > 0 }));
+  }
+  let rs = tile(ws.length, st.layout, st.ratio, W, H, st.gap, ws.findIndex((w) => w.id === st.mono), -1);
+  if (st.v === "D") rs = shade(ws, rs, st.gap);
+  return ws.map((w, i) => ({ w, r: rs[i], peek: false }));
+}
+
+/* ---------- actions ---------- */
+function say(s) { st.flash = s; }
+function nextOpen(fromId) {
+  const ws = st.wins, i = ws.findIndex((w) => w.id === fromId);
+  for (let k = 1; k < ws.length; k++) { const w = ws[(i + k) % ws.length]; if (!w.min) return w.id; }
+  return null;
+}
+function minimise(id) {
+  const w = win(id); if (!w || w.min) return;
+  w.min = true; w.minAt = ++st.seq;
+  if (st.mono === id) st.mono = null;
+  if (st.focus === id) st.focus = nextOpen(id);
+  say(`minimised ${w.kind}`);
+}
+function restore(id) {
+  const w = win(id); if (!w) return;
+  if (w.min) { w.min = false; seen(w); say(`restored ${w.kind}`); }
+  st.focus = id; st.drawer = false;
+}
+function focus(id) { const w = win(id); if (w?.min) return restore(id); st.focus = id; seen(w); }
+function seen(w) { if (w && (w.sig === "done" || w.sig === "error")) w.sig = null; }
+function close(id) {
+  const i = st.wins.findIndex((w) => w.id === id); if (i < 0) return;
+  const nx = st.focus === id ? nextOpen(id) : st.focus;
+  say(`closed ${st.wins[i].kind}`);
+  st.wins.splice(i, 1);
+  st.focus = nx === id ? null : nx;
+  if (st.mono === id) st.mono = null;
+}
+function maxToggle(id) { const w = win(id); if (w?.min) restore(id); st.mono = st.mono === id ? null : id; st.focus = id; }
+function restoreLast() { const w = minimised()[0]; if (w) restore(w.id); else say("nothing minimised"); }
+function neighbour(dx, dy) {
+  const placed = layoutNow().filter((p) => !p.w.min && p.r.w > 0);
+  const f = placed.find((p) => p.w.id === st.focus); if (!f) { if (placed[0]) st.focus = placed[0].w.id; return; }
+  const cx = f.r.x + f.r.w / 2, cy = f.r.y + f.r.h / 2;
+  let best = null, bs = Infinity;
+  for (const o of placed) {
+    if (o === f) continue;
+    const vx = o.r.x + o.r.w / 2 - cx, vy = o.r.y + o.r.h / 2 - cy, along = vx * dx + vy * dy, across = Math.abs(dx ? vy : vx);
+    if (along <= 1) continue;
+    const s = along + across * 2; if (s < bs) { bs = s; best = o; }
+  }
+  if (st.layout === "mono" && !best) { const open = st.wins.filter((w) => !w.min), i = open.findIndex((w) => w.id === st.focus); best = { w: open[(i + (dx || dy) + open.length) % open.length] }; }
+  if (best) focus(best.w.id);
+}
+
+/* ---------- render ---------- */
+function body(w, thumb) {
+  if (w.web) return `<div class="body web"><div><b style="color:var(--text)">tri-code</b><br>localhost:1420</div></div>`;
+  const ls = w.lines.map((l, i) => i === 0 ? `<span class="hl">${esc(l)}</span>` : esc(l));
+  if (w.sig === "blocked") ls.push("", `<span class="hl">? Allow edit to src/state.ts?  (y/n)</span>`);
+  return `<div class="body">${ls.join("\n")}</div>`;
+}
+function barHtml(w, opts = {}) {
+  const dot = w.kind === "browser" ? "web" : w.kind === "git" ? "git" : "";
+  const ast = w.sig ? `<span class="ast"><span class="sg s-${w.sig}"></span>${SIG_TEXT[w.sig]}</span>` : "";
+  const btns = opts.noButtons ? "" : st.v === "D" && w.min
+    ? `<button class="mn" data-act="restore" title="Unshade (Alt+Shift+N)">▾</button><button data-act="close" title="Close (Alt+Q)">×</button>`
+    : `<button class="mn" data-act="min" title="Minimise (Alt+N)">–</button><button data-act="max" title="Maximize (Alt+F)">▢</button><button data-act="close" title="Close (Alt+Q)">×</button>`;
+  return `<div class="bar"><span class="dot ${dot}"></span><span class="kind">${w.kind}</span>${ast}<span class="ttl">${esc(w.title)}</span>${btns}</div>`;
+}
+
+function renderTop() {
+  const strip = st.v === "A" ? st.wins : st.wins.filter((w) => !w.min || st.v === "D");
+  const tabs = strip.map((w) => `<button class="tab${w.min ? " min" : ""}${w.sig && w.sig !== "working" ? " has-sig" : ""}" data-tab="${w.id}" aria-pressed="${st.focus === w.id}"
+      title="${w.kind}${w.min ? " · minimised, click to restore" : ""}"><span class="glyph">${w.glyph}</span>${w.kind}${w.sig ? ` <span class="sg s-${w.sig}"></span>` : ""}</button>`).join("");
+  let counter = "";
+  if (st.v === "C") {
+    const m = minimised(), l = loudest(m);
+    counter = `<button class="tool mincount" id="cnt" aria-pressed="${st.drawer}" title="Minimised windows" ${m.length ? "" : "disabled style='opacity:.45'"}>
+      ${l ? `<span class="sg s-${l}"></span>` : ""}<b>${m.length}</b> minimised ▾</button>`;
+  }
+  $("top").innerHTML = `<div class="tabs">${tabs}<button class="tab-add" title="New window">+</button></div><span class="spacer"></span>${counter}
+    <div class="layouts">${["master", "grid", "mono"].map((l) => `<button data-layout="${l}" aria-pressed="${st.layout === l}">${l}</button>`).join("")}</div>`;
+  if (st.v === "C" && st.drawer && minimised().length) {
+    const d = document.createElement("div");
+    d.className = "drawer";
+    d.innerHTML = `<div class="hd"><span>minimised · newest first</span><button id="restoreAll">restore all</button></div><div class="thumbs">${
+      minimised().map((w) => `<button class="thumb${w.sig ? " sig-" + w.sig : ""}" data-restore="${w.id}">${barHtml(w, { noButtons: true })}${body(w, true)}</button>`).join("")}</div>`;
+    $("top").appendChild(d);
+  }
+}
+
+function renderShelf() {
+  const m = minimised();
+  if (st.v !== "B" || !m.length) { $("shelf").innerHTML = ""; return; }
+  $("shelf").innerHTML = `<div class="shelf"><span class="lbl">minimised</span>${m.map((w) => {
+    const tail = w.sig === "blocked" ? "? Allow edit to src/state.ts?" : w.lines.filter(Boolean).at(-1) ?? "";
+    return `<div class="chip${w.sig ? " sig-" + w.sig : ""}" data-restore="${w.id}" title="Restore ${w.kind}">
+      <span class="glyph" style="font-family:var(--mono)">${w.glyph}</span><span class="nm">${w.kind}</span>
+      ${w.sig ? `<span class="sg s-${w.sig}"></span>` : ""}<span class="tail">${esc(tail)}</span>
+      <button class="x" data-closechip="${w.id}" title="Close">×</button></div>`;
+  }).join("")}</div>`;
+}
+
+function renderWorld() {
+  const placed = layoutNow();
+  const world = $("world");
+  const open = st.wins.filter((w) => !w.min);
+  const html = placed.filter((p) => p.r.w > 0).map(({ w, r, peek }) => {
+    const cls = ["win", st.focus === w.id && "focused", peek && "peek", w.sig && `sig-${w.sig}`, st.v === "D" && w.min && "shaded"].filter(Boolean).join(" ");
+    const z = st.mono === w.id ? 4 : st.focus === w.id ? 3 : 2;
+    return `<div class="${cls}" data-win="${w.id}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;z-index:${z}">${barHtml(w)}${body(w)}</div>`;
+  }).join("");
+  const empty = !open.length && st.wins.length
+    ? `<div class="empty"><div>All ${st.wins.length} windows are minimised.<br><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> brings back the last one.</div></div>`
+    : !st.wins.length ? `<div class="empty">No windows · press reset</div>` : "";
+  world.innerHTML = html + empty;
+}
+
+function renderSide() {
+  const l = loudest(st.wins);
+  $("side").innerHTML = `<h2>local</h2>
+    <div class="project active" style="--pa:#7aa2f7"><span class="ic">t</span>${l ? `<span class="badge s-${l}"></span>` : ""}tri-code</div>
+    <div class="project" style="--pa:#9ece6a"><span class="ic">p</span>pi-todos</div>
+    <h2>dev-box</h2><div class="project" style="--pa:#e0af68"><span class="ic">d</span>dev-hub</div>`;
+}
+
+function renderStatus() {
+  const m = minimised().length;
+  $("status").innerHTML = `<span>${st.layout} · ${st.wins.length - m} on canvas${m ? ` · ${m} minimised` : ""}</span><span class="flash">${esc(st.flash)}</span>
+    <span class="hints"><span><kbd>Alt</kbd>+<kbd>N</kbd> minimise</span><span><kbd>Alt</kbd>+<kbd>⇧</kbd>+<kbd>N</kbd> restore last</span><span><kbd>Alt</kbd>+<kbd>H/J/K/L</kbd> focus</span><span><kbd>←</kbd><kbd>→</kbd> variant</span><span><kbd>S</kbd> state</span></span>`;
+}
+
+function renderState() {
+  $("state").hidden = !st.showState;
+  $("stBtn").setAttribute("aria-pressed", st.showState);
+  if (!st.showState) return;
+  $("sim").innerHTML = st.wins.map((w) => `<span>${w.glyph} ${w.kind}${w.min ? " (min)" : ""}</span>${["working", "blocked", "done"].map((s) => `<button data-sig="${s}" data-for="${w.id}">${s}</button>`).join("")}<button data-sig="" data-for="${w.id}">clear</button>`).join("");
+  const sp = {
+    layout: st.layout, focus: st.focus, mono: st.mono ?? undefined,
+    tabs: st.wins.map((w) => ({ id: w.id, kind: w.kind, ...(w.min ? { min: true } : {}) })),
+  };
+  $("model").textContent = `// workspace in state.json — "min" is the only new field\n${JSON.stringify(sp, null, 2)}\n\n// runtime only\n${JSON.stringify({ signals: Object.fromEntries(st.wins.filter((w) => w.sig).map((w) => [w.id, w.sig])), minimisedOrder: minimised().map((w) => w.id) }, null, 2)}`;
+}
+
+function render() {
+  const [l, d] = VARIANTS[st.v];
+  $("vlabel").textContent = l; $("vdesc").textContent = d;
+  renderSide(); renderTop(); renderShelf(); renderWorld(); renderStatus(); renderState();
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button, [data-restore], [data-win]");
+  if (!t) { if (st.drawer) { st.drawer = false; render(); } return; }
+  if (t.closest(".proto-bar")) return;
+  const winEl = t.closest("[data-win]");
+  if (t.dataset.closechip) { e.stopPropagation(); close(t.dataset.closechip); }
+  else if (t.dataset.act && winEl) {
+    const id = winEl.dataset.win;
+    ({ min: minimise, max: maxToggle, close, restore })[t.dataset.act](id);
+  }
+  else if (t.dataset.restore) restore(t.dataset.restore);
+  else if (t.dataset.tab) focus(t.dataset.tab);
+  else if (t.dataset.layout) { st.layout = t.dataset.layout; st.mono = null; }
+  else if (t.id === "cnt") st.drawer = !st.drawer;
+  else if (t.id === "restoreAll") { st.wins.forEach((w) => { if (w.min) { w.min = false; seen(w); } }); st.drawer = false; say("restored all"); }
+  else if (t.dataset.for) { const w = win(t.dataset.for); w.sig = t.dataset.sig || null; say(w.sig ? `${w.kind}: ${SIG_TEXT[w.sig]}` : `${w.kind}: cleared`); }
+  else if (winEl) { focus(winEl.dataset.win); }
+  else if (st.drawer && !t.closest(".drawer")) st.drawer = false;
+  render();
+});
+document.addEventListener("dblclick", (e) => {
+  const b = e.target.closest(".bar"), w = e.target.closest("[data-win]");
+  if (!b || !w || e.target.closest("button")) return;
+  // D: double-click a bar toggles shade, like a classic window shade.
+  if (st.v === "D") { const x = win(w.dataset.win); x.min ? restore(x.id) : minimise(x.id); } else maxToggle(w.dataset.win);
+  render();
+});
+const DIRS = { KeyH: [-1, 0], KeyL: [1, 0], KeyK: [0, -1], KeyJ: [0, 1] };
+document.addEventListener("keydown", (e) => {
+  if (e.altKey && e.code === "KeyN") { e.preventDefault(); e.shiftKey ? restoreLast() : st.focus && minimise(st.focus); render(); return; }
+  if (e.altKey && e.code === "KeyF") { e.preventDefault(); if (st.focus) maxToggle(st.focus); render(); return; }
+  if (e.altKey && e.code === "KeyQ") { e.preventDefault(); if (st.focus) close(st.focus); render(); return; }
+  if (e.altKey && e.code === "KeyG") { e.preventDefault(); st.layout = { master: "grid", grid: "mono", mono: "master" }[st.layout]; st.mono = null; render(); return; }
+  if (e.altKey && DIRS[e.code]) { e.preventDefault(); neighbour(...DIRS[e.code]); render(); return; }
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === "Escape" && st.drawer) { st.drawer = false; render(); }
+  else if (e.key === "ArrowLeft") cycle(-1);
+  else if (e.key === "ArrowRight") cycle(1);
+  else if (e.key === "s" || e.key === "S") { st.showState = !st.showState; render(); }
+});
+addEventListener("resize", () => render());
+
+function setVariant(v, push) {
+  st.v = ORDER.includes(v) ? v : "A";
+  st.drawer = false; st.flash = "";
+  if (!st.focus || win(st.focus)?.min) st.focus = nextOpen(st.wins[0]?.id) ?? st.focus;
+  if (push) {
+    try {
+      if (location.protocol === "file:") location.hash = st.v;
+      else { const u = new URL(location.href); u.searchParams.set("variant", st.v); history.replaceState(null, "", u); }
+    } catch { /* ignore */ }
+  }
+  render();
+}
+const cycle = (d) => setVariant(ORDER[(ORDER.indexOf(st.v) + d + ORDER.length) % ORDER.length], true);
+$("prev").onclick = (e) => { e.stopPropagation(); cycle(-1); };
+$("next").onclick = (e) => { e.stopPropagation(); cycle(1); };
+$("stBtn").onclick = (e) => { e.stopPropagation(); st.showState = !st.showState; render(); };
+$("resetBtn").onclick = (e) => { e.stopPropagation(); reset(); seed(); render(); };
+
+// Start with something already minimised (and a blocked agent among them) so there is something to look at.
+function seed() { minimise("w2"); minimise("w4"); win("w2").sig = "blocked"; st.flash = ""; }
+seed();
+const initial = (new URLSearchParams(location.search).get("variant") || location.hash.replace(/^#/, "") || "A").toUpperCase();
+setVariant(initial, false);
+addEventListener("hashchange", () => setVariant((location.hash.replace(/^#/, "") || "A").toUpperCase(), false));
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 
 import {
   GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, agentOf, app, focusTab, focusedTab, goSpace, isRemote, live,
-  promote, sendTo, setApp, setGap, setLayout, space, tabName, toggleMono,
+  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, space, tabName, toggleMono,
 } from "./state";
 import { requestClose } from "./Canvas";
 import { openAppearance, toggleAppearance } from "./Appearance";
@@ -64,6 +64,18 @@ export function maximize(p: Project, f: Tab) {
   flash(space(p).mono ? "maximize" : "restore");
 }
 
+export function minimise(p: Project, f: Tab) {
+  minimiseTab(p.id, f.id);
+  flash(`${tabName(f)} minimised · its tab brings it back`);
+}
+
+export function restoreLast(p: Project) {
+  const t = lastMinimised(p);
+  if (!t) return flash("nothing minimised");
+  focusTab(p.id, t.id);
+  flash(`${tabName(t)} restored`);
+}
+
 export function makeMain(p: Project, f: Tab) {
   if (space(p).layout !== "master") return flash("promote works in Main + stack");
   promote(p.id, f.id);
@@ -119,6 +131,7 @@ export function commands(): Command[] {
         id: "maximize", group: "Window", title: space(p).mono === f.id ? `Restore ${windowTitle(f)}` : `Maximize ${windowTitle(f)}`,
         icon: space(p).mono === f.id ? "minimize-2" : "maximize-2", keys: ["Alt", "F"], run: () => maximize(p, f),
       });
+      add({ id: "minimise", group: "Window", title: `Minimise ${windowTitle(f)}`, icon: "minus", keys: ["Alt", "N"], run: () => minimise(p, f) });
       if (space(p).layout === "master") {
         add({ id: "main", group: "Window", title: `Make ${windowTitle(f)} main`, icon: "panel-left", keys: ["Alt", "M"], run: () => makeMain(p, f) });
       }
@@ -127,6 +140,9 @@ export function commands(): Command[] {
         add({ id: `send:${i}`, group: "Window", title: `Send ${windowTitle(f)} to workspace ${i + 1}`, icon: "arrow-right-to-line", keys: ["Alt", "Shift", String(i + 1)], run: () => sendWindow(p, f, i) });
       }
     }
+
+    const lm = lastMinimised(p);
+    if (lm) add({ id: "restore-last", group: "Window", title: `Restore ${windowTitle(lm)}`, hint: "last minimised", icon: "undo-2", keys: ["Alt", "Shift", "N"], run: () => restoreLast(p) });
 
     for (const l of ["master", "grid", "mono"] as const) {
       add({
@@ -169,7 +185,7 @@ export function commands(): Command[] {
       const detail = t.kind === "file" ? t.path : t.kind === "browser" ? activePage(t)?.url : live[t.id]?.title;
       add({
         id: `tab:${t.id}`, group: "Go to window", title: windowTitle(t), icon: tabIcon(t),
-        hint: [t.space === p.ws ? "" : `workspace ${t.space + 1}`, detail].filter(Boolean).join(" · ") || undefined,
+        hint: [t.space === p.ws ? "" : `workspace ${t.space + 1}`, t.min ? "minimised" : "", detail].filter(Boolean).join(" · ") || undefined,
         run: () => focusTab(p.id, t.id),
       });
     }
