@@ -4,10 +4,9 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { createStore, produce } from "solid-js/store";
-import { type Project, addTab, focusTab, repoOf, space, tabName } from "./state";
-import { agentTarget } from "./agents";
+import { type Project, addTab, focusTab, repoOf } from "./state";
+import { copyText } from "./clipboard";
 import { devOf, inProgress, slugOf } from "./issues";
-import { sendText } from "./terms";
 import { flash } from "./ui";
 
 export type Change = { path: string; x: string; y: string };
@@ -25,7 +24,7 @@ export type Pr = {
   number: number; title: string; body: string; state: "OPEN" | "CLOSED" | "MERGED"; url: string;
   isDraft: boolean; baseRefName: string; mergeable: string; checks: Check[];
 };
-export type Finding = { sev: "fix" | "note" | "ok"; loc: string; text: string; sent?: boolean };
+export type Finding = { sev: "fix" | "note" | "ok"; loc: string; text: string };
 export type Drawer = "push" | "pr" | "merge";
 export type CtxId = "diff" | "issue" | "style" | "terms";
 /** A file in one of the two lists: the same path can be in both (partly staged). */
@@ -419,15 +418,11 @@ export function review(p: Project): Promise<void> {
 }
 
 /** Type a review finding into the project's agent window (not submitted), as issues do. */
-export function sendFinding(p: Project, i: number): void {
+export function copyFinding(p: Project, i: number): void {
   const f = gitOf(p.id).review?.[i];
   if (!f) return;
-  const target = agentTarget(p, space(p).focus);
-  if (!target) return void flash("open an agent window first (the + menu)");
-  sendText(target.id, `Review note${f.loc ? ` on ${f.loc}` : ""}: ${f.text}`);
-  set(p, (g) => { if (g.review?.[i]) g.review[i].sent = true; });
-  focusTab(p.id, target.id);
-  flash(`typed the note into ${tabName(target)}, not sent`);
+  copyText(`Review note${f.loc ? ` on ${f.loc}` : ""}: ${f.text}`);
+  flash("copied the note");
 }
 
 /** Open or focus the project's git window. */

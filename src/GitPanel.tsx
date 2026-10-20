@@ -5,8 +5,8 @@
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import { type Project, type Tab, isRemote } from "./state";
 import {
-  type Change, type CtxId, type Drawer, commit, draftCommit, draftPr, gitOf, isStaged, isUnstaged, linkedIssue, loadPr,
-  merge, openDrawer, openPr, push, refresh, review, select, selectCommit, sendFinding, setField, setOpt, stage, stepOf,
+  type Change, type CtxId, type Drawer, commit, copyFinding, draftCommit, draftPr, gitOf, isStaged, isUnstaged, linkedIssue, loadPr,
+  merge, openDrawer, openPr, push, refresh, review, select, selectCommit, setField, setOpt, stage, stepOf,
   toggleCtx, unpushed, unstage,
 } from "./git";
 import { openFile } from "./files";
@@ -178,7 +178,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
       }
     >
       {(list) => {
-        const open = () => list().filter((f) => f.sev === "fix" && !f.sent).length;
+        const open = () => list().filter((f) => f.sev === "fix").length;
         return (
           <div class="g-review">
             <div class="g-row">
@@ -190,16 +190,14 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             </div>
             <For each={list()}>
               {(f, i) => (
-                <div class="g-finding" classList={{ sent: !!f.sent }}>
+                <div class="g-finding">
                   <span class={`sev ${f.sev}`}>{f.sev === "fix" ? "!" : f.sev === "ok" ? "✓" : "i"}</span>
                   <div>
                     <Show when={f.loc}><div class="loc">{f.loc}</div></Show>
                     <p>{f.text}</p>
                   </div>
                   <Show when={f.sev !== "ok"} fallback={<span />}>
-                    <Show when={!f.sent} fallback={<span class="g-hint">sent</span>}>
-                      <button class="g-btn sm" title="Type it into the claude window (not sent)" onClick={() => sendFinding(p(), i())}>Send to claude</button>
-                    </Show>
+                    <button class="g-btn sm" title="Copy the note to the clipboard" onClick={() => copyFinding(p(), i())}>Copy</button>
                   </Show>
                 </div>
               )}
