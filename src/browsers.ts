@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { batch } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { activePage, addPage, addTab, app, focusTab, Page, Project, projectById, setPageUrl, space, Tab, tabName, visibleTabs } from "./state";
 import { agentTarget } from "./agents";
@@ -216,8 +217,11 @@ export function navigateBrowser(pageId: string, url: string): void {
     return frame(pageId, url);
   }
   if (!created.has(pageId)) {
-    patchInfo(pageId, { url, title: browserInfo[pageId]?.title ?? "New tab", loading: !!url });
-    remember(pageId, url);
+    // Together: the canvas creates the webview as soon as the page stops being blank, from page.url.
+    batch(() => {
+      remember(pageId, url);
+      patchInfo(pageId, { url, title: browserInfo[pageId]?.title ?? "New tab", loading: !!url });
+    });
     return;
   }
   send("browser_navigate", { label: label(pageId), url });
