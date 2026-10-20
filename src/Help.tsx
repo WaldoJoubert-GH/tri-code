@@ -50,6 +50,8 @@ export function HelpOverlay() {
             <dd>Open a project, or add an environment (local or ssh)</dd>
             <dt><Keys keys={["Alt", "S"]} /></dt>
             <dd>Collapse or expand the sidebar · while collapsed, hover the rail to peek at the full list</dd>
+            <dt><Keys keys={["Alt", "W"]} /></dt>
+            <dd>New worktree: another checkout of this repo on its own branch, listed under the project with its own windows</dd>
             <dt><Keys keys={["Alt", "P"]} /></dt>
             <dd>Change this project's name, icon, accent colour and background</dd>
           </dl>

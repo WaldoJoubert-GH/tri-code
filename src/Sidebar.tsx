@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
   Project, app, envIcon, envName, isLocalHost, isTerminal, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
-  setSidebarCollapsed,
+  setSidebarCollapsed, worktreesOf,
 } from "./state";
 import { closeBrowser, setBrowsersCovered } from "./browsers";
 import { closeSession } from "./terms";
@@ -12,6 +12,7 @@ import { IconFace, forgetIcon } from "./icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { openProjectDialog } from "./OpenProject";
 import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
+import { branchOf, loadWorktrees, openNewWorktree, removeWorktree, tileLabel } from "./worktrees";
 import { flash } from "./ui";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
@@ -36,7 +37,7 @@ export function toggleSidebar() {
 }
 
 /** End a project's windows and drop everything stored for it. */
-function dropProject(p: Project) {
+export function dropProject(p: Project) {
   for (const t of p.tabs) {
     if (t.kind === "browser") closeBrowser(t);
     else if (isTerminal(t)) closeSession(t.id);
@@ -85,14 +86,32 @@ export default function Sidebar() {
   createEffect(() => setBrowsersCovered(peek() ? FULL : 0));
   onCleanup(() => clearTimeout(timer));
 
-  /** The loudest signal among another project's windows, and how many windows share it. */
+  /** The loudest signal among another project's windows, and how many windows share it. A repo
+   *  with Worktrees counts the windows of every checkout but the one you are in. */
   const badge = (p: Project) => {
+    const tabs = [p, ...worktreesOf(p.id)].filter((x) => x.id !== app.activeProject).flatMap((x) => x.tabs);
+    const s = topSig(tabs);
+    return s ? { s, n: tabs.filter((t) => sigOf(t) === s).length } : null;
+  };
+  const ownBadge = (p: Project) => {
     const s = app.activeProject === p.id ? null : topSig(p.tabs);
     return s ? { s, n: p.tabs.filter((t) => sigOf(t) === s).length } : null;
   };
+  /** The repo project or one of its Worktrees is the active project. */
+  const inFamily = (p: Project) => app.activeProject === p.id || worktreesOf(p.id).some((w) => w.id === app.activeProject);
+
+  // Branch names come from `git worktree list`; ask again whenever a repo's set of Worktrees changes.
+  createEffect(() => {
+    for (const p of app.projects) {
+      if (!p.parent && worktreesOf(p.id).length) void loadWorktrees(p);
+    }
+  });
 
   const remove = (p: Project) => {
-    if (!confirm(`Remove "${p.name}" and end its ${p.tabs.length} tab(s)?`)) return;
+    const wts = worktreesOf(p.id);
+    const tabs = [p, ...wts].reduce((n, x) => n + x.tabs.length, 0);
+    if (!confirm(`Remove "${p.name}"${wts.length ? ` and its ${wts.length} worktree(s)` : ""} and end its ${tabs} tab(s)? Worktree folders stay on disk.`)) return;
+    wts.forEach(dropProject);
     dropProject(p);
   };
 
@@ -162,16 +181,17 @@ export default function Sidebar() {
               <button class="env-x" title="Remove environment" aria-label={`Remove environment ${host}`} onClick={() => removeEnv(host)}>×</button>
             </h2>
             <For
-              each={app.projects.filter((p) => p.host === host)}
+              each={app.projects.filter((p) => p.host === host && !p.parent)}
               fallback={<button class="env-empty" onClick={() => openProjectDialog(host)}>No projects · open one</button>}
             >
               {(p) => (
+                <>
                 <div
                   class="project"
-                  classList={{ active: app.activeProject === p.id }}
+                  classList={{ active: inFamily(p) }}
                   style={{ "--pa": p.accent }}
                   title={[app.sidebarCollapsed && !peek() ? `${p.name} · ${envName(p.host)} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : "", sigSummary(p)].filter(Boolean).join("\n") || undefined}
-                  onClick={() => setApp("activeProject", p.id)}
+                  onClick={() => !inFamily(p) && setApp("activeProject", p.id)}
                 >
                   <span class="swatch"><IconFace project={p} /></span>
                   <Show when={badge(p)}>
@@ -189,7 +209,15 @@ export default function Sidebar() {
                       <For each={miniBar(p)}>{(c) => <i style={{ flex: String(c.n), background: c.color }} />}</For>
                     </span>
                   </Show>
-                  <span class="count">{p.tabs.length || ""}</span>
+                  <span class="count">{worktreesOf(p.id).length ? "" : p.tabs.length || ""}</span>
+                  <button
+                    class="gear"
+                    title="New worktree (Alt+W)"
+                    aria-label={`New worktree of ${p.name}`}
+                    onClick={(e) => (e.stopPropagation(), openNewWorktree(p))}
+                  >
+                    <Icon name="git-branch-plus" size={13} />
+                  </button>
                   <button
                     class="gear"
                     title="Appearance"
@@ -204,6 +232,37 @@ export default function Sidebar() {
                   </button>
                   <button class="x" title="Remove project" aria-label={`Remove ${p.name}`} onClick={(e) => (e.stopPropagation(), remove(p))}>×</button>
                 </div>
+                <Show when={worktreesOf(p.id).length}>
+                  {/* Every checkout of the repo, the repo's own folder first: one row each, open or
+                      collapsed, with the tile in the same place so nothing moves when the rail peeks. */}
+                  <div class="wts">
+                    <For each={[p, ...worktreesOf(p.id)]}>
+                      {(w) => (
+                        <div
+                          class="wt"
+                          classList={{ active: app.activeProject === w.id }}
+                          style={{ "--wa": w.accent }}
+                          title={[`${branchOf(w)} · ${w.path}${w.tabs.length ? ` · ${w.tabs.length} window${w.tabs.length === 1 ? "" : "s"}` : ""}`, sigSummary(w)].filter(Boolean).join("\n")}
+                          onClick={() => setApp("activeProject", w.id)}
+                        >
+                          <span class="wtile">{w.parent ? tileLabel(w) : <Icon name="git-branch" size={12} />}</span>
+                          <Show when={ownBadge(w)}>
+                            {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
+                          </Show>
+                          <span class="bn">{branchOf(w)}</span>
+                          <span class="count">{w.tabs.length || ""}</span>
+                          <Show when={w.parent}>
+                            <button class="x" title="Remove worktree" aria-label={`Remove worktree ${branchOf(w)}`} onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}>×</button>
+                          </Show>
+                        </div>
+                      )}
+                    </For>
+                    <button class="wt new" title="New worktree (Alt+W)" onClick={() => openNewWorktree(p)}>
+                      <span class="wtile">+</span><span class="bn">New worktree</span>
+                    </button>
+                  </div>
+                </Show>
+                </>
               )}
             </For>
           </section>

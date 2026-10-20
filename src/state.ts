@@ -120,6 +120,13 @@ export type Project = {
   icon?: ProjectIcon;
   /** Sounds and alerts for agent signals; a missing field follows the app-wide `notify`. */
   notify?: ProjectNotify;
+  /** A Worktree only: the project of the repo it was added to. Its icon, background and
+   *  signal settings are the repo's (see repoOf); its own `accent` tells the branches apart. */
+  parent?: string;
+  /** A Worktree only: the branch it was made for (the checkout can move on; the sidebar shows what git says). */
+  branch?: string;
+  /** A Worktree only: the Slug-ID of the issue it was made for, if any. */
+  issue?: string;
 };
 
 /** The signals that alert. `working` only badges. */
@@ -186,6 +193,12 @@ export const sessionName = (p: Project, t: Tab) => `tri-${p.id}-${t.id}`;
 
 const newSpace = (): Space => ({ layout: "master", ratio: 0.55 });
 
+/** The project that owns the repo: a Worktree's parent, else the project itself. Appearance,
+ *  signal settings and the Dev Directory are the repo's. */
+export const repoOf = (p: Project): Project => (p.parent && projectById(p.parent)) || p;
+/** A repo project's Worktrees, in sidebar order. */
+export const worktreesOf = (projectId: string) => app.projects.filter((p) => p.parent === projectId);
+
 export const activeProject = () => app.projects.find((p) => p.id === app.activeProject);
 export const projectById = (id: string) => app.projects.find((p) => p.id === id);
 export const space = (p: Project) => p.spaces[p.ws];
@@ -215,6 +228,27 @@ export function addProject(name: string, host: string, path: string): string {
     s.activeProject = id;
     if (!s.environments.includes(host)) s.environments.push(host);
     s.recent = [{ host, path }, ...s.recent.filter((r) => r.host !== host || r.path !== path)].slice(0, RECENT_MAX);
+  }));
+  return id;
+}
+
+/** Add a Worktree under `parentId` and make it active. Returns its id. */
+export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string }): string {
+  const id = newId();
+  setApp(produce((s) => {
+    const parent = s.projects.find((p) => p.id === parentId);
+    if (!parent) return;
+    // An accent no other checkout of the repo has, so each branch's windows look different.
+    const family = s.projects.filter((p) => p.id === parentId || p.parent === parentId).map((p) => p.accent);
+    const accent = ACCENTS.find((a) => !family.includes(a)) ?? ACCENTS[family.length % ACCENTS.length];
+    let at = 0;
+    s.projects.forEach((p, i) => { if (p.id === parentId || p.parent === parentId) at = i + 1; });
+    s.projects.splice(at, 0, {
+      id, name: w.branch, host: parent.host, path: w.path, tabs: [], ws: 0,
+      spaces: Array.from({ length: SPACES }, newSpace), accent, bg: "none", dim: 0, favs: [...parent.favs],
+      parent: parentId, branch: w.branch, ...(w.issue ? { issue: w.issue } : {}),
+    });
+    s.activeProject = id;
   }));
   return id;
 }
@@ -550,8 +584,11 @@ function migrate(raw: any): Persisted {
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
       favs: p.favs ?? [], icon: p.icon, notify: p.notify,
+      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue } : {}),
     };
   });
+  // A Worktree whose repo project is gone stands on its own.
+  for (const p of projects) if (p.parent && !projects.some((q) => q.id === p.parent)) delete p.parent;
   // Before environments existed, hosts only came from projects.
   const environments: string[] = raw.environments ?? ["local"];
   for (const p of projects) if (!environments.includes(p.host)) environments.push(p.host);

@@ -150,6 +150,40 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .project > .sb:empty { min-width: 0; width: 10px; height: 10px; padding: 0; left: 26px; top: 1px; }
 .project > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
 @keyframes sbp { 50% { box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px color-mix(in srgb, var(--sc) 28%, transparent); } }
+/* Worktrees: a row per checkout of the repo under its row, the repo's own folder first. The small
+   tile sits at the same x open or collapsed (centred under the project tile, on a stem), so
+   nothing moves when the rail peeks; collapsed, only the tiles show. */
+.wts { position: relative; display: flex; flex-direction: column; gap: 1px; margin: 1px 0 3px; }
+.wts::before { content: ""; position: absolute; left: 18px; top: -3px; bottom: 13px; border-left: 1px solid var(--line); }
+.wt {
+  position: relative; display: flex; align-items: center; gap: 8px; width: 100%; height: 26px; padding: 0 22px 0 7px;
+  border-radius: 6px; cursor: pointer; white-space: nowrap; font-size: 12px; text-align: left;
+}
+.wt:hover { background: var(--hover); }
+.wt.active { background: color-mix(in srgb, var(--wa) 16%, var(--raised)); }
+.wt .wtile {
+  position: relative; z-index: 1; width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 5px;
+  background: color-mix(in srgb, var(--wa) 24%, var(--panel)); border: 1px solid color-mix(in srgb, var(--wa) 55%, transparent);
+  color: var(--text); font: 600 9.5px var(--mono);
+}
+.wt .bn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 11.5px var(--mono); }
+.wt .count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.wt .x { position: absolute; right: 4px; opacity: 0; color: var(--muted); padding: 0 2px; }
+.wt:hover .x, .wt .x:focus-visible { opacity: 1; }
+.wt .x:hover { color: var(--text); }
+.wt.new { color: var(--muted); }
+.wt.new .wtile { background: var(--panel); border: 1px dashed var(--line); color: var(--muted); font: 400 13px var(--ui); }
+.wt.new:hover, .wt.new:hover .wtile { color: var(--text); }
+.wt > .sb {
+  position: absolute; left: 23px; top: -1px; z-index: 2; min-width: 12px; height: 12px; padding: 0 3px; border-radius: 6px;
+  background: var(--sc); box-shadow: 0 0 0 2px var(--panel); color: var(--bg); font: 700 8.5px/12px var(--ui); text-align: center;
+}
+.wt > .sb:empty { min-width: 0; width: 8px; height: 8px; padding: 0; left: 25px; top: 0; }
+.wt > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
+.rail:not(.peek) .wt { justify-content: center; padding: 0; }
+.rail:not(.peek) .wt .bn, .rail:not(.peek) .wt .count, .rail:not(.peek) .wt .x { display: none; }
+.rail:not(.peek) .wt.active { background: none; }
+.rail:not(.peek) .wt.active .wtile { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--wa); }
 .side-actions { margin-top: 10px; }
 .add { display: flex; align-items: center; gap: 8px; width: 100%; white-space: nowrap; padding: 6px 4px; text-align: left; color: var(--muted); border-radius: 6px; }
 .add .glyph { width: 28px; flex: none; text-align: center; font-size: 15px; line-height: 18px; }
@@ -434,6 +468,37 @@ svg.lucide { flex: none; display: block; }
 .open-dlg .chip:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
 .open-dlg .chip.on { color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--bg)); }
 .open-dlg .chip:disabled { opacity: .4; text-decoration: line-through; cursor: default; }
+
+/* New worktree dialog (Alt+W) */
+.wt-dlg {
+  width: min(520px, calc(100% - 32px)); display: flex; flex-direction: column; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow);
+}
+.wt-dlg header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.wt-dlg header span { display: flex; align-items: center; gap: 7px; }
+.wt-dlg header button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); font-size: 15px; }
+.wt-dlg header button:hover { background: var(--hover); color: var(--text); }
+.wt-dlg .body { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; }
+.wt-dlg input, .wt-dlg select {
+  font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; outline: none; min-width: 0;
+}
+.wt-dlg input { font-family: var(--mono); }
+.wt-dlg input:focus, .wt-dlg select:focus { border-color: var(--accent); }
+.wt-dlg .mt { margin-top: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.wt-dlg .issues { display: flex; flex-wrap: wrap; gap: 5px; }
+.wt-dlg .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.wt-dlg .chip b { font: 600 11px var(--mono); color: var(--text); }
+.wt-dlg .chip:hover { color: var(--text); border-color: var(--accent); }
+.wt-dlg .chip.on { color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--bg)); }
+.wt-dlg .row { display: flex; align-items: center; gap: 7px; margin-top: 4px; color: var(--muted); }
+.wt-dlg .where { padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; font: 11px/1.5 var(--mono); color: var(--muted); word-break: break-all; user-select: text; }
+.wt-dlg .note { font-size: 12px; color: var(--warn); }
+.wt-dlg .note.bad { color: var(--bad); white-space: pre-wrap; user-select: text; }
+.wt-dlg footer { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.wt-dlg footer button { padding: 4px 12px; border-radius: 4px; border: 1px solid var(--line); }
+.wt-dlg footer button:hover:not(:disabled) { background: var(--hover); }
+.wt-dlg footer button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.wt-dlg footer button:disabled { opacity: .45; cursor: default; }
 
 .picker { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .picker.loading { opacity: .7; }

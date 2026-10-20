@@ -9,6 +9,7 @@ import { helpOpen, setHelpOpen } from "./Help";
 import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
+import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees";
 import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { openIssuePanel } from "./issues";
@@ -35,7 +36,7 @@ export const RESERVED: Record<string, string> = {
   KeyI: "issues", KeyE: "files", KeyT: "go to file", KeyC: "git", KeyQ: "close window", KeyF: "maximize", KeyM: "make main",
   KeyG: "switch layout", Comma: "less gap", Period: "more gap", Slash: "hotkey help", KeyS: "sidebar",
   KeyP: "appearance", BracketLeft: "previous project", BracketRight: "next project", KeyO: "open project",
-  Semicolon: "agents", KeyX: "command palette", KeyU: "next agent that needs you",
+  Semicolon: "agents", KeyX: "command palette", KeyU: "next agent that needs you", KeyW: "new worktree",
 };
 
 const DIRS: Record<string, [number, number]> = {
@@ -130,6 +131,10 @@ function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
     case "KeyU":
       nextSignal();
       return true;
+    case "KeyW":
+      if (newWorktreeOpen()) closeNewWorktree();
+      else openNewWorktree(p);
+      return true;
     case "BracketLeft":
     case "BracketRight":
       stepProject(p, e.code === "BracketRight" ? 1 : -1);
@@ -153,6 +158,7 @@ function onKey(e: KeyboardEvent) {
     else if (helpOpen()) setHelpOpen(false);
     else if (aboutOpen()) setAboutOpen(false);
     else if (openProjectOpen()) closeOpenProject();
+    else if (newWorktreeOpen()) closeNewWorktree();
     else if (appearanceOpen()) closeAppearance();
     else if (signalsOpen()) closeSignals();
     else if (tabMenuOpen()) closeTabMenu();

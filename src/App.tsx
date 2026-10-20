@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onMount, untrack } from "solid-js";
 import {
   GAPS, SPACES, activeProject, app, focusedTab, goSpace, isRemote, isTerminal, live, loadState,
-  persistChanges, setGap, setLayout, space, tabName,
+  persistChanges, repoOf, setGap, setLayout, space, tabName,
 } from "./state";
 import { SIG_TEXT, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
@@ -15,6 +15,8 @@ import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
+import { NewWorktreeDialog } from "./NewWorktree";
+import { newWorktreeOpen } from "./worktrees";
 import { loadIcons } from "./icons";
 import { installHotkeys } from "./hotkeys";
 import { installClipboardFallback } from "./clipboard";
@@ -83,15 +85,17 @@ export default function App() {
   createEffect(() => {
     if (!ready()) return;
     const p = activeProject();
-    if (p && !untrack(() => dev[p.id]?.loaded)) untrack(() => loadDev(p));
+    const r = p && repoOf(p);
+    if (r && !untrack(() => dev[r.id]?.loaded)) untrack(() => loadDev(r));
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen()));
 
   const backdrop = () => {
     const p = activeProject();
-    return p ? { background: backgroundCss(p), "--dim": String(p.dim / 100) } : { background: "var(--canvas)", "--dim": "0" };
+    const r = p && repoOf(p);
+    return r ? { background: backgroundCss(r), "--dim": String(r.dim / 100) } : { background: "var(--canvas)", "--dim": "0" };
   };
 
   return (
@@ -121,6 +125,7 @@ export default function App() {
       <GoToFile />
       <Palette />
       <OpenProjectDialog />
+      <NewWorktreeDialog />
       <HelpOverlay />
       <AboutDialog />
       <SignalsPopover />
@@ -289,31 +294,32 @@ function SignalCounts() {
 /** The project's "In Progress" issues, next to Appearance. Click a chip to drill in. */
 function InProgressChips() {
   const p = activeProject();
-  const list = () => (p ? inProgress(p.id) : []);
+  const r = p && repoOf(p);
+  const list = () => (r ? inProgress(r.id) : []);
   return (
     <Show when={list().length}>
       <div class="prog" role="group" aria-label="In Progress issues">
         <For each={list().slice(0, 2)}>
           {(i) => {
-            const run = () => runningEntry(p!.id)?.issue_id === i.id;
+            const run = () => runningEntry(r!.id)?.issue_id === i.id;
             return (
               <button
                 classList={{ run: run() }}
-                title={`${slugOf(dev[p!.id], i)} · ${i.title} · In Progress${run() ? " · timer running" : ""}. Click to open`}
+                title={`${slugOf(dev[r!.id], i)} · ${i.title} · In Progress${run() ? " · timer running" : ""}. Click to open`}
                 onClick={() => openIssuePanel(p!, i.id)}
               >
-                <span class="sd" style={{ background: stateOf(dev[p!.id], i)?.color ?? "#f59e0b" }} />
-                <span class="sid">{slugOf(dev[p!.id], i)}</span>
+                <span class="sd" style={{ background: stateOf(dev[r!.id], i)?.color ?? "#f59e0b" }} />
+                <span class="sid">{slugOf(dev[r!.id], i)}</span>
                 <span class="pt">{i.title}</span>
                 <Show when={run()}>
-                  <span class="pe"><i class="rec" />{formatHm(clock() - Date.parse(runningEntry(p!.id)!.started_at))}</span>
+                  <span class="pe"><i class="rec" />{formatHm(clock() - Date.parse(runningEntry(r!.id)!.started_at))}</span>
                 </Show>
               </button>
             );
           }}
         </For>
         <Show when={list().length > 2}>
-          <button class="more" title={`${list().slice(2).map((i) => slugOf(dev[p!.id], i)).join(", ")} · open the list`} onClick={() => openIssuePanel(p!)}>
+          <button class="more" title={`${list().slice(2).map((i) => slugOf(dev[r!.id], i)).join(", ")} · open the list`} onClick={() => openIssuePanel(p!)}>
             +{list().length - 2}
           </button>
         </Show>
@@ -324,7 +330,8 @@ function InProgressChips() {
 
 /** Running Entry and the day's total, in the status line. */
 function StatusTimer() {
-  const p = activeProject();
+  const a = activeProject();
+  const p = a && repoOf(a);
   const d = () => (p ? dev[p.id] : undefined);
   const run = () => (p ? runningEntry(p.id) : null);
   return (

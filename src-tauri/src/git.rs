@@ -419,6 +419,101 @@ pub async fn gh_pr_merge(host: String, path: String, strategy: String, delete_br
     .await
 }
 
+// ── worktrees ───────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct Worktree {
+    /// As git prints it: absolute, `/`-separated.
+    pub path: String,
+    /// None when HEAD is detached.
+    pub branch: Option<String>,
+    /// The repo's own folder (the first entry), not an added worktree.
+    pub main: bool,
+}
+
+/// Parse `git worktree list --porcelain`: blank-line separated records, the main one first.
+fn parse_worktrees(out: &str) -> Vec<Worktree> {
+    out.split("\n\n")
+        .filter_map(|rec| {
+            let mut path = None;
+            let mut branch = None;
+            for l in rec.lines() {
+                if let Some(p) = l.strip_prefix("worktree ") {
+                    path = Some(p.to_string());
+                } else if let Some(b) = l.strip_prefix("branch ") {
+                    branch = Some(b.strip_prefix("refs/heads/").unwrap_or(b).to_string());
+                }
+            }
+            path.map(|path| Worktree { path, branch, main: false })
+        })
+        .enumerate()
+        .map(|(i, w)| Worktree { main: i == 0, ..w })
+        .collect()
+}
+
+/// git in `path` with some arguments that are paths: those keep a leading `~` expandable,
+/// locally and over ssh, where every other argument is quoted.
+fn exec_with_paths(host: &str, path: &str, args: &[&str], paths: &[usize]) -> Result<String, String> {
+    if matches!(host, "" | "local") {
+        let owned: Vec<String> = args.iter().enumerate().map(|(i, a)| if paths.contains(&i) { expand_home(a) } else { a.to_string() }).collect();
+        let refs: Vec<&str> = owned.iter().map(String::as_str).collect();
+        return exec(host, path, "git", &refs, None);
+    }
+    let words: Vec<String> = args.iter().enumerate().map(|(i, a)| if paths.contains(&i) { remote_path(a) } else { sq(a) }).collect();
+    remote::run(host, &format!("cd {} && git {}", remote_path(path), words.join(" ")))
+}
+
+#[tauri::command]
+pub async fn git_worktrees(host: String, path: String) -> Result<Vec<Worktree>, String> {
+    blocking(move || exec(&host, &path, "git", &["worktree", "list", "--porcelain"], None).map(|o| parse_worktrees(&o))).await
+}
+
+/// Check out `branch` in a new folder `dir`, creating the branch from `base` when it does not
+/// exist yet (from HEAD when there is no local `base` either).
+#[tauri::command]
+pub async fn git_worktree_add(host: String, path: String, dir: String, branch: String, base: String) -> Result<(), String> {
+    blocking(move || {
+        let has = |r: &str| exec(&host, &path, "git", &["rev-parse", "--verify", "--quiet", r], None).is_ok();
+        let exists = has(&format!("refs/heads/{branch}"));
+        let base = if has(&format!("refs/heads/{base}")) { base } else { "HEAD".to_string() };
+        let args: Vec<&str> = if exists {
+            vec!["worktree", "add", &dir, &branch]
+        } else {
+            vec!["worktree", "add", "-b", &branch, &dir, &base]
+        };
+        let at = if exists { 2 } else { 4 };
+        exec_with_paths(&host, &path, &args, &[at]).map(|_| ())
+    })
+    .await
+}
+
+/// Remove the worktree at `dir`; `force` also throws away its uncommitted changes.
+#[tauri::command]
+pub async fn git_worktree_remove(host: String, path: String, dir: String, force: bool) -> Result<(), String> {
+    blocking(move || {
+        let mut args = vec!["worktree", "remove"];
+        if force {
+            args.push("--force");
+        }
+        args.push(&dir);
+        let at = args.len() - 1;
+        exec_with_paths(&host, &path, &args, &[at]).map(|_| ())
+    })
+    .await
+}
+
+/// Delete a local branch; `force` also deletes one git thinks is unmerged (a squash-merged PR's).
+#[tauri::command]
+pub async fn git_branch_delete(host: String, path: String, branch: String, force: bool) -> Result<(), String> {
+    blocking(move || exec(&host, &path, "git", &["branch", if force { "-D" } else { "-d" }, &branch], None).map(|_| ())).await
+}
+
+/// Delete the branch on origin (what `gh pr merge --delete-branch` does, which fails in a worktree).
+#[tauri::command]
+pub async fn git_push_delete(host: String, path: String, branch: String) -> Result<(), String> {
+    blocking(move || exec(&host, &path, "git", &["push", "origin", "--delete", &branch], None).map(|_| ())).await
+}
+
 /// One ✦ draft: `prompt` on the stdin of `claude -p` in the project folder, so it runs
 /// with the user's own Claude Code login and settings on the project's host.
 #[tauri::command]
@@ -472,6 +567,48 @@ mod tests {
         assert!(!c[0].pushed);
         assert!(c[1].pushed);
         assert_eq!(c[1].subject, "Two");
+    }
+
+    #[test]
+    fn worktree_list_marks_the_main_one_and_detached_heads() {
+        let w = parse_worktrees("worktree /r\nHEAD aaa\nbranch refs/heads/main\n\nworktree /r.worktrees/feat-x\nHEAD bbb\nbranch refs/heads/feat/x\n\nworktree /tmp/d\nHEAD ccc\ndetached\n\n");
+        assert_eq!(w, vec![
+            Worktree { path: "/r".into(), branch: Some("main".into()), main: true },
+            Worktree { path: "/r.worktrees/feat-x".into(), branch: Some("feat/x".into()), main: false },
+            Worktree { path: "/tmp/d".into(), branch: None, main: false },
+        ]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn worktree_add_list_and_remove_against_a_real_repo() {
+        let dir = std::env::temp_dir().join(format!("tri-wt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("r")).unwrap();
+        let p = dir.join("r");
+        let p = p.to_str().unwrap();
+        let git = |args: &[&str]| exec("local", p, "git", args, None).unwrap();
+        git(&["init", "-q", "-b", "main"]);
+        git(&["-c", "user.email=t@example.com", "-c", "user.name=T", "commit", "-q", "--allow-empty", "-m", "i"]);
+
+        let wt = format!("{}/r.worktrees/tri-1-x", dir.to_str().unwrap());
+        exec_with_paths("local", p, &["worktree", "add", "-b", "tri-1-x", &wt, "main"], &[4]).unwrap();
+        // an existing branch is checked out instead of created
+        git(&["branch", "old"]);
+        let wt2 = format!("{}/r.worktrees/old", dir.to_str().unwrap());
+        exec_with_paths("local", p, &["worktree", "add", &wt2, "old"], &[2]).unwrap();
+        let list = parse_worktrees(&git(&["worktree", "list", "--porcelain"]));
+        let mut branches: Vec<String> = list.iter().map(|w| w.branch.clone().unwrap()).collect();
+        branches[1..].sort();
+        assert_eq!(branches, ["main", "old", "tri-1-x"]);
+        assert!(list[0].main && !list[1].main);
+
+        std::fs::write(format!("{wt}/dirty.txt"), "x").unwrap();
+        assert!(exec_with_paths("local", p, &["worktree", "remove", &wt], &[2]).is_err());
+        exec_with_paths("local", p, &["worktree", "remove", "--force", &wt], &[3]).unwrap();
+        git(&["branch", "-D", "tri-1-x"]);
+        assert_eq!(parse_worktrees(&git(&["worktree", "list", "--porcelain"])).len(), 2);
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[cfg(unix)]

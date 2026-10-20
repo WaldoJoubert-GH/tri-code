@@ -2,7 +2,7 @@ import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import {
   type Page, type Project, type Tab, activePage, addPage, app, focusTab, isTerminal, live, projectById, removePage,
-  removeTab, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabName, toggleMono, visibleTabs,
+  removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabName, toggleMono, visibleTabs,
 } from "./state";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
@@ -178,7 +178,7 @@ export default function Canvas(props: { project: Project }) {
 
     const title = () =>
       isBrowser ? (browserInfo[pageId()]?.title ?? "")
-      : isIssues ? panelTitle(props.project)
+      : isIssues ? panelTitle(repoOf(props.project))
       : isFiles ? `${props.project.name} files`
       : isFile ? ((tab.path ?? "").split("/").pop() ?? "")
       : isGit ? `${props.project.name} · ${gitOf(props.project.id).status?.branch ?? ""}`
@@ -363,7 +363,7 @@ export default function Canvas(props: { project: Project }) {
           <span
             class={`dot ${
               isBrowser ? "web"
-              : isIssues ? `plane${dev[props.project.id]?.syncing ? " syncing" : ""}`
+              : isIssues ? `plane${dev[repoOf(props.project).id]?.syncing ? " syncing" : ""}`
               : isFiles || isFile ? "files"
               : isGit ? "git"
               : isAgents ? "agents"
@@ -452,7 +452,7 @@ export default function Canvas(props: { project: Project }) {
             </div>
           </>
         ) : isIssues ? (
-          <IssuesPanel project={props.project} tab={tab} focused={focused()} />
+          <IssuesPanel project={repoOf(props.project)} home={props.project} tab={tab} focused={focused()} />
         ) : isFiles ? (
           <FileList project={props.project} tab={tab} focused={focused()} />
         ) : isFile ? (

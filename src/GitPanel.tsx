@@ -11,6 +11,7 @@ import {
 } from "./git";
 import { openFile } from "./files";
 import { openUrlInProject } from "./browsers";
+import { removeWorktree } from "./worktrees";
 import "./git.css";
 
 const MAX_LINES = 4000;
@@ -381,6 +382,16 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               disabled={!g().pr ? "Open a PR first" : undefined}
             />
           </div>
+        </Show>
+        <Show when={p().parent}>
+          <button
+            class="g-btn sm"
+            classList={{ primary: g().pr?.state === "MERGED" }}
+            title={`Close this worktree's windows, delete ${p().path} and its branch`}
+            onClick={() => void removeWorktree(p())}
+          >
+            Remove worktree
+          </button>
         </Show>
         <button class="g-icon" title="Refresh" classList={{ spin: g().loading }} onClick={() => refresh(p())}>⟳</button>
       </div>

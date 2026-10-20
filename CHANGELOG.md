@@ -2,6 +2,11 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.18 — 2026-10-20
+
+- Worktrees: run agents on several branches of one repo at once. `Alt+W` (or the branch-plus icon on a project's row) makes a new checkout on its own branch, in a folder next to the repo, optionally named after an In Progress issue, and opens claude in it. Each worktree sits under its repo in the sidebar with its own windows, workspaces, colour and signal badge; on the collapsed sidebar each one is a small tile under the project's icon, so you can see which branch needs you.
+- The git window works in a worktree as it does in the repo; merging deletes the remote branch, and "Remove worktree" closes its windows and deletes its folder and branch.
+
 ## 0.1.17 — 2026-10-19
 
 - Agent signals work on Windows. tri-code now ships Windows Terminal's ConPTY, which passes agents' status reports through to the terminal; the one built into Windows dropped them, so no badges, sounds or notifications showed up.

@@ -6,7 +6,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import {
-  AgentState, AlertMode, Project, SoundEvent, Tab, app, focusTab, live, projectById, setNotify, setProjectNotify, space, tabName,
+  AgentState, AlertMode, Project, SoundEvent, Tab, app, focusTab, live, projectById, repoOf, setNotify, setProjectNotify, space, tabName,
 } from "./state";
 import { flash } from "./ui";
 
@@ -49,9 +49,10 @@ export const SOUNDS: Record<string, { name: string; notes: [number, number, numb
   knock: { name: "Knock", notes: [[196, 0, 0.08], [196, 0.15, 0.08]], type: "triangle" },
 };
 
-export const soundFor = (p: Project, ev: SoundEvent) => p.notify?.[ev] ?? app.notify[ev];
-export const alertFor = (p: Project): AlertMode => (app.notify.dnd ? "badge" : p.notify?.alert ?? app.notify.alert);
-export const desktopFor = (p: Project) => p.notify?.desktop ?? app.notify.desktop;
+// A Worktree alerts the way its repo project is set to.
+export const soundFor = (p: Project, ev: SoundEvent) => repoOf(p).notify?.[ev] ?? app.notify[ev];
+export const alertFor = (p: Project): AlertMode => (app.notify.dnd ? "badge" : repoOf(p).notify?.alert ?? app.notify.alert);
+export const desktopFor = (p: Project) => repoOf(p).notify?.desktop ?? app.notify.desktop;
 
 let ctx: AudioContext | undefined;
 
@@ -106,7 +107,7 @@ async function customSound(projectId: string, ev: SoundEvent): Promise<string | 
 /** Play the sound a project gives a signal. */
 export async function playFor(p: Project, ev: SoundEvent) {
   const id = soundFor(p, ev);
-  playSound(id, id === "custom" ? await customSound(p.id, ev) : undefined);
+  playSound(id, id === "custom" ? await customSound(repoOf(p).id, ev) : undefined);
 }
 
 /** Store an uploaded audio file as the project's sound for a signal. */

@@ -76,7 +76,7 @@ function Dropdown(props: { anchor: () => Element | null | undefined; children: J
 
 // ── the panel ───────────────────────────────────────────────────────
 
-export default function IssuesPanel(props: { project: Project; tab: Tab; focused: boolean }): JSX.Element {
+export default function IssuesPanel(props: { project: Project; home?: Project; tab: Tab; focused: boolean }): JSX.Element {
   const [view, setView] = createSignal<"list" | "detail">("list");
   const [sel, setSel] = createSignal<string | null>(null);
   const [src, setSrc] = createSignal<"all" | "plane" | "sentry">("all");
@@ -94,6 +94,8 @@ export default function IssuesPanel(props: { project: Project; tab: Tab; focused
   /** The first time this panel gets focus, pull Plane once. */
   let syncedOnce = false;
 
+  /** The project this window is in: a Worktree's panel shows its repo's issues (`project`) but types into its own agents. */
+  const home = () => props.home ?? props.project;
   const state = (): DevState | undefined => dev[props.project.id];
   const rows = createMemo(() => shownIssues(state(), { src: src(), done: done(), q: q() }));
   const selected = createMemo(() => (state()?.issues ?? []).find((i) => issueKey(i) === sel()));
@@ -124,7 +126,7 @@ export default function IssuesPanel(props: { project: Project; tab: Tab; focused
   // Open an issue asked for by the toolbar chips or the sidebar.
   createEffect(() => {
     const p = pendingIssue();
-    if (!p || p.projectId !== props.project.id) return;
+    if (!p || p.projectId !== home().id) return;
     setPendingIssue(null);
     openDetailById(p.issueId);
   });
@@ -178,7 +180,7 @@ export default function IssuesPanel(props: { project: Project; tab: Tab; focused
   }
 
   function sendToAgent(issue: UnifiedIssue) {
-    const p = props.project;
+    const p = home();
     const target = agentTarget(p, space(p).focus);
     if (!target) return void flash("open an agent window first (the + menu)");
     sendText(target.id, `${slugOf(state(), issue)}: ${issue.title} ${issue.link}`);
@@ -187,7 +189,7 @@ export default function IssuesPanel(props: { project: Project; tab: Tab; focused
   }
 
   function openExternal(issue: UnifiedIssue) {
-    openUrlInProject(props.project.id, issue.link, props.tab.id);
+    openUrlInProject(home().id, issue.link, props.tab.id);
   }
 
   function copySlug(issue: UnifiedIssue) {

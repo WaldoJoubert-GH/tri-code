@@ -5,7 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { ACCENTS, Project, activeProject, projectById, renameProject, setAppearance, setIcon } from "./state";
+import { ACCENTS, Project, activeProject, projectById, renameProject, repoOf, setAppearance, setIcon } from "./state";
 import { GLYPHS, IconFace, Logo, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
 import { SignalsForm } from "./SignalSettings";
 import { flash } from "./ui";
@@ -60,7 +60,9 @@ export const appearanceOpen = () => pop() !== null;
 
 /** Open the popover for a project (default: the active one), anchored under `anchor` (default: the toolbar button). */
 export function openAppearance(anchor?: HTMLElement | null, projectId?: string, section: AppearanceSection = "look") {
-  const pid = projectId ?? activeProject()?.id;
+  // A Worktree's look and signals are its repo's, so its gear and Alt+P edit the repo project.
+  const p = projectId ? projectById(projectId) : activeProject();
+  const pid = p && repoOf(p).id;
   const a = anchor ?? document.getElementById("themeBtn");
   if (!pid || !a) return;
   setPop({ projectId: pid, anchor: a, section });

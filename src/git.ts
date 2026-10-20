@@ -4,7 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { createStore, produce } from "solid-js/store";
-import { type Project, addTab, focusTab, space, tabName } from "./state";
+import { type Project, addTab, focusTab, repoOf, space, tabName } from "./state";
 import { agentTarget } from "./agents";
 import { devOf, inProgress, slugOf } from "./issues";
 import { sendText } from "./terms";
@@ -269,9 +269,15 @@ export async function merge(p: Project): Promise<void> {
   const g = gitOf(p.id);
   if (!g.pr || g.pr.state !== "OPEN") return;
   const n = g.pr.number;
+  const branch = g.status?.branch;
+  // In a Worktree, gh's --delete-branch fails after the merge: it tries to check out the base,
+  // which the repo's own folder already has. Delete the remote branch here instead; the local
+  // one goes with the worktree (Remove worktree).
+  const wt = !!p.parent;
   const ok = await act(p, "merge", () =>
-    invoke("gh_pr_merge", { ...args(p), strategy: g.strategy, deleteBranch: g.delBranch }));
+    invoke("gh_pr_merge", { ...args(p), strategy: g.strategy, deleteBranch: g.delBranch && !wt }));
   if (!ok) return;
+  if (wt && g.delBranch && branch) await invoke("git_push_delete", { ...args(p), branch }).catch(() => {});
   flash(`merged #${n}`);
   set(p, (g) => { g.review = undefined; });
   await loadPr(p);
@@ -307,9 +313,9 @@ const clip = (s: string) => (s.length > LIMIT ? `${s.slice(0, LIMIT)}\n… (diff
 
 /** The issue the work is for: an In Progress one whose slug is in the branch name, else the first. */
 export function linkedIssue(p: Project): { slug: string; title: string; link: string } | undefined {
-  const list = inProgress(p.id);
+  const list = inProgress(repoOf(p).id);
   const branch = (gitOf(p.id).status?.branch ?? "").toLowerCase();
-  const d = devOf(p.id);
+  const d = devOf(repoOf(p).id);
   const hit = list.find((i) => branch.includes(slugOf(d, i).toLowerCase())) ?? list[0];
   return hit && { slug: slugOf(d, hit), title: hit.title, link: hit.link };
 }
