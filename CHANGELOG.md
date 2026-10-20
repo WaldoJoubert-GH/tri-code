@@ -2,6 +2,10 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.19 — 2026-10-20
+
+- Typing an address into a new browser window or tab and pressing Enter loads it the first time; before, it opened a blank page and needed a second Enter.
+
 ## 0.1.18 — 2026-10-20
 
 - Worktrees: run agents on several branches of one repo at once. `Alt+W` (or the branch-plus icon on a project's row) makes a new checkout on its own branch, in a folder next to the repo, optionally named after an In Progress issue, and opens claude in it. Each worktree sits under its repo in the sidebar with its own windows, workspaces, colour and signal badge; on the collapsed sidebar each one is a small tile under the project's icon, so you can see which branch needs you.
