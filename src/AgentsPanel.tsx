@@ -1,10 +1,13 @@
-// The agents window: every agent as an editable row (icon, name, command, hotkey), plus a
+// The agents window: every agent as an editable row (icon, name, command or URL, hotkey), plus a
 // last row that adds one as you type. Changes apply as you type; the + menu and hotkeys follow.
-// One window per project, but the list is global. Chosen from design/agents.html (variant B).
+// A URL makes the row a web app (the chip before it flips to a globe); the project's Favourites
+// are offered under the add row. One window per project, but the list is global. Chosen from
+// design/agents.html (variant B) and design/webapps.html (variant A).
 
 import { For, Show, createSignal } from "solid-js";
-import { type Agent, type Project, addAgent, app, moveAgent, removeAgent, restoreAgent, updateAgent } from "./state";
-import { hotkeyKeys, hotkeyProblem, launchAgent, nameProblem, newAgent, recording, setRecording } from "./agents";
+import { type Agent, type Fav, type Project, addAgent, app, isWebApp, moveAgent, removeAgent, restoreAgent, updateAgent } from "./state";
+import { hotkeyKeys, hotkeyProblem, launchAgent, looksLikeUrl, nameProblem, newAgent, recording, setRecording, urlProblem } from "./agents";
+import { normalizeUrl } from "./browsers";
 import { Icon, toggleIconPicker } from "./lucide";
 import { flash, showToast } from "./ui";
 import "./agents.css";
@@ -47,6 +50,46 @@ function HotkeyField(props: { agent: Agent }) {
   );
 }
 
+/** The command or URL cell. Typing an address into a command (or the other way round) flips
+ *  the row's kind; the chip flips it by hand. A web app also picks its address bar. */
+function TargetField(props: { agent: Agent }) {
+  const web = () => isWebApp(props.agent);
+  const setKind = (toWeb: boolean, value: string) =>
+    updateAgent(props.agent.id, toWeb ? { url: value, command: "" } : { command: value, url: undefined, bar: undefined });
+  const onInput = (value: string) => {
+    const prev = web() ? props.agent.url ?? "" : props.agent.command;
+    const isUrl = looksLikeUrl(value);
+    if (isUrl !== looksLikeUrl(prev) && isUrl !== web()) setKind(isUrl, value);
+    else updateAgent(props.agent.id, web() ? { url: value } : { command: value });
+  };
+  return (
+    <span class="ag-target">
+      <button
+        class="ag-kind"
+        classList={{ web: web() }}
+        title={`${web() ? "Web app: opens a browser window" : "Runs in a terminal"} · click to switch`}
+        onClick={() => setKind(!web(), web() ? props.agent.url ?? "" : props.agent.command)}
+      >
+        <Icon name={web() ? "globe" : "square-terminal"} size={13} />
+      </button>
+      <input
+        class="ag-in mono"
+        classList={{ bad: !!urlProblem(props.agent) }}
+        value={web() ? props.agent.url ?? "" : props.agent.command}
+        placeholder={web() ? "https://… or localhost:5173" : "(login shell)"}
+        spellcheck={false}
+        onInput={(e) => onInput(e.currentTarget.value)}
+      />
+      <Show when={web()}>
+        <span class="ag-seg" title="Address bar: full, or app (title bar only)">
+          <button classList={{ on: props.agent.bar !== "app" }} onClick={() => updateAgent(props.agent.id, { bar: undefined })}>full</button>
+          <button classList={{ on: props.agent.bar === "app" }} onClick={() => updateAgent(props.agent.id, { bar: "app" })}>app</button>
+        </span>
+      </Show>
+    </span>
+  );
+}
+
 export default function AgentsPanel(props: { project: Project }) {
   const [dragged, setDragged] = createSignal<string | null>(null);
   const [over, setOver] = createSignal<string | null>(null);
@@ -67,6 +110,17 @@ export default function AgentsPanel(props: { project: Project }) {
     showToast({ msg: `Deleted ${a.name || "agent"} · open windows keep running.`, undo: () => restoreAgent(copy, index) });
   }
 
+  /** The project's Favourites that are not a web app yet, offered under the add row. */
+  const suggestions = () => {
+    const key = (url: string) => normalizeUrl(url).replace(/\/$/, "");
+    const urls = new Set(app.agents.filter(isWebApp).map((a) => key(a.url ?? "")));
+    return props.project.favs.filter((f) => !urls.has(key(f.url)));
+  };
+  function addFav(f: Fav) {
+    addAgent({ ...newAgent(), name: f.name, url: f.url, icon: "globe" });
+    flash(`added ${f.name} · give it an icon and a hotkey`);
+  }
+
   function addFrom(input: HTMLInputElement) {
     if (!input.value.trim()) return;
     const a = { ...newAgent(), name: input.value };
@@ -79,7 +133,7 @@ export default function AgentsPanel(props: { project: Project }) {
     <div class="agentswin">
       <div class="ag-list" ref={listEl}>
         <div class="ag-row ag-th">
-          <span /><span>Icon</span><span>Name</span><span>Command</span><span>Hotkey</span><span />
+          <span /><span>Icon</span><span>Name</span><span>Command or URL</span><span>Hotkey</span><span />
         </div>
         <For each={app.agents}>
           {(a) => (
@@ -129,13 +183,7 @@ export default function AgentsPanel(props: { project: Project }) {
                   spellcheck={false}
                   onInput={(e) => updateAgent(a.id, { name: e.currentTarget.value })}
                 />
-                <input
-                  class="ag-in mono"
-                  value={a.command}
-                  placeholder="(login shell)"
-                  spellcheck={false}
-                  onInput={(e) => updateAgent(a.id, { command: e.currentTarget.value })}
-                />
+                <TargetField agent={a} />
                 <HotkeyField agent={a} />
                 <span class="ag-ops">
                   <button title={`Open ${a.name || "one"}`} onClick={() => launchAgent(props.project, a)}>
@@ -146,8 +194,8 @@ export default function AgentsPanel(props: { project: Project }) {
                   </button>
                 </span>
               </div>
-              <Show when={nameProblem(a) || hotkeyProblem(a)}>
-                {(msg) => <div class="ag-msg">{msg()}{hotkeyProblem(a) ? " · the hotkey is ignored" : ""}</div>}
+              <Show when={nameProblem(a) || urlProblem(a) || hotkeyProblem(a)}>
+                {(msg) => <div class="ag-msg">{msg()}{hotkeyProblem(a) && !nameProblem(a) && !urlProblem(a) ? " · the hotkey is ignored" : ""}</div>}
               </Show>
             </div>
           )}
@@ -163,12 +211,26 @@ export default function AgentsPanel(props: { project: Project }) {
         >
           <span />
           <span class="ag-icon ghost"><Icon name="plus" size={14} /></span>
-          <input class="ag-in" placeholder="add an agent…" spellcheck={false} onInput={(e) => addFrom(e.currentTarget)} />
+          <input class="ag-in" placeholder="add an agent or web app…" spellcheck={false} onInput={(e) => addFrom(e.currentTarget)} />
         </div>
+        <Show when={suggestions().length}>
+          <div class="ag-favs">
+            <span>From {props.project.name}'s favourites</span>
+            <For each={suggestions()}>
+              {(f) => (
+                <button title={`Add ${f.url} as a web app`} onClick={() => addFav(f)}>
+                  <Icon name="plus" size={12} />
+                  {f.name || f.url}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
         <p class="ag-note">
           Commands run in the project folder on the project's host (over ssh for remote projects); an empty command is your
-          login shell. Editing a command changes new windows only. Hotkeys start with Alt, so plain keys and Ctrl chords keep
-          reaching the terminal. The list is shared by every project.
+          login shell. A URL (<code>localhost:5173</code>, <code>https://…</code>) makes a web app that opens a browser window
+          instead; “app” hides its address bar. Editing a command or URL changes new windows only. Hotkeys start with Alt, so
+          plain keys and Ctrl chords keep reaching the terminal. The list is shared by every project.
         </p>
       </div>
     </div>

@@ -4,11 +4,11 @@
 .dot.agents { background: var(--muted); border-radius: 2px; }
 
 .agentswin { flex: 1; min-height: 0; overflow: auto; font-size: 12.5px; }
-.ag-list { padding: 8px 12px 24px; min-width: 420px; }
+.ag-list { padding: 8px 12px 24px; min-width: 480px; }
 
 .ag-row {
   display: grid; align-items: center; column-gap: 6px;
-  grid-template-columns: 16px 32px minmax(64px, 1fr) minmax(96px, 1.7fr) minmax(84px, auto) 50px;
+  grid-template-columns: 16px 32px minmax(64px, 1fr) minmax(150px, 2.2fr) minmax(84px, auto) 50px;
 }
 .ag-th { padding: 4px 0 6px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .ag-item { border-top: 1px solid var(--line); padding: 4px 0; }
@@ -45,6 +45,29 @@
 .ag-ops { display: flex; justify-content: flex-end; gap: 2px; }
 .ag-ops button { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
 .ag-ops button:hover { background: var(--hover); color: var(--text); }
+
+/* Command or URL: the kind chip, the field and, for a web app, its address bar. */
+.ag-target { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.ag-target .ag-in { flex: 1; }
+.ag-kind {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 5px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--muted);
+}
+.ag-kind:hover { border-color: var(--accent); color: var(--text); }
+.ag-kind.web { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ag-seg { flex: none; display: inline-flex; height: 24px; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.ag-seg button { padding: 0 7px; font-size: 11px; color: var(--muted); }
+.ag-seg button.on { background: var(--raised); color: var(--text); }
+
+/* The project's Favourites, offered as web apps under the add row. */
+.ag-favs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 2px 0 4px calc(16px + 32px + 12px + 8px); color: var(--muted); font-size: 11.5px; }
+.ag-favs span { margin-right: 4px; }
+.ag-favs button {
+  display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px 0 5px;
+  border: 1px dashed var(--line); border-radius: 11px; color: var(--text); font-size: 11.5px;
+}
+.ag-favs button:hover { border-style: solid; border-color: var(--accent); }
+.ag-note code { font: 11px var(--mono); color: var(--text); }
 
 .ag-msg { padding: 0 0 4px calc(16px + 32px + 12px + 8px); font-size: 11px; color: var(--bad); }
 .ag-note { margin: 14px 0 0; max-width: 62ch; color: var(--muted); font-size: 11.5px; line-height: 1.55; }

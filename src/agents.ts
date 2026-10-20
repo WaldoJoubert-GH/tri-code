@@ -1,9 +1,11 @@
-// Agents: the terminal apps the New Window Menu offers (claude, pi, a shell, lazygit, ...),
-// each a name, a command, a lucide icon and an optional Alt hotkey. Edited in the agents
-// window (AgentsPanel.tsx); the list lives in state.json as `agents`.
+// Agents: the apps the New Window Menu offers (claude, pi, a shell, lazygit, ...), each a name,
+// a command, a lucide icon and an optional Alt hotkey. An agent with a `url` is a web app and
+// opens a browser window instead. Edited in the agents window (AgentsPanel.tsx); the list
+// lives in state.json as `agents`.
 
 import { createSignal } from "solid-js";
-import { Agent, Hotkey, Project, Tab, addTab, agentOf, app, focusTab, newId } from "./state";
+import { Agent, Hotkey, Project, Tab, addTab, agentOf, app, focusTab, isWebApp, newId } from "./state";
+import { normalizeUrl } from "./browsers";
 import { RESERVED } from "./hotkeys";
 import { flash } from "./ui";
 
@@ -35,6 +37,10 @@ export function hotkeyProblem(a: Agent): string {
   return first && first.id !== a.id ? `${hotkeyText(h)} is already ${first.name || "another agent"}'s` : "";
 }
 
+export function urlProblem(a: Agent): string {
+  return isWebApp(a) && !a.url?.trim() ? "needs a URL" : "";
+}
+
 export function nameProblem(a: Agent): string {
   const name = a.name.trim().toLowerCase();
   if (!name) return "needs a name";
@@ -54,10 +60,16 @@ export function newAgent(): Agent {
   return { id: newId(), name: "", command: "", icon: "bot" };
 }
 
-/** Open a new terminal window running `a`. */
+/** Whether typed text is an address rather than a command: a scheme, localhost, an IP or a
+ *  dotted name ending in letters (so `python3.12` stays a command). */
+export const looksLikeUrl = (s: string) =>
+  /^(https?:\/\/|localhost(:\d|\/|$)|\d{1,3}(\.\d{1,3}){3}(:|\/|$)|[\w-]+(\.[\w-]+)*\.[a-z]{2,}(:\d|\/|$))/i.test(s.trim());
+
+/** Open a new window for `a`: a terminal running its command, or a browser at a web app's URL. */
 export function launchAgent(p: Project, a: Agent) {
-  addTab(p.id, "term", { agent: a });
-  flash(`new ${a.name || "terminal"}`);
+  if (isWebApp(a)) addTab(p.id, "browser", { agent: a, url: normalizeUrl(a.url ?? "") });
+  else addTab(p.id, "term", { agent: a });
+  flash(`new ${a.name || (isWebApp(a) ? "browser" : "terminal")}`);
 }
 
 /** Alt+Enter: another window like the focused terminal (even if its agent is gone), else a shell. */
@@ -66,7 +78,8 @@ export function newTerminalLike(p: Project, f: Tab | undefined) {
     const a = agentOf(f) ?? { id: f.agent ?? "", name: f.name ?? "terminal", command: f.cmd ?? "", icon: "" };
     return launchAgent(p, a);
   }
-  const shell = app.agents.find((a) => a.id === "shell") ?? app.agents.find((a) => !a.command.trim()) ?? app.agents[0];
+  const terms = app.agents.filter((a) => !isWebApp(a));
+  const shell = terms.find((a) => a.id === "shell") ?? terms.find((a) => !a.command.trim()) ?? terms[0];
   if (shell) launchAgent(p, shell);
   else flash("no agents · add one in the agents window (Alt+;)");
 }

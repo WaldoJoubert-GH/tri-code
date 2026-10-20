@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tri-code · web apps prototype</title>
+<!--
+  PROTOTYPE — throwaway. Not imported by the app; open this file directly in a browser
+  (or visit /design/webapps.html on the dev server). Needs the network once for lucide
+  (unpkg); without it icons fall back to their names.
+
+  Question: "Can a browser window be set up like an Agent?" A web app would be the same four
+  things as an Agent (a name, a lucide icon, an Alt hotkey and a place in the New Window Menu),
+  with a URL where the Agent has a command. Opening one makes a browser window at that URL,
+  and the window takes the app's icon and name in the Tab Strip and title bar, the way a
+  terminal takes its Agent's.
+
+  OUTCOME (settled): variant A — one list. A web app is an Agent with a `url` (state.ts),
+  edited in the same agents window row (src/AgentsPanel.tsx TargetField), launched by
+  launchAgent (src/agents.ts) and shown with "app" mode in src/Canvas.tsx. The project's
+  Favourites are offered under the add row as optional adds. The ssh port forward ("via devbox")
+  was not built.
+
+  Three variants, A–C, switchable from the floating bar (also ← / → when no field is
+  focused). URL keeps the choice: webapps.html?variant=B (served) or webapps.html#B (file://).
+  Every variant uses the same in-memory lists. The + menu, the Tab Strip and the hotkeys follow
+  them live: add "grafana", give it Alt+Shift+M and press it. "{} state" on the bar shows what
+  would land in state.json.
+
+  A  One list            Agents and web apps share the agents table. The Command cell takes a
+                         URL too, and its kind chip (terminal / globe) flips when you type
+                         one. Global, like Agents.
+  B  Two sections        The agents window gets a second "Web apps" table: icon, name, URL,
+                         hotkey and address bar. Global, and its own group in the + menu.
+  C  Favourites grow up  No new concept. A project's Favourites get an icon, a hotkey and a
+                         "show in +" pin, and they are edited in a table. Per project, since
+                         localhost:5173 means something different in each project.
+
+  Shared by all three:
+  - Address bar: "full" is today's browser window; "app" hides the nav row and leaves only the
+    title bar, like a PWA. ⋯ in the title bar brings the address back for that window.
+  - A bare "localhost:5173" gets http://, and anything else without a scheme gets https://.
+  - On an ssh project, a localhost URL means the remote box. The window would need a port
+    forward, shown here as "via devbox" in the title bar. Try it on the infra project.
+  - Hotkey conflicts are checked across agents and web apps together.
+-->
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style>
+/* ---- palette: copied from design/agents.html, which mirrors src/styles.css ---- */
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --violet: #7c4dbd; --scrim: rgba(30,34,44,.35); --shadow: rgba(30,34,44,.22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --violet: #bb9af7; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+    --accent: var(--accent-raw);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 var(--ui); overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+input { font: inherit; color: var(--text); }
+kbd {
+  font: 10.5px var(--mono); padding: 0 4px; border: 1px solid var(--line);
+  border-bottom-width: 2px; border-radius: 3px; color: var(--muted); background: var(--bg); white-space: nowrap;
+}
+svg.lucide { width: 14px; height: 14px; stroke-width: 2; flex: none; display: block; }
+.ic { display: inline-grid; place-items: center; flex: none; }
+.ic-miss { font: 9px var(--mono); color: var(--muted); }
+
+/* ---- app shell ---- */
+.app {
+  display: grid; height: 100%;
+  grid-template-columns: 200px 1fr; grid-template-rows: 34px 1fr 26px;
+  grid-template-areas: "side top" "side canvas" "side status";
+}
+aside { grid-area: side; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 6px 8px; }
+.side-head { display: flex; align-items: center; height: 26px; padding-left: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+aside h2 { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.project { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 8px; border-radius: 5px; text-align: left; }
+.project:hover { background: var(--hover); }
+.project.active { background: color-mix(in srgb, var(--pa) 16%, var(--raised)); }
+.project .swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--pa); }
+.project .name { flex: 1; }
+.project .count { color: var(--muted); font-size: 11px; }
+
+.top { grid-area: top; display: flex; align-items: stretch; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
+.top .sep { width: 1px; background: var(--line); margin: 7px 6px; flex: none; }
+.top .where { align-self: center; padding: 0 12px; color: var(--muted); font-size: 11px; flex: 1; white-space: nowrap; overflow: hidden; }
+.spaces { display: flex; align-self: center; gap: 2px; margin: 0 4px; }
+.spaces span { display: grid; place-items: center; width: 26px; height: 22px; border-radius: 4px; color: var(--muted); font: 600 11px var(--mono); border: 1px solid transparent; }
+.spaces span.cur { background: color-mix(in srgb, var(--accent) 22%, var(--raised)); border-color: var(--accent); color: var(--text); }
+
+.tabs { display: flex; align-items: stretch; padding-left: 4px; min-width: 0; overflow: hidden; }
+.tabs button { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); font-size: 12.5px; white-space: nowrap; box-shadow: inset 0 -2px transparent; }
+.tabs button:hover { color: var(--text); }
+.tabs button[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.tabs .plus { justify-content: center; width: 26px; font-size: 15px; box-shadow: none; }
+
+/* New Window Menu */
+.tabmenu {
+  position: fixed; z-index: 50; min-width: 250px; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 20px 50px -12px var(--shadow);
+}
+.tabmenu .mt { display: flex; align-items: center; padding: 5px 8px 4px; color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.tabmenu .item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 5px; font-size: 12.5px; text-align: left; }
+.tabmenu .item:hover { background: var(--hover); }
+.tabmenu .item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabmenu .item .host { color: var(--muted); font: 10.5px var(--mono); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabmenu .div { height: 1px; background: var(--line); margin: 4px 2px; }
+.tabmenu .foot { color: var(--muted); }
+.tabmenu .foot:hover { color: var(--text); }
+
+/* ---- mock canvas ---- */
+.viewport { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); }
+.world { position: absolute; inset: 0; display: grid; gap: 12px; padding: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+.world.has-settings { grid-template-columns: 1.7fr 1fr; }
+.world.has-settings { grid-auto-flow: column; }
+.world.has-settings > .win.settings { grid-row: 1 / -1; }
+.world.has-settings > .win:not(.settings) { grid-column: 2; }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12.5px; }
+.empty[hidden] { display: none; }
+.win { display: flex; flex-direction: column; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; min-width: 0; min-height: 0; }
+.win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.bar { height: 28px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); }
+.win.focused .bar { color: var(--text); }
+.bar .kind { font-weight: 600; white-space: nowrap; }
+.bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.bar .ttl.mono { font: 11.5px var(--mono); }
+.bar .via { flex: none; font: 10.5px var(--mono); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: 9px; padding: 0 6px; }
+.bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); display: grid; place-items: center; flex: none; }
+.bar button:hover { background: var(--hover); color: var(--text); }
+.screen { flex: 1; margin: 0; padding: 8px 10px; overflow: hidden; white-space: pre-wrap; font: 12.5px/17px var(--mono); }
+.win:not(.focused) .screen, .win:not(.focused) .page { opacity: .75; }
+.c-a { color: var(--accent); } .c-m { color: var(--muted); } .c-o { color: var(--ok); } .c-w { color: var(--warn); }
+
+/* Browser window, as in src/canvas.css */
+.nav { height: 32px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.nav button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); display: grid; place-items: center; flex: none; }
+.nav button:hover { background: var(--hover); color: var(--text); }
+.nav .url { flex: 1; min-width: 0; margin: 0 4px; font: 12px var(--mono); color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; outline: none; }
+.page { flex: 1; min-height: 0; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+
+/* mock pages */
+.pg-dev { flex: 1; display: grid; place-items: center; background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 18%, var(--bg)), var(--bg) 60%); }
+.pg-dev .card { text-align: center; display: grid; gap: 6px; }
+.pg-dev .logo { width: 44px; height: 44px; margin: 0 auto 6px; border-radius: 12px; background: var(--accent); display: grid; place-items: center; color: #fff; font-weight: 800; }
+.pg-dev small { color: var(--muted); font: 11px var(--mono); }
+.pg-gh { padding: 14px 16px; display: grid; gap: 10px; align-content: start; }
+.pg-gh .h { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.pg-gh .row { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+.pg-gh .row .dotc { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.pg-gh .row .dotc.v { background: var(--violet); }
+.pg-graf { flex: 1; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: color-mix(in srgb, var(--canvas) 60%, var(--bg)); }
+.pg-graf .panel { border: 1px solid var(--line); border-radius: 4px; background: var(--bg); padding: 6px 8px; font-size: 11px; color: var(--muted); display: flex; flex-direction: column; }
+.pg-graf svg { flex: 1; width: 100%; }
+.pg-any { flex: 1; display: grid; place-items: center; color: var(--muted); }
+.pg-any b { display: block; color: var(--text); font-size: 18px; text-align: center; margin-bottom: 4px; }
+
+.status { grid-area: status; display: flex; align-items: center; gap: 12px; padding: 0 10px; background: var(--panel); border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; }
+.status .state { color: var(--text); font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+.status .flash { color: var(--accent); }
+.status .hints { margin-left: auto; display: flex; gap: 12px; }
+
+/* ---- agents window table (as src/agents.css) ---- */
+.txt { height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); outline: none; min-width: 0; width: 100%; }
+.txt:focus { border-color: var(--accent); }
+.txt.mono { font: 12px var(--mono); }
+.txt.bad { border-color: var(--bad); }
+.iconbtn { display: grid; place-items: center; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
+.iconbtn:hover { border-color: var(--accent); }
+.hk { display: inline-flex; align-items: center; gap: 3px; height: 26px; padding: 0 7px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.hk:hover { border-color: var(--accent); }
+.hk.rec { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+.hk.bad { border-color: var(--bad); }
+.hk kbd { color: var(--text); }
+.ghost { color: var(--muted); border-radius: 4px; }
+.ghost:hover { color: var(--text); background: var(--hover); }
+
+.sbody { flex: 1; overflow: auto; padding: 10px 14px 70px; display: grid; gap: 10px; align-content: start; font-size: 12.5px; }
+.sbody h3 { margin: 6px 0 0; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.sbody h3 span { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+.tbl { display: grid; align-items: center; column-gap: 6px; }
+.tbl.t-agents { grid-template-columns: 16px 32px minmax(64px, 1fr) minmax(130px, 2fr) auto 50px; }
+.tbl.t-web { grid-template-columns: 16px 32px minmax(64px, 1fr) minmax(130px, 2fr) auto auto 50px; }
+.tbl .th { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 0 0 6px; }
+.tbl .cell { padding: 4px 0; border-top: 1px solid var(--line); height: 100%; display: flex; align-items: center; min-width: 0; gap: 4px; }
+.tbl .cell .txt { flex: 1; border-color: transparent; background: transparent; }
+.tbl .cell .seg { flex: none; }
+.tbl .cell .txt:hover { border-color: var(--line); }
+.tbl .cell .txt:focus { border-color: var(--accent); background: var(--bg); }
+.tbl .cell .iconbtn { width: 32px; height: 28px; border-color: transparent; background: transparent; }
+.tbl .cell .iconbtn:hover { border-color: var(--line); }
+.tbl .grip { color: var(--muted); cursor: grab; justify-content: center; opacity: .6; }
+.tbl .ops { gap: 2px; justify-content: flex-end; }
+.tbl .ops button { width: 24px; height: 24px; display: grid; place-items: center; }
+.tbl .ghostrow .txt::placeholder { color: var(--muted); font-style: italic; }
+.tbl .msg { grid-column: 3 / -1; font-size: 11px; color: var(--bad); padding: 0 8px 4px; margin-top: -2px; }
+.sbody .note { color: var(--muted); font-size: 11.5px; line-height: 1.55; max-width: 66ch; }
+.sbody .note code { font: 11px var(--mono); color: var(--text); }
+
+/* A: the kind chip at the start of the Command / URL cell */
+.kchip { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 5px; color: var(--muted); border: 1px solid var(--line); background: var(--bg); }
+.kchip:hover { border-color: var(--accent); color: var(--text); }
+.kchip.web { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+/* address bar toggle */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; height: 24px; }
+.seg button { padding: 0 7px; font-size: 11px; color: var(--muted); }
+.seg button.on { background: var(--raised); color: var(--text); }
+.pin { width: 26px; height: 24px; display: grid; place-items: center; border-radius: 5px; color: var(--muted); border: 1px solid transparent; }
+.pin:hover { border-color: var(--line); }
+.pin.on { color: var(--accent); }
+
+/* ---- icon picker ---- */
+.picker {
+  position: fixed; z-index: 200; width: 316px; padding: 8px; display: grid; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 20px 50px -12px var(--shadow);
+}
+.picker .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; max-height: 236px; overflow-y: auto; }
+.picker .grid button { display: grid; place-items: center; height: 32px; border-radius: 5px; color: var(--text); }
+.picker .grid button:hover { background: var(--hover); }
+.picker .grid button.on { background: color-mix(in srgb, var(--accent) 22%, var(--raised)); box-shadow: inset 0 0 0 1px var(--accent); }
+.picker .grid svg.lucide { width: 16px; height: 16px; }
+.picker .meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.picker .meta code { font: 11px var(--mono); color: var(--text); }
+
+/* ---- prototype switcher (throwaway, above everything) ---- */
+.proto-bar {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9999;
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 8px;
+  background: #14161cf2; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px;
+  box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); font: 12px/1.35 var(--ui);
+}
+.proto-bar .tag { font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; border: 1px solid #3a3f4d; border-radius: 999px; padding: 4px 7px; }
+.proto-bar button.arrow { width: 26px; height: 26px; border-radius: 7px; color: #cfd5e4; font-size: 15px; }
+.proto-bar button.arrow:hover, .proto-bar button.cmp:hover { background: #262b36; color: #fff; }
+.proto-bar button.cmp { height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid #3a3f4d; color: #cfd5e4; font-size: 11.5px; white-space: nowrap; }
+.proto-bar .cur { width: 380px; }
+.proto-bar .cur b { font: 600 12px var(--mono); color: #fff; }
+.proto-bar .cur span { display: block; color: #9aa3b8; font-size: 11px; }
+.proto-bar .keys { color: #6f778c; font-size: 10.5px; white-space: nowrap; }
+.json {
+  position: fixed; right: 16px; bottom: 70px; z-index: 9998; width: 400px; max-height: 60vh; overflow: auto; margin: 0;
+  padding: 10px 12px; background: #14161cf2; color: #cfd5e4; border: 1px solid #3a3f4d; border-radius: 10px;
+  font: 11px/1.5 var(--mono); white-space: pre;
+}
+.json[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="side-head">Projects</div>
+    <h2>local</h2>
+    <button class="project" data-proj="tri" style="--pa:#7aa2f7"><span class="swatch"></span><span class="name">tri-code</span><span class="count" data-count="tri"></span></button>
+    <button class="project" data-proj="shop" style="--pa:#9ece6a"><span class="swatch"></span><span class="name">shopfront</span><span class="count" data-count="shop"></span></button>
+    <h2>devbox</h2>
+    <button class="project" data-proj="infra" style="--pa:#ff9e64"><span class="swatch"></span><span class="name">infra</span><span class="count" data-count="infra"></span></button>
+  </aside>
+
+  <div class="top">
+    <div class="tabs" id="tabs"></div>
+    <div class="sep"></div>
+    <div class="spaces"><span class="cur">1</span><span>2</span><span>3</span><span>4</span></div>
+    <span class="where" id="where"></span>
+  </div>
+
+  <div class="viewport">
+    <div class="world" id="world"></div>
+    <div class="empty" id="worldEmpty" hidden>No windows · press + or a hotkey</div>
+  </div>
+
+  <div class="status">
+    <span class="state" id="state"></span>
+    <span class="flash" id="flash"></span>
+    <div class="hints"><span><kbd>Alt</kbd><kbd>;</kbd> agents</span><span><kbd>Alt</kbd><kbd>Q</kbd> close</span></div>
+  </div>
+</div>
+
+<div id="overlay"></div>
+<div id="pickerHost"></div>
+<pre class="json" id="json" hidden></pre>
+
+<div class="proto-bar">
+  <span class="tag">prototype</span>
+  <button class="arrow" id="prev" title="Previous variant (←)">‹</button>
+  <div class="cur"><b id="vlabel"></b><span id="vdesc"></span></div>
+  <button class="arrow" id="next" title="Next variant (→)">›</button>
+  <button class="cmp" id="jsonBtn" title="What would land in state.json">{} state</button>
+  <span class="keys">← → switch · ?variant=A…C</span>
+</div>
+
+<script>
+/* ================= icons (lucide UMD) ================= */
+const L = window.lucide;
+const toKebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/([a-zA-Z])(\d)/g, "$1-$2").toLowerCase();
+const ICONS = {};
+if (L && L.icons) for (const [k, node] of Object.entries(L.icons)) ICONS[toKebab(k)] = node;
+const ICON_NAMES = Object.keys(ICONS).sort();
+const SUGGESTED = [
+  "globe", "app-window", "monitor", "layout-dashboard", "github", "gitlab", "git-pull-request", "book-open",
+  "chart-line", "gauge", "activity", "database", "server", "cloud", "bug", "flame", "rocket", "store",
+  "shopping-cart", "figma", "palette", "message-square", "mail", "calendar", "list-todo", "kanban",
+  "file-text", "notebook-pen", "search", "lock", "shield", "box", "container", "zap", "star", "heart",
+  "asterisk", "pi", "square-terminal", "bot", "sparkles", "code", "wrench", "cat", "leaf",
+].filter((n) => ICONS[n] || !L);
+
+function icon(name, cls = "") {
+  const node = ICONS[name];
+  if (!node || !L) return `<span class="ic ic-miss ${cls}">${name ? name.slice(0, 3) : "?"}</span>`;
+  const el = L.createElement(node);
+  el.setAttribute("class", "lucide");
+  return `<span class="ic ${cls}">${el.outerHTML}</span>`;
+}
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ================= hotkeys (as design/agents.html) ================= */
+const chordId = (h) => h ? `Alt+${h.ctrl ? "Ctrl+" : ""}${h.shift ? "Shift+" : ""}${h.code}` : "";
+function keyLabel(code) {
+  if (code.startsWith("Key")) return code.slice(3);
+  if (code.startsWith("Digit")) return code.slice(5);
+  return { Enter: "↵", Semicolon: ";", Quote: "'", Minus: "-", Equal: "=", Backquote: "`", Comma: ",", Period: ".",
+    Slash: "/", Backslash: "\\", BracketLeft: "[", BracketRight: "]", Space: "Space" }[code] || code;
+}
+const kbds = (h) => h ? ["Alt", h.ctrl && "Ctrl", h.shift && "⇧", keyLabel(h.code)].filter(Boolean).map((k) => `<kbd>${k}</kbd>`).join("") : "";
+const chordText = (h) => h ? ["Alt", h.ctrl && "Ctrl", h.shift && "Shift", keyLabel(h.code)].filter(Boolean).join("+") : "";
+
+const BUILTIN = {};
+const bind = (code, mods, what) => { BUILTIN[chordId({ code, shift: mods.includes("s"), ctrl: mods.includes("c") })] = what; };
+for (const c of ["KeyH", "KeyJ", "KeyK", "KeyL", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+  bind(c, "", "focus window"); bind(c, "s", "swap window"); bind(c, "c", "resize split");
+}
+for (let i = 1; i <= 4; i++) { bind("Digit" + i, "", `workspace ${i}`); bind("Digit" + i, "s", `send to workspace ${i}`); }
+Object.entries({
+  Enter: "new terminal like this one", KeyB: "new browser", KeyI: "issues", KeyE: "files", KeyC: "git", KeyQ: "close window",
+  KeyF: "maximize", KeyM: "promote to main", KeyG: "cycle layout", Comma: "smaller gap", Period: "bigger gap",
+  Slash: "hotkey help", KeyS: "toggle sidebar", KeyP: "appearance", BracketLeft: "previous project",
+  BracketRight: "next project", KeyO: "open project", Semicolon: "agents window", KeyT: "go to file", KeyX: "command palette", KeyW: "new worktree",
+}).forEach(([c, w]) => bind(c, "", w));
+
+/* ================= state (memory only) ================= */
+let seq = 0;
+const nid = () => "e" + ++seq;
+// An entry is an Agent or a web app: kind "term" has a command, kind "web" a URL.
+const term = (name, target, ic, hotkey) => ({ id: nid(), kind: "term", name, target, icon: ic, hotkey });
+const web = (name, target, ic, hotkey, bar = "full") => ({ id: nid(), kind: "web", name, target, icon: ic, hotkey, bar });
+// C: a Favourite as it is today ({ url, name }) plus icon, hotkey, bar and "in the + menu".
+const fav = (name, url, ic, hotkey, menu = true, bar = "full") => ({ id: nid(), name, target: url, icon: ic, hotkey, bar, menu });
+
+const PROJECTS = {
+  tri: { name: "tri-code", host: "local", path: "~/code/tri-code" },
+  shop: { name: "shopfront", host: "local", path: "~/code/shopfront" },
+  infra: { name: "infra", host: "devbox", path: "devbox:~/infra" },
+};
+
+const st = {
+  v: "A",
+  proj: "tri",
+  entries: [
+    term("claude", "claude", "asterisk", { code: "KeyA" }),
+    term("pi", "pi", "pi", { code: "KeyP", shift: true }),
+    term("shell", "", "square-terminal", null),
+    web("dev server", "localhost:5173", "app-window", { code: "KeyD" }, "app"),
+    web("github", "github.com/WaldoJoubert-GH/tri-code/pulls", "github", { code: "KeyG", shift: true }),
+    web("grafana", "grafana.devbox.lan/d/api", "chart-line", null),
+  ],
+  favs: {
+    tri: [
+      fav("dev server", "localhost:5173", "app-window", { code: "KeyD" }, true, "app"),
+      fav("pulls", "github.com/WaldoJoubert-GH/tri-code/pulls", "github", { code: "KeyG", shift: true }),
+      fav("tauri docs", "v2.tauri.app/reference", "book-open", null, false),
+    ],
+    shop: [
+      fav("storefront", "localhost:3000", "store", { code: "KeyD" }, true, "app"),
+      fav("admin", "localhost:3000/admin", "lock", null),
+      fav("stripe", "dashboard.stripe.com/test", "credit-card", null, false),
+    ],
+    infra: [
+      fav("grafana", "localhost:3001/d/api", "chart-line", { code: "KeyD" }, true, "app"),
+      fav("argo", "argocd.devbox.lan", "rocket", null),
+    ],
+  },
+  tabs: [], focus: null,
+  menu: false,
+  recording: null,   // entry id
+  picker: null,      // { id, q }
+};
+
+const isC = () => st.v === "C";
+const agents = () => st.entries.filter((e) => e.kind === "term");
+const webs = () => isC() ? st.favs[st.proj] : st.entries.filter((e) => e.kind === "web");
+/** Everything that can hold a hotkey right now (C: this project's favourites). */
+const launchables = () => [...agents(), ...webs()];
+const entry = (id) => st.entries.find((e) => e.id === id) ?? Object.values(st.favs).flat().find((e) => e.id === id);
+const listOf = (e) => st.favs[st.proj].includes(e) ? st.favs[st.proj] : st.entries;
+const projTabs = () => st.tabs.filter((t) => t.proj === st.proj);
+
+function hotkeyProblem(e) {
+  if (!e.hotkey) return "";
+  const id = chordId(e.hotkey);
+  if (BUILTIN[id]) return `${chordText(e.hotkey)} is tri-code's “${BUILTIN[id]}”`;
+  const other = launchables().find((b) => b !== e && chordId(b.hotkey) === id);
+  return other && launchables().indexOf(other) < launchables().indexOf(e) ? `${chordText(e.hotkey)} is already ${other.name || "another entry"}'s` : "";
+}
+function nameProblem(e) {
+  if (!e.name.trim()) return "needs a name";
+  const same = (isC() && e.kind !== "term" ? webs() : st.entries).filter((b) => b !== e && b.name.trim().toLowerCase() === e.name.trim().toLowerCase());
+  return same.length ? "another entry has this name" : "";
+}
+function urlProblem(e) {
+  if (e.kind === "term") return "";
+  if (!e.target.trim()) return "needs a URL";
+  try { new URL(normUrl(e.target)); return ""; } catch { return "not a URL"; }
+}
+const problem = (e) => nameProblem(e) || urlProblem(e) || hotkeyProblem(e);
+
+const looksLikeUrl = (s) => /^(https?:\/\/|localhost[:/]|\d+\.\d+\.\d+\.\d+|[\w-]+(\.[\w-]+)+(\/|:|$))/i.test(s.trim());
+function normUrl(s) {
+  s = s.trim();
+  if (/^https?:\/\//i.test(s)) return s;
+  return (/^(localhost|127\.|\d+\.\d+\.\d+\.\d+)/.test(s) ? "http://" : "https://") + s;
+}
+const hostOf = (s) => { try { return new URL(normUrl(s)).host; } catch { return s; } };
+const isLocal = (s) => /^(localhost|127\.0\.0\.1)(:|$)/.test(hostOf(s));
+
+/* ================= actions ================= */
+let flashTimer = 0;
+function flash(msg) {
+  const el = document.getElementById("flash");
+  el.textContent = msg; clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { el.textContent = ""; }, 2600);
+}
+let tabSeq = 0;
+function launch(e) {
+  const p = problem(e);
+  if (p) { flash(`fix ${e.name || "this entry"} first: ${p}`); return; }
+  // snapshot like a terminal's cmd: editing the entry changes new windows only; name/icon follow
+  const t = { id: "t" + ++tabSeq, proj: st.proj, entryId: e.id, kind: e.kind === "term" ? "term" : "web",
+    snap: { name: e.name, icon: e.icon, target: e.kind === "term" ? e.target : normUrl(e.target), bar: e.bar }, showAddr: false };
+  st.tabs.push(t); st.focus = t.id; st.menu = false;
+  flash(`new ${e.name}${t.kind === "web" ? " · " + hostOf(e.target) : ""}`);
+  render();
+}
+function openBlankBrowser() {
+  const t = { id: "t" + ++tabSeq, proj: st.proj, kind: "web", snap: { name: "browser", icon: "globe", target: "", bar: "full" } };
+  st.tabs.push(t); st.focus = t.id; st.menu = false; flash("new browser"); render();
+}
+function openSettings() {
+  st.menu = false;
+  let t = projTabs().find((x) => x.kind === "settings");
+  if (!t) { t = { id: "t" + ++tabSeq, proj: st.proj, kind: "settings" }; st.tabs.unshift(t); }
+  st.focus = t.id;
+  render();
+}
+function closeTab(id) {
+  const list = projTabs(), i = list.findIndex((x) => x.id === id);
+  st.tabs = st.tabs.filter((x) => x.id !== id);
+  if (st.focus === id) st.focus = projTabs()[Math.min(i, projTabs().length - 1)]?.id ?? null;
+  render();
+}
+function removeEntry(id) {
+  const e = entry(id), list = listOf(e);
+  list.splice(list.indexOf(e), 1);
+  flash(`deleted ${e.name || "entry"} · open windows stay`);
+}
+
+/* ================= shared widgets ================= */
+function hotkeyBtn(e) {
+  const rec = st.recording === e.id, bad = !!hotkeyProblem(e);
+  const inner = rec ? "press Alt + a key…" : e.hotkey ? kbds(e.hotkey) : "<span>no hotkey</span>";
+  return `<button class="hk ${rec ? "rec" : ""} ${bad ? "bad" : ""}" data-rec="${e.id}" title="Click, then press a chord (Backspace clears)">${inner}</button>`;
+}
+const iconBtn = (e) => `<button class="iconbtn" data-pick="${e.id}" title="Icon: ${e.icon}">${icon(e.icon)}</button>`;
+const nameIn = (e) => `<input class="txt ${nameProblem(e) ? "bad" : ""}" data-f="name" data-id="${e.id}" value="${esc(e.name)}" placeholder="name" spellcheck="false">`;
+const targetIn = (e, ph) => `<input class="txt mono ${urlProblem(e) ? "bad" : ""}" data-f="target" data-id="${e.id}" value="${esc(e.target)}" placeholder="${ph}" spellcheck="false">`;
+const barSeg = (e) => `<span class="seg" title="Address bar: full = today's browser window, app = title bar only"><button class="${e.bar !== "app" ? "on" : ""}" data-bar="${e.id}" data-val="full">full</button><button class="${e.bar === "app" ? "on" : ""}" data-bar="${e.id}" data-val="app">app</button></span>`;
+const ops = (e) => `<div class="cell ops"><button class="ghost" data-try="${e.id}" title="Open one">${icon("play")}</button><button class="ghost" data-del="${e.id}" title="Delete">${icon("trash-2")}</button></div>`;
+const grip = (e) => `<div class="cell grip" draggable="true" data-drag="${e.id}" title="Drag to reorder the + menu">${icon("grip-vertical")}</div>`;
+const msgRow = (e) => problem(e) ? `<div class="msg">${problem(e)}${hotkeyProblem(e) && !nameProblem(e) && !urlProblem(e) ? " · the hotkey is ignored" : ""}</div>` : "";
+const ghostRow = (cols, kind, ph) => `<div class="cell"></div><div class="cell"><span class="iconbtn" style="opacity:.4;width:32px;height:28px;border-color:transparent">${icon("plus")}</span></div>
+  <div class="cell ghostrow"><input class="txt" data-new="${kind}" placeholder="${ph}" spellcheck="false"></div>${"<div class=\"cell\"></div>".repeat(cols - 3)}`;
+
+/* ---------- New Window Menu ---------- */
+function menuHtml() {
+  const row = (e) => `<button class="item" role="menuitem" data-launch="${e.id}">${icon(e.icon)}<span class="nm">${esc(e.name || "untitled")}</span>
+    ${e.kind !== "term" ? `<span class="host">${esc(hostOf(e.target))}</span>` : ""}${e.hotkey && !hotkeyProblem(e) ? kbds(e.hotkey) : ""}</button>`;
+  const panels = [["globe", "browser", "B"], ["list-todo", "issues", "I"], ["folder-tree", "files", "E"], ["git-branch", "git", "C"], ["settings-2", "agents", ";"]]
+    .map(([i, n, k]) => `<button class="item" data-panel="${n}">${icon(i)}<span class="nm">${n}</span><kbd>Alt</kbd><kbd>${k}</kbd></button>`).join("");
+  let top;
+  if (st.v === "A") top = `<div class="mt">New window</div>${st.entries.map(row).join("")}`;
+  else if (st.v === "B") top = `<div class="mt">Agents</div>${agents().map(row).join("")}<div class="div"></div><div class="mt">Web apps</div>${webs().map(row).join("")}`;
+  else top = `<div class="mt">Agents</div>${agents().map(row).join("")}<div class="div"></div><div class="mt">${esc(PROJECTS[st.proj].name)} favourites</div>${webs().filter((f) => f.menu).map(row).join("") || `<div class="item foot">none pinned</div>`}`;
+  return `${top}<div class="div"></div>${panels}`;
+}
+
+/* ---------- the agents window, per variant ---------- */
+function settingsBody() {
+  if (st.v === "A") {
+    const rows = st.entries.map((e) => `${grip(e)}<div class="cell">${iconBtn(e)}</div><div class="cell">${nameIn(e)}</div>
+      <div class="cell"><button class="kchip ${e.kind === "web" ? "web" : ""}" data-kind="${e.id}" title="${e.kind === "web" ? "Web app: opens a browser window" : "Agent: runs in a terminal"} · click to switch">${icon(e.kind === "web" ? "globe" : "square-terminal")}</button>${targetIn(e, e.kind === "web" ? "https://…" : "(login shell)")}${e.kind === "web" ? barSeg(e) : ""}</div>
+      <div class="cell">${hotkeyBtn(e)}</div>${ops(e)}${msgRow(e)}`).join("");
+    return `<div class="sbody">
+      <div class="tbl t-agents"><div class="th"></div><div class="th">Icon</div><div class="th">Name</div><div class="th">Command or URL</div><div class="th">Hotkey</div><div class="th"></div>
+      ${rows}${ghostRow(6, "any", "add an agent or web app…")}</div>
+      <div class="note">A command runs in the project folder on the project's host. A URL (<code>localhost:5173</code>, <code>https://…</code>) opens a browser window instead, and the chip flips to ${icon("globe")} as you type one. Click the chip to force either. “app” hides the address bar. The list is shared by every project.</div></div>`;
+  }
+  if (st.v === "B") {
+    const arows = agents().map((e) => `${grip(e)}<div class="cell">${iconBtn(e)}</div><div class="cell">${nameIn(e)}</div><div class="cell">${targetIn(e, "(login shell)")}</div><div class="cell">${hotkeyBtn(e)}</div>${ops(e)}${msgRow(e)}`).join("");
+    const wrows = webs().map((e) => `${grip(e)}<div class="cell">${iconBtn(e)}</div><div class="cell">${nameIn(e)}</div><div class="cell">${targetIn(e, "https://…")}</div><div class="cell">${barSeg(e)}</div><div class="cell">${hotkeyBtn(e)}</div>${ops(e)}${msgRow(e)}`).join("");
+    return `<div class="sbody">
+      <h3>${icon("square-terminal")}Agents <span>terminal apps</span></h3>
+      <div class="tbl t-agents"><div class="th"></div><div class="th">Icon</div><div class="th">Name</div><div class="th">Command</div><div class="th">Hotkey</div><div class="th"></div>
+      ${arows}${ghostRow(6, "term", "add an agent…")}</div>
+      <h3>${icon("globe")}Web apps <span>browser windows that open at a URL</span></h3>
+      <div class="tbl t-web"><div class="th"></div><div class="th">Icon</div><div class="th">Name</div><div class="th">URL</div><div class="th">Address</div><div class="th">Hotkey</div><div class="th"></div>
+      ${wrows}${ghostRow(7, "web", "add a web app…")}</div>
+      <div class="note">Both lists are shared by every project. A <code>localhost</code> URL opens on the project's host, so on an ssh project it goes through a port forward. “app” hides the address bar (⋯ in the title bar brings it back).</div></div>`;
+  }
+  // C: this project's favourites, grown up
+  const frows = webs().map((e) => `${grip(e)}<div class="cell">${iconBtn(e)}</div><div class="cell">${nameIn(e)}</div><div class="cell">${targetIn(e, "https://…")}</div><div class="cell">${barSeg(e)}<button class="pin ${e.menu ? "on" : ""}" data-menu-pin="${e.id}" title="${e.menu ? "In the + menu" : "Only on the favourites bar"}">${icon(e.menu ? "pin" : "pin-off")}</button></div><div class="cell">${hotkeyBtn(e)}</div>${ops(e)}${msgRow(e)}`).join("");
+  return `<div class="sbody">
+    <h3>${icon("star")}${esc(PROJECTS[st.proj].name)} favourites <span>this project only · the ★ in a browser's address adds one</span></h3>
+    <div class="tbl t-web"><div class="th"></div><div class="th">Icon</div><div class="th">Name</div><div class="th">URL</div><div class="th">Address · +</div><div class="th">Hotkey</div><div class="th"></div>
+    ${frows}${ghostRow(7, "fav", "add a favourite…")}</div>
+    <h3>${icon("square-terminal")}Agents <span>shared by every project</span></h3>
+    <div class="tbl t-agents"><div class="th"></div><div class="th">Icon</div><div class="th">Name</div><div class="th">Command</div><div class="th">Hotkey</div><div class="th"></div>
+    ${agents().map((e) => `${grip(e)}<div class="cell">${iconBtn(e)}</div><div class="cell">${nameIn(e)}</div><div class="cell">${targetIn(e, "(login shell)")}</div><div class="cell">${hotkeyBtn(e)}</div>${ops(e)}${msgRow(e)}`).join("")}</div>
+    <div class="note">A favourite's hotkey works only in its project, so <kbd>Alt</kbd><kbd>D</kbd> can open each project's own dev server (switch project in the sidebar to try it). Pinned ones (${icon("pin")}) show in the + menu; all of them stay on the favourites bar and blank-window tiles.</div></div>`;
+}
+
+/* ---------- icon picker ---------- */
+function pickerHtml() {
+  const e = entry(st.picker.id);
+  return `<div class="picker" id="picker"><input class="txt" id="pickq" placeholder="Search ${ICON_NAMES.length || ""} lucide icons…" value="${esc(st.picker.q)}" spellcheck="false">
+    <div class="grid" id="pickgrid"></div><div class="meta"><span id="pickcount"></span><code>${e.icon}</code></div></div>`;
+}
+function fillPickerGrid() {
+  const e = entry(st.picker?.id), grid = document.getElementById("pickgrid");
+  if (!e || !grid) return;
+  const q = st.picker.q.trim().toLowerCase();
+  const names = q ? ICON_NAMES.filter((n) => n.includes(q)) : SUGGESTED;
+  grid.innerHTML = names.slice(0, 135).map((n) => `<button class="${n === e.icon ? "on" : ""}" data-icon="${n}" title="${n}">${icon(n)}</button>`).join("")
+    || `<span class="c-m" style="grid-column:1/-1;padding:8px">no icon matches “${esc(q)}”</span>`;
+  document.getElementById("pickcount").textContent = q ? `${names.length} matches` : "suggested · type to search";
+}
+function placeFixed(el, anchor) {
+  if (!el || !anchor) return;
+  const r = anchor.getBoundingClientRect();
+  el.style.left = Math.max(8, Math.min(r.left, innerWidth - el.offsetWidth - 8)) + "px";
+  const below = r.bottom + 6;
+  el.style.top = (below + el.offsetHeight > innerHeight - 8 ? Math.max(8, r.top - el.offsetHeight - 6) : below) + "px";
+}
+
+/* ---------- windows ---------- */
+function tabLook(t) {
+  if (t.kind === "settings") return { name: "agents", icon: "settings-2" };
+  const e = t.entryId && entry(t.entryId);
+  return { name: e ? e.name || "untitled" : t.snap.name, icon: e ? e.icon : t.snap.icon };
+}
+function termScreen(c) {
+  if (!c) return `<span class="c-o">${esc(PROJECTS[st.proj].path)} $</span> ▍`;
+  const fake = {
+    claude: `<span class="c-a">✳</span> Welcome to Claude Code\n<span class="c-m">  cwd: ${esc(PROJECTS[st.proj].path)}</span>\n\n<span class="c-a">&gt;</span> ▍`,
+    pi: `<span class="c-a">π</span> pi · ${esc(PROJECTS[st.proj].name)}\n<span class="c-a">&gt;</span> ▍`,
+  }[c.split(/\s+/)[0]];
+  return fake ?? `<span class="c-o">$</span> ${esc(c)}\n<span class="c-m">  (pretend it is running)</span>\n▍`;
+}
+function spark(seed) {
+  let y = 30, d = "M0 30";
+  for (let x = 8; x <= 200; x += 8) { y = Math.max(6, Math.min(54, y + Math.sin(x * seed) * 9)); d += ` L${x} ${y.toFixed(1)}`; }
+  return `<svg viewBox="0 0 200 60" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>`;
+}
+function pageFor(url) {
+  if (!url) return `<div class="pg-any"><div><b>New tab</b>type an address</div></div>`;
+  const h = hostOf(url);
+  if (h.includes("grafana") || url.includes("/d/")) return `<div class="pg-graf">${["requests/s", "p95 latency", "errors", "cpu"].map((n, i) => `<div class="panel">${n}${spark(.31 + i * .17)}</div>`).join("")}</div>`;
+  if (isLocal(url)) return `<div class="pg-dev"><div class="card"><div class="logo">${esc(PROJECTS[st.proj].name[0].toUpperCase())}</div><b>${esc(PROJECTS[st.proj].name)}</b><small>vite dev · ${esc(h)}</small></div></div>`;
+  if (h.startsWith("github.com")) return `<div class="pg-gh"><div class="h">${icon("git-pull-request")}Pull requests</div>
+    <div class="row"><span class="dotc"></span>Show images, video and audio in the file window <span class="c-m">#41</span></div>
+    <div class="row"><span class="dotc v"></span>New app icon <span class="c-m">#40 · merged</span></div>
+    <div class="row"><span class="dotc v"></span>Add worktrees <span class="c-m">#38 · merged</span></div></div>`;
+  if (h.includes("grafana") || url.includes("/d/")) return `<div class="pg-graf">${["requests/s", "p95 latency", "errors", "cpu"].map((n, i) => `<div class="panel">${n}${spark(.31 + i * .17)}</div>`).join("")}</div>`;
+  return `<div class="pg-any"><div><b>${esc(h)}</b>(pretend page)</div></div>`;
+}
+function webWin(t) {
+  const url = t.snap.target, app = t.snap.bar === "app" && !t.showAddr;
+  const via = url && isLocal(url) && PROJECTS[t.proj].host !== "local" ? `<span class="via" title="localhost on ${PROJECTS[t.proj].host}, through an ssh port forward">via ${PROJECTS[t.proj].host}</span>` : "";
+  const nav = app ? "" : `<div class="nav"><button title="Back">${icon("arrow-left")}</button><button title="Forward">${icon("arrow-right")}</button><button title="Reload">${icon("rotate-cw")}</button>
+    <input class="url" value="${esc(url)}" spellcheck="false"><button title="Open in system browser">${icon("external-link")}</button></div>`;
+  const extra = t.snap.bar === "app" ? `<button data-addr="${t.id}" title="${t.showAddr ? "Hide" : "Show"} the address bar">${icon(t.showAddr ? "chevron-up" : "ellipsis")}</button>` : "";
+  return { bar: `${via}${app ? `<span class="ttl mono">${esc(hostOf(url))}</span>` : `<span class="ttl"></span>`}${app ? `<button title="Reload">${icon("rotate-cw")}</button>` : ""}${extra}`, body: `${nav}<div class="page">${pageFor(url)}</div>` };
+}
+
+/* ================= render ================= */
+const VARIANTS = ["A", "B", "C"];
+const NAMES = { A: "One list", B: "Two sections", C: "Favourites grow up" };
+const DESC = {
+  A: "Agents and web apps in one table: a URL in the Command cell makes it a web app.",
+  B: "A second “Web apps” table in the agents window and its own group in +. Global.",
+  C: "Per-project Favourites get an icon, a hotkey and a pin into +. Alt+D differs per project.",
+};
+
+function render() {
+  const ae = document.activeElement;
+  const keep = ae && ae.dataset && (ae.dataset.f ? `[data-f="${ae.dataset.f}"][data-id="${ae.dataset.id}"]` : null);
+  const caret = keep ? [ae.selectionStart, ae.selectionEnd] : null;
+
+  document.querySelectorAll("[data-proj]").forEach((b) => b.classList.toggle("active", b.dataset.proj === st.proj));
+  document.querySelectorAll("[data-count]").forEach((c) => { c.textContent = st.tabs.filter((t) => t.proj === c.dataset.count).length || ""; });
+  document.getElementById("where").textContent = PROJECTS[st.proj].path;
+
+  const tabs = projTabs();
+  document.getElementById("tabs").innerHTML = tabs.map((t) => {
+    const l = tabLook(t);
+    return `<button data-focus="${t.id}" aria-pressed="${st.focus === t.id}" title="${esc(t.snap?.target || "")}">${icon(l.icon)}${esc(l.name)}</button>`;
+  }).join("") + `<button class="plus" id="plus" data-menu="1" title="New window">+</button>`;
+
+  const world = document.getElementById("world");
+  const side = tabs.some((t) => t.kind === "settings") && tabs.length > 1;
+  world.classList.toggle("has-settings", side);
+  world.style.gridTemplateRows = side ? `repeat(${tabs.length - 1}, minmax(0, 1fr))` : "";
+  world.innerHTML = tabs.map((t) => {
+    const l = tabLook(t);
+    let bar = "", body;
+    if (t.kind === "settings") body = settingsBody();
+    else if (t.kind === "term") { bar = `<span class="ttl mono">${esc(t.snap.target || "$SHELL")}</span>`; body = `<pre class="screen">${termScreen(t.snap.target)}</pre>`; }
+    else ({ bar, body } = webWin(t));
+    if (t.kind === "settings") bar = `<span class="ttl">${isC() ? "favourites + agents" : "agents" + (st.v === "A" ? " & web apps" : "")}</span>`;
+    return `<div class="win ${t.kind === "settings" ? "settings" : ""} ${st.focus === t.id ? "focused" : ""}" data-win="${t.id}">
+      <div class="bar">${icon(l.icon)}<span class="kind">${esc(l.name)}</span>${bar}<button data-close="${t.id}" title="Close (Alt+Q)">×</button></div>${body}</div>`;
+  }).join("");
+  document.getElementById("worldEmpty").hidden = tabs.length > 0;
+
+  document.getElementById("overlay").innerHTML = st.menu ? `<div class="tabmenu" id="tabmenu" role="menu">${menuHtml()}</div>` : "";
+  placeFixed(document.getElementById("tabmenu"), document.getElementById("plus"));
+
+  const ph = document.getElementById("pickerHost");
+  if (st.picker) {
+    if (!document.getElementById("picker")) { ph.innerHTML = pickerHtml(); fillPickerGrid(); document.getElementById("pickq").focus(); }
+    else fillPickerGrid();
+    placeFixed(document.getElementById("picker"), document.querySelector(`[data-pick="${st.picker.id}"]`));
+  } else ph.innerHTML = "";
+
+  const hk = launchables().filter((e) => e.hotkey && !hotkeyProblem(e));
+  document.getElementById("state").textContent = `${PROJECTS[st.proj].name} · ` + hk.map((e) => `${chordText(e.hotkey)} ${e.name}`).join(" · ") + ` · ${tabs.length} windows${st.recording ? " · recording…" : ""}`;
+  document.getElementById("vlabel").textContent = `${st.v} · ${NAMES[st.v]}`;
+  document.getElementById("vdesc").textContent = DESC[st.v];
+  const out = (e) => ({ id: e.id, name: e.name, icon: e.icon, ...(e.hotkey ? { hotkey: chordText(e.hotkey) } : {}) });
+  const json = st.v === "A"
+    ? { agents: st.entries.map((e) => ({ ...out(e), ...(e.kind === "web" ? { url: normUrl(e.target), bar: e.bar } : { command: e.target }) })) }
+    : st.v === "B"
+      ? { agents: agents().map((e) => ({ ...out(e), command: e.target })), webApps: webs().map((e) => ({ ...out(e), url: normUrl(e.target), bar: e.bar })) }
+      : { agents: agents().map((e) => ({ ...out(e), command: e.target })), projects: Object.fromEntries(Object.entries(st.favs).map(([k, fs]) => [PROJECTS[k].name, { favs: fs.map((f) => ({ url: normUrl(f.target), name: f.name, icon: f.icon, ...(f.hotkey ? { hotkey: chordText(f.hotkey) } : {}), ...(f.bar === "app" ? { bar: "app" } : {}), ...(f.menu ? { menu: true } : {}) })) }])) };
+  document.getElementById("json").textContent = "// state.json\n" + JSON.stringify(json, null, 2);
+
+  if (keep) { const el = document.querySelector(keep); if (el) { el.focus(); try { el.setSelectionRange(caret[0], caret[1]); } catch {} } }
+}
+
+/* ================= events ================= */
+document.addEventListener("input", (ev) => {
+  const el = ev.target;
+  if (el.id === "pickq") { st.picker.q = el.value; fillPickerGrid(); return; }
+  if (el.dataset.f) {
+    const e = entry(el.dataset.id);
+    const wasUrl = looksLikeUrl(e.target);
+    e[el.dataset.f] = el.value;
+    // A: the kind follows what you type, unless you've flipped the chip yourself
+    if (st.v === "A" && el.dataset.f === "target" && !e.forced && looksLikeUrl(el.value) !== wasUrl) {
+      e.kind = looksLikeUrl(el.value) ? "web" : "term"; e.bar ??= "full";
+    }
+    render(); return;
+  }
+  if (el.dataset.new && el.value.trim()) {
+    const k = el.dataset.new, name = el.value;
+    let e;
+    if (k === "fav") { e = fav(name, "", "globe", null); st.favs[st.proj].push(e); }
+    else if (k === "web") { e = web(name, "", "globe", null); st.entries.push(e); }
+    else { e = term(name, "", "bot", null); st.entries.push(e); }
+    el.value = ""; render();
+    const f = document.querySelector(`[data-f="name"][data-id="${e.id}"]`);
+    if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
+  }
+});
+
+document.addEventListener("click", (ev) => {
+  const el = ev.target.closest("[data-launch],[data-panel],[data-menu],[data-focus],[data-close],[data-pick],[data-icon],[data-rec],[data-del],[data-try],[data-kind],[data-bar],[data-menu-pin],[data-addr],[data-proj],[data-win]");
+  if (st.picker && !ev.target.closest("#picker") && !(el && el.dataset.pick)) { st.picker = null; render(); if (!el) return; }
+  if (st.recording && !(el && el.dataset.rec === st.recording)) { st.recording = null; render(); }
+  if (st.menu && !ev.target.closest("#tabmenu") && !(el && el.dataset.menu)) { st.menu = false; render(); }
+  if (!el) return;
+  const d = el.dataset;
+  if (d.launch) return launch(entry(d.launch));
+  if (d.panel) { if (d.panel === "browser") return openBlankBrowser(); if (d.panel === "agents") return openSettings(); st.menu = false; flash(`(${d.panel} not mocked here)`); render(); return; }
+  if (d.menu) { st.menu = !st.menu; render(); return; }
+  if (d.focus) { st.focus = d.focus; render(); return; }
+  if (d.close) return closeTab(d.close);
+  if (d.pick) { st.picker = st.picker?.id === d.pick ? null : { id: d.pick, q: "" }; document.getElementById("pickerHost").innerHTML = ""; render(); return; }
+  if (d.icon) { entry(st.picker.id).icon = d.icon; st.picker = null; render(); return; }
+  if (d.rec) { st.recording = st.recording === d.rec ? null : d.rec; render(); return; }
+  if (d.del) { removeEntry(d.del); render(); return; }
+  if (d.try) return launch(entry(d.try));
+  if (d.kind) { const e = entry(d.kind); e.kind = e.kind === "web" ? "term" : "web"; e.bar ??= "full"; e.forced = true; flash(`${e.name} is now ${e.kind === "web" ? "a web app" : "an agent"}`); render(); return; }
+  if (d.bar) { entry(d.bar).bar = d.val; render(); return; }
+  if (d.menuPin) { const e = entry(d.menuPin); e.menu = !e.menu; render(); return; }
+  if (d.addr) { const t = st.tabs.find((x) => x.id === d.addr); t.showAddr = !t.showAddr; render(); return; }
+  if (d.proj) { st.proj = d.proj; st.focus = projTabs()[0]?.id ?? null; flash(`${PROJECTS[d.proj].name}`); render(); return; }
+  if (d.win && st.focus !== d.win && !ev.target.closest("input")) { st.focus = d.win; render(); }
+});
+
+// drag the grip to reorder (within its list)
+let dragId = null;
+document.addEventListener("dragstart", (ev) => { const g = ev.target.closest?.("[data-drag]"); if (g) { dragId = g.dataset.drag; ev.dataTransfer.effectAllowed = "move"; } });
+document.addEventListener("dragover", (ev) => { if (dragId && ev.target.closest?.(".tbl")) ev.preventDefault(); });
+document.addEventListener("drop", (ev) => {
+  if (!dragId) return;
+  let c = ev.target.closest?.(".cell");
+  while (c && !c.dataset.drag) c = c.previousElementSibling;
+  const a = entry(dragId), b = c && entry(c.dataset.drag), list = listOf(a);
+  if (b && b !== a && listOf(b) === list) { list.splice(list.indexOf(a), 1); list.splice(list.indexOf(b), 0, a); flash(`${a.name} moved`); }
+  dragId = null; render();
+});
+
+addEventListener("keydown", (ev) => {
+  if (st.recording) {
+    ev.preventDefault(); ev.stopPropagation();
+    const e = entry(st.recording);
+    if (ev.key === "Escape") { st.recording = null; render(); return; }
+    if (ev.key === "Backspace" || ev.key === "Delete") { e.hotkey = null; st.recording = null; render(); return; }
+    if (["Alt", "Shift", "Control", "Meta"].includes(ev.key)) return;
+    if (!ev.altKey) { flash("hotkeys start with Alt"); return; }
+    e.hotkey = { code: ev.code, ...(ev.shiftKey ? { shift: true } : {}), ...(ev.ctrlKey ? { ctrl: true } : {}) };
+    st.recording = null;
+    flash(hotkeyProblem(e) ? `⚠ ${hotkeyProblem(e)}` : `${e.name} → ${chordText(e.hotkey)}`);
+    render(); return;
+  }
+  if (ev.key === "Escape") { if (st.picker) st.picker = null; else if (st.menu) st.menu = false; else return; render(); return; }
+  if (ev.altKey) {
+    const id = chordId({ code: ev.code, shift: ev.shiftKey, ctrl: ev.ctrlKey });
+    if (id === "Alt+Semicolon") { ev.preventDefault(); return openSettings(); }
+    if (id === "Alt+KeyQ") { ev.preventDefault(); if (st.focus) closeTab(st.focus); return; }
+    if (id === "Alt+KeyB") { ev.preventDefault(); return openBlankBrowser(); }
+    const e = launchables().find((x) => chordId(x.hotkey) === id && !problem(x));
+    if (e) { ev.preventDefault(); return launch(e); }
+    if (BUILTIN[id]) { ev.preventDefault(); flash(`${chordText({ code: ev.code, shift: ev.shiftKey, ctrl: ev.ctrlKey })}: ${BUILTIN[id]} (not mocked)`); }
+    return;
+  }
+  if (ev.target.closest?.("input")) return;
+  if (ev.key === "ArrowLeft") cycle(-1);
+  else if (ev.key === "ArrowRight") cycle(1);
+});
+addEventListener("resize", () => render());
+
+/* ================= variant switcher ================= */
+function setVariant(v, push) {
+  if (!VARIANTS.includes(v)) v = "A";
+  st.v = v; st.menu = false; st.picker = null; st.recording = null;
+  if (push) {
+    try {
+      if (location.protocol === "file:") location.hash = v;
+      else { const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null, "", u); }
+    } catch {}
+  }
+  render();
+}
+const cycle = (d) => setVariant(VARIANTS[(VARIANTS.indexOf(st.v) + d + VARIANTS.length) % VARIANTS.length], true);
+document.getElementById("prev").onclick = (e) => { e.stopPropagation(); cycle(-1); };
+document.getElementById("next").onclick = (e) => { e.stopPropagation(); cycle(1); };
+document.getElementById("jsonBtn").onclick = (e) => { e.stopPropagation(); const j = document.getElementById("json"); j.hidden = !j.hidden; };
+
+/* ================= boot ================= */
+const initial = (new URLSearchParams(location.search).get("variant") || location.hash.replace(/^#/, "") || "A").toUpperCase();
+st.v = VARIANTS.includes(initial) ? initial : "A";
+openSettings();
+launch(st.entries[0]);
+launch(webs()[0]);
+st.focus = projTabs()[0].id;
+setVariant(st.v, false);
+addEventListener("hashchange", () => setVariant((location.hash.replace(/^#/, "") || "A").toUpperCase(), false));
+</script>
+</body>
+</html>

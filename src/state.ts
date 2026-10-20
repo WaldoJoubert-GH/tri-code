@@ -7,12 +7,17 @@ export type TabKind = "term" | "browser" | "issues" | "files" | "file" | "git" |
 /** An Alt chord, matched on e.code like every window binding. Alt is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
 
-/** A terminal app the New Window Menu offers: claude, pi, a shell, lazygit, ... Global, not per project. */
+/** An app the New Window Menu offers: a terminal app (claude, pi, a shell, lazygit, ...) or, with a
+ *  `url`, a web app that opens a browser window there. Global, not per project. */
 export type Agent = {
   id: string;
   name: string;
-  /** Run in the project folder on the project's host; "" is the login shell. */
+  /** Run in the project folder on the project's host; "" is the login shell. Unused by a web app. */
   command: string;
+  /** Set for a web app: the address its browser window opens ("" until typed). */
+  url?: string;
+  /** Web apps only: "app" hides the address and favourites bars, like an installed web app. */
+  bar?: "app";
   /** A lucide icon name, kebab-case. */
   icon: string;
   hotkey?: Hotkey;
@@ -50,9 +55,9 @@ export type Tab = {
   page?: string;
   /** `file` tabs only: the path being viewed. */
   path?: string;
-  /** `term` tabs only: the agent it was opened from. The name and icon follow the agent. */
+  /** `term` and browser tabs: the agent (or web app) it was opened from. The name and icon follow the agent. */
   agent?: string;
-  /** `term` tabs only: the agent's name at launch, shown once the agent is deleted. */
+  /** `term` and browser tabs: the agent's name at launch, shown once the agent is deleted. */
   name?: string;
   /** `term` tabs only: the command it runs ("" = login shell). Kept from launch, so editing an agent only changes new windows. */
   cmd?: string;
@@ -68,8 +73,15 @@ export const isTerminal = (t: Tab) => t.kind === "term";
 
 export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
 
-/** What a window is called in the tab strip, title bar and messages: its agent for terminals, else its kind. */
-export const tabName = (t: Tab) => (t.kind === "term" ? agentOf(t)?.name || t.name || "terminal" : t.kind);
+/** A web app: an agent that opens a browser window rather than a terminal. */
+export const isWebApp = (a: Agent) => a.url !== undefined;
+
+/** What a window is called in the tab strip, title bar and messages: its agent for terminals and
+ *  web apps, else its kind. */
+export const tabName = (t: Tab) =>
+  t.kind === "term" ? agentOf(t)?.name || t.name || "terminal"
+  : t.agent ? agentOf(t)?.name || t.name || t.kind
+  : t.kind;
 
 export type Layout = "master" | "grid" | "mono";
 
@@ -306,7 +318,7 @@ export function addTab(projectId: string, kind: TabKind, opts: { url?: string; p
     const a = opts.agent;
     const tab: Tab = {
       id, kind, space: p.ws,
-      ...(kind === "browser" ? newPages(opts.url ?? "") : {}),
+      ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}) } : {}),
       ...(kind === "file" ? { path: opts.path ?? "" } : {}),
       ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "" } : {}),
     };

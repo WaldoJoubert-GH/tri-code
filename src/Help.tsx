@@ -76,7 +76,7 @@ export function HelpOverlay() {
             <dt><Keys keys={["Alt", "Enter"]} /></dt>
             <dd>New terminal like the focused one, else a shell</dd>
             <dt><Keys keys={["Alt", ";"]} /></dt>
-            <dd>Open or focus the agents window: the terminal apps in the + menu, each with a command, an icon and an optional Alt hotkey of its own</dd>
+            <dd>Open or focus the agents window: the terminal apps and web apps in the + menu, each with a command or URL, an icon and an optional Alt hotkey of its own</dd>
             <dt><Keys keys={["Alt", "B"]} /></dt>
             <dd>New browser window</dd>
             <dt><Keys keys={["Ctrl", "D"]} /></dt>

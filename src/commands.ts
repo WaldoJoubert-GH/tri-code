@@ -95,8 +95,9 @@ export function sendWindow(p: Project, f: Tab, i: number) {
 
 const PANEL_ICON = { browser: "globe", issues: "list-todo", files: "folder-tree", file: "file-text", git: "git-branch", agents: "settings-2" };
 
-/** A window's icon: its agent's for a terminal, else its kind's. */
-export const tabIcon = (t: Tab) => (t.kind === "term" ? agentOf(t)?.icon ?? "square-terminal" : PANEL_ICON[t.kind]);
+/** A window's icon: its agent's for a terminal or web app, else its kind's. */
+export const tabIcon = (t: Tab) =>
+  t.kind === "term" ? agentOf(t)?.icon ?? "square-terminal" : (t.agent && agentOf(t)?.icon) || PANEL_ICON[t.kind];
 
 /** What a window is called in the palette: a file window by its file. */
 const windowTitle = (t: Tab) => (t.kind === "file" ? (t.path ?? "").split("/").pop() || "file" : tabName(t));

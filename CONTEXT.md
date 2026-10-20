@@ -81,6 +81,10 @@ The popup under the Tab Strip's `+`: one row per Agent (with its hotkey), then o
 A terminal app the New Window Menu offers: a name, a shell command (empty = the login shell), a lucide icon and an optional Alt hotkey. Global, in `state.json` as `agents`, seeded with claude, pi and shell. A terminal Window (`TabKind` `"term"`) remembers its Agent and the command it was launched with, so editing an Agent changes only new Windows and deleting one leaves its Windows running. "Send to agent" targets terminals with a command, never a plain shell.
 _Avoid_: Terminal kind, profile, preset.
 
+**Web App**:
+An Agent with a URL instead of a command: it opens a browser window at that address, and the window takes its name and icon as a terminal takes its Agent's. Same list, menu row and hotkeys as the other Agents; typing an address in the agents window's Command cell makes one. "app" hides the window's address and favourites bars (⋯ in its title bar shows them). The agents window offers the project's Favourites as Web Apps to add. Chosen from design/webapps.html (variant A).
+_Avoid_: Bookmark, site, browser profile.
+
 **Agents Window**:
 A canvas Window, one per project, that edits the Agent list as a table; rows save as you type. New `TabKind` `"agents"`, addressed with `Alt+;`. Chosen from design/agents.html (variant B).
 _Avoid_: Settings page, preferences.

@@ -1,7 +1,7 @@
 import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import {
-  type Page, type Project, type Tab, activePage, addPage, app, focusTab, isTerminal, live, projectById, removePage,
+  type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isTerminal, live, projectById, removePage,
   canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabName, toggleMono, visibleTabs,
 } from "./state";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
@@ -162,8 +162,13 @@ export default function Canvas(props: { project: Project }) {
       const dy = d?.id === id ? d.dy : 0;
       return { left: r.x + dx, top: r.y + dy };
     };
+    /** A web app set to "app" hides the address and favourites bars; ⋯ shows them for this window. */
+    const [showAddr, setShowAddr] = createSignal(false);
+    const appBar = () => isBrowser && agentOf(tab)?.bar === "app";
+    const bare = () => appBar() && !showAddr();
     const tipText = () => {
       const r = rect();
+      if (bare()) return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR))} <span>px</span></>;
       if (isBrowser) {
         const favs = props.project.favs.length ? FAVS : 0;
         return <>{Math.round(r.w)} × {Math.max(0, Math.round(r.h - BAR - NAV - favs))} <span>px</span></>;
@@ -404,13 +409,18 @@ export default function Canvas(props: { project: Project }) {
           <Show when={isBrowser}>
             <button title="New tab" onClick={newPage}>+</button>
           </Show>
+          <Show when={appBar()}>
+            <button title={showAddr() ? "Hide the address bar" : "Show the address bar"} onClick={() => setShowAddr(!showAddr())}>
+              <Icon name={showAddr() ? "chevron-up" : "ellipsis"} size={13} />
+            </button>
+          </Show>
           <button class="mn" title="Minimise (Alt+N)" onClick={() => minimiseTab(props.project.id, id)}>–</button>
           <button title="Maximize (Alt+F)" onClick={doMax}>▢</button>
           <button title="Close (Alt+Q)" onClick={() => requestClose(props.project.id, id)}>×</button>
         </div>
         {isBrowser ? (
           <>
-            <div class="nav">
+            <div class="nav" hidden={bare()}>
               <button title="Back" onClick={() => browserBack(pageId())}>←</button>
               <button title="Forward" onClick={() => browserForward(pageId())}>→</button>
               <button title="Reload" onClick={() => browserReload(pageId())}>↻</button>
@@ -441,7 +451,9 @@ export default function Canvas(props: { project: Project }) {
               </Show>
               <button title="Open in system browser" onClick={() => openExternal(url())}>↗</button>
             </div>
-            <FavBar projectId={props.project.id} favs={props.project.favs} url={url()} onOpen={open} />
+            <Show when={!bare()}>
+              <FavBar projectId={props.project.id} favs={props.project.favs} url={url()} onOpen={open} />
+            </Show>
             <div class="page" ref={pageEl}>
               <Show when={blank()}>
                 <StartPage favs={props.project.favs} onOpen={open} />

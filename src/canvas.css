@@ -71,6 +71,7 @@
   height: 32px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 6px;
   background: var(--panel); border-bottom: 1px solid var(--line);
 }
+.nav[hidden] { display: none; }
 .nav button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
 .nav button:hover { background: var(--hover); color: var(--text); }
 .url {

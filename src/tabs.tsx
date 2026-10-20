@@ -32,10 +32,11 @@ const PANELS: { kind: Exclude<TabKind, "term" | "file">; key: string }[] = [
 /** What the strip shows for a window. `file` windows are named by their file. */
 const label = (t: Tab) => (t.kind === "file" ? (t.path ?? "").split("/").pop() || "file" : tabName(t));
 
-/** A window's glyph: its agent's lucide icon for a terminal, else the kind's glyph. */
+/** A window's glyph: its agent's lucide icon for a terminal or web app, else the kind's glyph. */
 function Glyph(props: { tab: Tab }) {
+  const agentIcon = () => agentOf(props.tab)?.icon ?? (props.tab.kind === "term" ? "square-terminal" : "globe");
   return (
-    <Show when={props.tab.kind !== "term"} fallback={<Icon name={agentOf(props.tab)?.icon ?? "square-terminal"} size={13} class="glyph" />}>
+    <Show when={props.tab.kind !== "term" && !props.tab.agent} fallback={<Icon name={agentIcon()} size={13} class="glyph" />}>
       <span class="glyph" aria-hidden="true">{GLYPH[props.tab.kind as Exclude<TabKind, "term">]}</span>
     </Show>
   );
