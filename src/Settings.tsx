@@ -4,7 +4,7 @@
 // Chosen from design/settings.html (variant D), with the settings button moved to the sidebar.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { type FileOpen, GAPS, app, setGap } from "./state";
+import { type FileOpen, GAP_MAX, app, setGap, setMonoGutter } from "./state";
 import { setFileOpen } from "./files";
 
 /** The modes in menu order, each with its short name and what it does. */
@@ -61,10 +61,28 @@ export function SettingsPopover() {
           <h4>Windows</h4>
           <label class="row">
             Gap between windows
-            <select value={String(app.gap)} onChange={(e) => setGap(+e.currentTarget.value)}>
-              <For each={GAPS}>{(g) => <option value={String(g)} selected={app.gap === g}>{g}</option>}</For>
-            </select>
+            <span class="px">
+              <input
+                type="number" min={0} max={GAP_MAX} value={app.gap}
+                title="Alt+, / Alt+. step it"
+                onInput={(e) => e.currentTarget.value !== "" && setGap(+e.currentTarget.value)}
+                onBlur={(e) => (e.currentTarget.value = String(app.gap))}
+              />
+              px
+            </span>
           </label>
+          <label class="row">
+            Carousel gutter
+            <span class="px">
+              <input
+                type="number" min={0} placeholder="auto" value={app.settings.monoGutter ?? ""}
+                title="Width each side of the centred window, where its neighbours peek. Empty is auto; 0 hides them."
+                onInput={(e) => setMonoGutter(e.currentTarget.value === "" ? undefined : +e.currentTarget.value)}
+              />
+              px
+            </span>
+          </label>
+          <p class="note">The carousel gutter is the space each side of the centred window. Leave it empty for auto; 0 hides the neighbours.</p>
         </div>
       )}
     </Show>

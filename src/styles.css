@@ -198,6 +198,7 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 .side-actions { margin-top: 10px; }
 .add { display: flex; align-items: center; gap: 8px; width: 100%; white-space: nowrap; padding: 6px 4px; text-align: left; color: var(--muted); border-radius: 6px; }
 .add .glyph { width: 28px; flex: none; text-align: center; font-size: 15px; line-height: 18px; }
+.add .glyph svg { display: block; margin: 0 auto; }
 .add:hover { background: var(--hover); color: var(--text); }
 .add kbd { margin-left: auto; font-size: 10px; color: var(--muted); }
 .rail:not(.peek) .add { justify-content: center; }
@@ -245,10 +246,7 @@ svg.lucide { flex: none; display: block; }
 .seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
 .seg button svg { width: 15px; height: 15px; display: block; }
 .gapctl { display: flex; gap: 5px; align-items: center; color: var(--muted); font: 11px var(--mono); flex: none; }
-.gapctl select {
-  font: 11px var(--mono); color: var(--text); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 4px; padding: 1px 2px; outline: none;
-}
+.gapctl input { width: 34px; font-size: 11px; padding: 0 4px; }
 .spaces { display: flex; align-self: center; gap: 2px; margin: 0 4px; flex: none; }
 .spaces button {
   position: relative; width: 26px; height: 22px; border-radius: 4px; color: var(--muted);
@@ -644,4 +642,13 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .pop .radio input { margin: 3px 0 0; accent-color: var(--accent); }
 .pop .radio small { display: block; color: var(--muted); font-size: 11.5px; }
 .pop .note { margin: 0; color: var(--muted); font-size: 11.5px; }
-.pop.settings .row select { margin-left: auto; }
+.pop.settings .px { margin-left: auto; display: flex; align-items: center; gap: 5px; font: 11px var(--mono); }
+/* Px fields here and in the status line: plain boxes, no spinner arrows. */
+.pop.settings .px input, .gapctl input {
+  width: 52px; font: 12px var(--mono); color: var(--text); background: var(--bg); text-align: right;
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; outline: none; user-select: text;
+  -moz-appearance: textfield;
+}
+.pop.settings .px input:focus, .gapctl input:focus { border-color: var(--accent); }
+.pop.settings .px input::placeholder { color: var(--muted); }
+.pop.settings .px input::-webkit-inner-spin-button, .gapctl input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

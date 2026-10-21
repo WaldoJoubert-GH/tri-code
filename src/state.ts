@@ -207,7 +207,12 @@ type Persisted = {
  *  ask which, replace its file, open a new window, add a tab to it, or replace the preview window. */
 export type FileOpen = "ask" | "reuse" | "window" | "tabs" | "preview";
 
-export type Settings = { fileOpen: FileOpen };
+export type Settings = {
+  fileOpen: FileOpen;
+  /** Carousel (mono) layout: px each side of the centred window, where its neighbours peek.
+   *  Unset is auto: the window takes 62% of the width, up to MONO_MAX. */
+  monoGutter?: number;
+};
 
 const defaultSettings = (): Settings => ({ fileOpen: "ask" });
 
@@ -222,7 +227,9 @@ export type AgentReport = { state: AgentState; msg: string; at: number; seen: bo
 export type Live = { status: TabStatus; attention: boolean; title: string; agent?: AgentReport };
 
 export const SPACES = 4;
+/** Steps for Alt+, / Alt+. ; any whole px up to GAP_MAX can be typed in Settings or the status line. */
 export const GAPS = [0, 4, 8, 12, 16, 24, 32];
+export const GAP_MAX = 64;
 export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "#ff9e64", "#f5a3d0", "#73daca"];
 
 const RECENT_MAX = 12;
@@ -530,7 +537,12 @@ export function toggleMono(projectId: string, tabId: string) {
 }
 
 export function setGap(gap: number) {
-  setApp("gap", gap);
+  setApp("gap", Math.round(Math.min(GAP_MAX, Math.max(0, gap))));
+}
+
+/** Carousel gutter in px each side, or undefined for auto. */
+export function setMonoGutter(px: number | undefined) {
+  setApp("settings", "monoGutter", px === undefined ? undefined : Math.round(Math.max(0, px)));
 }
 
 export function setSidebarCollapsed(collapsed: boolean) {

@@ -13,8 +13,10 @@ export type Tiling = {
 
 /** Widest a window gets in the mono layout; the leftover width becomes equal side padding. */
 export const MONO_MAX = 1024;
-/** Narrowest a mono peek gutter may get before the neighbours are hidden. */
+/** Narrowest an auto mono peek gutter may get before the neighbours are hidden. */
 const PEEK_MIN = 120;
+/** Narrowest the centred mono window gets when the gutter is set. */
+const MONO_MIN = 320;
 
 /**
  * Tile `n` windows into a `width` x `height` area, `gap` px between windows and
@@ -24,10 +26,11 @@ const PEEK_MIN = 120;
  * - mono (carousel): the focused window (`focus`) sits centered in a column up to
  *   `MONO_MAX` wide; its neighbours peek in the side gutters when there is room, and
  *   every other window gets a zero-size rect (hidden). Peek rects are shrunk vertically
- *   so the focused window keeps the top and bottom edge.
+ *   so the focused window keeps the top and bottom edge. `gutter` fixes the side gutters
+ *   at that many px instead (no MONO_MAX cap, 0 = no peeking), leaving the window at least MONO_MIN.
  * `mono` (an index) gets the whole area, drawn above the others.
  */
-export function tile(n: number, layout: Layout, ratio: number, width: number, height: number, gap: number, mono = -1, focus = -1): Tiling {
+export function tile(n: number, layout: Layout, ratio: number, width: number, height: number, gap: number, mono = -1, focus = -1, gutter?: number): Tiling {
   const g = gap, ax = g, ay = g, aw = Math.max(0, width - 2 * g), ah = Math.max(0, height - 2 * g);
   const r = (x: number, y: number, w: number, h: number): Rect => ({ x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
   const rects: Rect[] = [];
@@ -35,10 +38,12 @@ export function tile(n: number, layout: Layout, ratio: number, width: number, he
   if (n === 0) return { rects };
   if (layout === "mono") {
     const f = focus >= 0 && focus < n ? focus : 0;
-    const cw = Math.min(aw * 0.62, MONO_MAX), x0 = ax + (aw - cw) / 2, gut = x0 - ax;
+    const fixed = gutter !== undefined;
+    const cw = fixed ? aw - 2 * Math.min(gutter, Math.max(0, (aw - MONO_MIN) / 2)) : Math.min(aw * 0.62, MONO_MAX);
+    const x0 = ax + (aw - cw) / 2, gut = x0 - ax;
     for (let i = 0; i < n; i++) rects.push(r(0, 0, 0, 0));
     rects[f] = r(x0, ay, cw, ah);
-    if (n > 1 && gut >= PEEK_MIN) {
+    if (n > 1 && (fixed ? gut - g > 0 : gut >= PEEK_MIN)) {
       const pw = gut - g, ph = Math.max(0, ah - 88);
       const prev = (f - 1 + n) % n, next = (f + 1) % n;
       rects[prev] = r(ax, ay + 44, pw, ph);

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onMount, untrack } from "solid-js";
 import {
-  GAPS, SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
+  GAP_MAX, SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
   persistChanges, repoOf, setGap, setLayout, space, tabName,
 } from "./state";
 import { SIG_TEXT, nextSignal, sigOf, topSig } from "./signals";
@@ -230,9 +230,11 @@ function StatusBar() {
     <div class="status">
       <label class="gapctl" title="Gap between windows (Alt+, / Alt+.)">
         gap
-        <select value={String(app.gap)} onChange={(e) => setGap(+e.currentTarget.value)}>
-          <For each={GAPS}>{(g) => <option value={String(g)} selected={app.gap === g}>{g}</option>}</For>
-        </select>
+        <input
+          type="number" min={0} max={GAP_MAX} value={app.gap}
+          onInput={(e) => e.currentTarget.value !== "" && setGap(+e.currentTarget.value)}
+          onBlur={(e) => (e.currentTarget.value = String(app.gap))}
+        />
       </label>
       <span class="flash">{flashMsg()}</span>
       <StatusTimer />

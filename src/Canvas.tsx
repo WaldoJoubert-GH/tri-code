@@ -74,7 +74,7 @@ function layoutOf(p: Project, w: number, h: number) {
   const sp = space(p);
   const mono = tabs.findIndex((t) => t.id === sp.mono);
   const focus = tabs.findIndex((t) => t.id === sp.focus);
-  const t = tile(tabs.length, sp.layout, sp.ratio, w, h, app.gap, mono, focus);
+  const t = tile(tabs.length, sp.layout, sp.ratio, w, h, app.gap, mono, focus, app.settings.monoGutter);
   return { tabs, rects: t.rects, split: t.split, mono, focus };
 }
 
