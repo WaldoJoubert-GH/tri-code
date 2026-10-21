@@ -152,6 +152,10 @@ _Avoid_: Notification settings, ping.
 Another checkout of a project's repo on its own branch, made with `git worktree add` in a folder next to the repo (`<repo>.worktrees/<branch>`) on the project's host. In tri-code it is a Project with a `parent` (the repo's project), a `branch` and maybe an `issue` Slug-ID: it has its own windows, workspaces, accent and Agent Signals, and takes its repo's icon, background, Alert settings and Dev Directory. The sidebar lists every checkout under the repo's row, the repo's own folder first; the collapsed rail stacks a small tile per checkout under the project tile (an issue number, or the branch's first letters). `Alt+Shift+W` makes one. Chosen from design/worktrees.html (variant A, "stack" rail).
 _Avoid_: Branch (a Worktree is on one, but switching branch is not what it does), sub-project, workspace (that is the Alt+1–4 canvas).
 
+**Folder Copy**:
+A Worktree of a folder that isn't a git repo (several repos side by side, or no git at all): the folder copied to the same `<folder>.worktrees/<branch>`, so it looks and works like any other Worktree. Each repo nested in the folder is left out of the copy and added back as a git worktree on the branch; `node_modules`, `target`, `.venv` and other build folders are skipped. A snapshot of the other files is kept beside it (`.<branch>.copy.json`). **Finish** (its ×) copies what changed outside git back to the folder, asks which side wins for a file changed in both, removes the nested worktrees (keeping a branch that isn't merged) and deletes the copy. In the sidebar the folder's own row reads `base`. Stored as `copy: { repos }` on the Worktree. Chosen from design/folder-worktrees.html; see ADR 0003.
+_Avoid_: Clone, snapshot, sandbox.
+
 **Favourite**:
 A page a project keeps for its browser windows: a URL and a name, in `state.json` under the project (`favs`). The star in a browser's address field (or `Ctrl+D`) adds one; they show on the bar under the address and as tiles on a blank browser window. Per project, not global, since each project has its own dev server and tracker.
 _Avoid_: Bookmark.

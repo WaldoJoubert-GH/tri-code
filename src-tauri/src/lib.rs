@@ -4,6 +4,7 @@ mod devfs;
 mod dirs;
 mod envs;
 mod envssh;
+mod folders;
 mod fs;
 mod git;
 mod github;
@@ -92,6 +93,10 @@ pub fn run() {
             pty::pty_kill_all,
             pty::remote_kill_session,
             dirs::list_dirs,
+            folders::folder_repos,
+            folders::folder_copy,
+            folders::folder_changes,
+            folders::folder_finish,
             envs::ssh_hosts,
             envs::scan_logos,
             envssh::env_ssh_set,

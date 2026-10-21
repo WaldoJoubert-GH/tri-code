@@ -157,7 +157,10 @@ export function commands(): Command[] {
     }
 
     add({ id: "new-worktree", group: "Project", title: "New worktree", hint: "another checkout of the repo, on its own branch", icon: "git-branch-plus", keys: capsOf("new-worktree"), run: () => openNewWorktree(p) });
-    if (p.parent) add({ id: "remove-worktree", group: "Project", title: `Remove worktree ${branchOf(p)}`, hint: p.path, icon: "trash-2", run: () => void removeWorktree(p) });
+    if (p.parent) add({
+      id: "remove-worktree", group: "Project", title: `${p.copy ? "Finish" : "Remove worktree"} ${branchOf(p)}`,
+      hint: p.copy ? "copy the changes back, delete the copy" : p.path, icon: "trash-2", run: () => void removeWorktree(p),
+    });
     add({ id: "appearance", group: "Project", title: "Appearance", hint: "name, icon, accent, background", icon: "palette", keys: capsOf("appearance"), run: () => toggleAppearance() });
   }
 

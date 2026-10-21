@@ -323,7 +323,12 @@ export default function Sidebar() {
                           <span class="bn">{branchOf(w)}</span>
                           <span class="count">{w.tabs.length || ""}</span>
                           <Show when={w.parent}>
-                            <button class="x" title="Remove worktree" aria-label={`Remove worktree ${branchOf(w)}`} onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}>×</button>
+                            <button
+                              class="x"
+                              title={w.copy ? "Finish: copy the changes back and delete the copy" : "Remove worktree"}
+                              aria-label={`${w.copy ? "Finish" : "Remove worktree"} ${branchOf(w)}`}
+                              onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}
+                            >×</button>
                           </Show>
                         </div>
                       )}

@@ -15,7 +15,11 @@ pub struct DirList {
     pub repos: Vec<String>,
     /// Drive roots (`C:\`, `D:\`, ...) to jump between; only for local Windows.
     pub drives: Vec<String>,
+    /// VS Code `.code-workspace` files in the folder, sorted.
+    pub workspaces: Vec<String>,
 }
+
+const WORKSPACE_EXT: &str = ".code-workspace";
 
 /// Sort key: dot-folders after the rest, then case-insensitive.
 fn sort_key(n: &String) -> (bool, String) {
@@ -36,18 +40,23 @@ fn list_local(path: &str) -> Result<DirList, String> {
     // A bare `D:` means the current directory on D:, not its root.
     let path = &if path.len() == 2 && path.ends_with(':') { format!("{path}\\") } else { path.to_string() };
     let dir = std::fs::canonicalize(expand_home(path)).map_err(|e| format!("{path}: {e}"))?;
-    let mut dirs: Vec<String> = std::fs::read_dir(&dir)
-        .map_err(|e| e.to_string())?
-        .filter_map(Result::ok)
-        .filter(|e| e.path().is_dir())
-        .filter_map(|e| e.file_name().into_string().ok())
-        .collect();
+    let mut dirs = Vec::new();
+    let mut workspaces = Vec::new();
+    for e in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.filter_map(Result::ok) {
+        let Ok(name) = e.file_name().into_string() else { continue };
+        if e.path().is_dir() {
+            dirs.push(name);
+        } else if name.ends_with(WORKSPACE_EXT) {
+            workspaces.push(name);
+        }
+    }
     dirs.sort_by_key(sort_key);
+    workspaces.sort_by_key(sort_key);
     let repos = dirs.iter().filter(|n| dir.join(n).join(".git").exists()).cloned().collect();
     let path = dir.to_string_lossy();
     // canonicalize returns verbatim `\\?\C:\...` paths on Windows.
     let path = path.strip_prefix(r"\\?\").unwrap_or(&path).to_string();
-    Ok(DirList { path, dirs, repos, drives: drives() })
+    Ok(DirList { path, dirs, repos, drives: drives(), workspaces })
 }
 
 #[cfg(windows)]
@@ -62,10 +71,10 @@ fn drives() -> Vec<String> {
 }
 
 /// Remote script: print the resolved directory, then one subdirectory per line,
-/// prefixed `g` for a git repository and `d` otherwise.
+/// prefixed `g` for a git repository and `d` otherwise, then `w` and each `.code-workspace` file.
 fn remote_script(path: &str) -> String {
     let inner = format!(
-        "cd {} || exit 1; pwd; for d in */ .*/; do [ -d \"$d\" ] || continue; case $d in ./|../) continue;; esac; t=d; [ -e \"$d.git\" ] && t=g; printf '%s%s\\n' \"$t\" \"${{d%/}}\"; done; true",
+        "cd {} || exit 1; pwd; for d in */ .*/; do [ -d \"$d\" ] || continue; case $d in ./|../) continue;; esac; t=d; [ -e \"$d.git\" ] && t=g; printf '%s%s\\n' \"$t\" \"${{d%/}}\"; done; for f in *{WORKSPACE_EXT}; do [ -f \"$f\" ] && printf 'w%s\\n' \"$f\"; done; true",
         remote_path(path)
     );
     // `sh -c` so it works whatever the login shell is (bash, zsh, fish, ...).
@@ -78,16 +87,22 @@ fn list_remote(host: &str, path: &str) -> Result<DirList, String> {
     let path = lines.next().unwrap_or("/").to_string();
     let mut dirs = Vec::new();
     let mut repos = Vec::new();
+    let mut workspaces = Vec::new();
     for line in lines {
         let (kind, name) = line.split_at(line.len().min(1));
-        if kind == "g" {
-            repos.push(name.to_string());
+        match kind {
+            "w" => workspaces.push(name.to_string()),
+            "g" => {
+                repos.push(name.to_string());
+                dirs.push(name.to_string());
+            }
+            _ => dirs.push(name.to_string()),
         }
-        dirs.push(name.to_string());
     }
     dirs.sort_by_key(sort_key);
     repos.sort_by_key(sort_key);
-    Ok(DirList { path, dirs, repos, drives: Vec::new() })
+    workspaces.sort_by_key(sort_key);
+    Ok(DirList { path, dirs, repos, drives: Vec::new(), workspaces })
 }
 
 #[cfg(all(test, unix))]
@@ -102,10 +117,12 @@ mod tests {
         std::fs::create_dir_all(root.join("b dir/.git")).unwrap();
         std::fs::create_dir_all(root.join(".hidden")).unwrap();
         std::fs::write(root.join("file"), "").unwrap();
+        std::fs::write(root.join("shop.code-workspace"), "{}").unwrap();
         let l = list_local(&format!("{}/A/..", root.display())).unwrap();
         std::fs::remove_dir_all(&root).ok();
         assert_eq!(l.dirs, ["A", "b dir", ".hidden"]);
         assert_eq!(l.repos, ["b dir"]);
+        assert_eq!(l.workspaces, ["shop.code-workspace"]);
         assert_eq!(l.path, std::fs::canonicalize(std::env::temp_dir()).unwrap().join(root.file_name().unwrap()).to_string_lossy());
     }
 
@@ -116,6 +133,7 @@ mod tests {
         std::fs::create_dir_all(root.join("repo/.git")).unwrap();
         std::fs::create_dir_all(root.join(".config")).unwrap();
         std::fs::write(root.join("file"), "").unwrap();
+        std::fs::write(root.join("my shop.code-workspace"), "{}").unwrap();
         // ssh hands the command string to the remote login shell as-is.
         let out = std::process::Command::new("/bin/sh")
             .arg("-c")
@@ -127,6 +145,7 @@ mod tests {
         assert_eq!(text.lines().nth(1), Some("dit's here"), "{out:?}");
         assert_eq!(text.lines().nth(2), Some("grepo"), "{out:?}");
         assert_eq!(text.lines().nth(3), Some("d.config"), "{out:?}");
-        assert_eq!(text.lines().count(), 4, "{out:?}");
+        assert_eq!(text.lines().nth(4), Some("wmy shop.code-workspace"), "{out:?}");
+        assert_eq!(text.lines().count(), 5, "{out:?}");
     }
 }

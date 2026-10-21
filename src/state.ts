@@ -160,6 +160,9 @@ export type Project = {
   branch?: string;
   /** A Worktree only: the Slug-ID of the issue it was made for, if any. */
   issue?: string;
+  /** A Worktree of a folder that is not a git repo: a copy of the folder. `repos` are the repos
+   *  nested in it, each added back as a git worktree on `branch` (see worktrees.ts). */
+  copy?: { repos: string[] };
   /** The tour's sample project: its terminals are scripted, and it can be closed with nothing lost. */
   sample?: boolean;
 };
@@ -321,7 +324,7 @@ export function addSampleProject(path: string): string {
 }
 
 /** Add a Worktree under `parentId` and make it active. Returns its id. */
-export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string }): string {
+export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string; copy?: { repos: string[] } }): string {
   const id = newId();
   setApp(produce((s) => {
     const parent = s.projects.find((p) => p.id === parentId);
@@ -334,7 +337,7 @@ export function addWorktree(parentId: string, w: { path: string; branch: string;
     s.projects.splice(at, 0, {
       id, name: w.branch, host: parent.host, path: w.path, tabs: [], ws: 0,
       spaces: Array.from({ length: SPACES }, newSpace), accent, bg: "none", dim: 0, favs: [...parent.favs],
-      parent: parentId, branch: w.branch, ...(w.issue ? { issue: w.issue } : {}),
+      parent: parentId, branch: w.branch, ...(w.issue ? { issue: w.issue } : {}), ...(w.copy ? { copy: w.copy } : {}),
     });
     s.activeProject = id;
   }));
@@ -744,7 +747,7 @@ function migrate(raw: any): Persisted {
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
       favs: p.favs ?? [], icon: p.icon, notify: p.notify,
-      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue } : {}),
+      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.copy ? { copy: p.copy } : {}) } : {}),
       ...(p.sample ? { sample: true } : {}),
     };
   });
