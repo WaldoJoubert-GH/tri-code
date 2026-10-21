@@ -2,6 +2,13 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.23 — 2026-10-21
+
+- ssh environments that need a key file. In New environment, paste the ssh command you use in a terminal (`ssh -i key.pem user@host`, with `-p` and `-o` too) or fill in the Key file field; tri-code uses that key, and only that key, for every terminal, git and file call to the host. A failed test says what to try: the key, its passphrase (add it with `ssh-add`), or file permissions that are too open.
+- Lock an ssh environment with a PIN. Turn on "Lock with PIN" when you add it and pick how long an unlock lasts. While it's locked, its projects show a PIN pad instead of their windows, its terminals don't start, and tri-code won't connect to it. The lock in its sidebar header shows the state; click it to lock again now. Restarting tri-code locks it again.
+- Project icons can be any lucide icon: the Appearance panel's Glyph tab is now Icon, with 32 to pick from and a search over the full set.
+- The status bar timer follows the project you switch to. The hotkey hints and the focused-window info are gone from the status line.
+
 ## 0.1.22 — 2026-10-20
 
 - A tour for new users. The first launch opens a sample project with claude part-way through a task, a dev server, the files window and pi waiting on workspace 2, and walks through eight stops: projects, workspaces, windows, Go to File, agent signals, the status line, Appearance and the Command Palette. Most stops have something to try and tick once you have; pi asks you something on cue so you can see a signal arrive and jump to it with `Alt+U`. The sample agents are recordings, so nothing runs. Close the `tour` project when you're done, and replay it any time from `Alt+X` › Take the tour.
