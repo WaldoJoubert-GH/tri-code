@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onMount, untrack } from "solid-js";
 import {
-  GAPS, SPACES, activeProject, app, focusedTab, goSpace, isRemote, isTerminal, live, loadState,
+  GAPS, SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
   persistChanges, repoOf, setGap, setLayout, space, tabName,
 } from "./state";
 import { SIG_TEXT, nextSignal, sigOf, topSig } from "./signals";
@@ -221,17 +221,6 @@ function Toolbar() {
 }
 
 function StatusBar() {
-  const info = () => {
-    const p = activeProject();
-    if (!p) return "";
-    const sp = space(p);
-    const where = sp.layout === "master" ? `main ${Math.round(sp.ratio * 100)}%` : sp.layout;
-    const f = focusedTab(p);
-    if (!f) return where;
-    const title = live[f.id]?.title;
-    return `${tabName(f)}${title ? " · " + title : ""}  [${where}]`;
-  };
-
   return (
     <div class="status">
       <label class="gapctl" title="Gap between windows (Alt+, / Alt+.)">
@@ -240,16 +229,9 @@ function StatusBar() {
           <For each={GAPS}>{(g) => <option value={String(g)} selected={app.gap === g}>{g}</option>}</For>
         </select>
       </label>
-      <span class="focus">{info()}</span>
       <span class="flash">{flashMsg()}</span>
       <StatusTimer />
       <SignalCounts />
-      <div class="hints">
-        <span><kbd>Alt</kbd><kbd>X</kbd> commands</span>
-        <span><kbd>Alt</kbd><kbd>I</kbd> issues</span>
-        <span><kbd>Alt</kbd><kbd>E</kbd> files</span>
-        <span><kbd>Alt</kbd><kbd>/</kbd> all keys</span>
-      </div>
       <Show when={updateReady()}>
         {(u) => (
           <button class="update" title={`Install tri-code ${u().version} and restart. Local terminal sessions end; remote ones reattach.`} onClick={installUpdate}>
@@ -297,8 +279,16 @@ function SignalCounts() {
 
 /** The project's "In Progress" issues, next to Appearance. Click a chip to drill in. */
 function InProgressChips() {
-  const p = activeProject();
-  const r = p && repoOf(p);
+  return (
+    <Show when={activeProject()} keyed>
+      {(p) => <ProjectInProgressChips p={p} />}
+    </Show>
+  );
+}
+
+function ProjectInProgressChips(props: { p: NonNullable<ReturnType<typeof activeProject>> }) {
+  const p = props.p;
+  const r = repoOf(p);
   const list = () => (r ? inProgress(r.id) : []);
   return (
     <Show when={list().length}>
@@ -334,10 +324,18 @@ function InProgressChips() {
 
 /** Running Entry and the day's total, in the status line. */
 function StatusTimer() {
-  const a = activeProject();
-  const p = a && repoOf(a);
-  const d = () => (p ? dev[p.id] : undefined);
-  const run = () => (p ? runningEntry(p.id) : null);
+  const repo = () => {
+    const a = activeProject();
+    return a && repoOf(a);
+  };
+  const d = () => {
+    const p = repo();
+    return p ? dev[p.id] : undefined;
+  };
+  const run = () => {
+    const p = repo();
+    return p ? runningEntry(p.id) : null;
+  };
   return (
     <Show when={d()?.connected}>
       <span class="timer">
@@ -353,7 +351,7 @@ function StatusTimer() {
             );
           }}
         </Show>
-        today {d() ? formatHm(todayTotal(p!.id)) : "0m"}
+        today {repo() ? formatHm(todayTotal(repo()!.id)) : "0m"}
       </span>
     </Show>
   );
