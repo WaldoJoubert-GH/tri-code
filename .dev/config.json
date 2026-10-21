@@ -1,0 +1,13 @@
+{
+  "sources": [
+    "github",
+    "local"
+  ],
+  "github": {
+    "repo": "WaldoJoubert-GH/tri-code",
+    "progress_label": "in progress"
+  },
+  "local": {
+    "prefix": ""
+  }
+}
