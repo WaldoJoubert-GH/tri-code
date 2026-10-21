@@ -10,6 +10,7 @@ import { requestClose } from "./Canvas";
 import { openAppearance, toggleAppearance } from "./Appearance";
 import { nextSignal, toggleDnd } from "./signals";
 import { toggleSignals } from "./SignalSettings";
+import { toggleSettings } from "./Settings";
 import { setHelpOpen } from "./Help";
 import { setAboutOpen } from "./About";
 import { openProjectDialog } from "./OpenProject";
@@ -165,6 +166,7 @@ export function commands(): Command[] {
     add({ id: "appearance", group: "Project", title: "Appearance", hint: "name, icon, accent, background", icon: "palette", keys: ["Alt", "P"], run: () => toggleAppearance() });
   }
 
+  add({ id: "settings", group: "App", title: "Settings", hint: "opening files, gap between windows", icon: "settings", run: () => toggleSettings() });
   add({ id: "open-project", group: "Project", title: "Open project", hint: "or add an environment", icon: "folder-open", keys: ["Alt", "O"], run: () => openProjectDialog() });
   if (p && app.projects.length > 1) {
     add({ id: "project-prev", group: "Project", title: "Previous project", icon: "chevron-up", keys: ["Alt", "["], run: () => stepProject(p, -1) });

@@ -55,6 +55,10 @@ export type Tab = {
   page?: string;
   /** `file` tabs only: the path being viewed. */
   path?: string;
+  /** `file` tabs only, with more than one file: every file in the window's tab strip, `path` among them. */
+  files?: string[];
+  /** `file` tabs only: a preview, replaced by the next file opened until it is kept. */
+  preview?: boolean;
   /** `term` and browser tabs: the agent (or web app) it was opened from. The name and icon follow the agent. */
   agent?: string;
   /** `term` and browser tabs: the agent's name at launch, shown once the agent is deleted. */
@@ -195,7 +199,17 @@ type Persisted = {
   notify: NotifySettings;
   /** The tour was finished or skipped, so a launch with no projects no longer starts it. */
   toured: boolean;
+  /** App-wide settings (the Settings button at the foot of the sidebar). */
+  settings: Settings;
 };
+
+/** What opening a file (a click in the files window, Enter in Go to File) does with a file window already open:
+ *  ask which, replace its file, open a new window, add a tab to it, or replace the preview window. */
+export type FileOpen = "ask" | "reuse" | "window" | "tabs" | "preview";
+
+export type Settings = { fileOpen: FileOpen };
+
+const defaultSettings = (): Settings => ({ fileOpen: "ask" });
 
 export type TabStatus = "connecting" | "running" | "reconnecting" | "exited";
 
@@ -213,7 +227,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, settings: defaultSettings() });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -622,12 +636,18 @@ export function moveFav(projectId: string, url: string, before: string) {
   });
 }
 
-/** Point a `file` tab at another file (the window is reused). */
-export function setTabPath(projectId: string, tabId: string, path: string) {
-  edit(projectId, (p) => {
-    const t = p.tabs.find((t) => t.id === tabId);
-    if (t) t.path = path;
+/** Change what a `file` tab shows: its file, its tab strip, whether it is a preview. An `undefined` drops the field. */
+export function setFileTab(projectId: string, tabId: string, patch: Pick<Tab, "path" | "files" | "preview">) {
+  editTab(projectId, tabId, (t) => {
+    for (const [k, v] of Object.entries(patch) as [keyof typeof patch, never][]) {
+      if (v === undefined) delete t[k];
+      else t[k] = v;
+    }
   });
+}
+
+export function setSettings(patch: Partial<Settings>) {
+  setApp(produce((s) => Object.assign(s.settings, patch)));
 }
 
 export function addAgent(agent: Agent) {
@@ -705,6 +725,7 @@ function migrate(raw: any): Persisted {
     notify: { ...defaultNotify(), ...raw.notify },
     // Anyone with a state file from before the tour already knows their way around.
     toured: raw.toured ?? true,
+    settings: { ...defaultSettings(), ...raw.settings },
   };
 }
 

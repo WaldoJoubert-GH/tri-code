@@ -76,7 +76,11 @@ kbd {
 aside {
   grid-area: side; background: var(--panel); border-right: 1px solid var(--line);
   padding: 4px 6px 8px; overflow-y: auto; overflow-x: hidden; min-width: 0;
+  display: flex; flex-direction: column;
 }
+aside > * { flex: none; }
+/* Settings sits at the foot of the sidebar, under the list however long it is */
+.side-foot { margin-top: auto; padding-top: 10px; }
 .side-head { display: flex; align-items: center; justify-content: space-between; height: 26px; padding-left: 8px; }
 .side-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
 .collapse { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; font-size: 14px; line-height: 1; }
@@ -631,3 +635,13 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .tour-end .row { justify-content: flex-end; }
 .project .sample { font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }
 .rail:not(.peek) .project .sample { display: none; }
+
+/* App settings popover (Settings.tsx), opened from the foot of the sidebar */
+.pop.settings { width: 320px; }
+.pop .radios { display: grid; gap: 1px; }
+.pop .radio { display: flex; align-items: flex-start; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; }
+.pop .radio:hover { background: var(--hover); }
+.pop .radio input { margin: 3px 0 0; accent-color: var(--accent); }
+.pop .radio small { display: block; color: var(--muted); font-size: 11.5px; }
+.pop .note { margin: 0; color: var(--muted); font-size: 11.5px; }
+.pop.settings .row select { margin-left: auto; }

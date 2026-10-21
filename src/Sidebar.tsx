@@ -15,6 +15,7 @@ import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
 import { branchOf, loadWorktrees, openNewWorktree, removeWorktree, tileLabel } from "./worktrees";
 import { flash } from "./ui";
 import { envLocked, lockEnv } from "./envlock";
+import { settingsOpen, toggleSettings } from "./Settings";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
 const FULL = 220;
@@ -26,7 +27,7 @@ const [peek, setPeek] = createSignal(false);
 export const sidebarPeek = peek;
 /** Something opened from the peeked list (appearance, icon picker, a rename) holds it open until it closes. */
 const [renaming, setRenaming] = createSignal<string | null>(null);
-const held = () => appearanceOpen() || iconPickerOpen() || renaming() !== null;
+const held = () => appearanceOpen() || iconPickerOpen() || settingsOpen() || renaming() !== null;
 
 // Press and drag a project row to move it within its environment. Pointer events rather than HTML5
 // drag and drop, so a press that barely moves is still a click and the rail works the same way.
@@ -342,6 +343,11 @@ export default function Sidebar() {
         </button>
         <button class="add env" title="Add environment" onClick={() => openProjectDialog(undefined, true)}>
           <span class="glyph">⇄</span><span class="label">Add environment</span>
+        </button>
+      </div>
+      <div class="side-foot">
+        <button class="add" id="settingsBtn" title="Settings" aria-expanded={settingsOpen()} onClick={(e) => toggleSettings(e.currentTarget)}>
+          <span class="glyph"><Icon name="settings" size={15} /></span><span class="label">Settings</span>
         </button>
       </div>
     </aside>

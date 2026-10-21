@@ -5,6 +5,7 @@
 import { Project, Tab, activeProject, addTab, canvasTabs, focusedTab, setRatio, space } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
+import { closeSettings, settingsOpen } from "./Settings";
 import { helpOpen, setHelpOpen } from "./Help";
 import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
@@ -13,7 +14,7 @@ import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees"
 import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { openIssuePanel } from "./issues";
-import { openFilesPanel } from "./files";
+import { ask, cancelAsk, openFilesPanel } from "./files";
 import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { agentForKey, launchAgent, newTerminalLike, openAgentsPanel, recording } from "./agents";
@@ -165,6 +166,8 @@ function onKey(e: KeyboardEvent) {
     else if (openProjectOpen()) closeOpenProject();
     else if (newWorktreeOpen()) closeNewWorktree();
     else if (appearanceOpen()) closeAppearance();
+    else if (settingsOpen()) closeSettings();
+    else if (ask()) cancelAsk();
     else if (signalsOpen()) closeSignals();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();

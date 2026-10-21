@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tri-code · settings prototype</title>
+<!--
+  PROTOTYPE: throwaway. Not imported by the app; open this file directly in a browser.
+  Question: "Where do app-wide settings live, and how does a user choose what opening a file does?"
+
+  OUTCOME (picked 2026-10-21): variant D, in context, plus a Settings button at the foot of the
+  sidebar that opens a small popover (Opening a file, Gap between windows). "Ask each time" is the
+  default and one of the modes. Built in src/Settings.tsx, openFile in src/files.ts (ask, tabs,
+  preview), FileView.tsx (⋯ menu, ask card, tab strip, preview) and `settings` in state.json.
+
+  Today (v0.1.23) a click in the files window, or Enter in Go to File, always reuses the most
+  recently used `file` window (openFile in src/files.ts). Ctrl+Enter / Ctrl+click open a new one.
+  There is no app-wide settings surface: the gap lives in the status bar, the rest is per project
+  (Appearance, Alt+P).
+
+  The setting being decided, "Opening a file", has four modes. All four work in every variant:
+    reuse   · Replace the file in the last file window (today's behaviour)
+    window  · Every file gets its own window on the canvas
+    tabs    · One file window, a tab per file inside it
+    preview · A click previews (replaces the preview window, title in italics); double-click the
+              title, or Keep, makes it a normal window, and the next click opens a fresh preview
+  In every mode a file that is already open is focused, not opened twice, and Ctrl+click does the
+  opposite (a new window, or in "window" mode, reuse the last one).
+
+  Four structurally different settings surfaces, switchable from the floating bar (also ← / →):
+    A · Popover: a gear in the toolbar opens a compact popover, the same shape as Appearance.
+    B · Settings window: Settings is a canvas Window (TabKind "settings") with a search box and
+        every setting in one scrolling list. Opens beside your files, so you change and try at once.
+    C · Dialog: a modal with category tabs; file opening is picked from illustrated cards.
+    D · In context: no settings page. The choice is asked the first time you open a second file,
+        with "remember", and changed later from the file window's ⋯ menu.
+
+  Try it: click files in the files window (left tile), Ctrl+click, double-click a preview title.
+  The "state" button on the bar shows what would persist in state.json (`settings`) and the
+  windows on the canvas. Nothing persists.
+-->
+<style>
+/* ---- palette: copied from design/onboarding.html, which mirrors src/styles.css ---- */
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --violet: #7c4dbd; --scrim: rgba(30,34,44,.35); --shadow: rgba(30,34,44,.22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --violet: #bb9af7; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+    --accent: var(--accent-raw);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+  --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+  --bad: #f7768e; --violet: #bb9af7; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+  --accent: var(--accent-raw);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 var(--ui); overflow: hidden; user-select: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+kbd { font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; color: var(--text); background: var(--panel); }
+input[type="radio"], input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
+
+/* ---- app chrome ---- */
+.app { display: grid; height: 100%; grid-template-columns: 200px 1fr; grid-template-rows: 34px 1fr 26px; grid-template-areas: "side top" "side canvas" "side status"; }
+aside { grid-area: side; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 6px; }
+aside h2 { margin: 10px 4px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.project { display: flex; align-items: center; gap: 8px; padding: 4px; border-radius: 6px; }
+.project.active { background: color-mix(in srgb, var(--accent) 16%, var(--raised)); }
+.project .swatch { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; background: var(--accent); color: #111; font-weight: 600; }
+.project .count { margin-left: auto; color: var(--muted); font-size: 11px; }
+.top { grid-area: top; display: flex; align-items: stretch; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
+.spaces { display: flex; align-self: center; gap: 2px; margin: 0 6px; }
+.spaces button { width: 26px; height: 22px; border-radius: 4px; color: var(--muted); font: 600 11px var(--mono); border: 1px solid transparent; }
+.spaces button.cur { background: color-mix(in srgb, var(--accent) 22%, var(--raised)); border-color: var(--accent); color: var(--text); }
+.tabs { display: flex; min-width: 0; overflow: hidden; }
+.tabs .tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); white-space: nowrap; box-shadow: inset 0 -2px transparent; }
+.tabs .tab:hover { color: var(--text); background: var(--hover); }
+.tabs .tab.on { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.tabs .tab.pv { font-style: italic; }
+.where { align-self: center; height: 24px; margin: 0 6px; padding: 0 8px; color: var(--muted); font: 11px/24px var(--mono); flex: 1 1 160px; max-width: 360px; margin-right: auto; overflow: hidden; white-space: nowrap; }
+.tool { padding: 0 10px; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.tool:hover, .tool.on { color: var(--text); background: var(--hover); }
+.tool svg { width: 15px; height: 15px; }
+.status { grid-area: status; display: flex; align-items: center; gap: 14px; padding: 0 10px; background: var(--panel); border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.status .flash { color: var(--text); }
+
+.viewport { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); }
+.world { position: absolute; inset: 0; padding: var(--gap); display: grid; gap: var(--gap); grid-template-columns: 240px minmax(0, 1fr); }
+.rest { display: grid; gap: var(--gap); min-width: 0; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+.win { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; position: relative; }
+.win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.win.flashin { animation: flashin .5s; }
+@keyframes flashin { from { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent); } }
+.bar { height: 28px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); }
+.win.focused .bar { color: var(--text); }
+.bar .kind { font-weight: 600; }
+.bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); color: var(--muted); }
+.bar .ttl.pv { font-style: italic; }
+.bar .x, .bar .more { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); flex: none; }
+.bar .x:hover, .bar .more:hover { background: var(--hover); color: var(--text); }
+.bar .keep { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; }
+.bar .keep:hover { color: var(--text); background: var(--hover); }
+.pvtag { font: 600 10px var(--mono); color: var(--violet); border: 1px solid color-mix(in srgb, var(--violet) 45%, transparent); border-radius: 3px; padding: 0 4px; font-style: normal; }
+.body { flex: 1; min-height: 0; overflow: auto; }
+
+/* files window */
+.tree { padding: 4px 0; font-size: 12.5px; }
+.tree .row { display: flex; align-items: center; gap: 6px; width: 100%; padding: 2px 8px; text-align: left; white-space: nowrap; }
+.tree .row:hover { background: var(--hover); }
+.tree .row.dir { color: var(--muted); cursor: default; }
+.tree .row.ign { opacity: .6; }
+.tree .row .ic { width: 14px; text-align: center; font: 10px var(--mono); color: var(--muted); }
+.tree .row.open .nm::after { content: " ●"; color: var(--accent); font-size: 9px; }
+.tree .hint { padding: 8px 10px; color: var(--muted); font-size: 11.5px; border-top: 1px solid var(--line); margin-top: 6px; line-height: 1.5; }
+
+/* file window */
+.ftabs { display: flex; flex: none; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; }
+.ftabs .ft { display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; font: 11.5px var(--mono); color: var(--muted); border-right: 1px solid var(--line); white-space: nowrap; }
+.ftabs .ft.on { background: var(--bg); color: var(--text); box-shadow: inset 0 2px var(--accent); }
+.ftabs .ft i { width: 16px; height: 16px; border-radius: 3px; display: grid; place-items: center; font-style: normal; }
+.ftabs .ft i:hover { background: var(--hover); }
+pre.code { margin: 0; padding: 8px 0; font: 12px/1.6 var(--mono); counter-reset: ln; }
+pre.code span { display: block; padding: 0 12px 0 0; }
+pre.code span::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 34px; padding-right: 12px; text-align: right; color: var(--muted); opacity: .6; }
+.term { padding: 8px 10px; font: 12px/1.6 var(--mono); color: var(--muted); }
+.term b { color: var(--accent); font-weight: 400; }
+
+/* ⋯ menu and first-time ask (variant D) */
+.menu { position: absolute; z-index: 50; min-width: 260px; padding: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 32px -10px var(--shadow); }
+.menu h6 { margin: 6px 8px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 5px; text-align: left; }
+.menu button:hover { background: var(--hover); }
+.menu button .ck { width: 14px; color: var(--accent); }
+.menu button small { margin-left: auto; color: var(--muted); }
+.ask { position: absolute; z-index: 40; left: 12px; right: 12px; top: 36px; padding: 12px; background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 14px 36px -12px var(--shadow); }
+.ask p { margin: 0 0 10px; }
+.ask p code { font: 12px var(--mono); }
+.ask .opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.ask .opts button { padding: 4px 10px; border: 1px solid var(--line); border-radius: 5px; }
+.ask .opts button:hover { border-color: var(--accent); }
+.ask .opts button:first-child { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
+.ask label { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--muted); font-size: 12px; }
+
+/* shared setting rows */
+.set { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.set:last-child { border-bottom: 0; }
+.set .lbl { font-weight: 600; }
+.set .lbl small { font-weight: 400; color: var(--muted); margin-left: 6px; font: 10.5px var(--mono); }
+.set .help { color: var(--muted); font-size: 12px; }
+.radio { display: flex; align-items: flex-start; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; }
+.radio:hover { background: var(--hover); }
+.radio input { margin-top: 3px; }
+.radio span small { display: block; color: var(--muted); font-size: 11.5px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; align-self: start; }
+.seg button { padding: 3px 10px; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: color-mix(in srgb, var(--accent) 20%, var(--raised)); color: var(--text); }
+.chk { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+mark { background: color-mix(in srgb, var(--warn) 30%, transparent); color: inherit; border-radius: 2px; }
+
+/* A: popover */
+.pop { position: absolute; z-index: 60; top: 40px; right: 46px; width: 340px; max-height: calc(100% - 80px); overflow: auto; padding: 4px 14px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 18px 44px -14px var(--shadow); }
+.pop header { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 2px; }
+.pop header b { font-size: 14px; }
+.pop header span { color: var(--muted); font-size: 11.5px; }
+.pop h5 { margin: 12px 0 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.pop .set { padding: 8px 0; }
+
+/* B: settings window */
+.sw { display: flex; flex-direction: column; height: 100%; }
+.sw .search { flex: none; margin: 8px; display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.sw .search input { flex: 1; border: 0; background: none; color: inherit; font: inherit; outline: none; }
+.sw .list { flex: 1; overflow: auto; padding: 0 14px 12px; }
+.sw h5 { position: sticky; top: 0; margin: 0; padding: 8px 0 4px; background: var(--bg); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.sw .set { grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: 16px; }
+.sw .set .ctl { grid-column: 2; grid-row: 1 / span 2; }
+.sw .set.wide .ctl { grid-column: 1 / -1; grid-row: auto; }
+.sw .none { color: var(--muted); padding: 16px 0; }
+select { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; }
+
+/* C: dialog */
+.scrim { position: absolute; inset: 0; z-index: 70; background: var(--scrim); display: grid; place-items: center; }
+.dlg { width: min(720px, calc(100% - 32px)); max-height: calc(100% - 48px); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 60px -16px var(--shadow); overflow: hidden; }
+.dlg header { display: flex; align-items: center; gap: 8px; padding: 12px 16px 0; }
+.dlg header b { font-size: 15px; margin-right: auto; }
+.dlg nav { display: flex; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--line); }
+.dlg nav button { padding: 6px 12px; color: var(--muted); box-shadow: inset 0 -2px transparent; }
+.dlg nav button.on { color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.dlg .pane { padding: 6px 16px 16px; overflow: auto; }
+.dlg footer { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.dlg footer button { padding: 5px 14px; border-radius: 6px; background: var(--accent); color: #111; font-weight: 600; }
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+.card { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; text-align: left; }
+.card:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.card b { font-size: 12.5px; }
+.card small { color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.dia { height: 70px; border-radius: 5px; background: var(--canvas); padding: 6px; display: flex; gap: 4px; }
+.dia i { flex: 1; border-radius: 3px; background: var(--bg); border: 1px solid var(--line); position: relative; font-style: normal; font: 9px var(--mono); color: var(--muted); display: grid; place-items: center; }
+.dia i.f { flex: none; width: 22%; }
+.dia i.hl { border-color: var(--accent); }
+.dia i.pv { border-style: dashed; font-style: italic; }
+.dia .col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.dia i.tb { display: block; padding-top: 12px; }
+.dia i.tb::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 9px; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(90deg, var(--raised) 0 14px, var(--line) 14px 15px); }
+@media (max-width: 760px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- prototype switcher + state drawer (throwaway) ---- */
+.proto-bar { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px; padding: 7px 8px; background: #14161cf2; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px; box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); font: 12px/1.35 var(--ui); }
+.proto-bar .tag { font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; border: 1px solid #3a3f4d; border-radius: 999px; padding: 4px 7px; }
+.proto-bar button { color: #cfd5e4; }
+.proto-bar .arrow { width: 26px; height: 26px; border-radius: 7px; font-size: 15px; }
+.proto-bar .arrow:hover, .proto-bar .pb:hover { background: #262b36; color: #fff; }
+.proto-bar .cur { min-width: 280px; }
+.proto-bar .cur b { font: 600 12px var(--mono); color: #fff; }
+.proto-bar .cur span { display: block; color: #9aa3b8; font-size: 11px; }
+.proto-bar .pb { white-space: nowrap; padding: 4px 9px; border-radius: 7px; border: 1px solid #3a3f4d; font-size: 11.5px; }
+.drawer { position: fixed; right: 16px; bottom: 92px; z-index: 9999; width: 340px; max-height: calc(100% - 120px); overflow: auto; padding: 12px; background: #14161cf7; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px; font: 12px/1.4 var(--ui); box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); }
+.drawer h5 { margin: 0 0 6px; font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; }
+.drawer pre { margin: 0 0 10px; padding: 8px; background: #0b0c10; border-radius: 6px; font: 11px/1.45 var(--mono); white-space: pre-wrap; color: #c9d1e3; user-select: text; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<div class="proto-bar">
+  <span class="tag">prototype</span>
+  <button class="arrow" id="prev" title="Previous variant (←)">‹</button>
+  <div class="cur"><b id="vlabel"></b><span id="vdesc"></span></div>
+  <button class="arrow" id="next" title="Next variant (→)">›</button>
+  <button class="pb" id="resetBtn" title="Fresh settings, one file window">↺ reset</button>
+  <button class="pb" id="stateBtn">state</button>
+</div>
+<div class="drawer" id="drawer" hidden></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+/* ---------- the project ---------- */
+const TREE = [
+  { d: "src", kids: ["App.tsx", "FileList.tsx", "GoToFile.tsx", "files.ts", "state.ts"] },
+  { d: "src-tauri/src", kids: ["git.rs", "fs.rs"] },
+  { f: ".env", ign: true }, { f: "README.md" }, { f: "package.json" },
+];
+const FILES = TREE.flatMap((n) => n.f ? [n.f] : n.kids.map((k) => `${n.d}/${k}`));
+const IGNORED = new Set([".env"]);
+const BODY = {
+  ".env": ["PLANE_TOKEN=pl_••••••••••••", "SENTRY_DSN=https://••••@sentry.io/42", "TRI_DEBUG=1"],
+  "README.md": ["# tri-code", "", "A minimal agent development environment.", "", "Open a project with Alt+O."],
+  "package.json": ["{", '  "name": "tri-code",', '  "version": "0.1.23",', '  "private": true,', '  "type": "module"', "}"],
+  "src-tauri/src/git.rs": ["/// Go to File's index: tracked plus untracked-but-not-ignored", "#[tauri::command]", "pub async fn project_files(host: String, path: String)", "    -> Result<FileIndex, String> {", "    blocking(move || match multi(&host, &path, CMDS) {", "        …"],
+  "src/files.ts": ["/** Show `path` in the project's `file` window. */", "export function openFile(project, path, fromTabId, fresh = false) {", "  const mode = app.settings.fileOpen;", "  …", "}"],
+};
+const body = (f) => BODY[f] ?? [`// ${f}`, "", `import { createSignal } from "solid-js";`, "", "export function Example() {", "  const [n, setN] = createSignal(0);", "  return <button onClick={() => setN(n() + 1)}>{n()}</button>;", "}"];
+
+/* ---------- settings: what state.json would keep under `settings` ---------- */
+const MODES = {
+  reuse: { name: "Reuse the last file window", short: "Replace", help: "The file replaces what the last file window shows. Today's behaviour." },
+  window: { name: "A new window per file", short: "New window", help: "Every file gets its own window on the canvas." },
+  tabs: { name: "Tabs in one file window", short: "Tabs", help: "One file window, with a tab per open file." },
+  preview: { name: "Preview, then keep", short: "Preview", help: "A click previews in one window. Double-click its title, or Keep, and the next file opens a new preview." },
+};
+const DEFAULTS = () => ({ fileOpen: "reuse", ctrlOpposite: true, gotoIgnored: true, theme: "system", gap: 12 });
+
+/* ---------- the app model ---------- */
+let S, uid = 1, clock = 1;
+function fresh(v) {
+  const files = { id: "w" + uid++, kind: "files" };
+  const agent = { id: "w" + uid++, kind: "claude" };
+  const first = { id: "w" + uid++, kind: "file", tabs: ["src/files.ts"], at: 0, preview: false, used: clock++ };
+  return {
+    v, settings: { ...DEFAULTS(), fileOpen: v === "D" ? null : "reuse" },
+    wins: [files, first, agent], focus: first.id, flash: "", lastFlash: null,
+    pop: false, dlg: null, menu: null, ask: null, q: "",
+  };
+}
+const fileWins = () => S.wins.filter((w) => w.kind === "file");
+const lastFileWin = () => fileWins().sort((a, b) => b.used - a.used)[0];
+const openPaths = () => new Set(fileWins().flatMap((w) => w.tabs));
+const pathOf = (w) => w.tabs[w.at];
+function flash(m) { S.flash = m; clearTimeout(S.ft); S.ft = setTimeout(() => { S.flash = ""; render(); }, 3500); }
+function touch(w) { w.used = clock++; S.focus = w.id; S.lastFlash = w.id; }
+
+/** The heart of it: what a click (or Enter in Go to File) on `path` does under the current setting. */
+function openFile(path, ctrl) {
+  const mode = S.settings.fileOpen;
+  // already open somewhere: focus it, never open twice
+  for (const w of fileWins()) {
+    const i = w.tabs.indexOf(path);
+    if (i >= 0) { w.at = i; touch(w); return flash(`${path} is already open: focused it`); }
+  }
+  if (mode === null) {
+    // variant D, nothing chosen yet: the first file reuses; the second one asks
+    const w = lastFileWin();
+    if (!w) return newWin(path, false);
+    S.ask = { path, win: w.id, remember: true };
+    return;
+  }
+  let how = mode;
+  if (ctrl && S.settings.ctrlOpposite) how = mode === "window" ? "reuse" : "window";
+  const last = lastFileWin();
+  if (how === "window" || !last) return newWin(path, how === "preview");
+  if (how === "reuse") { last.tabs = [path]; last.at = 0; last.preview = false; touch(last); return flash(ctrl ? `Ctrl: ${path} replaced the last file window` : ""); }
+  if (how === "tabs") {
+    last.tabs.push(path); last.at = last.tabs.length - 1; last.preview = false; touch(last); return;
+  }
+  if (how === "preview") {
+    const pv = fileWins().find((w) => w.preview);
+    if (pv) { pv.tabs = [path]; pv.at = 0; touch(pv); return; }
+    return newWin(path, true);
+  }
+}
+function newWin(path, preview) {
+  const w = { id: "w" + uid++, kind: "file", tabs: [path], at: 0, preview, used: clock++ };
+  const i = S.wins.findIndex((x) => x.kind === "claude");
+  S.wins.splice(i < 0 ? S.wins.length : i, 0, w);
+  touch(w);
+}
+function keep(id) { const w = S.wins.find((x) => x.id === id); if (w?.preview) { w.preview = false; flash(`kept ${pathOf(w)}: the next click opens a new preview`); } }
+function closeWin(id) {
+  S.wins = S.wins.filter((w) => w.id !== id);
+  if (S.focus === id) S.focus = (lastFileWin() ?? S.wins[0])?.id;
+}
+function closeTab(id, i) {
+  const w = S.wins.find((x) => x.id === id);
+  w.tabs.splice(i, 1);
+  if (!w.tabs.length) return closeWin(id);
+  w.at = Math.min(w.at, w.tabs.length - 1);
+}
+function setSetting(k, v) {
+  S.settings[k] = v;
+  if (k === "theme") document.documentElement.dataset.theme = v === "system" ? "" : v;
+  if (k === "fileOpen" && v !== "tabs") {
+    // leaving tabs: each extra tab becomes its own window so nothing silently closes
+    for (const w of fileWins()) {
+      if (w.tabs.length < 2) continue;
+      const others = w.tabs.filter((_, i) => i !== w.at);
+      w.tabs = [pathOf(w)]; w.at = 0;
+      for (const p of others) newWin(p, false);
+    }
+  }
+  if (k === "fileOpen" && v !== "preview") for (const w of fileWins()) w.preview = false;
+}
+function openSettings() {
+  if (S.v === "A") S.pop = !S.pop;
+  else if (S.v === "B") {
+    const w = S.wins.find((x) => x.kind === "settings");
+    if (w) { S.focus = w.id; S.lastFlash = w.id; }
+    else { const n = { id: "w" + uid++, kind: "settings", used: 0 }; S.wins.splice(1, 0, n); S.focus = n.id; S.lastFlash = n.id; }
+  } else if (S.v === "C") S.dlg = S.dlg ? null : { tab: "files" };
+}
+
+/* ---------- setting controls (shared building blocks, laid out differently per variant) ---------- */
+const SETTINGS = [
+  { k: "fileOpen", group: "Files", label: "Opening a file", help: "What a click in the files window, or Enter in Go to File, does.", wide: true },
+  { k: "ctrlOpposite", group: "Files", label: "Ctrl+click does the opposite", help: "Ctrl+click opens a new window, or in “new window” mode reuses the last one." },
+  { k: "gotoIgnored", group: "Files", label: "Ignored files in Go to File", help: "List gitignored files like .env (not whole ignored folders like node_modules)." },
+  { k: "theme", group: "Appearance", label: "Theme", help: "System follows the OS light or dark mode." },
+  { k: "gap", group: "Windows", label: "Gap between windows", help: "Also Alt+, and Alt+. (and the status bar)." },
+];
+function control(s, hl = (x) => esc(x)) {
+  const v = S.settings[s.k];
+  if (s.k === "fileOpen") return Object.entries(MODES).map(([m, d]) => `
+    <label class="radio"><input type="radio" name="fo-${S.v}" data-set="fileOpen" value="${m}" ${v === m ? "checked" : ""}>
+    <span>${hl(d.name)}<small>${hl(d.help)}</small></span></label>`).join("");
+  if (s.k === "theme") return `<div class="seg">${["system", "light", "dark"].map((t) => `<button data-seg="theme" data-val="${t}" class="${v === t ? "on" : ""}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div>`;
+  if (s.k === "gap") return `<select data-set="gap">${[0, 4, 8, 12, 16, 24].map((g) => `<option ${v === g ? "selected" : ""}>${g}</option>`).join("")}</select>`;
+  return `<input type="checkbox" data-set="${s.k}" ${v ? "checked" : ""}>`;
+}
+
+/* ---------- render ---------- */
+const GEAR = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`;
+
+function render() {
+  const showGear = S.v !== "D";
+  const tabs = S.wins.filter((w) => w.kind !== "files").map((w) => {
+    const name = w.kind === "file" ? pathOf(w).split("/").pop() + (w.tabs.length > 1 ? ` +${w.tabs.length - 1}` : "") : w.kind;
+    return `<button class="tab ${S.focus === w.id ? "on" : ""} ${w.preview ? "pv" : ""}" data-focus="${w.id}">${esc(name)}</button>`;
+  }).join("");
+  const gearOn = (S.v === "A" && S.pop) || (S.v === "C" && S.dlg) || (S.v === "B" && S.wins.some((w) => w.kind === "settings"));
+  const rest = S.wins.filter((w) => w.kind !== "files");
+  const cols = rest.length <= 2 ? 1 : rest.length <= 4 ? 2 : 3;
+  $("root").innerHTML = `
+  <div class="app">
+    <aside>
+      <h2>Local</h2>
+      <div class="project active"><span class="swatch">T</span>tri-code<span class="count">${S.wins.length}</span></div>
+      <div class="project"><span class="swatch" style="background:var(--raised);color:var(--text)">D</span>dotfiles</div>
+    </aside>
+    <div class="top">
+      <div class="spaces"><button class="cur">1</button><button>2</button><button>3</button></div>
+      <div class="tabs">${tabs}</div>
+      <div class="where">~/Projects/tri-code</div>
+      <button class="tool">Appearance</button>
+      ${showGear ? `<button class="tool ${gearOn ? "on" : ""}" id="gear" data-act="settings" title="Settings (Ctrl+,)">${GEAR}Settings</button>` : ""}
+      <button class="tool">?</button>
+    </div>
+    <div class="viewport">
+      <div class="world" style="--gap:${S.settings.gap}px">
+        ${winHtml(S.wins.find((w) => w.kind === "files"))}
+        <div class="rest" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr))">${rest.map(winHtml).join("")}</div>
+      </div>
+      ${S.v === "A" && S.pop ? popHtml() : ""}
+      ${S.v === "C" && S.dlg ? dlgHtml() : ""}
+    </div>
+    <div class="status">
+      <span>gap ${S.settings.gap}</span>
+      <span>opening a file: <b style="color:var(--text)">${S.settings.fileOpen ? MODES[S.settings.fileOpen].short : "ask the first time"}</b></span>
+      <span class="flash">${esc(S.flash)}</span>
+    </div>
+  </div>`;
+  S.lastFlash = null;
+  if (!$("drawer").hidden) drawer();
+  const qi = $("swq");
+  if (qi && S.keepFocus) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S.keepFocus = false; }
+}
+
+function winHtml(w) {
+  if (!w) return "";
+  const cls = `win ${S.focus === w.id ? "focused" : ""} ${S.lastFlash === w.id ? "flashin" : ""}`;
+  const x = `<button class="x" data-close="${w.id}" title="Close">✕</button>`;
+  if (w.kind === "files") {
+    const open = openPaths();
+    const rows = TREE.map((n) => n.f ? fileRow(n.f, 0, open) : `<div class="row dir"><span class="ic">▾</span>${esc(n.d)}</div>` + n.kids.map((k) => fileRow(`${n.d}/${k}`, 1, open)).join("")).join("");
+    return `<div class="${cls}" data-win="${w.id}"><div class="bar"><span class="kind">files</span><span class="ttl">tri-code</span></div>
+      <div class="body tree">${rows}<div class="hint">Click a file. <kbd>Ctrl</kbd>+click ${S.settings.ctrlOpposite ? "does the opposite" : "does the same"}.${S.settings.fileOpen === "preview" ? " Double-click a preview's title to keep it." : ""}</div></div></div>`;
+  }
+  if (w.kind === "claude") return `<div class="${cls}" data-win="${w.id}"><div class="bar"><span class="kind">claude</span><span class="ttl">fixing Go to File</span>${x}</div>
+    <div class="body term"><b>&gt;</b> .env doesn't show in Go to File<br>● Reading src-tauri/src/git.rs<br>● project_files uses --exclude-standard…</div></div>`;
+  if (w.kind === "settings") return `<div class="${cls}" data-win="${w.id}"><div class="bar"><span class="kind">settings</span><span class="ttl">tri-code · all projects</span>${x}</div>${settingsWindowHtml()}</div>`;
+  // file window
+  const p = pathOf(w);
+  const ftabs = S.settings.fileOpen === "tabs" || w.tabs.length > 1
+    ? `<div class="ftabs">${w.tabs.map((t, i) => `<span class="ft ${i === w.at ? "on" : ""}" data-ftab="${w.id}|${i}">${esc(t.split("/").pop())}<i data-ftclose="${w.id}|${i}" title="Close tab">✕</i></span>`).join("")}</div>` : "";
+  const more = S.v === "D" ? `<button class="more" data-menu="${w.id}" title="Window options">⋯</button>` : "";
+  const keepBtn = w.preview ? `<span class="pvtag">preview</span><button class="keep" data-keep="${w.id}" title="Keep this file open (or double-click the title)">Keep</button>` : "";
+  return `<div class="${cls}" data-win="${w.id}">
+    <div class="bar"><span class="kind">file</span><span class="ttl ${w.preview ? "pv" : ""}" data-ttl="${w.id}" title="${esc(p)}">${esc(p)}</span>${keepBtn}${more}${x}</div>
+    ${ftabs}
+    <div class="body"><pre class="code">${body(p).map((l) => `<span>${esc(l) || " "}</span>`).join("")}</pre></div>
+    ${S.menu === w.id ? menuHtml() : ""}
+    ${S.ask?.win === w.id ? askHtml() : ""}
+  </div>`;
+}
+function fileRow(f, depth, open) {
+  const ign = IGNORED.has(f);
+  return `<button class="row ${ign ? "ign" : ""} ${open.has(f) ? "open" : ""}" data-file="${esc(f)}" style="padding-left:${8 + depth * 14}px"><span class="ic">${f.endsWith(".rs") ? "rs" : f.endsWith(".md") ? "md" : f.startsWith(".") ? "··" : "ts"}</span><span class="nm">${esc(f.split("/").pop())}</span></button>`;
+}
+
+/* A · popover */
+function popHtml() {
+  const groups = [...new Set(SETTINGS.map((s) => s.group))];
+  return `<div class="pop" role="dialog" aria-label="Settings">
+    <header><b>Settings</b><span>every project</span></header>
+    ${groups.map((g) => `<h5>${g}</h5>${SETTINGS.filter((s) => s.group === g).map((s) => s.wide
+      ? `<div class="set"><span class="lbl">${s.label}</span>${control(s)}</div>`
+      : `<div class="set"><label class="chk" style="justify-content:space-between"><span class="lbl">${s.label}</span>${control(s)}</label></div>`).join("")}`).join("")}
+  </div>`;
+}
+
+/* B · settings window */
+function settingsWindowHtml() {
+  const q = S.q.trim().toLowerCase();
+  const hl = (t) => { if (!q) return esc(t); const i = t.toLowerCase().indexOf(q); return i < 0 ? esc(t) : esc(t.slice(0, i)) + `<mark>${esc(t.slice(i, i + q.length))}</mark>` + esc(t.slice(i + q.length)); };
+  const match = (s) => !q || [s.label, s.help, s.group, ...(s.k === "fileOpen" ? Object.values(MODES).flatMap((m) => [m.name, m.help]) : [])].some((t) => t.toLowerCase().includes(q));
+  const shown = SETTINGS.filter(match);
+  const groups = [...new Set(shown.map((s) => s.group))];
+  return `<div class="body sw">
+    <div class="search"><svg viewBox="0 0 16 16" width="13" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>
+      <input id="swq" placeholder="Search settings" value="${esc(S.q)}" spellcheck="false"></div>
+    <div class="list">${groups.length ? groups.map((g) => `<h5>${g}</h5>${shown.filter((s) => s.group === g).map((s) => `
+      <div class="set ${s.wide ? "wide" : ""}"><span class="lbl">${hl(s.label)}<small>${s.k}</small></span><span class="help">${hl(s.help)}</span><div class="ctl">${control(s, hl)}</div></div>`).join("")}`).join("")
+      : `<div class="none">No setting matches “${esc(S.q)}”</div>`}</div>
+  </div>`;
+}
+
+/* C · dialog */
+const DIA = {
+  reuse: `<i class="f">tree</i><i class="hl">b.ts</i>`,
+  window: `<i class="f">tree</i><div class="col"><i>a.ts</i><i class="hl">b.ts</i></div>`,
+  tabs: `<i class="f">tree</i><i class="tb hl">b.ts</i>`,
+  preview: `<i class="f">tree</i><div class="col"><i>a.ts</i><i class="pv hl">b.ts</i></div>`,
+};
+function dlgHtml() {
+  const tab = S.dlg.tab;
+  const NAV = { files: "Files", windows: "Windows", appearance: "Appearance" };
+  let pane = "";
+  if (tab === "files") {
+    pane = `<div class="set"><span class="lbl">Opening a file</span><span class="help">What a click in the files window, or Enter in Go to File, does.</span>
+      <div class="cards">${Object.entries(MODES).map(([m, d]) => `<button class="card ${S.settings.fileOpen === m ? "on" : ""}" data-seg="fileOpen" data-val="${m}">
+        <div class="dia">${DIA[m]}</div><b>${d.short}</b><small>${d.help}</small></button>`).join("")}</div></div>
+      ${SETTINGS.filter((s) => s.group === "Files" && !s.wide).map((s) => `<div class="set"><label class="chk">${control(s)}<span><span class="lbl">${s.label}</span><br><span class="help">${s.help}</span></span></label></div>`).join("")}`;
+  } else if (tab === "windows") {
+    const s = SETTINGS.find((x) => x.k === "gap");
+    pane = `<div class="set"><span class="lbl">${s.label}</span><span class="help">${s.help}</span>${control(s)}</div>`;
+  } else {
+    const s = SETTINGS.find((x) => x.k === "theme");
+    pane = `<div class="set"><span class="lbl">${s.label}</span><span class="help">${s.help} Per-project accent and background stay in Appearance (Alt+P).</span>${control(s)}</div>`;
+  }
+  return `<div class="scrim" data-scrim><div class="dlg" role="dialog" aria-label="Settings">
+    <header><b>Settings</b><kbd>Esc</kbd></header>
+    <nav>${Object.entries(NAV).map(([k, n]) => `<button class="${tab === k ? "on" : ""}" data-dtab="${k}">${n}</button>`).join("")}</nav>
+    <div class="pane">${pane}</div>
+    <footer><span>Saved as you change them · every project</span><button data-act="dlgDone">Done</button></footer>
+  </div></div>`;
+}
+
+/* D · in context */
+function menuHtml() {
+  const v = S.settings.fileOpen;
+  return `<div class="menu" style="right:30px;top:30px">
+    <h6>Opening a file</h6>
+    ${Object.entries(MODES).map(([m, d]) => `<button data-seg="fileOpen" data-val="${m}"><span class="ck">${v === m ? "✓" : ""}</span>${d.short}<small>${m === "reuse" ? "today" : ""}</small></button>`).join("")}
+    <button data-seg="fileOpen" data-val="__ask"><span class="ck">${v === null ? "✓" : ""}</span>Ask each time</button>
+    <h6>This window</h6>
+    <button data-close="${S.menu}"><span class="ck"></span>Close<small>Alt Q</small></button>
+  </div>`;
+}
+function askHtml() {
+  const w = S.wins.find((x) => x.id === S.ask.win);
+  const cur = pathOf(w).split("/").pop(), nxt = S.ask.path.split("/").pop();
+  return `<div class="ask" role="dialog" aria-label="Open file">
+    <p>Open <code>${esc(nxt)}</code> with <code>${esc(cur)}</code> still open?</p>
+    <div class="opts">
+      <button data-answer="window">Beside it</button>
+      <button data-answer="tabs">As a tab</button>
+      <button data-answer="reuse">Replace ${esc(cur)}</button>
+      <button data-answer="preview">Preview</button>
+    </div>
+    <label><input type="checkbox" id="remember" ${S.ask.remember ? "checked" : ""}> Remember (change it later from ⋯ on any file window)</label>
+  </div>`;
+}
+
+function drawer() {
+  const wins = S.wins.map((w) => w.kind === "file" ? { kind: "file", tabs: w.tabs, ...(w.tabs.length > 1 ? { active: w.at } : {}), ...(w.preview ? { preview: true } : {}) } : { kind: w.kind });
+  $("drawer").innerHTML = `<h5>state.json · settings</h5><pre>${esc(JSON.stringify(S.settings, null, 2))}</pre>
+    <h5>canvas windows (runtime)</h5><pre>${esc(JSON.stringify(wins, null, 1))}</pre>`;
+}
+
+/* ---------- variants ---------- */
+const ORDER = ["A", "B", "C", "D"];
+const NAMES = { A: "Popover", B: "Settings window", C: "Dialog", D: "In context" };
+const DESC = {
+  A: "A gear in the toolbar opens a compact popover, like Appearance",
+  B: "Settings is a canvas window with search, beside your files",
+  C: "A modal with tabs; file opening picked from illustrated cards",
+  D: "No settings page: asked on the second file, changed from ⋯",
+};
+function setVariant(v, push) {
+  if (!ORDER.includes(v)) v = "A";
+  document.documentElement.dataset.theme = "";
+  S = fresh(v);
+  if (v === "B") openSettings();
+  $("vlabel").textContent = `${v} · ${NAMES[v]}`;
+  $("vdesc").textContent = DESC[v];
+  if (push) {
+    try {
+      if (location.protocol === "file:") history.replaceState(null, "", "#" + v);
+      else { const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null, "", u); }
+    } catch { /* ignore */ }
+  }
+  render();
+}
+function cycle(d) { setVariant(ORDER[(ORDER.indexOf(S.v) + d + ORDER.length) % ORDER.length], true); }
+
+/* ---------- events ---------- */
+document.addEventListener("click", (e) => {
+  const t = e.target, g = (sel) => t.closest(sel);
+  if (g(".proto-bar, .drawer")) return;
+  let el;
+  if (S.pop && !g(".pop") && !g("#gear")) S.pop = false;
+  if (S.menu && !g(".menu") && !g("[data-menu]")) S.menu = null;
+  if (t.matches("[data-scrim]")) { S.dlg = null; return render(); }
+  if ((el = g("[data-act]"))) {
+    const a = el.dataset.act;
+    if (a === "settings") openSettings();
+    if (a === "dlgDone") S.dlg = null;
+    return render();
+  }
+  if ((el = g("[data-answer]"))) {
+    const m = el.dataset.answer, { path } = S.ask, remember = $("remember").checked;
+    S.ask = null;
+    const before = S.settings.fileOpen;
+    S.settings.fileOpen = m;
+    openFile(path, false);
+    if (!remember) S.settings.fileOpen = before;
+    else flash(`remembered: ${MODES[m].short}. Change it from ⋯ on a file window`);
+    return render();
+  }
+  if ((el = g("[data-seg]"))) {
+    const v = el.dataset.val;
+    setSetting(el.dataset.seg, v === "__ask" ? null : v);
+    if (el.closest(".menu")) S.menu = null;
+    return render();
+  }
+  if ((el = g("[data-ftclose]"))) { const [id, i] = el.dataset.ftclose.split("|"); closeTab(id, +i); return render(); }
+  if ((el = g("[data-ftab]"))) { const [id, i] = el.dataset.ftab.split("|"); const w = S.wins.find((x) => x.id === id); w.at = +i; touch(w); return render(); }
+  if ((el = g("[data-keep]"))) { keep(el.dataset.keep); return render(); }
+  if ((el = g("[data-menu]"))) { S.menu = S.menu === el.dataset.menu ? null : el.dataset.menu; return render(); }
+  if ((el = g("[data-close]"))) { closeWin(el.dataset.close); S.menu = null; return render(); }
+  if ((el = g("[data-dtab]"))) { S.dlg.tab = el.dataset.dtab; return render(); }
+  if ((el = g("[data-file]"))) { if (e.detail > 1) return; S.ask = null; openFile(el.dataset.file, e.ctrlKey || e.metaKey); return render(); }
+  if ((el = g("[data-focus]"))) { const w = S.wins.find((x) => x.id === el.dataset.focus); S.focus = w.id; if (w.kind === "file") w.used = clock++; return render(); }
+  if (g(".ask")) return;
+  if ((el = g("[data-win]")) && !g("input, select, label")) { if (S.focus !== el.dataset.win) { S.focus = el.dataset.win; const w = S.wins.find((x) => x.id === S.focus); if (w.kind === "file") w.used = clock++; } return render(); }
+  render();
+});
+document.addEventListener("dblclick", (e) => {
+  const el = e.target.closest("[data-ttl]");
+  if (el) { keep(el.dataset.ttl); render(); }
+});
+document.addEventListener("change", (e) => {
+  const t = e.target, k = t.dataset?.set;
+  if (!k) return;
+  setSetting(k, t.type === "checkbox" ? t.checked : k === "gap" ? +t.value : t.value);
+  render();
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "swq") { S.q = e.target.value; S.keepFocus = true; render(); }
+});
+addEventListener("keydown", (e) => {
+  const t = document.activeElement;
+  const typing = t && ((t.tagName === "INPUT" && !["checkbox", "radio"].includes(t.type)) || t.tagName === "SELECT");
+  if (e.key === "Escape") { S.pop = false; S.dlg = null; S.menu = null; S.ask = null; return render(); }
+  if (e.key === "," && e.ctrlKey && S.v !== "D") { e.preventDefault(); openSettings(); return render(); }
+  if (typing) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  else if (e.key === "ArrowRight") cycle(1);
+});
+$("prev").onclick = () => cycle(-1);
+$("next").onclick = () => cycle(1);
+$("resetBtn").onclick = () => setVariant(S.v, false);
+$("stateBtn").onclick = () => { $("drawer").hidden = !$("drawer").hidden; render(); };
+
+const initial = (new URLSearchParams(location.search).get("variant") || location.hash.replace(/^#/, "") || "A").toUpperCase();
+setVariant(initial, false);
+addEventListener("hashchange", () => setVariant((location.hash.replace(/^#/, "") || "A").toUpperCase(), false));
+</script>
+</body>
+</html>

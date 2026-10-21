@@ -148,3 +148,36 @@
 }
 .fmedia img, .fmedia video { max-width: 100%; max-height: 100%; object-fit: contain; }
 .fmedia audio { width: min(480px, 100%); }
+
+/* File window: preview, tab strip, the ⋯ menu and the "how should it open?" card. See Settings.tsx. */
+.filev { position: relative; }
+.fbar .path.pv { font-style: italic; }
+.pvtag { flex: none; font: 600 10px var(--mono); color: var(--violet); border: 1px solid color-mix(in srgb, var(--violet) 45%, transparent); border-radius: 3px; padding: 0 4px; }
+.ftabs { display: flex; flex: none; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--line); }
+.ftabs .ft { display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; font: 11.5px var(--mono); color: var(--muted); border-right: 1px solid var(--line); white-space: nowrap; cursor: default; }
+.ftabs .ft:hover { color: var(--text); }
+.ftabs .ft.on { background: var(--bg); color: var(--text); box-shadow: inset 0 2px var(--accent); }
+.ftabs .ft .fdirty { font-size: 8px; }
+.ftabs .ft button { width: 16px; height: 16px; border-radius: 3px; color: var(--muted); font-size: 10px; line-height: 1; }
+.ftabs .ft button:hover { background: var(--hover); color: var(--text); }
+.fmenu {
+  position: absolute; z-index: 5; top: 30px; right: 6px; min-width: 190px; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 32px -10px var(--shadow);
+}
+.fmenu h6 { margin: 4px 8px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.fmenu button { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 8px; border-radius: 5px; text-align: left; font-size: 12px; }
+.fmenu button:hover { background: var(--hover); }
+.fmenu .ck { width: 12px; color: var(--accent); }
+.fmenu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.fask {
+  position: absolute; z-index: 4; top: 36px; left: 8px; right: 8px; padding: 10px 12px;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 14px 36px -12px var(--shadow); font-size: 12.5px;
+}
+.fask p { margin: 0 0 8px; }
+.fask code { font: 12px var(--mono); }
+.fask .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.fask .opts button { padding: 3px 10px; border: 1px solid var(--line); border-radius: 5px; }
+.fask .opts button:hover { border-color: var(--accent); }
+.fask .opts .primary { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
+.fask .opts .x { margin-left: auto; border-color: transparent; color: var(--muted); }
+.fask label { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--muted); font-size: 12px; }

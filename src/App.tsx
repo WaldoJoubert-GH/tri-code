@@ -10,6 +10,7 @@ import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
+import { SettingsPopover } from "./Settings";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
@@ -127,6 +128,7 @@ export default function App() {
       <StatusBar />
       <TabMenu />
       <AppearancePopover />
+      <SettingsPopover />
       <FavPopover />
       <GoToFile />
       <Palette />

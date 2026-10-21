@@ -1,10 +1,18 @@
 // The file window: one file, as source, in an editor, or — for Markdown and HTML —
 // a rendered preview. Unsaved edits are a draft that every mode shows, so Preview
 // reflects them before Save. The body is a memo so switching modes swaps the DOM.
+// In Tabs mode it holds several files in a tab strip; in Preview mode it can be the
+// preview window, which the next file replaces. Its ⋯ menu changes the mode, and the
+// first time a second file opens it asks how (see Settings.tsx).
 
-import { Show, createEffect, createMemo, createResource, createSignal, on, onCleanup, type JSX } from "solid-js";
-import { type Project, type Tab } from "./state";
-import { type Media, loadImage, loadMedia, loadText, mediaType, openFile, reloadText, saveText, textState } from "./files";
+import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
+import { createStore } from "solid-js/store";
+import { type Project, type Tab, app } from "./state";
+import {
+  type Media, answerAsk, ask, cancelAsk, closeFileInTab, filesOf, keepPreview, loadImage, loadMedia, loadText, mediaType, openFile,
+  reloadText, saveText, setFileOpen, textState,
+} from "./files";
+import { FILE_OPEN, toggleSettings } from "./Settings";
 import { codeHtml } from "./code";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { openExternal, openUrlInProject } from "./browsers";
@@ -60,8 +68,12 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
   const path = () => props.tab.path ?? "";
   const state = () => textState(props.project, path());
   const [mode, setMode] = createSignal<"auto" | "preview" | "source" | "edit">("auto");
-  /** Unsaved text, or null when the editor matches the file. */
-  const [draft, setDraft] = createSignal<string | null>(null);
+  /** Unsaved text by path, so switching tabs keeps each file's edits. */
+  const [drafts, setDrafts] = createStore<Record<string, string | undefined>>({});
+  /** Unsaved text of the file shown, or null when the editor matches the file. */
+  const draft = () => drafts[path()] ?? null;
+  const setDraft = (v: string | null) => setDrafts(path(), v ?? undefined);
+  const [menu, setMenu] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   /** Bumped by Reload so a media file is read again. */
   const [reloads, setReloads] = createSignal(0);
@@ -70,8 +82,29 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
   createEffect(() => {
     if (path() && !media()) loadText(props.project, path());
   });
-  // A reused window gets a new path: start it in the default mode again.
-  createEffect(on(path, () => { setMode("auto"); setDraft(null); }, { defer: true }));
+  // A reused window, or another tab, gets a new path: start it in the default mode again.
+  createEffect(on(path, () => setMode("auto"), { defer: true }));
+  // Editing a preview keeps it, so the next file can't replace the edits.
+  createEffect(() => { if (draft() !== null && props.tab.preview) keepPreview(props.project, props.tab); });
+  // A file closed (or replaced) out of the window drops its draft.
+  createEffect(() => {
+    const held = new Set(filesOf(props.tab));
+    for (const k of Object.keys(drafts)) if (!held.has(k) && drafts[k] !== undefined) setDrafts(k, undefined);
+  });
+
+  const onDown = (e: PointerEvent) => {
+    if (menu() && !(e.target as Element).closest(".fmenu, .fmore")) setMenu(false);
+  };
+  onMount(() => document.addEventListener("pointerdown", onDown));
+  onCleanup(() => document.removeEventListener("pointerdown", onDown));
+  const asking = () => {
+    const a = ask();
+    return a && a.tabId === props.tab.id ? a : null;
+  };
+  const closeFile = (f: string) => {
+    if (drafts[f] !== undefined && !confirm(`Discard your changes to ${f.split("/").pop()}?`)) return;
+    closeFileInTab(props.project, props.tab, f);
+  };
 
   const kind = () => previewKind(path());
   const previewing = () => !!kind() && (mode() === "auto" || mode() === "preview");
@@ -83,12 +116,13 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
   const text = () => draft() ?? state()?.file?.text ?? "";
 
   const save = async () => {
-    const d = draft();
+    const d = draft(), f = path();
     if (d === null || saving()) return;
     setSaving(true);
     try {
-      await saveText(props.project, path(), d);
-      setDraft(null);
+      await saveText(props.project, f, d);
+      // the tab strip may show another file by now
+      if (drafts[f] === d) setDrafts(f, undefined);
       flash("saved");
     } catch (e) {
       flash(`save failed: ${e}`);
@@ -178,7 +212,18 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
   return (
     <div class="filev">
       <div class="fbar">
-        <span class="path" title={path()}>{path()}</span>
+        <span
+          class="path"
+          classList={{ pv: !!props.tab.preview }}
+          title={props.tab.preview ? `${path()} · preview: double-click to keep` : path()}
+          onDblClick={() => keepPreview(props.project, props.tab)}
+        >
+          {path()}
+        </span>
+        <Show when={props.tab.preview}>
+          <span class="pvtag">preview</span>
+          <button title="Keep this file open: the next file opens a new preview" onClick={() => keepPreview(props.project, props.tab)}>Keep</button>
+        </Show>
         <Show when={state()?.file}>
           {(f) => (
             <span class="fmeta">
@@ -211,7 +256,63 @@ export default function FileView(props: { project: Project; tab: Tab }): JSX.Ele
           </button>
         </Show>
         <button title={draft() !== null ? "Reload (discards changes)" : "Reload"} onClick={reload}>⟳</button>
+        <button class="fmore" title="Opening files" aria-label="Opening files" aria-expanded={menu()} onClick={() => setMenu(!menu())}>⋯</button>
       </div>
+      <Show when={menu()}>
+        <div class="fmenu" role="menu">
+          <h6>Opening a file</h6>
+          <For each={FILE_OPEN}>
+            {(o) => (
+              <button role="menuitemradio" aria-checked={app.settings.fileOpen === o.mode} title={o.help} onClick={() => (setFileOpen(o.mode), setMenu(false))}>
+                <span class="ck">{app.settings.fileOpen === o.mode ? "✓" : ""}</span>{o.name}
+              </button>
+            )}
+          </For>
+          <hr />
+          <button role="menuitem" onClick={() => (setMenu(false), toggleSettings())}><span class="ck" />Settings…</button>
+        </div>
+      </Show>
+      <Show when={asking()}>
+        {(a) => {
+          let remember!: HTMLInputElement;
+          const name = (f: string) => f.split("/").pop();
+          const go = (how: "window" | "tabs" | "reuse" | "preview") => answerAsk(how, remember.checked);
+          return (
+            <div class="fask" role="dialog" aria-label="Open file">
+              <p>Open <code>{name(a().path)}</code> with <code>{name(path())}</code> open?</p>
+              <div class="opts">
+                <button class="primary" onClick={() => go("window")} ref={(el) => queueMicrotask(() => el.focus())}>Beside it</button>
+                <button onClick={() => go("tabs")}>As a tab</button>
+                <button onClick={() => go("reuse")}>Replace {name(path())}</button>
+                <button onClick={() => go("preview")}>Preview</button>
+                <button class="x" title="Cancel (Esc)" aria-label="Cancel" onClick={cancelAsk}>✕</button>
+              </div>
+              <label><input type="checkbox" ref={remember} checked /> Remember (change it from ⋯ or Settings)</label>
+            </div>
+          );
+        }}
+      </Show>
+      <Show when={filesOf(props.tab).length > 1}>
+        <div class="ftabs" role="tablist">
+          <For each={filesOf(props.tab)}>
+            {(f) => (
+              <span
+                class="ft"
+                classList={{ on: f === path() }}
+                role="tab"
+                aria-selected={f === path()}
+                title={f}
+                onClick={() => openFile(props.project, f)}
+                onAuxClick={(e) => e.button === 1 && closeFile(f)}
+              >
+                {f.split("/").pop()}
+                <Show when={drafts[f] !== undefined}><b class="fdirty">●</b></Show>
+                <button title="Close" aria-label={`Close ${f}`} onClick={(e) => (e.stopPropagation(), closeFile(f))}>✕</button>
+              </span>
+            )}
+          </For>
+        </div>
+      </Show>
       <Show when={media()} fallback={body()}>
         {(m) => <MediaView project={props.project} path={path()} media={m()[0]} mime={m()[1]} reloads={reloads()} />}
       </Show>
