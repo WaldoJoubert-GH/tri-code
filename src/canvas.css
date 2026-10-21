@@ -72,6 +72,16 @@
   background: var(--panel); border-bottom: 1px solid var(--line);
 }
 .nav[hidden] { display: none; }
+/* Page load line (LoadBar): on the nav row's bottom edge, or the title bar's when bare. */
+.bar, .nav { position: relative; }
+.loadbar {
+  position: absolute; left: 0; bottom: -1px; z-index: 1; height: 2px; width: 0; pointer-events: none;
+  background: var(--accent); box-shadow: 0 0 6px var(--accent);
+  animation: loadbar-in 0s linear 150ms both, loadbar-trickle 9s cubic-bezier(.08, .75, .25, 1) 150ms both;
+}
+.loadbar.done { animation: none; width: 100%; opacity: 0; transition: width 180ms ease-out, opacity 260ms 160ms; }
+@keyframes loadbar-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes loadbar-trickle { 0% { width: 0; } 8% { width: 30%; } 100% { width: 88%; } }
 .nav button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
 .nav button:hover { background: var(--hover); color: var(--text); }
 .url {

@@ -28,6 +28,37 @@ const ago = (ms: number) => {
   return m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`;
 };
 
+/** Loads shorter than this (HMR, cache) show no line at all, so they don't flicker. Matches .loadbar's delay. */
+const LOAD_SHOW_MS = 150;
+
+/**
+ * A thin line on the edge above a browser page while it loads. The webview only reports
+ * started / finished, so the line creeps toward ~88% and fills then fades when the page is done.
+ */
+function LoadBar(props: { loading: boolean }) {
+  const [run, setRun] = createSignal(0); // 0 hides it; bumped per load so each gets a fresh line
+  let el: HTMLDivElement | undefined;
+  let started = 0;
+  let timer = 0;
+  createEffect(on(() => props.loading, (loading) => {
+    clearTimeout(timer);
+    if (loading) {
+      started = performance.now();
+      return setRun((n) => n + 1);
+    }
+    if (!el || !run()) return;
+    if (performance.now() - started < LOAD_SHOW_MS) return setRun(0);
+    // Freeze the line where the trickle got to, then let it fill and fade.
+    el.style.width = getComputedStyle(el).width;
+    el.classList.add("done");
+    void el.offsetWidth;
+    el.style.width = "";
+    timer = window.setTimeout(() => setRun(0), 450);
+  }));
+  onCleanup(() => clearTimeout(timer));
+  return <Show when={run()} keyed>{(_n) => <div class="loadbar" ref={el} />}</Show>;
+}
+
 const BAR = 28;
 const NAV = 32;
 const FAVS = 26;
@@ -195,6 +226,12 @@ export default function Canvas(props: { project: Project }) {
     const pageId = () => page()?.id ?? "";
     const url = () => browserInfo[pageId()]?.url ?? page()?.url ?? "";
     const pageTitle = (pg: Page) => browserInfo[pg.id]?.title || (pg.url ? pg.url.replace(/^https?:\/\//, "") : "New tab");
+    /** The shown page's load line: on the nav row, or on the title bar when the nav row is hidden. */
+    const loadBar = () => (
+      <Show when={pageId()} keyed>
+        {(pid) => <LoadBar loading={browserInfo[pid]?.loading ?? false} />}
+      </Show>
+    );
     /** Close one page; closing the last one closes the window. */
     const closeTabPage = (pg: string) => {
       if ((tab.pages?.length ?? 0) < 2) return requestClose(props.project.id, id);
@@ -418,6 +455,7 @@ export default function Canvas(props: { project: Project }) {
           <button class="mn" title="Minimise (Alt+N)" onClick={() => minimiseTab(props.project.id, id)}>–</button>
           <button title="Maximize (Alt+F)" onClick={doMax}>▢</button>
           <button title="Close (Alt+Q)" onClick={() => requestClose(props.project.id, id)}>×</button>
+          <Show when={bare()}>{loadBar()}</Show>
         </div>
         {isBrowser ? (
           <>
@@ -451,6 +489,7 @@ export default function Canvas(props: { project: Project }) {
                 </button>
               </Show>
               <button title="Open in system browser" onClick={() => openExternal(url())}>↗</button>
+              <Show when={!bare()}>{loadBar()}</Show>
             </div>
             <Show when={!bare()}>
               <FavBar projectId={props.project.id} favs={props.project.favs} url={url()} onOpen={open} />
