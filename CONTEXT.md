@@ -79,6 +79,14 @@ _Avoid_: Quick open, file palette, Ctrl+P.
 The `Alt+X` box under the toolbar that runs any Command by name. The empty box lists recent picks, then every Command by group; typing fuzzy-matches titles (as Go to File does). Built from `commands.ts` each time it opens, so it only offers what applies now (no "Make main" outside Main + stack). A Command with a hotkey runs the same function the hotkey does.
 _Avoid_: Command menu, launcher, Ctrl+Shift+P (tri-code binds only Alt chords).
 
+**Hotkey Modifier**:
+The key every window hotkey starts with: Alt by default, or Cmd (Super / Win off macOS) in Settings › Hotkeys (`modkey.ts`). The other key is left to the terminal. With Cmd, Cmd+C and Cmd+X copy and cut while text is selected, and no hotkey can take Cmd+A, V, Z or Q.
+_Avoid_: Leader key, prefix.
+
+**Keymap**:
+Every action a hotkey runs (focus left, close window, go to workspace 2, copy, ...), with its default keys and the keys it has now (`keymap.ts`). An action can have several keys or none; Settings › Hotkeys changes them and only the changed ones are saved, as `settings.hotkeys`. Window actions are Hotkey Modifier chords; the text actions (copy, paste, favourite) are plain Ctrl / Cmd chords. Labels and tooltips print an action's current first key, so they follow a rebind. Agents keep their own one hotkey, which may not be a Keymap action's.
+_Avoid_: Keybindings, shortcuts (in code and docs; the UI says hotkeys).
+
 **File Index**:
 A project's files for Go to File, as relative paths: `git ls-files --cached --others --exclude-standard` on the project's host, or a walk that skips dependency folders when the folder is not a repo. Fetched each time the box opens; the last one shows meanwhile.
 
@@ -141,7 +149,7 @@ What a signal does beyond its badges: the project's sound for it and a desktop n
 _Avoid_: Notification settings, ping.
 
 **Worktree**:
-Another checkout of a project's repo on its own branch, made with `git worktree add` in a folder next to the repo (`<repo>.worktrees/<branch>`) on the project's host. In tri-code it is a Project with a `parent` (the repo's project), a `branch` and maybe an `issue` Slug-ID: it has its own windows, workspaces, accent and Agent Signals, and takes its repo's icon, background, Alert settings and Dev Directory. The sidebar lists every checkout under the repo's row, the repo's own folder first; the collapsed rail stacks a small tile per checkout under the project tile (an issue number, or the branch's first letters). `Alt+W` makes one. Chosen from design/worktrees.html (variant A, "stack" rail).
+Another checkout of a project's repo on its own branch, made with `git worktree add` in a folder next to the repo (`<repo>.worktrees/<branch>`) on the project's host. In tri-code it is a Project with a `parent` (the repo's project), a `branch` and maybe an `issue` Slug-ID: it has its own windows, workspaces, accent and Agent Signals, and takes its repo's icon, background, Alert settings and Dev Directory. The sidebar lists every checkout under the repo's row, the repo's own folder first; the collapsed rail stacks a small tile per checkout under the project tile (an issue number, or the branch's first letters). `Alt+Shift+W` makes one. Chosen from design/worktrees.html (variant A, "stack" rail).
 _Avoid_: Branch (a Worktree is on one, but switching branch is not what it does), sub-project, workspace (that is the Alt+1–4 canvas).
 
 **Favourite**:

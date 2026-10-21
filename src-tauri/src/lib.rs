@@ -17,11 +17,51 @@ mod usage;
 
 use std::sync::Arc;
 
+use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
 use tauri::{LogicalPosition, Manager, WebviewBuilder, WebviewUrl};
+
+/// The macOS menu bar: About, Quit and the Edit items that copy and paste in the webview.
+/// It replaces Tauri's default, whose Close Window (Cmd+W), Minimize (Cmd+M) and Hide (Cmd+H)
+/// would take those chords from the window hotkeys when Settings makes Cmd their modifier.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn mac_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    Menu::with_items(
+        app,
+        &[
+            &Submenu::with_items(
+                app,
+                &app.package_info().name,
+                true,
+                &[
+                    &PredefinedMenuItem::about(app, None, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::quit(app, None)?,
+                ],
+            )?,
+            &Submenu::with_items(
+                app,
+                "Edit",
+                true,
+                &[
+                    &PredefinedMenuItem::undo(app, None)?,
+                    &PredefinedMenuItem::redo(app, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::cut(app, None)?,
+                    &PredefinedMenuItem::copy(app, None)?,
+                    &PredefinedMenuItem::paste(app, None)?,
+                    &PredefinedMenuItem::select_all(app, None)?,
+                ],
+            )?,
+        ],
+    )
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(mac_menu);
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

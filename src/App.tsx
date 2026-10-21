@@ -10,9 +10,8 @@ import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
-import { SettingsPopover } from "./Settings";
+import { SettingsDialog, hotkeysOpen, settingsOpen, toggleHotkeys } from "./Settings";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
-import { HelpOverlay, helpOpen, setHelpOpen } from "./Help";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
@@ -29,6 +28,7 @@ import { Tour, startTour, tourOpen } from "./Tour";
 import { ensureSession, setLinkHandler } from "./terms";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { flash, flashMsg, toast, undoToast } from "./ui";
+import { keyOf, withKey } from "./keymap";
 import { appVersion, installUpdate, startUpdateChecks, updateReady } from "./updater";
 import { type Change, type GitStatus, branchStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
 import {
@@ -98,7 +98,7 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || helpOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen() || tourOpen()));
+  createEffect(() => setBrowsersSuspended(appearanceOpen() || settingsOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen() || tourOpen()));
 
   const backdrop = () => {
     const p = activeProject();
@@ -112,7 +112,7 @@ export default function App() {
       <Toolbar />
       <div class="stage">
         <div class="bg" style={backdrop()} />
-        <Show when={activeProject()} keyed fallback={<div class="empty">Open a project (Alt+O) to get started.</div>}>
+        <Show when={activeProject()} keyed fallback={<div class="empty">{withKey("Open a project", "open-project")} to get started.</div>}>
           {(p) => <Show when={!envLocked(p.host)} fallback={<PinPad host={p.host} />}><Canvas project={p} /></Show>}
         </Show>
         <Show when={toast()}>
@@ -129,13 +129,12 @@ export default function App() {
       <StatusBar />
       <TabMenu />
       <AppearancePopover />
-      <SettingsPopover />
+      <SettingsDialog />
       <FavPopover />
       <GoToFile />
       <Palette />
       <OpenProjectDialog />
       <NewWorktreeDialog />
-      <HelpOverlay />
       <AboutDialog />
       <SignalsPopover />
       <IconPicker />
@@ -165,7 +164,7 @@ function Toolbar() {
                       data-ws={i}
                       classList={{ used: inWs().length > 0, att: !!sig(), [`s-${sig()}`]: !!sig() }}
                       aria-current={p.ws === i}
-                      title={`Workspace ${i + 1}${inWs().length ? ": " + inWs().map((t) => tabName(t) + (sigOf(t) ? ` (${SIG_TEXT[sigOf(t)!]})` : "")).join(", ") : " (empty)"} · Alt+${i + 1}`}
+                      title={`Workspace ${i + 1}${inWs().length ? ": " + inWs().map((t) => tabName(t) + (sigOf(t) ? ` (${SIG_TEXT[sigOf(t)!]})` : "")).join(", ") : " (empty)"} · ${keyOf(`ws-${i + 1}`)}`}
                       onClick={() => {
                         goSpace(p.id, i);
                         flash(`workspace ${i + 1}`);
@@ -179,13 +178,13 @@ function Toolbar() {
             </div>
             <div class="sep" />
             <div class="seg" role="group" aria-label="Tiling layout">
-              <button aria-label="Main + stack" aria-pressed={space(p).layout === "master"} title="Main + stack (Alt+G)" onClick={() => setLayout(p.id, "master")}>
+              <button aria-label="Main + stack" aria-pressed={space(p).layout === "master"} title={withKey("Main + stack", "layout")} onClick={() => setLayout(p.id, "master")}>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6.5" height="11" rx="1.2" /><rect x="9.5" y="2.5" width="5" height="5" rx="1.2" /><rect x="9.5" y="8.5" width="5" height="5" rx="1.2" /></svg>
               </button>
-              <button aria-label="Grid" aria-pressed={space(p).layout === "grid"} title="Grid (Alt+G)" onClick={() => setLayout(p.id, "grid")}>
+              <button aria-label="Grid" aria-pressed={space(p).layout === "grid"} title={withKey("Grid", "layout")} onClick={() => setLayout(p.id, "grid")}>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6" height="5" rx="1.2" /><rect x="9" y="2.5" width="5.5" height="5" rx="1.2" /><rect x="1.5" y="8.5" width="6" height="5" rx="1.2" /><rect x="9" y="8.5" width="5.5" height="5" rx="1.2" /></svg>
               </button>
-              <button aria-label="Mono (centered column)" aria-pressed={space(p).layout === "mono"} title="Mono (Alt+G)" onClick={() => setLayout(p.id, "mono")}>
+              <button aria-label="Mono (centered column)" aria-pressed={space(p).layout === "mono"} title={withKey("Mono", "layout")} onClick={() => setLayout(p.id, "mono")}>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="11" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="5.75" y="2.5" width="4.5" height="11" rx="1.2" /></svg>
               </button>
             </div>
@@ -197,7 +196,7 @@ function Toolbar() {
       <button
         class="where"
         id="where"
-        title={where() ? `${where()} · Go to file (Alt+T)` : ""}
+        title={where() ? `${where()} · ${withKey("Go to file", "go-to-file")}` : ""}
         aria-haspopup="dialog"
         aria-expanded={goToFileOpen()}
         disabled={!activeProject()}
@@ -206,20 +205,20 @@ function Toolbar() {
         <Show when={activeProject()}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
           <span class="wp"><bdi>{where()}</bdi></span>
-          <kbd>Alt T</kbd>
+          <Show when={keyOf("go-to-file", " ")}>{(k) => <kbd>{k()}</kbd>}</Show>
         </Show>
       </button>
       <InProgressChips />
       <Show when={activeProject()}>
-        <button class="tool theme-btn" id="themeBtn" title="Project appearance (Alt+P)" onClick={(e) => toggleAppearance(e.currentTarget)}>
+        <button class="tool theme-btn" id="themeBtn" title={withKey("Project appearance", "appearance")} onClick={(e) => toggleAppearance(e.currentTarget)}>
           <i />
           Appearance
         </button>
       </Show>
-      <button class="tool" id="palBtn" title="Command palette (Alt+X)" aria-label="Command palette" onClick={togglePalette}>
+      <button class="tool" id="palBtn" title={withKey("Command palette", "palette")} aria-label="Command palette" onClick={togglePalette}>
         <Icon name="square-chevron-right" size={14} />
       </button>
-      <button class="tool" title="Hotkeys (Alt+/)" onClick={() => setHelpOpen(!helpOpen())}>
+      <button class="tool" title={withKey("Hotkeys", "help")} aria-pressed={hotkeysOpen()} onClick={toggleHotkeys}>
         ?
       </button>
     </div>
@@ -271,7 +270,7 @@ function SignalCounts() {
     s === "blocked" ? `${n} need${n === 1 ? "s" : ""} you` : s === "error" ? `${n} error${n === 1 ? "" : "s"}` : `${n} ${s}`;
   return (
     <Show when={parts().length}>
-      <button class="sigs" title={parts().some((x) => x.s !== "working") ? "Go to the next agent that needs you (Alt+U)" : "Agents at work"} onClick={nextSignal}>
+      <button class="sigs" title={parts().some((x) => x.s !== "working") ? withKey("Go to the next agent that needs you", "next-signal") : "Agents at work"} onClick={nextSignal}>
         <For each={parts()}>{(x) => <span class={`s-${x.s}`}><span class={`sg s-${x.s}`} />{label(x.s, x.n)}</span>}</For>
       </button>
     </Show>
@@ -456,7 +455,7 @@ function GitStatusPop(props: { s: GitStatus; at: DOMRect }) {
           )}
         </For>
       </Show>
-      <div class="pf">Click to open the git window · Alt+C</div>
+      <div class="pf">Click to open the git window{keyOf("git") ? ` · ${keyOf("git")}` : ""}</div>
     </div>
   );
 }

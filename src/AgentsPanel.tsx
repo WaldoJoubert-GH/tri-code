@@ -10,11 +10,12 @@ import { hotkeyKeys, hotkeyProblem, launchAgent, looksLikeUrl, nameProblem, newA
 import { normalizeUrl } from "./browsers";
 import { Icon, toggleIconPicker } from "./lucide";
 import { flash, showToast } from "./ui";
+import { modDown, modLabel } from "./modkey";
 import "./agents.css";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph"]);
 
-/** Click, then press an Alt chord. Backspace clears, Escape (or clicking away) cancels. */
+/** Click, then press a modifier chord. Backspace clears, Escape (or clicking away) cancels. */
 function HotkeyField(props: { agent: Agent }) {
   const on = () => recording() === props.agent.id;
   const onKey = (e: KeyboardEvent) => {
@@ -28,7 +29,7 @@ function HotkeyField(props: { agent: Agent }) {
       return setRecording(null);
     }
     if (MODIFIERS.has(e.key)) return;
-    if (!e.altKey) return flash("hotkeys start with Alt, so plain keys and Ctrl chords still reach the terminal");
+    if (!modDown(e)) return flash(`hotkeys start with ${modLabel()}, so plain keys and Ctrl chords still reach the terminal`);
     updateAgent(props.agent.id, { hotkey: { code: e.code, ...(e.shiftKey ? { shift: true } : {}), ...(e.ctrlKey ? { ctrl: true } : {}) } });
     setRecording(null);
   };
@@ -36,12 +37,12 @@ function HotkeyField(props: { agent: Agent }) {
     <button
       class="ag-hk"
       classList={{ rec: on(), bad: !!hotkeyProblem(props.agent) }}
-      title={on() ? "Press Alt + a key · Backspace clears · Esc cancels" : "Click, then press a chord"}
+      title={on() ? `Press ${modLabel()} + a key · Backspace clears · Esc cancels` : "Click, then press a chord"}
       onClick={() => setRecording(on() ? null : props.agent.id)}
       onKeyDown={onKey}
       onBlur={() => on() && setRecording(null)}
     >
-      <Show when={!on()} fallback={<span>press Alt + a key…</span>}>
+      <Show when={!on()} fallback={<span>press {modLabel()} + a key…</span>}>
         <Show when={props.agent.hotkey} fallback={<span>no hotkey</span>}>
           {(h) => <For each={hotkeyKeys(h())}>{(k) => <kbd>{k}</kbd>}</For>}
         </Show>
@@ -229,7 +230,7 @@ export default function AgentsPanel(props: { project: Project }) {
         <p class="ag-note">
           Commands run in the project folder on the project's host (over ssh for remote projects); an empty command is your
           login shell. A URL (<code>localhost:5173</code>, <code>https://…</code>) makes a web app that opens a browser window
-          instead; “app” hides its address bar. Editing a command or URL changes new windows only. Hotkeys start with Alt, so
+          instead; “app” hides its address bar. Editing a command or URL changes new windows only. Hotkeys start with {modLabel()}, so
           plain keys and Ctrl chords keep reaching the terminal. The list is shared by every project.
         </p>
       </div>

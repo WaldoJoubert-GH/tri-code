@@ -13,6 +13,7 @@ import { hotkeyProblem, hotkeyText, launchAgent, openAgentsPanel } from "./agent
 import { Icon } from "./lucide";
 import { SIG_TEXT, sigOf } from "./signals";
 import { flash } from "./ui";
+import { keyOf } from "./keymap";
 
 /** Glyphs of the windows that aren't terminals (those show their agent's icon). A `file`
  *  window shows the file name as its label, so it shares the files glyph. */
@@ -21,12 +22,12 @@ const GLYPH: Record<Exclude<TabKind, "term">, string> = {
 };
 
 /** The panels the New window menu offers under the agents, with the key that also opens one. */
-const PANELS: { kind: Exclude<TabKind, "term" | "file">; key: string }[] = [
-  { kind: "browser", key: "Alt+B" },
-  { kind: "issues", key: "Alt+I" },
-  { kind: "files", key: "Alt+E" },
-  { kind: "git", key: "Alt+C" },
-  { kind: "agents", key: "Alt+;" },
+const PANELS: { kind: Exclude<TabKind, "term" | "file">; /** The Keymap action that also opens it. */ key: string }[] = [
+  { kind: "browser", key: "browser" },
+  { kind: "issues", key: "issues" },
+  { kind: "files", key: "files" },
+  { kind: "git", key: "git" },
+  { kind: "agents", key: "agents" },
 ];
 
 /** What the strip shows for a window. `file` windows are named by their file. */
@@ -123,7 +124,7 @@ export function TabMenu() {
                   >
                     <span class="glyph" aria-hidden="true">{GLYPH[k.kind]}</span>
                     {k.kind}
-                    <kbd>{k.key}</kbd>
+                    <Show when={keyOf(k.key)}>{(t) => <kbd>{t()}</kbd>}</Show>
                   </button>
                 )}
               </For>

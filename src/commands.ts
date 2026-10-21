@@ -10,8 +10,8 @@ import { requestClose } from "./Canvas";
 import { openAppearance, toggleAppearance } from "./Appearance";
 import { nextSignal, toggleDnd } from "./signals";
 import { toggleSignals } from "./SignalSettings";
-import { toggleSettings } from "./Settings";
-import { setHelpOpen } from "./Help";
+import { openSettings, toggleSettings } from "./Settings";
+import { capsOf } from "./keymap";
 import { setAboutOpen } from "./About";
 import { openProjectDialog } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
@@ -115,65 +115,65 @@ export function commands(): Command[] {
         run: () => launchAgent(p, a),
       });
     }
-    add({ id: "term-like", group: "New", title: "New terminal like this one", icon: "copy-plus", keys: ["Alt", "Enter"], run: () => newTerminalLike(p, f) });
-    add({ id: "browser", group: "New", title: "New browser", icon: "globe", keys: ["Alt", "B"], run: () => { addTab(p.id, "browser"); flash("new browser"); } });
-    add({ id: "issues", group: "New", title: "Issues", icon: "list-todo", keys: ["Alt", "I"], run: () => openIssuePanel(p) });
-    add({ id: "files", group: "New", title: "Files", icon: "folder-tree", keys: ["Alt", "E"], run: () => void openFilesPanel(p) });
-    add({ id: "git", group: "New", title: "Git", icon: "git-branch", keys: ["Alt", "C"], run: () => void openGitPanel(p) });
-    add({ id: "agents", group: "New", title: "Agents", hint: "edit the + menu", icon: "settings-2", keys: ["Alt", ";"], run: () => void openAgentsPanel(p) });
-    add({ id: "go-to-file", group: "New", title: "Go to file", icon: "search", keys: ["Alt", "T"], run: openGoToFile });
+    add({ id: "term-like", group: "New", title: "New terminal like this one", icon: "copy-plus", keys: capsOf("term-like"), run: () => newTerminalLike(p, f) });
+    add({ id: "browser", group: "New", title: "New browser", icon: "globe", keys: capsOf("browser"), run: () => { addTab(p.id, "browser"); flash("new browser"); } });
+    add({ id: "issues", group: "New", title: "Issues", icon: "list-todo", keys: capsOf("issues"), run: () => openIssuePanel(p) });
+    add({ id: "files", group: "New", title: "Files", icon: "folder-tree", keys: capsOf("files"), run: () => void openFilesPanel(p) });
+    add({ id: "git", group: "New", title: "Git", icon: "git-branch", keys: capsOf("git"), run: () => void openGitPanel(p) });
+    add({ id: "agents", group: "New", title: "Agents", hint: "edit the + menu", icon: "settings-2", keys: capsOf("agents"), run: () => void openAgentsPanel(p) });
+    add({ id: "go-to-file", group: "New", title: "Go to file", icon: "search", keys: capsOf("go-to-file"), run: openGoToFile });
 
     if (f) {
-      add({ id: "close", group: "Window", title: `Close ${windowTitle(f)}`, icon: "x", keys: ["Alt", "Q"], run: () => requestClose(p.id, f.id) });
+      add({ id: "close", group: "Window", title: `Close ${windowTitle(f)}`, icon: "x", keys: capsOf("close"), run: () => requestClose(p.id, f.id) });
       add({
         id: "maximize", group: "Window", title: space(p).mono === f.id ? `Restore ${windowTitle(f)}` : `Maximize ${windowTitle(f)}`,
-        icon: space(p).mono === f.id ? "minimize-2" : "maximize-2", keys: ["Alt", "F"], run: () => maximize(p, f),
+        icon: space(p).mono === f.id ? "minimize-2" : "maximize-2", keys: capsOf("maximize"), run: () => maximize(p, f),
       });
-      add({ id: "minimise", group: "Window", title: `Minimise ${windowTitle(f)}`, icon: "minus", keys: ["Alt", "N"], run: () => minimise(p, f) });
+      add({ id: "minimise", group: "Window", title: `Minimise ${windowTitle(f)}`, icon: "minus", keys: capsOf("minimise"), run: () => minimise(p, f) });
       if (space(p).layout === "master") {
-        add({ id: "main", group: "Window", title: `Make ${windowTitle(f)} main`, icon: "panel-left", keys: ["Alt", "M"], run: () => makeMain(p, f) });
+        add({ id: "main", group: "Window", title: `Make ${windowTitle(f)} main`, icon: "panel-left", keys: capsOf("main"), run: () => makeMain(p, f) });
       }
       for (let i = 0; i < SPACES; i++) {
         if (i === f.space) continue;
-        add({ id: `send:${i}`, group: "Window", title: `Send ${windowTitle(f)} to workspace ${i + 1}`, icon: "arrow-right-to-line", keys: ["Alt", "Shift", String(i + 1)], run: () => sendWindow(p, f, i) });
+        add({ id: `send:${i}`, group: "Window", title: `Send ${windowTitle(f)} to workspace ${i + 1}`, icon: "arrow-right-to-line", keys: capsOf(`send-${i + 1}`), run: () => sendWindow(p, f, i) });
       }
     }
 
     const lm = lastMinimised(p);
-    if (lm) add({ id: "restore-last", group: "Window", title: `Restore ${windowTitle(lm)}`, hint: "last minimised", icon: "undo-2", keys: ["Alt", "Shift", "N"], run: () => restoreLast(p) });
+    if (lm) add({ id: "restore-last", group: "Window", title: `Restore ${windowTitle(lm)}`, hint: "last minimised", icon: "undo-2", keys: capsOf("restore-last"), run: () => restoreLast(p) });
 
     for (const l of ["master", "grid", "mono"] as const) {
       add({
         id: `layout:${l}`, group: "Layout", title: `Layout: ${LAYOUT_NAMES[l]}`, icon: l === "master" ? "layout-panel-left" : l === "grid" ? "layout-grid" : "rectangle-vertical",
-        hint: space(p).layout === l ? "current" : undefined, keys: ["Alt", "G"], run: () => { setLayout(p.id, l); flash(LAYOUT_NAMES[l]); },
+        hint: space(p).layout === l ? "current" : undefined, keys: capsOf("layout"), run: () => { setLayout(p.id, l); flash(LAYOUT_NAMES[l]); },
       });
     }
-    add({ id: "gap-less", group: "Layout", title: "Less gap", hint: `${app.gap}px now`, icon: "fold-horizontal", keys: ["Alt", ","], run: () => stepGap(-1) });
-    add({ id: "gap-more", group: "Layout", title: "More gap", hint: `${app.gap}px now`, icon: "unfold-horizontal", keys: ["Alt", "."], run: () => stepGap(1) });
+    add({ id: "gap-less", group: "Layout", title: "Less gap", hint: `${app.gap}px now`, icon: "fold-horizontal", keys: capsOf("gap-less"), run: () => stepGap(-1) });
+    add({ id: "gap-more", group: "Layout", title: "More gap", hint: `${app.gap}px now`, icon: "unfold-horizontal", keys: capsOf("gap-more"), run: () => stepGap(1) });
     for (let i = 0; i < SPACES; i++) {
       if (i === p.ws) continue;
       const n = p.tabs.filter((t) => t.space === i).length;
-      add({ id: `ws:${i}`, group: "Layout", title: `Workspace ${i + 1}`, hint: n ? `${n} window${n > 1 ? "s" : ""}` : "empty", icon: "square-stack", keys: ["Alt", String(i + 1)], run: () => workspace(p, i) });
+      add({ id: `ws:${i}`, group: "Layout", title: `Workspace ${i + 1}`, hint: n ? `${n} window${n > 1 ? "s" : ""}` : "empty", icon: "square-stack", keys: capsOf(`ws-${i + 1}`), run: () => workspace(p, i) });
     }
 
-    add({ id: "new-worktree", group: "Project", title: "New worktree", hint: "another checkout of the repo, on its own branch", icon: "git-branch-plus", keys: ["Alt", "W"], run: () => openNewWorktree(p) });
+    add({ id: "new-worktree", group: "Project", title: "New worktree", hint: "another checkout of the repo, on its own branch", icon: "git-branch-plus", keys: capsOf("new-worktree"), run: () => openNewWorktree(p) });
     if (p.parent) add({ id: "remove-worktree", group: "Project", title: `Remove worktree ${branchOf(p)}`, hint: p.path, icon: "trash-2", run: () => void removeWorktree(p) });
-    add({ id: "appearance", group: "Project", title: "Appearance", hint: "name, icon, accent, background", icon: "palette", keys: ["Alt", "P"], run: () => toggleAppearance() });
+    add({ id: "appearance", group: "Project", title: "Appearance", hint: "name, icon, accent, background", icon: "palette", keys: capsOf("appearance"), run: () => toggleAppearance() });
   }
 
-  add({ id: "settings", group: "App", title: "Settings", hint: "opening files, gap between windows", icon: "settings", run: () => toggleSettings() });
-  add({ id: "open-project", group: "Project", title: "Open project", hint: "or add an environment", icon: "folder-open", keys: ["Alt", "O"], run: () => openProjectDialog() });
+  add({ id: "settings", group: "App", title: "Settings", hint: "opening files, windows, hotkeys", icon: "settings", run: () => toggleSettings() });
+  add({ id: "open-project", group: "Project", title: "Open project", hint: "or add an environment", icon: "folder-open", keys: capsOf("open-project"), run: () => openProjectDialog() });
   if (p && app.projects.length > 1) {
-    add({ id: "project-prev", group: "Project", title: "Previous project", icon: "chevron-up", keys: ["Alt", "["], run: () => stepProject(p, -1) });
-    add({ id: "project-next", group: "Project", title: "Next project", icon: "chevron-down", keys: ["Alt", "]"], run: () => stepProject(p, 1) });
+    add({ id: "project-prev", group: "Project", title: "Previous project", icon: "chevron-up", keys: capsOf("project-prev"), run: () => stepProject(p, -1) });
+    add({ id: "project-next", group: "Project", title: "Next project", icon: "chevron-down", keys: capsOf("project-next"), run: () => stepProject(p, 1) });
   }
-  add({ id: "next-signal", group: "Signals", title: "Go to the next agent that needs you", icon: "bell-ring", keys: ["Alt", "U"], run: nextSignal });
+  add({ id: "next-signal", group: "Signals", title: "Go to the next agent that needs you", icon: "bell-ring", keys: capsOf("next-signal"), run: nextSignal });
   if (p) add({ id: "signals", group: "Signals", title: `Signals and sounds for ${p.name}`, hint: "a sound per signal, when to alert", icon: "bell", run: () => openAppearance(null, p.id, "signals") });
   add({ id: "bell", group: "Signals", title: "Signals and sounds for every project", icon: "bell-dot", run: () => toggleSignals() });
   add({ id: "dnd", group: "Signals", title: app.notify.dnd ? "Turn off Do not disturb" : "Do not disturb", hint: "badges only", icon: app.notify.dnd ? "bell" : "bell-off", run: toggleDnd });
-  add({ id: "sidebar", group: "App", title: app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar", icon: "panel-left-close", keys: ["Alt", "S"], run: toggleSidebar });
+  add({ id: "sidebar", group: "App", title: app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar", icon: "panel-left-close", keys: capsOf("sidebar"), run: toggleSidebar });
   add({ id: "tour", group: "App", title: "Take the tour", hint: "a sample project and eight stops", icon: "map", run: () => void startTour() });
-  add({ id: "help", group: "App", title: "Hotkeys", icon: "keyboard", keys: ["Alt", "/"], run: () => setHelpOpen(true) });
+  add({ id: "help", group: "App", title: "Hotkeys", icon: "keyboard", keys: capsOf("help"), run: () => openSettings("hotkeys") });
   const u = updateReady();
   if (u) add({ id: "update", group: "App", title: `Restart to update to ${u.version}`, icon: "refresh-cw", run: installUpdate });
   else add({ id: "check-updates", group: "App", title: "Check for updates", hint: `v${appVersion}`, icon: "refresh-cw", run: checkForUpdates });

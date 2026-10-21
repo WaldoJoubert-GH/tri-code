@@ -1,12 +1,12 @@
-// Window hotkeys. Every binding starts with Alt and is matched on e.code, so plain keys,
-// Ctrl chords and terminal input keep reaching xterm. Listens in the capture phase so
-// handled keys never reach the terminal.
+// Window hotkeys. Every binding is a Hotkey Modifier chord (Alt unless Settings makes it Cmd, see
+// modkey.ts) from the Keymap (keymap.ts), matched on e.code, so plain keys, Ctrl chords and
+// terminal input keep reaching xterm. Listens in the capture phase so handled keys never reach
+// the terminal.
 
 import { Project, Tab, activeProject, addTab, canvasTabs, focusedTab, setRatio, space } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
-import { closeSettings, settingsOpen } from "./Settings";
-import { helpOpen, setHelpOpen } from "./Help";
+import { closeSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
@@ -24,144 +24,140 @@ import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, ste
 import { nextSignal } from "./signals";
 import { closeSignals, signalsOpen } from "./SignalSettings";
 import { flash } from "./ui";
+import { hasSelection } from "./terms";
+import { actionFor } from "./keymap";
 
-/**
- * Keys `run` binds, with what they do. They are taken with any Shift/Ctrl combination (the
- * switch below ignores those), so an agent can't be given one; keep in step with `run`.
- */
-export const RESERVED: Record<string, string> = {
-  KeyH: "focus left", KeyJ: "focus down", KeyK: "focus up", KeyL: "focus right",
-  ArrowLeft: "focus left", ArrowRight: "focus right", ArrowUp: "focus up", ArrowDown: "focus down",
-  Digit1: "workspace 1", Digit2: "workspace 2", Digit3: "workspace 3", Digit4: "workspace 4",
-  Enter: "new terminal like this one", NumpadEnter: "new terminal like this one", KeyB: "new browser",
-  KeyI: "issues", KeyE: "files", KeyT: "go to file", KeyC: "git", KeyQ: "close window", KeyF: "maximize", KeyN: "minimise", KeyM: "make main",
-  KeyG: "switch layout", Comma: "less gap", Period: "more gap", Slash: "hotkey help", KeyS: "sidebar",
-  KeyP: "appearance", BracketLeft: "previous project", BracketRight: "next project", KeyO: "open project",
-  Semicolon: "agents", KeyX: "command palette", KeyU: "next agent that needs you", KeyW: "new worktree",
-};
+const DIRS: Record<string, [number, number]> = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
 
-const DIRS: Record<string, [number, number]> = {
-  KeyH: [-1, 0], ArrowLeft: [-1, 0],
-  KeyL: [1, 0], ArrowRight: [1, 0],
-  KeyK: [0, -1], ArrowUp: [0, -1],
-  KeyJ: [0, 1], ArrowDown: [0, 1],
-};
+/** With Cmd as the modifier, Cmd+C and Cmd+X copy and cut while text is selected. */
+function textChord(e: KeyboardEvent, f: Tab | undefined): boolean {
+  if (!e.metaKey || e.shiftKey || e.ctrlKey || (e.code !== "KeyC" && e.code !== "KeyX")) return false;
+  const el = document.activeElement;
+  const field = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el.selectionStart !== el.selectionEnd : false;
+  return field || !!window.getSelection()?.toString() || (!!f && hasSelection(f.id));
+}
 
-/** Handle one Alt chord for the active project. Returns true if it was a bound key. */
-function run(e: KeyboardEvent, p: Project, f: Tab | undefined): boolean {
-  const d = DIRS[e.code];
-  if (d) {
-    if (e.ctrlKey) {
-      if (d[0] === 0) {
-        flash("stack windows share height equally");
-      } else if (space(p).layout !== "master" || canvasTabs(p).length < 2) {
-        flash("only Main + stack has a resizable split");
-      } else {
-        const ratio = Math.min(0.8, Math.max(0.2, space(p).ratio + d[0] * 0.05));
-        setRatio(p.id, ratio);
-        flash(`main ${Math.round(ratio * 100)}%`);
-      }
-    } else if (e.shiftKey) {
-      if (!swapDir(p, d[0], d[1])) flash("nothing to swap with that way");
-    } else if (!focusDir(p, d[0], d[1])) {
-      flash("no window that way");
+/** Run one Keymap action for the active project. Returns false to let the key through. */
+function run(id: string, p: Project, f: Tab | undefined): boolean {
+  const [verb, arg] = id.split("-");
+  const d = DIRS[arg];
+  if (verb === "focus" && d) {
+    if (!focusDir(p, d[0], d[1])) flash("no window that way");
+    return true;
+  }
+  if (verb === "swap" && d) {
+    if (!swapDir(p, d[0], d[1])) flash("nothing to swap with that way");
+    return true;
+  }
+  if (verb === "split" && d) {
+    if (space(p).layout !== "master" || canvasTabs(p).length < 2) {
+      flash("only Main + stack has a resizable split");
+    } else {
+      const ratio = Math.min(0.8, Math.max(0.2, space(p).ratio + d[0] * 0.05));
+      setRatio(p.id, ratio);
+      flash(`main ${Math.round(ratio * 100)}%`);
     }
     return true;
   }
-
-  if (/^Digit[1-4]$/.test(e.code)) {
-    const i = Number(e.code.slice(5)) - 1;
-    if (!e.shiftKey) workspace(p, i);
-    else if (!f) flash("no window to send");
-    else sendWindow(p, f, i);
+  if (verb === "ws") {
+    workspace(p, Number(arg) - 1);
+    return true;
+  }
+  if (verb === "send") {
+    if (!f) flash("no window to send");
+    else sendWindow(p, f, Number(arg) - 1);
     return true;
   }
 
-  switch (e.code) {
-    case "Enter":
-    case "NumpadEnter":
+  switch (id) {
+    case "term-like":
       newTerminalLike(p, f);
       return true;
-    case "KeyB":
+    case "browser":
       addTab(p.id, "browser");
       flash("new browser");
       return true;
-    case "KeyI":
+    case "issues":
       openIssuePanel(p);
       return true;
-    case "KeyE":
+    case "files":
       openFilesPanel(p);
       return true;
-    case "KeyT":
+    case "go-to-file":
       toggleGoToFile();
       return true;
-    case "KeyC":
+    case "git":
       openGitPanel(p);
       return true;
-    case "Semicolon":
+    case "agents":
       openAgentsPanel(p);
       return true;
-    case "KeyQ":
+    case "close":
       if (!f) return false;
       requestClose(p.id, f.id);
       return true;
-    case "KeyF":
+    case "maximize":
       if (!f) return false;
       maximize(p, f);
       return true;
-    case "KeyN":
-      if (e.shiftKey) restoreLast(p);
-      else if (!f) return false;
-      else minimise(p, f);
+    case "minimise":
+      if (!f) return false;
+      minimise(p, f);
       return true;
-    case "KeyM":
+    case "restore-last":
+      restoreLast(p);
+      return true;
+    case "main":
       if (!f) return false;
       makeMain(p, f);
       return true;
-    case "KeyG":
+    case "layout":
       cycleLayout(p);
       return true;
-    case "Comma":
-    case "Period":
-      stepGap(e.code === "Period" ? 1 : -1);
+    case "gap-less":
+    case "gap-more":
+      stepGap(id === "gap-more" ? 1 : -1);
       return true;
-    case "Slash":
-      setHelpOpen(!helpOpen());
+    case "help":
+      toggleHotkeys();
       return true;
-    case "KeyS":
+    case "sidebar":
       toggleSidebar();
       return true;
-    case "KeyP":
+    case "appearance":
       toggleAppearance();
       return true;
-    case "KeyU":
+    case "next-signal":
       nextSignal();
       return true;
-    case "KeyW":
+    case "new-worktree":
       if (newWorktreeOpen()) closeNewWorktree();
       else openNewWorktree(p);
       return true;
-    case "BracketLeft":
-    case "BracketRight":
-      stepProject(p, e.code === "BracketRight" ? 1 : -1);
+    case "project-prev":
+    case "project-next":
+      stepProject(p, id === "project-next" ? 1 : -1);
       return true;
-    default: {
-      const a = agentForKey(e);
-      if (!a) return false;
-      launchAgent(p, a);
-      return true;
-    }
   }
+  return false;
+}
+
+/** Actions that work with no project yet: they are how the first one is opened. */
+function runAnywhere(id: string): boolean {
+  if (id === "palette") togglePalette();
+  else if (id === "open-project") openProjectOpen() ? closeOpenProject() : openProjectDialog();
+  else if (id === "help") toggleHotkeys();
+  else return false;
+  return true;
 }
 
 function onKey(e: KeyboardEvent) {
-  // The agents window is recording a hotkey: the chord (and Escape) are its to take.
+  // The agents window or Settings is recording a hotkey: the chord (and Escape) are its to take.
   if (recording()) return;
   // Escape closes the overlays first; it is never bound on its own.
   if (e.code === "Escape" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     if (iconPickerOpen()) closeIconPicker();
     else if (paletteOpen()) closePalette();
-    else if (helpOpen()) setHelpOpen(false);
     else if (aboutOpen()) setAboutOpen(false);
     else if (openProjectOpen()) closeOpenProject();
     else if (newWorktreeOpen()) closeNewWorktree();
@@ -178,19 +174,20 @@ function onKey(e: KeyboardEvent) {
     return;
   }
 
-  if (!e.altKey) return;
-  // Alt+O and Alt+X work with no project yet: they are how the first one is opened.
-  if ((e.code === "KeyO" || e.code === "KeyX") && !e.ctrlKey && !e.shiftKey) {
-    if (e.code === "KeyX") togglePalette();
-    else if (openProjectOpen()) closeOpenProject();
-    else openProjectDialog();
-    e.preventDefault();
-    e.stopPropagation();
-    return;
-  }
   const p = activeProject();
-  if (!p) return;
-  if (run(e, p, focusedTab(p))) {
+  const f = p && focusedTab(p);
+  if (textChord(e, f)) return;
+  const id = actionFor(e);
+  let done = false;
+  if (id) done = runAnywhere(id) || (!!p && run(id, p, f));
+  else if (p) {
+    const a = agentForKey(e);
+    if (a) {
+      launchAgent(p, a);
+      done = true;
+    }
+  }
+  if (done) {
     e.preventDefault();
     e.stopPropagation();
   }

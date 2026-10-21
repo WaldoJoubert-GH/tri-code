@@ -4,8 +4,10 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type TabKind = "term" | "browser" | "issues" | "files" | "file" | "git" | "agents";
 
-/** An Alt chord, matched on e.code like every window binding. Alt is implied. */
+/** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
+/** A key of a Keymap action: a Hotkey, or with `bare` a plain Ctrl / Cmd (`meta`) chord, as the text keys are. */
+export type Chord = Hotkey & { meta?: boolean; bare?: boolean };
 
 /** An app the New Window Menu offers: a terminal app (claude, pi, a shell, lazygit, ...) or, with a
  *  `url`, a web app that opens a browser window there. Global, not per project. */
@@ -218,9 +220,13 @@ export type Settings = {
   /** Carousel (mono) layout: px each side of the centred window, where its neighbours peek.
    *  Unset is auto: the window takes 62% of the width, up to MONO_MAX. */
   monoGutter?: number;
+  /** The key window hotkeys start with (modkey.ts). */
+  modKey: "alt" | "meta";
+  /** Keymap actions whose keys were changed, by action id (keymap.ts); the rest keep their defaults. */
+  hotkeys?: Record<string, Chord[]>;
 };
 
-const defaultSettings = (): Settings => ({ fileOpen: "ask" });
+const defaultSettings = (): Settings => ({ fileOpen: "ask", modKey: "alt" });
 
 export type TabStatus = "connecting" | "running" | "reconnecting" | "exited";
 
@@ -666,6 +672,16 @@ export function setFileTab(projectId: string, tabId: string, patch: Pick<Tab, "p
 
 export function setSettings(patch: Partial<Settings>) {
   setApp(produce((s) => Object.assign(s.settings, patch)));
+}
+
+/** Change an action's keys; undefined goes back to its defaults. */
+export function setHotkeys(id: string, keys: Chord[] | undefined) {
+  setApp(produce((s) => {
+    const h = (s.settings.hotkeys ??= {});
+    if (keys) h[id] = keys;
+    else delete h[id];
+    if (!Object.keys(h).length) delete s.settings.hotkeys;
+  }));
 }
 
 export function addAgent(agent: Agent) {

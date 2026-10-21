@@ -5,6 +5,8 @@
 // those events. Use the async Clipboard API directly instead; it still works in
 // the webview.
 
+import { isKey } from "./keymap";
+
 /** Copy text to the system clipboard. Fails quietly when unavailable. */
 export function copyText(text: string): void {
   if (!text) return;
@@ -64,13 +66,13 @@ export function installClipboardFallback(): void {
     if (e.altKey || !(e.ctrlKey || e.metaKey)) return;
     const target = e.target as HTMLElement | null;
     if (target?.closest?.(".xterm")) return; // xterm handles its own keys
-    if (e.code === "KeyC") {
+    if (isKey("copy", e)) {
       const text = selectedText(target);
       if (text) {
         e.preventDefault();
         copyText(text);
       }
-    } else if (e.code === "KeyV" && editable(target)) {
+    } else if (isKey("paste", e) && editable(target)) {
       e.preventDefault();
       readText().then((text) => {
         if (text) document.execCommand("insertText", false, text);
