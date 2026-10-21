@@ -83,7 +83,8 @@ export default function FileList(props: { project: Project; tab: Tab; focused: b
     else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); move(i - 1); }
     else if (e.key === "ArrowRight" || e.key === "l") { if (at?.dir && !isOpen(at.path)) toggle(at.path); }
     else if (e.key === "ArrowLeft" || e.key === "h") { if (at?.dir && isOpen(at.path)) toggle(at.path); }
-    else if (e.key === "Enter") { if (at) at.dir ? toggle(at.path) : openFile(props.project, at.path, props.tab.id); }
+    // Ctrl+Enter (like Ctrl+click) opens a new file window instead of reusing the last one
+    else if (e.key === "Enter") { if (at) at.dir ? toggle(at.path) : openFile(props.project, at.path, props.tab.id, e.ctrlKey || e.metaKey); }
   };
 
   const where = () => `${isRemote(props.project) ? `${props.project.host}:` : ""}${props.project.path}`;
@@ -107,7 +108,7 @@ export default function FileList(props: { project: Project; tab: Tab; focused: b
           const path = el.dataset.path!;
           setSel(path);
           if (el.dataset.dir === "1") toggle(path);
-          else openFile(props.project, path, props.tab.id);
+          else openFile(props.project, path, props.tab.id, e.ctrlKey || e.metaKey);
         }}
       >
         <Show
