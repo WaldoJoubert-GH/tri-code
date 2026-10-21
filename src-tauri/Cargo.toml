@@ -21,6 +21,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
 ureq = { version = "3", features = ["json", "multipart"] }
 base64 = "0.22"
+sha2 = "0.10"
 
 # Dev builds: keep link time and memory low (4 GB build machines).
 [profile.dev]

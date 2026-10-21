@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use tauri::ipc::{Channel, InvokeResponseBody};
 
+use crate::envssh;
 use crate::spawn::{self, SpawnSpec};
 
 struct Session {
@@ -56,6 +57,9 @@ pub async fn pty_spawn(
     on_data: Channel<InvokeResponseBody>,
     on_exit: Channel<i32>,
 ) -> Result<u32, String> {
+    if let Some(host) = spec.host.as_deref().filter(|h| !matches!(*h, "" | "local")) {
+        envssh::check(host)?;
+    }
     let prog = spawn::build(&spec);
     // portable-pty silently falls back to the home dir for a missing cwd.
     if let Some(cwd) = &prog.cwd
@@ -146,6 +150,7 @@ pub async fn remote_kill_session(host: String, session: String) -> Result<(), St
 }
 
 fn kill_remote_blocking(host: &str, session: &str) -> Result<(), String> {
+    envssh::check(host)?;
     let prog = spawn::kill_remote(host, session);
     let mut cmd = std::process::Command::new(&prog.program);
     cmd.args(&prog.args)

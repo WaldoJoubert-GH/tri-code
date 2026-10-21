@@ -7,10 +7,14 @@
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
-/// `ssh` Command that runs `script` on `host` with no TTY and no prompts.
+use crate::envssh;
+
+/// `ssh` Command that runs `script` on `host` with no TTY and no prompts. Callers
+/// check `envssh::check` first: `run*` here do, and so does git.rs.
 pub fn command(host: &str, script: &str) -> Command {
     let mut cmd = Command::new("ssh");
     cmd.args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=5"])
+        .args(envssh::args(host))
         .arg(host)
         .arg(script)
         .stdin(Stdio::null());
@@ -31,12 +35,14 @@ pub fn run(host: &str, script: &str) -> Result<String, String> {
 
 /// Run `script` and return raw stdout bytes, for a file that may be binary.
 pub fn run_bytes(host: &str, script: &str) -> Result<Vec<u8>, String> {
+    envssh::check(host)?;
     let out = command(host, script).output().map_err(|e| format!("ssh: {e}"))?;
     checked(out, host)
 }
 
 /// Run `script`, feeding `input` on stdin (used to write a file remotely).
 pub fn run_stdin(host: &str, script: &str, input: &[u8]) -> Result<String, String> {
+    envssh::check(host)?;
     let mut cmd = command(host, script);
     cmd.stdin(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| format!("ssh: {e}"))?;

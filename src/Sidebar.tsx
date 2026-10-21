@@ -14,6 +14,7 @@ import { openProjectDialog } from "./OpenProject";
 import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
 import { branchOf, loadWorktrees, openNewWorktree, removeWorktree, tileLabel } from "./worktrees";
 import { flash } from "./ui";
+import { envLocked, lockEnv } from "./envlock";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
 const FULL = 220;
@@ -103,7 +104,7 @@ export default function Sidebar() {
   // Branch names come from `git worktree list`; ask again whenever a repo's set of Worktrees changes.
   createEffect(() => {
     for (const p of app.projects) {
-      if (!p.parent && worktreesOf(p.id).length) void loadWorktrees(p);
+      if (!p.parent && worktreesOf(p.id).length && !envLocked(p.host)) void loadWorktrees(p);
     }
   });
 
@@ -121,6 +122,8 @@ export default function Sidebar() {
     if (ps.length && !confirm(`Remove environment "${envName(host)}", its ${ps.length} project(s) and ${tabs} tab(s)?`)) return;
     ps.forEach(dropProject);
     removeEnvironment(host);
+    void invoke("env_ssh_set", { host, ssh: null });
+    void invoke("env_forget_lock", { host });
   };
 
   /** Active Plane issues per State, in Plane's colours (the pi-todos widget). */
@@ -176,6 +179,21 @@ export default function Sidebar() {
                 }
               >
                 <RenameInput value={envName(host)} placeholder={host} save={(name) => setEnvStyle(host, { name })} done={() => setRenaming(null)} />
+              </Show>
+              <Show when={app.envLocks[host]}>
+                <button
+                  class="env-lock"
+                  classList={{ on: envLocked(host) }}
+                  title={envLocked(host) ? "Locked: open a project to enter the PIN" : "Unlocked: click to lock now"}
+                  aria-label={envLocked(host) ? `${envName(host)} is locked` : `Lock ${envName(host)}`}
+                  onClick={() => {
+                    if (!envLocked(host)) return void lockEnv(host);
+                    const first = app.projects.find((p) => p.host === host);
+                    if (first) setApp("activeProject", first.id);
+                  }}
+                >
+                  <Icon name={envLocked(host) ? "lock" : "lock-open"} size={12} />
+                </button>
               </Show>
               <button class="env-add" title={`Open a project on ${host}`} aria-label={`Open a project on ${host}`} onClick={() => openProjectDialog(host)}>+</button>
               <button class="env-x" title="Remove environment" aria-label={`Remove environment ${host}`} onClick={() => removeEnv(host)}>×</button>

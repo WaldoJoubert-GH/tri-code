@@ -3,6 +3,7 @@ mod browser;
 mod devfs;
 mod dirs;
 mod envs;
+mod envssh;
 mod fs;
 mod git;
 mod plane;
@@ -52,6 +53,11 @@ pub fn run() {
             dirs::list_dirs,
             envs::ssh_hosts,
             envs::scan_logos,
+            envssh::env_ssh_set,
+            envssh::env_pin_hash,
+            envssh::env_lock,
+            envssh::env_unlock,
+            envssh::env_forget_lock,
             fs::list_files,
             fs::read_file,
             fs::read_image,

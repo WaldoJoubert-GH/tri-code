@@ -7,6 +7,8 @@
 
 use serde::Deserialize;
 
+use crate::envssh;
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpawnSpec {
@@ -94,9 +96,11 @@ fn ssh(host: &str, spec: &SpawnSpec) -> Program {
             "ServerAliveInterval=10".into(),
             "-o".into(),
             "ServerAliveCountMax=3".into(),
-            host.into(),
-            remote,
-        ],
+        ]
+        .into_iter()
+        .chain(envssh::args(host))
+        .chain([host.into(), remote])
+        .collect(),
         cwd: None,
     }
 }
@@ -114,9 +118,11 @@ pub fn kill_remote(host: &str, session: &str) -> Program {
             "BatchMode=yes".into(),
             "-o".into(),
             "ConnectTimeout=5".into(),
-            host.into(),
-            format!("exec \"${{SHELL:-/bin/sh}}\" -lc {}", sq(&inner)),
-        ],
+        ]
+        .into_iter()
+        .chain(envssh::args(host))
+        .chain([host.into(), format!("exec \"${{SHELL:-/bin/sh}}\" -lc {}", sq(&inner))])
+        .collect(),
         cwd: None,
     }
 }

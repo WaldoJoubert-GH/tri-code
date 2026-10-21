@@ -26,6 +26,7 @@ import { GoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./Tour";
 import { ensureSession, setLinkHandler } from "./terms";
+import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { appVersion, installUpdate, startUpdateChecks, updateReady } from "./updater";
 import {
@@ -50,6 +51,7 @@ export default function App() {
     // After a webview reload, PTYs from the previous page are unreachable.
     await invoke("pty_kill_all");
     await loadState();
+    await syncEnvs();
     for (const p of app.projects) {
       if (p.bg !== "image") continue;
       invoke<string | null>("bg_load", { projectId: p.id })
@@ -71,6 +73,7 @@ export default function App() {
   createEffect(() => {
     if (!ready()) return;
     for (const p of app.projects) {
+      if (envLocked(p.host)) continue; // they start once it is unlocked
       for (const t of p.tabs) {
         if (!isTerminal(t) || started.has(t.id)) continue;
         started.add(t.id);
@@ -88,7 +91,7 @@ export default function App() {
   createEffect(() => {
     if (!ready()) return;
     const p = activeProject();
-    const r = p && repoOf(p);
+    const r = p && !envLocked(p.host) && repoOf(p);
     if (r && !untrack(() => dev[r.id]?.loaded)) untrack(() => loadDev(r));
   });
 
@@ -108,7 +111,7 @@ export default function App() {
       <div class="stage">
         <div class="bg" style={backdrop()} />
         <Show when={activeProject()} keyed fallback={<div class="empty">Open a project (Alt+O) to get started.</div>}>
-          {(p) => <Canvas project={p} />}
+          {(p) => <Show when={!envLocked(p.host)} fallback={<PinPad host={p.host} />}><Canvas project={p} /></Show>}
         </Show>
         <Show when={toast()}>
           {(t) => (

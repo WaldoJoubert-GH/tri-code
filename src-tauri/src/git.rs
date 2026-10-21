@@ -73,12 +73,13 @@ fn line(program: &str, args: &[&str]) -> String {
     std::iter::once(program).chain(args.iter().copied()).map(sq).collect::<Vec<_>>().join(" ")
 }
 
-/// `program args` in `path` on `host`.
-fn command(host: &str, path: &str, program: &str, args: &[&str]) -> Command {
+/// `program args` in `path` on `host`. Err while the host is locked.
+fn command(host: &str, path: &str, program: &str, args: &[&str]) -> Result<Command, String> {
     if !matches!(host, "" | "local") {
+        crate::envssh::check(host)?;
         let inner = format!("cd {} && {}", remote_path(path), line(program, args));
         let script = if needs_login(program) { format!("exec \"${{SHELL:-/bin/sh}}\" -lc {}", sq(&inner)) } else { inner };
-        return remote::command(host, &script);
+        return Ok(remote::command(host, &script));
     }
     let mut cmd = if cfg!(windows) {
         // claude is a .cmd shim on Windows; git and gh are real executables.
@@ -105,7 +106,7 @@ fn command(host: &str, path: &str, program: &str, args: &[&str]) -> Command {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    cmd
+    Ok(cmd)
 }
 
 /// Run to completion, feeding `input` on stdin. Exit codes in `also_ok` count as success
@@ -136,7 +137,7 @@ fn run(mut cmd: Command, input: Option<String>, also_ok: &[i32]) -> Result<Strin
 }
 
 fn exec(host: &str, path: &str, program: &str, args: &[&str], input: Option<String>) -> Result<String, String> {
-    run(command(host, path, program, args), input, &[])
+    run(command(host, path, program, args)?, input, &[])
 }
 
 /// Several read-only git commands. Locally each is its own process; remotely they share one
@@ -145,7 +146,7 @@ fn multi(host: &str, path: &str, cmds: &[&[&str]]) -> Result<Vec<Result<String, 
     if matches!(host, "" | "local") {
         return Ok(cmds
             .iter()
-            .map(|args| run(command(host, path, "git", args), None, &[]).map_err(|_| 1))
+            .map(|args| command(host, path, "git", args).and_then(|c| run(c, None, &[])).map_err(|_| 1))
             .collect());
     }
     Ok(split_multi(&remote::run(host, &multi_script(path, cmds))?))
@@ -285,7 +286,7 @@ pub async fn git_diff(host: String, path: String, file: Option<String>, staged: 
         if untracked {
             let f = file.unwrap_or_default();
             let args = ["diff", "--no-color", "--no-index", "--", "/dev/null", f.as_str()];
-            return run(command(&host, &path, "git", &args), None, &[1]);
+            return run(command(&host, &path, "git", &args)?, None, &[1]);
         }
         let mut args = vec!["diff", "--no-color"];
         if staged {
@@ -629,7 +630,7 @@ mod tests {
         parse_status(r[0].as_ref().unwrap(), &mut s);
         assert_eq!(s.files, vec![Change { path: "it's.txt".into(), x: "?".into(), y: "?".into() }]);
 
-        let diff = run(command("local", p, "git", &["diff", "--no-color", "--no-index", "--", "/dev/null", "it's.txt"]), None, &[1]).unwrap();
+        let diff = run(command("local", p, "git", &["diff", "--no-color", "--no-index", "--", "/dev/null", "it's.txt"]).unwrap(), None, &[1]).unwrap();
         assert!(diff.contains("+hi"));
 
         // Go to File's index: untracked files count, ignored ones do not

@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tri-code · ssh env + PIN prototype</title>
+<!--
+  PROTOTYPE: throwaway. The app does not import it. Open the file directly in a browser
+  (or visit /design/ssh-env.html on the dev server).
+
+  Question: "This didn't work when I tried to add it as an environment:
+      ssh -i '.\OneDrive - Firmlinx (PTY) Ltd\.Keys\firmlinx.pem' azureuser@102.133.171.65
+  How should an ssh environment take a key file, and what should a PIN lock on an
+  environment look like?"
+
+  Why it fails today (real code, not mocked):
+  - EnvForm (src/OpenProject.tsx) takes one string, `alias or user@host`. Nothing can
+    carry `-i <key>`, and pasting the whole command makes `ssh -i ... ssh` the destination.
+  - Every ssh call, in remote.rs command(), spawn.rs ssh() and kill_remote(), builds
+    `ssh [opts] <host> ...` with no identity file and `BatchMode=yes`. So the server only
+    sees ~/.ssh/id_* and answers "Permission denied (publickey)". No prompt can appear.
+  - Second trap on Windows: OpenSSH refuses a key that other users can read
+    ("UNPROTECTED PRIVATE KEY FILE"), and keys synced by OneDrive usually inherit loose
+    ACLs. The fix is icacls: remove inheritance and grant only the current user R.
+    (Checked 2026-10-21: firmlinx.pem has only SYSTEM, Administrators and the owner, which
+    OpenSSH accepts. So the missing -i is the whole cause here. The ACL path stays in
+    the mock for keys that do have loose ACLs.)
+  The workaround that works today: add a Host block to ~/.ssh/config
+      Host firmlinx-azure
+        HostName 102.133.171.65
+        User azureuser
+        IdentityFile "~/OneDrive - Firmlinx (PTY) Ltd/.Keys/firmlinx.pem"
+        IdentitiesOnly yes
+  then pick `firmlinx-azure` from the chips in New environment.
+
+  Shared across all variants:
+  - Paste parsing: the field accepts a whole `ssh ...` command. -i becomes the key file,
+    -p the port, -l the user, other -o options are kept, and the rest is the destination.
+  - Mock connection test (500ms): no key → publickey denied; OneDrive key with loose
+    ACL → UNPROTECTED PRIVATE KEY FILE, with a "Fix permissions" button; otherwise ok.
+  - PIN lock: 4–8 digits, stored as a hash (in memory here). While an environment is
+    locked, opening its projects, or any background ssh call to it (git, file index,
+    .dev/ reads), waits for the PIN. Unlock lasts until it relocks: after N idle minutes,
+    on app restart, or from "Lock now". Five wrong PINs → 30 s cooldown.
+    (A PIN like this is a UI gate, not encryption. The key file on disk stays as it is.)
+
+  OUTCOME (settled 2026-10-21): variant A, with lucide icons instead of emoji. It shipped in
+  src/OpenProject.tsx (EnvForm), src/envlock.tsx (PinPad, parseSsh, lock state), Sidebar.tsx
+  (lock button), App.tsx (pad in place of the canvas) and src-tauri/src/envssh.rs.
+  "Relock after N idle minutes" became "N minutes after unlock". There is no Browse button
+  for the key yet (no dialog plugin).
+
+  Three variants, A–C, switchable from the floating bar (← / → keys too).
+  The URL keeps the choice: ssh-env.html?variant=B (served) or ssh-env.html#B (file://).
+  The panel on the right prints the full state after every action.
+
+  A  Inline    — one longer New environment form: paste field, parsed chips, key row, and
+                 a "Lock with PIN" switch that reveals the PIN fields. Unlock = a PIN pad
+                 over the canvas where the terminal would open.
+  B  Steps     — a 3-step flow inside the dialog: Connect → Key → Protect. Each step tests
+                 something before Next. Unlock = a small modal with PIN dots.
+  C  Settings  — adding stays one field (paste). Key, port and PIN live in an
+                 Environment settings sheet (gear on the sidebar section header). Unlock is
+                 inline: the locked section folds to a PIN row and hides its projects.
+
+  How it would land (not built here):
+  - state.ts: `envSsh: Record<host, { identityFile?, port?, user?, options?: string[] }>` and
+    `envLocks: Record<host, { pinHash, salt, relockMin }>` beside envStyles.
+  - Rust: one `ssh_args(host)` used by remote::command, spawn::ssh and kill_remote. It
+    is fed by a `set_env_ssh` command on load and on change, so the call sites keep
+    passing only `host`.
+  - `fix_key_perms(path)` runs icacls on Windows (chmod 600 elsewhere).
+  - PIN check in Rust (argon2/sha256 + salt). The frontend keeps only "unlocked until".
+-->
+<style>
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --scrim: rgba(30,34,44,.35); --shadow: rgba(30,34,44,.22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+    --accent: var(--accent-raw); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+  --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+  --bad: #f7768e; --scrim: rgba(8,9,11,.6); --shadow: rgba(0,0,0,.8);
+  --accent: var(--accent-raw); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 13px/1.4 var(--ui); overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+button:disabled { opacity: .45; cursor: default; }
+input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; outline: none; width: 100%; }
+input:focus { border-color: var(--accent); }
+kbd { font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); }
+code { font: 11.5px var(--mono); }
+
+.app { display: grid; grid-template-columns: 220px 1fr 300px; height: 100vh; }
+aside { background: var(--panel); border-right: 1px solid var(--line); padding: 10px 8px; overflow: auto; }
+aside .head { font-size: 12px; font-weight: 600; color: var(--muted); padding: 2px 6px 10px; display: flex; justify-content: space-between; }
+aside h2 { display: flex; align-items: center; gap: 6px; margin: 10px 0 2px; padding: 2px 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+aside h2 .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+aside h2 button { color: var(--muted); width: 20px; height: 20px; border-radius: 4px; font-size: 12px; }
+aside h2 button:hover { background: var(--hover); color: var(--text); }
+.lockic { font-size: 11px; }
+.lockic.on { color: var(--warn); }
+.lockic.open { color: var(--ok); }
+.project { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 6px 4px 10px; border-radius: 6px; text-align: left; }
+.project:hover { background: var(--hover); }
+.project.active { background: var(--raised); }
+.project .ic { width: 18px; height: 18px; border-radius: 4px; background: var(--accent); color: var(--bg); display: grid; place-items: center; font: 700 10px var(--ui); flex: none; }
+.project.dim { opacity: .5; }
+.add { display: block; width: 100%; text-align: left; color: var(--muted); padding: 8px 6px; margin-top: 10px; border-top: 1px solid var(--line); }
+.add:hover { color: var(--text); }
+.inlock { margin: 4px 6px 6px 10px; display: flex; gap: 6px; align-items: center; }
+.inlock input { font: 13px var(--mono); letter-spacing: .3em; padding: 4px 6px; }
+.inlock .err { color: var(--bad); font-size: 11px; }
+
+main { position: relative; background: var(--canvas); overflow: hidden; display: flex; flex-direction: column; }
+.top { height: 34px; border-bottom: 1px solid var(--line); background: var(--bg); display: flex; align-items: center; padding: 0 12px; gap: 12px; color: var(--muted); }
+.top b { color: var(--text); font-weight: 600; }
+.term { flex: 1; margin: 10px; background: #0b0c0f; color: #c9d1d9; border-radius: 8px; font: 12px/1.5 var(--mono); padding: 12px; overflow: auto; white-space: pre-wrap; }
+.term .p { color: #9ece6a; }
+.empty { flex: 1; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 20px; }
+
+.scrim { position: absolute; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 5; }
+.dlg { width: min(720px, calc(100% - 32px)); max-height: calc(100% - 40px); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 20px 60px -20px var(--shadow); display: grid; grid-template-columns: 180px 1fr; grid-template-rows: auto 1fr; overflow: hidden; }
+.dlg > header { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.dlg nav { background: var(--panel); border-right: 1px solid var(--line); padding: 8px; }
+.dlg nav .mt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 4px 6px; }
+.dlg nav button { display: flex; gap: 6px; width: 100%; padding: 5px 6px; border-radius: 5px; text-align: left; }
+.dlg nav button[aria-pressed="true"] { background: var(--raised); }
+.dlg nav .kind { margin-left: auto; color: var(--muted); font-size: 11px; }
+.pane { padding: 14px 16px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.pane h3 { margin: 0; font-size: 14px; }
+.hint { color: var(--muted); font-size: 12px; }
+.lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: -6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; font: 11.5px var(--mono); background: var(--panel); }
+.chip b { font-weight: 600; color: var(--muted); margin-right: 4px; font-family: var(--ui); }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > input { flex: 1; }
+.btn { border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; background: var(--panel); white-space: nowrap; }
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.btn.warn { border-color: var(--warn); color: var(--warn); }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.test { font: 12px/1.45 var(--mono); padding: 8px 10px; border-radius: 6px; background: var(--panel); border-left: 3px solid var(--line); white-space: pre-wrap; word-break: break-word; }
+.test.ok { border-color: var(--ok); color: var(--ok); }
+.test.bad { border-color: var(--bad); color: var(--bad); }
+.test.warn { border-color: var(--warn); color: var(--warn); }
+.test.wait { color: var(--muted); }
+.switch { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.switch .t { width: 30px; height: 17px; border-radius: 999px; background: var(--raised); position: relative; transition: background .15s; flex: none; }
+.switch .t::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--bg); transition: left .15s; }
+.switch.on .t { background: var(--accent); }
+.switch.on .t::after { left: 15px; }
+.pinin { font: 15px var(--mono); letter-spacing: .35em; }
+select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; }
+.steps { display: flex; gap: 4px; }
+.steps span { flex: 1; font-size: 11.5px; padding: 6px 8px; border-bottom: 2px solid var(--line); color: var(--muted); }
+.steps span.on { border-color: var(--accent); color: var(--text); font-weight: 600; }
+.steps span.done { border-color: var(--ok); color: var(--ok); }
+.sheet { position: absolute; right: 0; top: 0; bottom: 0; width: min(380px, 100%); background: var(--bg); border-left: 1px solid var(--line); box-shadow: -20px 0 50px -30px var(--shadow); z-index: 6; display: flex; flex-direction: column; }
+.sheet header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.sheet section { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.sheet section h4 { margin: 0; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+.pad { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 18px; width: 240px; text-align: center; box-shadow: 0 20px 60px -20px var(--shadow); }
+.pad .who { font-weight: 600; }
+.pad .dots { display: flex; justify-content: center; gap: 10px; margin: 14px 0; }
+.pad .dots i { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--muted); }
+.pad .dots i.f { background: var(--text); border-color: var(--text); }
+.pad .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pad .keys button { height: 40px; border-radius: 8px; background: var(--panel); font-size: 16px; }
+.pad .keys button:hover { background: var(--hover); }
+.pad .err { color: var(--bad); font-size: 12px; min-height: 16px; margin-top: 8px; }
+.shake { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+.state { border-left: 1px solid var(--line); background: var(--panel); padding: 10px; overflow: auto; font: 11px/1.45 var(--mono); }
+.state h4 { margin: 0 0 6px; font: 600 11px var(--ui); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.state pre { margin: 0 0 12px; white-space: pre-wrap; word-break: break-all; }
+.state .log div { color: var(--muted); }
+
+.proto-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 8px; background: #14161cf2; color: #e8eaf0; border: 1px solid #3a3f4d; border-radius: 12px; box-shadow: 0 14px 44px -10px rgba(0,0,0,.65); font: 12px/1.35 var(--ui); }
+.proto-bar .tag { font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #9aa3b8; border: 1px solid #3a3f4d; border-radius: 999px; padding: 4px 7px; }
+.proto-bar button { color: #cfd5e4; }
+.proto-bar button.arrow { width: 26px; height: 26px; border-radius: 7px; font-size: 15px; }
+.proto-bar button.arrow:hover, .proto-bar button.rst:hover { background: #262b36; color: #fff; }
+.proto-bar button.rst { height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid #3a3f4d; font-size: 11.5px; }
+.proto-bar .cur { min-width: 260px; }
+.proto-bar .cur b { font: 600 12px var(--mono); color: #fff; }
+.proto-bar .cur span { display: block; color: #9aa3b8; font-size: 11px; }
+@media (max-width: 900px) { .app { grid-template-columns: 180px 1fr; } .state { display: none; } .dlg { grid-template-columns: 1fr; } .dlg nav { display: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="side"></aside>
+  <main id="main"></main>
+  <div class="state" id="state"></div>
+</div>
+<div class="proto-bar">
+  <span class="tag">prototype</span>
+  <button class="arrow" id="prev" title="Previous (←)">‹</button>
+  <div class="cur" id="cur"></div>
+  <button class="arrow" id="next" title="Next (→)">›</button>
+  <button class="rst" id="rst" title="Reset state">reset</button>
+</div>
+<script>
+const VARIANTS = {
+  A: ["Inline", "one form · PIN pad over the canvas"],
+  B: ["Steps", "Connect → Key → Protect · modal unlock"],
+  C: ["Settings", "paste to add · settings sheet · inline unlock"],
+};
+const KEYS = Object.keys(VARIANTS);
+const PASTE = "ssh -i '.\\OneDrive - Firmlinx (PTY) Ltd\\.Keys\\firmlinx.pem' azureuser@102.133.171.65";
+
+const fresh = () => ({
+  envs: ["local"],
+  projects: [{ id: 1, host: "local", name: "tri-code", path: "~/Projects/tri-code" }],
+  envSsh: {},     // host -> { identityFile, port, user, options }
+  envLocks: {},   // host -> { pinHash, relockMin }
+  unlockedUntil: {}, // host -> epoch ms (frontend-only)
+  keyAcl: {},     // mock: path -> "open" | "user-only"
+  active: 1,
+  dialog: null,   // { raw, step, test, pinOn, pin, pin2, relock }
+  sheet: null,    // host whose settings sheet is open (C)
+  prompt: null,   // { host, then, entered, error, tries, coolUntil }
+  log: [],
+});
+let S = fresh();
+let variant = (new URLSearchParams(location.search).get("variant") || location.hash.slice(1) || "A").toUpperCase();
+if (!VARIANTS[variant]) variant = "A";
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const log = (m) => { S.log.unshift(new Date().toLocaleTimeString() + "  " + m); S.log.length = Math.min(S.log.length, 30); };
+const hash = (pin) => "h:" + [...pin].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7).toString(16); // mock, not crypto
+
+/* ---------- parsing a pasted ssh command ---------- */
+function words(s) {
+  const out = []; let cur = "", q = null, any = false;
+  for (const c of s.trim()) {
+    if (q) { if (c === q) q = null; else cur += c; }
+    else if (c === "'" || c === '"') { q = c; any = true; }
+    else if (/\s/.test(c)) { if (cur || any) out.push(cur); cur = ""; any = false; }
+    else cur += c;
+  }
+  if (cur || any) out.push(cur);
+  return out;
+}
+function parse(raw) {
+  const w = words(raw || "");
+  if (w[0] === "ssh" || w[0] === "ssh.exe") w.shift();
+  const r = { dest: "", identityFile: "", port: "", user: "", options: [] };
+  for (let i = 0; i < w.length; i++) {
+    const a = w[i];
+    if (a === "-i") r.identityFile = w[++i] || "";
+    else if (a === "-p") r.port = w[++i] || "";
+    else if (a === "-l") r.user = w[++i] || "";
+    else if (a === "-o") r.options.push(w[++i] || "");
+    else if (a.startsWith("-")) r.options.push(a);
+    else if (!r.dest) r.dest = a;
+  }
+  // PowerShell's cwd was the profile folder, so ".\" resolves under ~
+  r.identityFile = r.identityFile.replace(/^\.[\\/]/, "~\\");
+  if (r.user && r.dest && !r.dest.includes("@")) r.dest = r.user + "@" + r.dest;
+  return r;
+}
+
+/* ---------- mock connection test ---------- */
+function test(p, done) {
+  if (!p.dest) return done({ state: "bad", msg: "✗ no destination" });
+  setTimeout(() => {
+    const fakeOneDrive = /onedrive/i.test(p.identityFile);
+    if (!p.identityFile) done({ state: "bad", msg: `✗ ${p.dest}: Permission denied (publickey).\n  ssh offered only ~/.ssh/id_*: add the key file that goes with this server.` });
+    else if (fakeOneDrive && S.keyAcl[p.identityFile] !== "user-only")
+      done({ state: "warn", fix: true, msg: `⚠ WARNING: UNPROTECTED PRIVATE KEY FILE!\n  Permissions for '${p.identityFile}' are too open.\n  Load key: bad permissions → ${p.dest}: Permission denied (publickey).` });
+    else done({ state: "ok", msg: `✓ connected · /home/${p.dest.split("@")[0] || "user"} · 7 folders` });
+  }, 500);
+}
+function fixAcl(path) {
+  S.keyAcl[path] = "user-only";
+  log(`icacls "${path}" /inheritance:r /grant:r "%USERNAME%:R"`);
+}
+
+/* ---------- lock logic ---------- */
+const isLocked = (h) => !!S.envLocks[h] && !((S.unlockedUntil[h] || 0) > Date.now());
+function withUnlock(host, then) {
+  if (!isLocked(host)) return then();
+  S.prompt = { host, then, entered: "", error: "", tries: 0, coolUntil: 0 };
+  log(`${host} is locked → ask for PIN`);
+  render();
+}
+function tryPin(pin) {
+  const P = S.prompt, L = S.envLocks[P.host];
+  if (P.coolUntil > Date.now()) { P.error = `Too many tries. Wait ${Math.ceil((P.coolUntil - Date.now()) / 1000)} s`; return render(); }
+  if (hash(pin) === L.pinHash) {
+    S.unlockedUntil[P.host] = Date.now() + L.relockMin * 60000;
+    log(`unlocked ${P.host} for ${L.relockMin} min`);
+    const then = P.then; S.prompt = null; then?.(); render();
+  } else {
+    P.tries++; P.entered = ""; P.error = "Wrong PIN";
+    if (P.tries >= 5) { P.coolUntil = Date.now() + 30000; P.tries = 0; P.error = "Too many tries. Wait 30 s"; }
+    log(`wrong PIN for ${P.host} (${P.tries}/5)`);
+    render(); document.querySelector(".pad, .inlock, .unlock")?.classList.add("shake");
+  }
+}
+function lockNow(h) { delete S.unlockedUntil[h]; log(`locked ${h}`); if (S.projects.find((p) => p.id === S.active)?.host === h) S.active = null; render(); }
+function openProject(id) {
+  const p = S.projects.find((x) => x.id === id);
+  withUnlock(p.host, () => { S.active = id; log(`open ${p.name} on ${p.host}`); render(); });
+}
+
+/* ---------- adding an env ---------- */
+function newDialog() { S.dialog = { raw: PASTE, step: 0, test: null, pinOn: false, pin: "", pin2: "", relock: 15 }; S.sheet = null; render(); }
+function runTest(then) {
+  const D = S.dialog, p = parse(D.raw);
+  D.test = { state: "wait", msg: `ssh${p.identityFile ? ` -i "${p.identityFile}"` : ""} ${p.dest} …` }; render();
+  test(p, (r) => { if (S.dialog !== D) return; D.test = r; log(`test ${p.dest}: ${r.state}`); render(); if (r.state === "ok") then?.(); });
+}
+function pinProblem(D) {
+  if (!D.pinOn) return "";
+  if (!/^\d{4,8}$/.test(D.pin)) return "PIN must be 4–8 digits";
+  if (D.pin !== D.pin2) return "PINs don't match";
+  return "";
+}
+function commit() {
+  const D = S.dialog, p = parse(D.raw);
+  const host = p.dest;
+  if (!S.envs.includes(host)) S.envs.push(host);
+  S.envSsh[host] = { identityFile: p.identityFile || undefined, port: p.port || undefined, options: p.options.length ? p.options : undefined };
+  if (D.pinOn) { S.envLocks[host] = { pinHash: hash(D.pin), relockMin: D.relock }; S.unlockedUntil[host] = Date.now() + D.relock * 60000; }
+  S.projects.push({ id: S.projects.length + 1, host, name: "api", path: "~/api" });
+  log(`added environment ${host}${D.pinOn ? " (PIN lock)" : ""} + project ~/api`);
+  S.dialog = null; render();
+}
+
+/* ---------- views ---------- */
+function sidebar() {
+  const sec = (h) => {
+    const L = S.envLocks[h], locked = isLocked(h), ssh = S.envSsh[h];
+    const lockBtn = L ? `<button class="lockic ${locked ? "on" : "open"}" data-act="${locked ? "unlock" : "lock"}" data-h="${esc(h)}" title="${locked ? "Locked: click to unlock" : "Unlocked: click to lock now"}">${locked ? "🔒" : "🔓"}</button>` : "";
+    const gear = variant === "C" && h !== "local" ? `<button data-act="sheet" data-h="${esc(h)}" title="Environment settings">⚙</button>` : "";
+    const head = `<h2><span class="nm" title="${esc(h)}${ssh?.identityFile ? "\n-i " + esc(ssh.identityFile) : ""}">${h === "local" ? "⌂" : "⇄"} ${esc(h)}</span>${lockBtn}${gear}</h2>`;
+    if (variant === "C" && locked) {
+      const P = S.prompt?.host === h ? S.prompt : null;
+      return head + `<form class="inlock" data-form="inlock" data-h="${esc(h)}"><input class="pinin" inputmode="numeric" type="password" maxlength="8" placeholder="PIN" autocomplete="off" ${P ? "autofocus" : ""}><button class="btn">↵</button></form>` +
+        (P?.error ? `<div class="inlock"><span class="err">${esc(P.error)}</span></div>` : `<div class="inlock hint">${S.projects.filter((p) => p.host === h).length} projects hidden</div>`);
+    }
+    return head + S.projects.filter((p) => p.host === h).map((p) =>
+      `<button class="project ${S.active === p.id ? "active" : ""} ${locked ? "dim" : ""}" data-act="open" data-id="${p.id}"><span class="ic">${p.name[0].toUpperCase()}</span>${esc(p.name)}${locked ? ' <span class="lockic on">🔒</span>' : ""}</button>`).join("");
+  };
+  $("#side").innerHTML = `<div class="head"><span>Projects</span></div>` + S.envs.map(sec).join("") +
+    `<button class="add" data-act="new">+ Open project / environment <kbd>Alt+O</kbd></button>`;
+}
+
+function mainView() {
+  const p = S.projects.find((x) => x.id === S.active);
+  let html = `<div class="top"><b>${p ? esc(p.name) : "-"}</b><span>${p ? esc(p.host) : ""}</span></div>`;
+  if (p) {
+    const ssh = S.envSsh[p.host];
+    const cmd = p.host === "local" ? "powershell.exe -NoLogo" : `ssh -t${ssh?.identityFile ? ` -i "${ssh.identityFile}" -o IdentitiesOnly=yes` : ""} ${p.host} 'exec $SHELL -lc "cd ${p.path}; shpool attach …"'`;
+    html += `<div class="term"><span class="p">$</span> ${esc(cmd)}\n\n${p.host === "local" ? "PS C:\\Users\\WaldoJoubert\\Projects\\tri-code>" : `Welcome to Ubuntu 24.04 LTS\n${esc(p.host.split("@")[0])}@vm:${esc(p.path)}$ ▍`}</div>`;
+  } else html += `<div class="empty">Pick a project in the sidebar.<br>Start with “+ Open project / environment”: the pasted command is already filled in.</div>`;
+
+  if (S.prompt && variant === "A") html += `<div class="scrim">${pad(S.prompt)}</div>`;
+  if (S.prompt && variant === "B") html += `<div class="scrim">${modalUnlock(S.prompt)}</div>`;
+  if (S.dialog) html += `<div class="scrim">${dialog()}</div>`;
+  if (S.sheet) html += sheet(S.sheet);
+  $("#main").innerHTML = html;
+}
+
+function pad(P) {
+  const n = P.entered.length;
+  return `<div class="pad"><div>🔒</div><div class="who">${esc(P.host)}</div><div class="hint">Enter PIN to open</div>
+    <div class="dots">${Array.from({ length: Math.max(4, n) }, (_, i) => `<i class="${i < n ? "f" : ""}"></i>`).join("")}</div>
+    <div class="keys">${[1,2,3,4,5,6,7,8,9].map((d) => `<button data-act="digit" data-d="${d}">${d}</button>`).join("")}
+    <button data-act="cancelpin" title="Cancel">✕</button><button data-act="digit" data-d="0">0</button><button data-act="submitpin" title="Unlock">↵</button></div>
+    <div class="err">${esc(P.error)}</div></div>`;
+}
+function modalUnlock(P) {
+  const n = P.entered.length;
+  return `<form class="pad unlock" data-form="unlock" style="width:300px;text-align:left">
+    <div class="who">Unlock ${esc(P.host)}</div><div class="hint">This environment is locked. tri-code won't run ssh to it until you enter the PIN.</div>
+    <div class="dots">${Array.from({ length: Math.max(4, n) }, (_, i) => `<i class="${i < n ? "f" : ""}"></i>`).join("")}</div>
+    <input class="pinin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" autofocus value="${esc(P.entered)}" data-in="entered">
+    <div class="err">${esc(P.error)}</div>
+    <div class="actions"><button type="button" class="btn" data-act="cancelpin">Cancel</button><button class="btn primary">Unlock</button></div></form>`;
+}
+
+function dlgShell(body) {
+  return `<div class="dlg"><header><span>Open project</span><button data-act="close">×</button></header>
+    <nav><div class="mt">Environments</div>${S.envs.map((h) => `<button><span>${h === "local" ? "⌂" : "⇄"}</span>${esc(h)}<span class="kind">${h === "local" ? "local" : "ssh"}</span></button>`).join("")}
+    <button aria-pressed="true">+ New environment</button></nav>${body}</div>`;
+}
+function parsedChips(p) {
+  const c = [];
+  if (p.dest) c.push(`<span class="chip"><b>host</b>${esc(p.dest)}</span>`);
+  if (p.identityFile) c.push(`<span class="chip"><b>key</b>${esc(p.identityFile)}</span>`);
+  if (p.port) c.push(`<span class="chip"><b>port</b>${esc(p.port)}</span>`);
+  p.options.forEach((o) => c.push(`<span class="chip"><b>opt</b>${esc(o)}</span>`));
+  return c.length ? `<div class="chips">${c.join("")}</div>` : "";
+}
+function testBox(t) {
+  if (!t) return "";
+  return `<div class="test ${t.state}">${esc(t.msg)}</div>` + (t.fix ? `<div class="row"><button class="btn warn" data-act="fixacl">Fix permissions (only you can read the key)</button><span class="hint">runs icacls, then retests</span></div>` : "");
+}
+function pinFields(D) {
+  return `<label class="switch ${D.pinOn ? "on" : ""}" data-act="pintoggle"><span class="t"></span>Lock with PIN</label>` + (D.pinOn ? `
+    <div class="row"><input class="pinin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" value="${esc(D.pin)}" data-in="pin"><input class="pinin" type="password" inputmode="numeric" maxlength="8" placeholder="again" value="${esc(D.pin2)}" data-in="pin2"></div>
+    <div class="row"><span class="hint">Relock after</span><select data-in="relock">${[5, 15, 60, 480].map((m) => `<option value="${m}" ${D.relock == m ? "selected" : ""}>${m < 60 ? m + " min" : m / 60 + " h"} idle</option>`).join("")}</select><span class="hint">and on restart</span></div>
+    ${pinProblem(D) && (D.pin || D.pin2) ? `<div class="hint" style="color:var(--bad)">${pinProblem(D)}</div>` : ""}` : "");
+}
+
+function dialog() {
+  const D = S.dialog, p = parse(D.raw), waiting = D.test?.state === "wait";
+  if (variant === "A") return dlgShell(`<form class="pane" data-form="addA"><h3>New environment</h3>
+    <div class="lbl">Destination or ssh command</div>
+    <input data-in="raw" value="${esc(D.raw)}" spellcheck="false" placeholder="alias, user@host, or paste: ssh -i key.pem user@host">
+    ${parsedChips(p)}
+    <div class="lbl">Key file</div>
+    <div class="row"><input data-in="key" value="${esc(p.identityFile)}" placeholder="none: uses ~/.ssh/config and ~/.ssh/id_*" spellcheck="false"><button type="button" class="btn">Browse…</button></div>
+    ${testBox(D.test)}
+    ${pinFields(D)}
+    <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" ${waiting || pinProblem(D) ? "disabled" : ""}>${D.test?.state === "ok" ? "Add" : "Test & add"}</button></div></form>`);
+
+  if (variant === "B") {
+    const names = ["Connect", "Key", "Protect"];
+    const steps = `<div class="steps">${names.map((n, i) => `<span class="${i === D.step ? "on" : i < D.step ? "done" : ""}">${i + 1}. ${n}</span>`).join("")}</div>`;
+    let body = "";
+    if (D.step === 0) body = `<div class="hint">Paste the ssh command you use in a terminal, or type an alias / user@host.</div>
+      <input data-in="raw" value="${esc(D.raw)}" spellcheck="false">${parsedChips(p)}
+      <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" ${p.dest ? "" : "disabled"}>Next</button></div>`;
+    if (D.step === 1) body = `<div class="hint">ssh runs without prompts here, so the server must accept this key on its own (no passphrase, or one already held by ssh-agent).</div>
+      <div class="row"><input data-in="key" value="${esc(p.identityFile)}" placeholder="key file" spellcheck="false"><button type="button" class="btn">Browse…</button></div>
+      ${testBox(D.test)}
+      <div class="actions"><button type="button" class="btn" data-act="back">Back</button><button class="btn primary" ${waiting ? "disabled" : ""}>${D.test?.state === "ok" ? "Next" : "Test"}</button></div>`;
+    if (D.step === 2) body = `<div class="hint">Optional. A PIN stops tri-code from opening terminals or running anything on <b>${esc(p.dest)}</b> until it is entered. It is a gate in tri-code, not encryption of the key.</div>
+      ${pinFields(D)}
+      <div class="actions"><button type="button" class="btn" data-act="back">Back</button><button class="btn primary" ${pinProblem(D) ? "disabled" : ""}>Add environment</button></div>`;
+    return dlgShell(`<form class="pane" data-form="addB"><h3>New environment</h3>${steps}${body}</form>`);
+  }
+
+  // C: one field
+  return dlgShell(`<form class="pane" data-form="addC"><h3>New environment</h3>
+    <input data-in="raw" value="${esc(D.raw)}" spellcheck="false" placeholder="alias, user@host, or paste an ssh command">
+    ${parsedChips(p)}${testBox(D.test)}
+    <div class="hint">Key, port and PIN lock live under ⚙ on the environment's header once it is added.</div>
+    <div class="actions"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn primary" ${waiting ? "disabled" : ""}>${D.test?.state === "ok" ? "Add" : "Test & add"}</button></div></form>`);
+}
+
+function sheet(h) {
+  const ssh = S.envSsh[h] || {}, L = S.envLocks[h], E = S.sheetEdit;
+  return `<div class="sheet"><header><span>⇄ ${esc(h)}</span><button data-act="closesheet">×</button></header>
+    <section><h4>Connection</h4>
+      <div class="lbl">Key file</div><input data-in="s.identityFile" value="${esc(ssh.identityFile || "")}" spellcheck="false">
+      <div class="lbl">Port</div><input data-in="s.port" value="${esc(ssh.port || "")}" placeholder="22">
+      <code class="hint">ssh${ssh.identityFile ? ` -i "${esc(ssh.identityFile)}" -o IdentitiesOnly=yes` : ""}${ssh.port ? " -p " + esc(ssh.port) : ""} ${esc(h)}</code>
+    </section>
+    <section><h4>PIN lock</h4>
+      ${L ? `<div class="row"><span>${isLocked(h) ? "🔒 Locked" : "🔓 Unlocked"} · relocks after ${L.relockMin} min idle</span></div>
+        <div class="row"><button class="btn" data-act="lock" data-h="${esc(h)}">Lock now</button><button class="btn" data-act="removepin" data-h="${esc(h)}">Remove PIN</button></div>`
+      : `<form data-form="setpin" data-h="${esc(h)}" style="display:flex;flex-direction:column;gap:8px">
+        <div class="row"><input class="pinin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" value="${esc(E.pin)}" data-in="e.pin"><input class="pinin" type="password" inputmode="numeric" maxlength="8" placeholder="again" value="${esc(E.pin2)}" data-in="e.pin2"></div>
+        <div class="row"><span class="hint">Relock after</span><select data-in="e.relock">${[5, 15, 60, 480].map((m) => `<option value="${m}" ${E.relock == m ? "selected" : ""}>${m < 60 ? m + " min" : m / 60 + " h"}</option>`).join("")}</select></div>
+        ${pinProblem({ ...E, pinOn: true }) && (E.pin || E.pin2) ? `<div class="hint" style="color:var(--bad)">${pinProblem({ ...E, pinOn: true })}</div>` : ""}
+        <div><button class="btn primary" ${pinProblem({ ...E, pinOn: true }) ? "disabled" : ""}>Set PIN</button></div></form>`}
+    </section></div>`;
+}
+
+function stateView() {
+  const show = { ...S, prompt: S.prompt && { ...S.prompt, then: undefined, entered: "•".repeat(S.prompt.entered.length) },
+    dialog: S.dialog && { ...S.dialog, pin: "•".repeat(S.dialog.pin.length), pin2: "•".repeat(S.dialog.pin2.length), parsed: parse(S.dialog.raw) },
+    unlockedUntil: Object.fromEntries(Object.entries(S.unlockedUntil).map(([h, t]) => [h, t > Date.now() ? `${Math.round((t - Date.now()) / 1000)} s left` : "expired"])),
+    locked: Object.fromEntries(S.envs.map((h) => [h, isLocked(h)])) };
+  delete show.log; delete show.sheetEdit;
+  $("#state").innerHTML = `<h4>State · variant ${variant}</h4><pre>${esc(JSON.stringify(show, null, 2))}</pre><h4>Log</h4><div class="log">${S.log.map((l) => `<div>${esc(l)}</div>`).join("")}</div>`;
+}
+
+function render() {
+  const focus = document.activeElement?.dataset?.in, sel = document.activeElement?.selectionStart;
+  sidebar(); mainView(); stateView();
+  $("#cur").innerHTML = `<b>${variant}: ${VARIANTS[variant][0]}</b><span>${VARIANTS[variant][1]}</span>`;
+  const back = focus && document.querySelector(`[data-in="${focus}"]`);
+  if (back) { back.focus(); try { back.setSelectionRange(sel, sel); } catch {} }
+  else document.querySelector("[autofocus]")?.focus();
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-act]"); if (!t) return;
+  const a = t.dataset.act, h = t.dataset.h, D = S.dialog;
+  if (a === "new") newDialog();
+  else if (a === "close") { S.dialog = null; render(); }
+  else if (a === "open") openProject(+t.dataset.id);
+  else if (a === "unlock") withUnlock(h, () => render());
+  else if (a === "lock") lockNow(h);
+  else if (a === "sheet") { S.sheet = h; S.sheetEdit = { pin: "", pin2: "", relock: 15 }; render(); }
+  else if (a === "closesheet") { S.sheet = null; render(); }
+  else if (a === "removepin") withUnlock(h, () => { delete S.envLocks[h]; delete S.unlockedUntil[h]; log(`removed PIN from ${h}`); render(); });
+  else if (a === "pintoggle") { e.preventDefault(); D.pinOn = !D.pinOn; render(); }
+  else if (a === "fixacl") { fixAcl(parse(D.raw).identityFile); runTest(); }
+  else if (a === "back") { D.step--; D.test = null; render(); }
+  else if (a === "digit") { if (S.prompt.entered.length < 8) S.prompt.entered += t.dataset.d; S.prompt.error = ""; render(); }
+  else if (a === "submitpin") tryPin(S.prompt.entered);
+  else if (a === "cancelpin") { S.prompt = null; log("PIN cancelled"); render(); }
+});
+document.addEventListener("input", (e) => {
+  const k = e.target.dataset.in; if (!k) return;
+  const v = e.target.value, D = S.dialog;
+  if (k === "raw") { D.raw = v; D.test = null; }
+  else if (k === "key") { // rewrite the -i in the raw command so both stay in sync
+    const p = parse(D.raw);
+    D.raw = `ssh${v ? ` -i '${v}'` : ""}${p.port ? " -p " + p.port : ""} ${p.dest}`; D.test = null;
+  }
+  else if (k === "pin" || k === "pin2") D[k] = v.replace(/\D/g, "");
+  else if (k === "relock") D.relock = +v;
+  else if (k === "entered") { S.prompt.entered = v.replace(/\D/g, ""); S.prompt.error = ""; }
+  else if (k.startsWith("e.")) S.sheetEdit[k.slice(2)] = k === "e.relock" ? +v : v.replace(/\D/g, "");
+  else if (k.startsWith("s.")) { const f = k.slice(2); S.envSsh[S.sheet] = { ...S.envSsh[S.sheet], [f]: v || undefined }; log(`set ${f} on ${S.sheet}`); }
+  render();
+});
+document.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = e.target.dataset.form, D = S.dialog;
+  if (f === "addA" || f === "addC") { if (D.test?.state === "ok") commit(); else runTest(commit); }
+  else if (f === "addB") {
+    if (D.step === 0) { D.step = 1; D.test = null; render(); }
+    else if (D.step === 1) { if (D.test?.state === "ok") { D.step = 2; render(); } else runTest(() => { D.step = 2; render(); }); }
+    else commit();
+  }
+  else if (f === "unlock") tryPin(S.prompt.entered);
+  else if (f === "inlock") {
+    const h = e.target.dataset.h, v = e.target.querySelector("input").value;
+    if (!S.prompt || S.prompt.host !== h) S.prompt = { host: h, then: null, entered: "", error: "", tries: 0, coolUntil: 0 };
+    tryPin(v);
+  }
+  else if (f === "setpin") {
+    const h = e.target.dataset.h, E = S.sheetEdit;
+    S.envLocks[h] = { pinHash: hash(E.pin), relockMin: E.relock }; S.unlockedUntil[h] = Date.now() + E.relock * 60000;
+    log(`set PIN on ${h}`); render();
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (S.prompt && variant === "A" && !e.target.closest("input")) {
+    if (/^\d$/.test(e.key)) { S.prompt.entered += e.key; S.prompt.error = ""; return render(); }
+    if (e.key === "Backspace") { S.prompt.entered = S.prompt.entered.slice(0, -1); return render(); }
+    if (e.key === "Enter") return tryPin(S.prompt.entered);
+  }
+  if (e.key === "Escape") { S.prompt = null; S.dialog = null; S.sheet = null; return render(); }
+  if (e.target.closest("input, textarea, select, [contenteditable]")) return;
+  if (e.key === "ArrowLeft") go(-1);
+  if (e.key === "ArrowRight") go(1);
+});
+function go(d) {
+  variant = KEYS[(KEYS.indexOf(variant) + d + KEYS.length) % KEYS.length];
+  S.prompt = null; S.dialog = null; S.sheet = null;
+  if (location.protocol === "file:") history.replaceState(null, "", "#" + variant);
+  else { const u = new URL(location); u.searchParams.set("variant", variant); history.replaceState(null, "", u); }
+  render();
+}
+$("#prev").onclick = () => go(-1);
+$("#next").onclick = () => go(1);
+$("#rst").onclick = () => { S = fresh(); render(); };
+setInterval(() => { // let relock timers expire visibly
+  for (const [h, t] of Object.entries(S.unlockedUntil)) if (t <= Date.now()) { delete S.unlockedUntil[h]; log(`${h} relocked (idle)`); render(); }
+  stateView();
+}, 1000);
+render();
+</script>
+</body>
+</html>

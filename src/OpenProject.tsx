@@ -6,7 +6,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, on, onMount } from "solid-js";
-import { addEnvironment, addProject, app, envIcon, envName, isLocalHost, setApp } from "./state";
+import { type EnvSsh, addEnvironment, addProject, app, envIcon, envName, isLocalHost, setApp, setEnvLock, setEnvSsh } from "./state";
+import { PinPad, envLocked, markUnlocked, parseSsh } from "./envlock";
 import { Icon } from "./lucide";
 import { autoIcon } from "./icons";
 import { flash } from "./ui";
@@ -84,21 +85,23 @@ export function OpenProjectDialog() {
 function FolderPane(props: { host: string }) {
   const recent = () => app.recent.filter((r) => r.host === props.host);
   return (
-    <div class="pane">
-      <Show when={recent().length}>
-        <div class="recent">
-          <span>Recent</span>
-          <For each={recent()}>
-            {(r) => (
-              <button type="button" class="chip" title={r.path} onClick={() => open(r.host, r.path)}>
-                {baseName(r.path)}
-              </button>
-            )}
-          </For>
-        </div>
-      </Show>
-      <FolderPicker host={props.host} onOpen={(path) => open(props.host, path)} />
-    </div>
+    <Show when={!envLocked(props.host)} fallback={<div class="pane"><PinPad host={props.host} /></div>}>
+      <div class="pane">
+        <Show when={recent().length}>
+          <div class="recent">
+            <span>Recent</span>
+            <For each={recent()}>
+              {(r) => (
+                <button type="button" class="chip" title={r.path} onClick={() => open(r.host, r.path)}>
+                  {baseName(r.path)}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <FolderPicker host={props.host} onOpen={(path) => open(props.host, path)} />
+      </div>
+    </Show>
   );
 }
 
@@ -230,15 +233,36 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void }) {
   );
 }
 
-type Test = { state: "wait" | "ok" | "bad"; msg: string };
+type Test = { state: "wait" | "ok" | "bad"; msg: string; hint?: string };
 
-/** New environment: this machine, or an ssh host (an alias from ~/.ssh/config or user@host), tested before it is added. */
+const RELOCK = [5, 15, 60, 480];
+const minutesText = (m: number) => (m < 60 ? `${m} min` : `${m / 60} h`);
+
+/** What to do about a failed test, when the error says. */
+function testHint(err: string, key: string | undefined): string | undefined {
+  if (/UNPROTECTED PRIVATE KEY|bad permissions/i.test(err))
+    return `Other users can read the key, so ssh won't use it. Restrict it with:\nicacls "${key}" /inheritance:r /grant:r "%USERNAME%:R"`;
+  if (/Permission denied \(publickey/i.test(err))
+    return key
+      ? "The server refused this key. If it has a passphrase, add it to ssh-agent first (ssh-add): tri-code can't ask for one."
+      : "The server wants a key. Paste the full ssh command, or fill in the key file.";
+  return undefined;
+}
+
+/** New environment: this machine, or an ssh host (an alias from ~/.ssh/config, user@host, or a
+ *  pasted `ssh -i key -p port user@host` command), tested before it is added. An ssh
+ *  environment can be locked with a PIN. */
 function EnvForm() {
   const hasLocal = () => app.environments.some(isLocalHost);
   const [kind, setKind] = createSignal<"local" | "ssh">(hasLocal() ? "ssh" : "local");
-  const [dest, setDest] = createSignal("");
+  const [raw, setRaw] = createSignal("");
+  const [key, setKey] = createSignal("");
   const [test, setTest] = createSignal<Test | null>(null);
   const [aliases, setAliases] = createSignal<string[]>([]);
+  const [pinOn, setPinOn] = createSignal(false);
+  const [pin, setPin] = createSignal("");
+  const [pin2, setPin2] = createSignal("");
+  const [relock, setRelock] = createSignal(15);
   let input: HTMLInputElement | undefined;
 
   onMount(() => {
@@ -246,30 +270,62 @@ function EnvForm() {
     input?.focus();
   });
 
-  const host = () => (kind() === "local" ? "local" : dest().trim());
+  const parsed = () => parseSsh(raw());
+  const host = () => (kind() === "local" ? "local" : parsed().dest);
+  const ssh = (): EnvSsh | undefined => {
+    const p = parsed(), identityFile = key().trim() || undefined;
+    return identityFile || p.port || p.options ? { identityFile, port: p.port, options: p.options } : undefined;
+  };
+  const pinProblem = () => {
+    if (!pinOn()) return "";
+    if (!/^\d{4,8}$/.test(pin())) return "PIN must be 4–8 digits";
+    if (pin() !== pin2()) return "PINs don't match";
+    return "";
+  };
+  const edited = () => setTest(null);
+  const onRaw = (v: string) => {
+    setRaw(v);
+    const k = parseSsh(v).identityFile;
+    if (k) setKey(k);
+    edited();
+  };
   const pick = (h: string) => {
-    setDest(h);
+    onRaw(h);
     runTest();
   };
   const runTest = async () => {
     const h = host();
     if (!h) return false;
-    setTest({ state: "wait", msg: `ssh ${h} …` });
+    const opts = ssh();
+    setTest({ state: "wait", msg: `ssh${opts?.identityFile ? ` -i "${opts.identityFile}"` : ""}${opts?.port ? ` -p ${opts.port}` : ""} ${h} …` });
     try {
+      await invoke("env_ssh_set", { host: h, ssh: opts ?? null });
       const l = await invoke<DirList>("list_dirs", { host: h, path: "~" });
       if (host() !== h) return false;
       setTest({ state: "ok", msg: `✓ connected · ${l.path} · ${l.dirs.length} folders` });
       return true;
     } catch (e) {
-      if (host() === h) setTest({ state: "bad", msg: `✗ ${e}` });
+      if (host() === h) setTest({ state: "bad", msg: `✗ ${e}`, hint: testHint(String(e), opts?.identityFile) });
       return false;
     }
   };
   const add = async () => {
     const h = host();
-    if (!h) return;
+    if (!h || pinProblem()) return;
     if (app.environments.includes(h)) return setSelected(h);
     if (kind() === "ssh" && test()?.state !== "ok" && !(await runTest())) return;
+    if (kind() === "ssh") {
+      if (pinOn()) {
+        try {
+          const { salt, hash } = await invoke<{ salt: string; hash: string }>("env_pin_hash", { pin: pin() });
+          setEnvLock(h, { salt, hash, minutes: relock() });
+          markUnlocked(h, relock());
+        } catch (e) {
+          return setTest({ state: "bad", msg: `✗ ${e}` });
+        }
+      }
+      setEnvSsh(h, ssh());
+    }
     addEnvironment(h);
     setSelected(h);
   };
@@ -278,10 +334,12 @@ function EnvForm() {
     <form class="pane env-form" onSubmit={(e) => (e.preventDefault(), add())}>
       <h3>New environment</h3>
       <div class="env-kind">
-        <button type="button" aria-pressed={kind() === "local"} disabled={hasLocal()} title={hasLocal() ? "local is already added" : undefined} onClick={() => (setKind("local"), setTest(null))}>
-          ⌂ Local
+        <button type="button" aria-pressed={kind() === "local"} disabled={hasLocal()} title={hasLocal() ? "local is already added" : undefined} onClick={() => (setKind("local"), edited())}>
+          <Icon name="laptop" size={12} /> Local
         </button>
-        <button type="button" aria-pressed={kind() === "ssh"} onClick={() => (setKind("ssh"), setTest(null))}>⇄ SSH</button>
+        <button type="button" aria-pressed={kind() === "ssh"} onClick={() => (setKind("ssh"), edited())}>
+          <Icon name="server" size={12} /> SSH
+        </button>
       </div>
       <Show when={kind() === "ssh"} fallback={<p class="hint">This machine. Projects run in local shells.</p>}>
         <Show when={aliases().length}>
@@ -289,7 +347,7 @@ function EnvForm() {
           <div class="chips">
             <For each={aliases()}>
               {(h) => (
-                <button type="button" class="chip" classList={{ on: dest() === h }} disabled={app.environments.includes(h)} onClick={() => pick(h)}>
+                <button type="button" class="chip" classList={{ on: raw() === h }} disabled={app.environments.includes(h)} onClick={() => pick(h)}>
                   {h}
                 </button>
               )}
@@ -298,16 +356,59 @@ function EnvForm() {
         </Show>
         <input
           ref={input}
-          placeholder="alias or user@host"
-          value={dest()}
+          placeholder="alias, user@host, or paste: ssh -i key.pem user@host"
+          value={raw()}
           spellcheck={false}
-          onInput={(e) => (setDest(e.currentTarget.value), setTest(null))}
+          onInput={(e) => onRaw(e.currentTarget.value)}
         />
+        <Show when={parsed().dest && raw().trim() !== parsed().dest}>
+          <div class="parsed">
+            <span><b>host</b>{parsed().dest}</span>
+            <Show when={parsed().port}><span><b>port</b>{parsed().port}</span></Show>
+            <For each={parsed().options ?? []}>{(o) => <span><b>-o</b>{o}</span>}</For>
+          </div>
+        </Show>
+        <label class="field">
+          <span class="hint"><Icon name="key-round" size={12} /> Key file</span>
+          <input
+            placeholder="none: ~/.ssh/config and ~/.ssh/id_* decide"
+            value={key()}
+            spellcheck={false}
+            onInput={(e) => (setKey(e.currentTarget.value), edited())}
+          />
+        </label>
       </Show>
-      <Show when={test()}>{(t) => <div class="test" classList={{ [t().state]: true }}>{t().msg}</div>}</Show>
+      <Show when={test()}>
+        {(t) => (
+          <>
+            <div class="test" classList={{ [t().state]: true }}>{t().msg}</div>
+            <Show when={t().hint}><div class="test tip">{t().hint}</div></Show>
+          </>
+        )}
+      </Show>
+      <Show when={kind() === "ssh"}>
+        <button type="button" class="pin-switch" role="switch" aria-checked={pinOn()} onClick={() => setPinOn(!pinOn())}>
+          <span class="track" />
+          <Icon name="lock" size={12} /> Lock with PIN
+        </button>
+        <Show when={pinOn()}>
+          <div class="pin-fields">
+            <input class="pin" type="password" inputmode="numeric" maxlength={8} placeholder="PIN" autocomplete="off" value={pin()} onInput={(e) => setPin(e.currentTarget.value.replace(/\D/g, ""))} />
+            <input class="pin" type="password" inputmode="numeric" maxlength={8} placeholder="again" autocomplete="off" value={pin2()} onInput={(e) => setPin2(e.currentTarget.value.replace(/\D/g, ""))} />
+          </div>
+          <label class="relock">
+            <span class="hint">Relock</span>
+            <select value={String(relock())} onChange={(e) => setRelock(Number(e.currentTarget.value))}>
+              <For each={RELOCK}>{(m) => <option value={String(m)}>{minutesText(m)} after unlock</option>}</For>
+            </select>
+            <span class="hint">and on restart</span>
+          </label>
+          <Show when={pinProblem() && (pin() || pin2())}><p class="hint bad">{pinProblem()}</p></Show>
+        </Show>
+      </Show>
       <div class="actions">
         <button type="button" onClick={() => setSelected(app.environments[0] ?? null)}>Cancel</button>
-        <button type="submit" class="primary" disabled={!host() || test()?.state === "wait"}>
+        <button type="submit" class="primary" disabled={!host() || test()?.state === "wait" || !!pinProblem()}>
           {kind() === "local" || test()?.state === "ok" ? "Add" : "Test & add"}
         </button>
       </div>
