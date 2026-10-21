@@ -22,9 +22,37 @@ pub async fn dev_read(host: String, path: String) -> Result<Option<String>, Stri
 
 #[tauri::command]
 pub async fn dev_write(host: String, path: String, contents: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || write(&host, &path, contents.as_bytes()))
-        .await
-        .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        ensure_ignored(&host, &path)?;
+        write(&host, &path, contents.as_bytes())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// The `.dev` folder `path` sits in, if any: `/repo/.dev/plane/x.json` → `/repo/.dev`.
+fn dev_dir(path: &str) -> Option<&str> {
+    path.rfind("/.dev/").map(|i| &path[..i + "/.dev".len()])
+}
+
+/// Keep `.dev/` out of git the way pi-todos does: a `.gitignore` of `*` inside it.
+/// Checked once per folder per run, so writes over ssh don't pay an extra round trip each.
+fn ensure_ignored(host: &str, path: &str) -> Result<(), String> {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+    static DONE: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+    let Some(dir) = dev_dir(path) else { return Ok(()) };
+    let key = format!("{host}\n{dir}");
+    if DONE.get_or_init(Default::default).lock().unwrap().contains(&key) {
+        return Ok(());
+    }
+    let ignore = format!("{dir}/.gitignore");
+    if read(host, &ignore)?.is_none() {
+        write(host, &ignore, b"*\n")?;
+    }
+    DONE.get_or_init(Default::default).lock().unwrap().insert(key);
+    Ok(())
 }
 
 /// Save a pasted image (base64 PNG) on `host` and return its path, so a
@@ -102,6 +130,35 @@ fn write_local(path: &str, contents: &[u8]) -> Result<(), String> {
     let tmp = std::path::PathBuf::from(tmp);
     std::fs::write(&tmp, contents).map_err(|e| format!("{}: {e}", tmp.display()))?;
     std::fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+#[cfg(test)]
+mod dev_dir_tests {
+    use super::*;
+
+    #[test]
+    fn finds_the_dev_folder_a_file_is_in() {
+        assert_eq!(dev_dir("/srv/app/.dev/issues.json"), Some("/srv/app/.dev"));
+        assert_eq!(dev_dir("C:/p/app/.dev/github/comments/2.json"), Some("C:/p/app/.dev"));
+        assert_eq!(dev_dir("~/.pi/agent/secrets/plane.json"), None);
+        assert_eq!(dev_dir("/srv/app/.devtools/x.json"), None);
+    }
+
+    #[test]
+    fn writing_into_dev_adds_a_gitignore() {
+        let root = std::env::temp_dir().join(format!("tri-devignore-{}", std::process::id()));
+        let at = |tag: &str| format!("{}/{tag}/.dev/issues.json", root.to_string_lossy().replace('\\', "/"));
+
+        ensure_ignored("local", &at("new")).unwrap();
+        assert_eq!(std::fs::read_to_string(root.join("new/.dev/.gitignore")).unwrap(), "*\n");
+
+        // a .gitignore the folder already has is left as it is
+        std::fs::create_dir_all(root.join("own/.dev")).unwrap();
+        std::fs::write(root.join("own/.dev/.gitignore"), "*\n!keep.json\n").unwrap();
+        ensure_ignored("local", &at("own")).unwrap();
+        assert_eq!(std::fs::read_to_string(root.join("own/.dev/.gitignore")).unwrap(), "*\n!keep.json\n");
+        std::fs::remove_dir_all(&root).ok();
+    }
 }
 
 #[cfg(all(test, unix))]

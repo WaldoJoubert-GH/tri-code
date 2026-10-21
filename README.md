@@ -145,7 +145,7 @@ Layout:
 - `dirs.rs`: folder listing for the project picker (marking git repositories), local or over ssh.
 - `envs.rs`: `ssh_hosts` (the `Host` aliases in `~/.ssh/config`) and `scan_logos` (logo files in a project folder, as data URLs), local or over ssh.
 - `bg.rs`: background and icon images, stored as data URL files next to `state.json`.
-- `devfs.rs`: `dev_read` / `dev_write` for a project's `.dev/` folder, local or over ssh, with an atomic write.
+- `devfs.rs`: `dev_read` / `dev_write` for a project's `.dev/` folder, local or over ssh, with an atomic write. The first write into a `.dev/` adds a `.gitignore` of `*` there, as pi-todos does, so the folder never ends up in git.
 - `plane.rs`: the Plane.so REST calls the issues panel needs (sync, set state, set labels, create, comments, asset upload). The token is read from `~/.pi/agent/secrets/plane.json` on the project's host.
 - `github.rs`: the GitHub Issues calls, through `gh` on the project's host (sync, set state, labels, create, comments). No token: gh uses the host's login.
 - `remote.rs`: the shared non-interactive ssh command builder used by `dirs.rs`, `envs.rs` and `devfs.rs`.
