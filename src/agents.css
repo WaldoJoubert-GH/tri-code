@@ -1,7 +1,7 @@
 /* Agents window, and the icon picker it opens. See src/AgentsPanel.tsx, src/lucide.tsx;
    the look comes from design/agents.html (variant B). */
 
-.dot.agents { background: var(--muted); border-radius: 2px; }
+.mark.agents { color: var(--muted); }
 
 .agentswin { flex: 1; min-height: 0; overflow: auto; font-size: 12.5px; }
 .ag-list { padding: 8px 12px 24px; min-width: 480px; }

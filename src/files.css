@@ -1,6 +1,6 @@
 /* Files window (tree) and file window (viewer). See src/FileList.tsx, src/FileView.tsx. */
 
-.dot.files { background: var(--accent); }
+.mark.files { color: var(--accent); }
 
 .filewin, .filev { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
@@ -17,8 +17,8 @@
 .fbar .seg { margin: 0 2px; }
 .fbar .seg button { height: auto; padding: 1px 8px; }
 
-/* The project tree. Kept off `.files`: `.dot.files` on a window title bar would inherit
-   this rule's `flex: 1` and stretch the status dot across the title. */
+/* The project tree. Kept off `.files`: `.mark.files` on a window title bar would inherit
+   this rule's `flex: 1` and stretch the icon across the title. */
 .ftree { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; outline: none; }
 .frow {
   display: flex; align-items: center; gap: 6px; height: 24px; padding-right: 8px;

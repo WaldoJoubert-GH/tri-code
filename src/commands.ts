@@ -3,8 +3,8 @@
 // hotkeys.ts run the same code and flash the same message.
 
 import {
-  GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, agentOf, app, focusTab, focusedTab, goSpace, isRemote, live,
-  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, space, tabName, toggleMono,
+  GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, app, focusTab, focusedTab, goSpace, isRemote, live,
+  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, space, tabIcon, tabName, toggleMono,
 } from "./state";
 import { requestClose } from "./Canvas";
 import { openAppearance, toggleAppearance } from "./Appearance";
@@ -95,12 +95,6 @@ export function sendWindow(p: Project, f: Tab, i: number) {
   sendTo(p.id, f.id, i);
   flash(`${tabName(f)} → workspace ${i + 1}`);
 }
-
-const PANEL_ICON = { browser: "globe", issues: "list-todo", files: "folder-tree", file: "file-text", git: "git-branch", agents: "settings-2" };
-
-/** A window's icon: its agent's for a terminal or web app, else its kind's. */
-export const tabIcon = (t: Tab) =>
-  t.kind === "term" ? agentOf(t)?.icon ?? "square-terminal" : (t.agent && agentOf(t)?.icon) || PANEL_ICON[t.kind];
 
 /** What a window is called in the palette: a file window by its file. */
 const windowTitle = (t: Tab) => (t.kind === "file" ? (t.path ?? "").split("/").pop() || "file" : tabName(t));

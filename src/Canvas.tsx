@@ -2,7 +2,7 @@ import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isTerminal, live, projectById, removePage,
-  canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabName, toggleMono, visibleTabs,
+  canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, toggleMono, visibleTabs,
 } from "./state";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
@@ -403,8 +403,9 @@ export default function Canvas(props: { project: Project }) {
             if (!(e.target as Element).closest("button, .ptab")) doMax();
           }}
         >
-          <span
-            class={`dot ${
+          <Icon
+            name={tabIcon(tab)}
+            class={`mark ${
               isBrowser ? "web"
               : isIssues ? `plane${dev[repoOf(props.project).id]?.syncing ? " syncing" : ""}`
               : isFiles || isFile ? "files"

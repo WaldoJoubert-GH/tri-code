@@ -82,6 +82,12 @@ export const isTerminal = (t: Tab) => t.kind === "term";
 
 export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
 
+const PANEL_ICON = { browser: "globe", issues: "list-todo", files: "folder-tree", file: "file-text", git: "git-branch", agents: "settings-2" };
+
+/** A window's lucide icon: its agent's for a terminal or web app, else its kind's. */
+export const tabIcon = (t: Tab) =>
+  t.kind === "term" ? agentOf(t)?.icon ?? "square-terminal" : (t.agent && agentOf(t)?.icon) || PANEL_ICON[t.kind];
+
 /** A web app: an agent that opens a browser window rather than a terminal. */
 export const isWebApp = (a: Agent) => a.url !== undefined;
 

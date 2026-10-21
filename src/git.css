@@ -1,6 +1,6 @@
 /* Git window. See src/GitPanel.tsx; the look comes from design/git.html (variant B). */
 
-.dot.git { background: var(--violet); }
+.mark.git { color: var(--violet); }
 
 .gitwin { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: 12.5px; }
 .gitwin .grow { flex: 1; min-width: 0; }

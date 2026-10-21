@@ -53,11 +53,12 @@
 .ptab button { width: 18px; height: 18px; opacity: 0; }
 .ptab:hover button, .ptab.on button { opacity: 1; }
 
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
-.dot.running { background: var(--ok); }
-.dot.reconnecting { background: var(--warn); }
-.dot.exited { background: var(--bad); }
-.dot.web { background: var(--accent); border-radius: 2px; }
+/* Title-bar mark: the window's lucide icon, coloured by a terminal's status or a panel's kind. */
+.mark { color: var(--muted); }
+.mark.running { color: var(--ok); }
+.mark.reconnecting { color: var(--warn); }
+.mark.exited { color: var(--bad); }
+.mark.web { color: var(--accent); }
 
 /* Terminal body: xterm fills it. */
 .body {
@@ -172,8 +173,8 @@
 .page .frame { display: block; width: 100%; height: 100%; border: 0; background: var(--page-bg, #fff); }
 /* Issues window: a view of the project's .dev/ (config.json, issues.json, plane-states.json),
    the same files pi-todos and dev-hub read and write. Plain HTML, not a terminal, so plain keys drive it. */
-.dot.plane { width: 6px; height: 6px; border-radius: 1px; background: var(--violet); transform: rotate(45deg); }
-.dot.plane.syncing { animation: syncp .7s ease-in-out infinite alternate; }
+.mark.plane { color: var(--violet); }
+.mark.plane.syncing { animation: syncp .7s ease-in-out infinite alternate; }
 @keyframes syncp { to { opacity: .2; } }
 .iss { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
 .itools {
