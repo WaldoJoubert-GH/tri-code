@@ -43,6 +43,11 @@ A toolbar chip for each Plane Issue whose State is named exactly `"In Progress"`
 
 **Environment**:
 Where projects run: `local`, or an ssh destination (an alias from `~/.ssh/config` or `user@host`). Kept as an ordered list in `state.json`, so one can exist with no projects; the sidebar shows one section per Environment. A project's `host` is its Environment. Each can have a display name (double-click its header) and a lucide icon (click the icon); both are labels only, kept in `envStyles` by host, so a rename never changes where projects run.
+An ssh Environment can also carry a key file, port and `-o` options (`envSsh`, applied to every ssh call to that host; New environment takes a pasted `ssh -i key user@host` command) and a **PIN Lock** (`envLocks`).
+
+**PIN Lock**:
+A 4–8 digit PIN on an Environment. Locked, its projects show the PIN pad instead of the canvas, its terminals don't start, and Rust refuses ssh to it. An unlock lasts the chosen minutes; a restart locks again. A gate in tri-code, not encryption of the key.
+_Avoid_: Password, vault.
 _Avoid_: Host group, machine, server.
 
 **Open Project Dialog**:
@@ -71,7 +76,7 @@ A project's files for Go to File, as relative paths: `git ls-files --cached --ot
 The path field that is also the folder list: typing filters, `Enter` goes in or opens, `Backspace` on empty goes up, a `~` or `/` path jumps.
 
 **Project Icon**:
-What the sidebar draws for a project: a logo file from the project, an uploaded image, a glyph or the first letter. **Auto** is tri-code's pick (the first logo found, else the letter); any other choice in the Appearance panel is an override until "reset to auto".
+What the sidebar draws for a project: a logo file from the project, an uploaded image, a lucide icon or the first letter. **Auto** is tri-code's pick (the first logo found, else the letter); any other choice in the Appearance panel is an override until "reset to auto".
 
 **Tab Strip**:
 The leftmost toolbar group: the active workspace's Windows in tiling order, the focused one underlined, then `+`. A strip tab only focuses a Window that already exists (bringing back a Minimised one), so nothing is created or moved by clicking one; Windows on other workspaces are not listed.

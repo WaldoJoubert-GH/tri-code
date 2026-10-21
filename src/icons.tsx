@@ -1,20 +1,23 @@
 // Project icons: a logo file found in the project (picked automatically or by hand), an
-// uploaded image, a glyph, or the name's first letter. Image icons are data URLs kept by
+// uploaded image, a lucide icon, or the name's first letter. Image icons are data URLs kept by
 // icon_save outside state.json, like background images.
 
 import { invoke } from "@tauri-apps/api/core";
 import { JSX, Match, Switch } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { Project, app, projectById, setIcon } from "./state";
+import { Icon } from "./lucide";
 import { flash } from "./ui";
 
 /** A logo file in a project folder, as scan_logos returns it. */
 export type Logo = { file: string; data_url: string };
 
-/** Glyphs offered by the Appearance panel, after the letter. */
-export const GLYPHS = [
-  "◆", "●", "▲", "■", "★", "✦", "⬢", "◐", "⚡", "⚙", "⌘", "λ", "π", "∑", "♪", "☁",
-  "☀", "☾", "✿", "♦", "♣", "⚑", "✎", "⌂", "∞", "Ω", "#", "@", "&", "§", "¶", "†",
+/** Lucide icons offered by the Appearance panel, after the letter; search finds the rest. */
+export const PROJECT_ICONS = [
+  "diamond", "circle", "triangle", "square", "star", "sparkles", "hexagon", "contrast",
+  "zap", "settings", "command", "lambda", "pi", "sigma", "cloud", "sun",
+  "moon", "flower", "leaf", "flame", "flag", "pencil", "house", "infinity",
+  "rocket", "code", "box", "layers", "globe", "database", "server", "brain",
 ];
 
 /** Icon images by project id, as data URLs (small: logos are capped at 256 KB). */
@@ -114,9 +117,13 @@ export function forgetIcon(projectId: string) {
   invoke("icon_delete", { projectId }).catch((e) => console.error("icon_delete failed:", e));
 }
 
-/** The icon's content: an <img>, a glyph or the letter. The caller draws the tile. */
+/** The icon's content: an <img>, a lucide icon, an old glyph or the letter. The caller draws the tile. */
 export function IconFace(props: { project: Project }): JSX.Element {
   const image = () => props.project.icon?.kind === "image" && iconImages[props.project.id];
+  const lucide = () => {
+    const i = props.project.icon;
+    return i?.kind === "lucide" ? i.name : undefined;
+  };
   const glyph = () => {
     const i = props.project.icon;
     return i?.kind === "glyph" ? i.glyph : undefined;
@@ -124,6 +131,7 @@ export function IconFace(props: { project: Project }): JSX.Element {
   return (
     <Switch fallback={<b>{letterOf(props.project)}</b>}>
       <Match when={image()}>{(src) => <img src={src()} alt="" draggable={false} />}</Match>
+      <Match when={lucide()}>{(n) => <Icon name={n()} />}</Match>
       <Match when={glyph()}>{(g) => <i>{g()}</i>}</Match>
     </Switch>
   );

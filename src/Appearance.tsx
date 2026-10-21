@@ -6,7 +6,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { ACCENTS, Project, activeProject, projectById, renameProject, repoOf, setAppearance, setIcon } from "./state";
-import { GLYPHS, IconFace, Logo, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
+import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
+import { Icon, toggleIconPicker } from "./lucide";
 import { SignalsForm } from "./SignalSettings";
 import { flash } from "./ui";
 
@@ -95,7 +96,7 @@ function placePop(el: HTMLElement, a: HTMLElement) {
 /** Mount once (in App). Renders the popover; closes it on an outside pointerdown (Escape is handled in hotkeys.ts). */
 export function AppearancePopover() {
   const onDown = (e: PointerEvent) => {
-    if (pop() && !(e.target as Element).closest(".pop, #themeBtn, .gear")) closeAppearance();
+    if (pop() && !(e.target as Element).closest(".pop, .iconpick, #themeBtn, .gear")) closeAppearance();
   };
   onMount(() => document.addEventListener("pointerdown", onDown));
   onCleanup(() => document.removeEventListener("pointerdown", onDown));
@@ -215,13 +216,13 @@ export function AppearancePopover() {
   );
 }
 
-/** Icon: the automatic pick, another logo found in the project, an upload, a glyph or the letter. */
+/** Icon: the automatic pick, another logo found in the project, an upload, a lucide icon or the letter. */
 function IconSection(props: { project: Project }) {
   const p = () => props.project;
   const [logos, setLogos] = createSignal<Logo[] | null>(null);
   const [scanError, setScanError] = createSignal("");
-  const [tab, setTab] = createSignal<"project" | "glyph">(
-    props.project.icon?.kind === "glyph" || (props.project.icon?.kind === "letter" && !props.project.icon.auto) ? "glyph" : "project",
+  const [tab, setTab] = createSignal<"project" | "icon">(
+    ["lucide", "glyph"].includes(props.project.icon?.kind ?? "") || (props.project.icon?.kind === "letter" && !props.project.icon.auto) ? "icon" : "project",
   );
   let fileEl: HTMLInputElement | undefined;
 
@@ -230,14 +231,19 @@ function IconSection(props: { project: Project }) {
   });
 
   const icon = () => p().icon;
-  const isAuto = () => icon() === undefined || (icon()?.kind !== "glyph" && !!(icon() as { auto?: boolean }).auto);
+  const isAuto = () => icon() === undefined || (icon()?.kind !== "glyph" && icon()?.kind !== "lucide" && !!(icon() as { auto?: boolean }).auto);
   const summary = () => {
     const i = icon();
     if (!i) return { label: "Auto", sub: "looking for a logo…" };
+    if (i.kind === "lucide") return { label: "Icon · override", sub: i.name };
     if (i.kind === "glyph") return { label: "Glyph · override", sub: i.glyph };
     if (i.kind === "letter") return i.auto ? { label: "Auto", sub: "no logo found, using the letter" } : { label: "Letter · override", sub: letterOf(p()) };
     if (i.auto) return { label: "Auto", sub: i.file ?? "" };
     return { label: i.file ? "Logo · override" : "Uploaded image · override", sub: i.file ?? "your image" };
+  };
+  const lucideName = () => {
+    const i = icon();
+    return i?.kind === "lucide" ? i.name : undefined;
   };
   const pickedLogo = (file: string) => icon()?.kind === "image" && (icon() as { file?: string }).file === file && !isAuto();
   const uploaded = () => icon()?.kind === "image" && !(icon() as { file?: string }).file;
@@ -265,7 +271,7 @@ function IconSection(props: { project: Project }) {
         <button type="button" role="tab" aria-selected={tab() === "project"} onClick={() => setTab("project")}>
           From project{logos()?.length ? ` (${logos()!.length})` : ""}
         </button>
-        <button type="button" role="tab" aria-selected={tab() === "glyph"} onClick={() => setTab("glyph")}>Glyph</button>
+        <button type="button" role="tab" aria-selected={tab() === "icon"} onClick={() => setTab("icon")}>Icon</button>
       </div>
       <Show when={tab() === "project"}>
         <div class="logos">
@@ -298,7 +304,7 @@ function IconSection(props: { project: Project }) {
           <input ref={fileEl} type="file" accept="image/*" hidden onChange={onFile} />
         </label>
       </Show>
-      <Show when={tab() === "glyph"}>
+      <Show when={tab() === "icon"}>
         <div class="glyphs">
           <button
             type="button"
@@ -309,18 +315,26 @@ function IconSection(props: { project: Project }) {
           >
             {letterOf(p())}
           </button>
-          <For each={GLYPHS}>
-            {(g) => (
+          <For each={PROJECT_ICONS}>
+            {(n) => (
               <button
                 type="button"
-                aria-pressed={icon()?.kind === "glyph" && (icon() as { glyph: string }).glyph === g}
-                onClick={() => setIcon(p().id, { kind: "glyph", glyph: g })}
+                title={n}
+                aria-pressed={lucideName() === n}
+                onClick={() => setIcon(p().id, { kind: "lucide", name: n })}
               >
-                {g}
+                <Icon name={n} size={15} />
               </button>
             )}
           </For>
         </div>
+        <button
+          type="button"
+          class="upload"
+          onClick={(e) => toggleIconPicker(e.currentTarget, lucideName() ?? "", (name) => setIcon(p().id, { kind: "lucide", name }))}
+        >
+          Search all icons…
+        </button>
       </Show>
     </>
   );

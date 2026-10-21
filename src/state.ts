@@ -108,6 +108,8 @@ export type Space = {
  */
 export type ProjectIcon =
   | { kind: "image"; file?: string; auto?: boolean }
+  | { kind: "lucide"; name: string }
+  /** From before lucide icons: still drawn, no longer offered. */
   | { kind: "glyph"; glyph: string }
   | { kind: "letter"; auto?: boolean };
 
@@ -166,12 +168,20 @@ export type ProjectNotify = Partial<Record<SoundEvent, string>> & {
 const defaultNotify = (): NotifySettings => ({ blocked: "chime", done: "soft", error: "knock", alert: "away", desktop: true, volume: 70, dnd: false });
 
 export type EnvStyle = { name?: string; icon?: string };
+/** ssh options an ssh destination alone can't carry (`-i`, `-p`, `-o`); passed on every ssh call to that host. */
+export type EnvSsh = { identityFile?: string; port?: string; options?: string[] };
+/** A PIN lock: salt and hash from `env_pin_hash`, and how long an unlock lasts. */
+export type EnvLock = { salt: string; hash: string; minutes: number };
 
 type Persisted = {
   /** Environments in sidebar order: "local" or an ssh destination. Each project's host is one of them. */
   environments: string[];
   /** Per environment, by host: a display name and a lucide icon. The host stays the key, so a rename never changes where projects run. */
   envStyles: Record<string, EnvStyle>;
+  /** Per environment, by host: its key file, port and extra ssh options. */
+  envSsh: Record<string, EnvSsh>;
+  /** Per environment, by host: its PIN lock, if it has one. */
+  envLocks: Record<string, EnvLock>;
   projects: Project[];
   /** Most recent first, at most RECENT_MAX. */
   recent: RecentFolder[];
@@ -203,7 +213,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -317,6 +327,22 @@ export function removeEnvironment(host: string) {
   setApp(produce((s) => {
     s.environments = s.environments.filter((h) => h !== host);
     delete s.envStyles[host];
+    delete s.envSsh[host];
+    delete s.envLocks[host];
+  }));
+}
+
+export function setEnvSsh(host: string, ssh: EnvSsh | undefined) {
+  setApp(produce((s) => {
+    if (ssh) s.envSsh[host] = ssh;
+    else delete s.envSsh[host];
+  }));
+}
+
+export function setEnvLock(host: string, lock: EnvLock | undefined) {
+  setApp(produce((s) => {
+    if (lock) s.envLocks[host] = lock;
+    else delete s.envLocks[host];
   }));
 }
 
@@ -660,7 +686,7 @@ function migrate(raw: any): Persisted {
   const environments: string[] = raw.environments ?? ["local"];
   for (const p of projects) if (!environments.includes(p.host)) environments.push(p.host);
   return {
-    environments, envStyles: raw.envStyles ?? {}, projects, recent: raw.recent ?? [],
+    environments, envStyles: raw.envStyles ?? {}, envSsh: raw.envSsh ?? {}, envLocks: raw.envLocks ?? {}, projects, recent: raw.recent ?? [],
     activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(), gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
     notify: { ...defaultNotify(), ...raw.notify },
     // Anyone with a state file from before the tour already knows their way around.
