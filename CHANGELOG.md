@@ -2,6 +2,15 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.26 — 2026-10-21
+
+- The issues panel isn't only for Plane any more. Tick any mix of Plane, GitHub Issues and Local issues from ⚙ in its toolbar (a project with none set up starts there); they show in one list, with Sentry beside them, and `f` filters by source. Existing Plane projects carry on unchanged.
+- GitHub Issues use `gh` on the project's machine with the login it already has, so tri-code needs no token. They show as `#231`, with Open, In Progress, Closed and Not planned; In Progress is a label (`in progress` unless you name another), added to the repo the first time it's needed. Labels and text comments work too.
+- Local issues need no account: they live in the project's `.dev/local-issues.json`. Give them a prefix (`TODO-3`) or leave it empty for plain numbers.
+- With more than one source on, `n` asks for a title and Tab picks where the new issue goes. Timers and the In Progress chips work for issues from any source.
+- Changing an issue's state shows the new state with a spinner until it's saved.
+- The state and label dropdowns close when you click outside them or switch windows.
+
 ## 0.1.25 — 2026-10-21
 
 - Browser windows show a thin line under the address bar while a page loads (on the title bar for web apps that hide it), so a slow click no longer looks like nothing happened. Quick loads under 150 ms show nothing.
