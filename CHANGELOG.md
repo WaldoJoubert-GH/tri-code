@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.27 — 2026-10-21
+
+- The status line shows the active project's branch on the left: `*` when it has uncommitted changes, ↑/↓ against its upstream, and counts like `git status --short` (`+` added, `~` modified, `−` deleted, `?` untracked). Hover for the files, click to open the git window. It refreshes when you switch project, when tri-code regains focus, and every 10s (30s over ssh).
+- Window title bars show the window's icon in colour instead of a dot: an agent's own icon, or the panel's (globe, git branch, folder tree…). A terminal's icon is green when running, amber while reconnecting and red once exited.
+- The gap between windows moved from the status line to Appearance. `Alt+,` and `Alt+.` still step it.
+
 ## 0.1.26 — 2026-10-21
 
 - The issues panel isn't only for Plane any more. Tick any mix of Plane, GitHub Issues and Local issues from ⚙ in its toolbar (a project with none set up starts there); they show in one list, with Sentry beside them, and `f` filters by source. Existing Plane projects carry on unchanged.
