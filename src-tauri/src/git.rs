@@ -258,19 +258,27 @@ pub struct FileIndex {
 const INDEX_LIMIT: usize = 50_000;
 
 /// Go to File's index: tracked plus untracked-but-not-ignored files, so a file you just
-/// created is findable and node_modules is not. A folder that is not a repo is walked.
+/// created is findable and node_modules is not. Ignored files outside ignored folders
+/// (`.env`, `.env.local`) are listed too; a wholly ignored folder is not. A folder that is
+/// not a repo is walked.
 #[tauri::command]
 pub async fn project_files(host: String, path: String) -> Result<FileIndex, String> {
-    blocking(move || match exec(&host, &path, "git", &["ls-files", "-z", "--cached", "--others", "--exclude-standard"], None) {
-        Ok(out) => {
-            let mut files: Vec<String> = out.split('\0').filter(|f| !f.is_empty()).map(String::from).collect();
+    const CMDS: &[&[&str]] = &[
+        &["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        // --directory folds a wholly ignored folder into one "dir/" entry, dropped below
+        &["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"],
+    ];
+    blocking(move || match multi(&host, &path, CMDS).ok().and_then(|r| r.into_iter().map(Result::ok).collect::<Option<Vec<_>>>()) {
+        Some(outs) => {
+            let mut files: Vec<String> = outs[0].split('\0').filter(|f| !f.is_empty()).map(String::from).collect();
             // a conflicted file is listed once per merge stage
             files.dedup();
+            files.extend(outs[1].split('\0').filter(|f| !f.is_empty() && !f.ends_with('/')).map(String::from));
             let truncated = files.len() > INDEX_LIMIT;
             files.truncate(INDEX_LIMIT);
             Ok(FileIndex { files, git: true, truncated })
         }
-        Err(_) => {
+        None => {
             let (files, truncated) = crate::fs::walk(&host, &path, INDEX_LIMIT)?;
             Ok(FileIndex { files, git: false, truncated })
         }
