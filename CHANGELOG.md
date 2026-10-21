@@ -2,6 +2,14 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.24 — 2026-10-21
+
+- Choose what opening a file does when a file window is already open: replace its file, open a new window, add it as a tab, or open a preview that the next file replaces until you keep it (double-click its name, or start editing). The first time, the file window asks, with "remember". Change it later from ⋯ in any file window, or from Settings.
+- Settings, at the foot of the sidebar (or `Alt+X` › Settings): opening files and the gap between windows, for every project.
+- Ctrl+click in the files window opens a file in a new window. A file that's already open is focused instead of opened again.
+- Go to File finds gitignored files like `.env`. Whole ignored folders such as `node_modules` stay out.
+- Drag a project in the sidebar to reorder it within its environment. Its worktrees move with it.
+
 ## 0.1.23 — 2026-10-21
 
 - ssh environments that need a key file. In New environment, paste the ssh command you use in a terminal (`ssh -i key.pem user@host`, with `-p` and `-o` too) or fill in the Key file field; tri-code uses that key, and only that key, for every terminal, git and file call to the host. A failed test says what to try: the key, its passphrase (add it with `ssh-add`), or file permissions that are too open.
