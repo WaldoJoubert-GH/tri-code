@@ -245,8 +245,6 @@ svg.lucide { flex: none; display: block; }
 .seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
 .seg button svg { width: 15px; height: 15px; display: block; }
-.gapctl { display: flex; gap: 5px; align-items: center; color: var(--muted); font: 11px var(--mono); flex: none; }
-.gapctl input { width: 34px; font-size: 11px; padding: 0 4px; }
 .spaces { display: flex; align-self: center; gap: 2px; margin: 0 4px; flex: none; }
 .spaces button {
   position: relative; width: 26px; height: 22px; border-radius: 4px; color: var(--muted);
@@ -383,6 +381,31 @@ svg.lucide { flex: none; display: block; }
 .status .sigs:hover { background: var(--hover); }
 .status .sigs > span { display: flex; align-items: center; gap: 5px; color: var(--sc); }
 .status .sigs > .s-working { color: var(--muted); }
+/* The active project's branch and changes (hidden when it is not a repo); hover lists the files */
+.status .gstat { flex: none; display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 360px; color: var(--text); font: 11px var(--mono); }
+.status .gstat .nm { overflow: hidden; text-overflow: ellipsis; }
+.status .gstat .nm.det { color: var(--bad); }
+.status .gstat .ab { color: var(--muted); }
+.gstat .cnt, .gstat-pop .s { font: 10.5px var(--mono); }
+.gstat .cnt { display: flex; gap: 5px; }
+.gstat .A, .gstat-pop .s.A { color: var(--ok); }
+.gstat .M, .gstat-pop .s.M { color: var(--warn); }
+.gstat .D, .gstat-pop .s.D { color: var(--bad); }
+.gstat .U, .gstat-pop .s.U { color: var(--muted); }
+.gstat-pop {
+  position: fixed; z-index: 50; width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 16px 40px -12px var(--shadow); font-size: 12px; overflow: hidden; pointer-events: none;
+}
+.gstat-pop .ph { padding: 8px 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.gstat-pop .ph b { font: 600 12px var(--mono); }
+.gstat-pop .ph span { color: var(--muted); font: 11px var(--mono); }
+.gstat-pop .sec { padding: 6px 10px 2px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.gstat-pop .f { display: flex; gap: 8px; padding: 2px 10px; font: 12px var(--mono); }
+.gstat-pop .s { width: 14px; font-weight: 700; text-align: center; flex: none; font-size: 12px; }
+.gstat-pop .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gstat-pop .more, .gstat-pop .clean { padding: 2px 10px; color: var(--muted); font-size: 11px; }
+.gstat-pop .clean { padding: 10px; }
+.gstat-pop .pf { margin-top: 6px; padding: 7px 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .status .bellbtn { flex: none; display: grid; place-items: center; width: 24px; height: 20px; border-radius: 4px; color: var(--muted); }
 .status .bellbtn:hover, .status .bellbtn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
 .status .bellbtn.dnd { color: var(--warn); }
@@ -642,13 +665,13 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .pop .radio input { margin: 3px 0 0; accent-color: var(--accent); }
 .pop .radio small { display: block; color: var(--muted); font-size: 11.5px; }
 .pop .note { margin: 0; color: var(--muted); font-size: 11.5px; }
-.pop.settings .px { margin-left: auto; display: flex; align-items: center; gap: 5px; font: 11px var(--mono); }
-/* Px fields here and in the status line: plain boxes, no spinner arrows. */
-.pop.settings .px input, .gapctl input {
+.pop .px { margin-left: auto; display: flex; align-items: center; gap: 5px; font: 11px var(--mono); }
+/* Px fields in Settings and Appearance: plain boxes, no spinner arrows. */
+.pop .px input {
   width: 52px; font: 12px var(--mono); color: var(--text); background: var(--bg); text-align: right;
   border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; outline: none; user-select: text;
   -moz-appearance: textfield;
 }
-.pop.settings .px input:focus, .gapctl input:focus { border-color: var(--accent); }
-.pop.settings .px input::placeholder { color: var(--muted); }
-.pop.settings .px input::-webkit-inner-spin-button, .gapctl input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.pop .px input:focus { border-color: var(--accent); }
+.pop .px input::placeholder { color: var(--muted); }
+.pop .px input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

@@ -5,7 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { ACCENTS, Project, activeProject, projectById, renameProject, repoOf, setAppearance, setIcon } from "./state";
+import { ACCENTS, GAP_MAX, Project, activeProject, app, projectById, renameProject, repoOf, setAppearance, setGap, setIcon } from "./state";
 import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
 import { Icon, toggleIconPicker } from "./lucide";
 import { SignalsForm } from "./SignalSettings";
@@ -206,6 +206,17 @@ export function AppearancePopover() {
                     <input type="range" min="0" max="85" step="5" value={String(p.dim)} onInput={(e) => setAppearance(p.id, { dim: +e.currentTarget.value })} />
                     <span class="val">{p.dim}%</span>
                   </div>
+                  <label class="row" title="Between windows, in every project (Alt+, / Alt+.)">
+                    Gap
+                    <span class="px">
+                      <input
+                        type="number" min={0} max={GAP_MAX} value={app.gap}
+                        onInput={(e) => e.currentTarget.value !== "" && setGap(+e.currentTarget.value)}
+                        onBlur={(e) => (e.currentTarget.value = String(app.gap))}
+                      />
+                      px · all projects
+                    </span>
+                  </label>
                 </Show>
               </div>
             );

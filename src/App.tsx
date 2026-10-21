@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createEffect, createSignal, onMount, untrack } from "solid-js";
+import { For, Show, createEffect, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import {
-  GAP_MAX, SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
-  persistChanges, repoOf, setGap, setLayout, space, tabName,
+  SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
+  persistChanges, repoOf, setLayout, space, tabName,
 } from "./state";
 import { SIG_TEXT, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
@@ -30,6 +30,7 @@ import { ensureSession, setLinkHandler } from "./terms";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { appVersion, installUpdate, startUpdateChecks, updateReady } from "./updater";
+import { type Change, type GitStatus, branchStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
 import {
   clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
 } from "./issues";
@@ -228,14 +229,7 @@ function Toolbar() {
 function StatusBar() {
   return (
     <div class="status">
-      <label class="gapctl" title="Gap between windows (Alt+, / Alt+.)">
-        gap
-        <input
-          type="number" min={0} max={GAP_MAX} value={app.gap}
-          onInput={(e) => e.currentTarget.value !== "" && setGap(+e.currentTarget.value)}
-          onBlur={(e) => (e.currentTarget.value = String(app.gap))}
-        />
-      </label>
+      <BranchStatus />
       <span class="flash">{flashMsg()}</span>
       <StatusTimer />
       <SignalCounts />
@@ -361,5 +355,108 @@ function StatusTimer() {
         today {repo() ? formatHm(todayTotal(repo()!.id)) : "0m"}
       </span>
     </Show>
+  );
+}
+
+/** The active project's branch and changes, like `git status --short`; nothing when it is not a repo. */
+function BranchStatus() {
+  const [hover, setHover] = createSignal<DOMRect | null>(null);
+  const project = () => activeProject();
+  const st = () => {
+    const p = project();
+    return p ? branchStatus[p.id] : undefined;
+  };
+  const tick = () => {
+    const p = activeProject();
+    if (p && !document.hidden) void peekStatus(p);
+  };
+  createEffect(on(() => app.activeProject, tick));
+  // Every 10s locally, every 30s over ssh; and when the window comes back.
+  let n = 0;
+  const timer = setInterval(() => {
+    const p = activeProject();
+    if (p && (!isRemote(p) || ++n % 3 === 0)) tick();
+  }, 10_000);
+  window.addEventListener("focus", tick);
+  onCleanup(() => (clearInterval(timer), window.removeEventListener("focus", tick)));
+
+  return (
+    <Show when={st()}>
+      {(s) => (
+        <>
+          <button
+            class="gstat"
+            aria-label="Git status · open the git window"
+            onClick={() => project() && openGitPanel(project()!)}
+            onMouseEnter={(e) => setHover(e.currentTarget.getBoundingClientRect())}
+            onMouseLeave={() => setHover(null)}
+          >
+            <Icon name="git-branch" size={12} />
+            <span class="nm" classList={{ det: !s().branch }}>{s().branch ?? `HEAD ${s().commits[0]?.sha.slice(0, 7) ?? ""}`}</span>
+            <Show when={s().files.length}><span>*</span></Show>
+            <Show when={aheadBehind(s())}><span class="ab">{aheadBehind(s())}</span></Show>
+            <ChangeCounts s={s()} />
+          </button>
+          <Show when={hover()}>{(r) => <GitStatusPop s={s()} at={r()} />}</Show>
+        </>
+      )}
+    </Show>
+  );
+}
+
+function aheadBehind(s: GitStatus): string {
+  const up = unpushed(s);
+  return [up ? `↑${up}` : "", s.upstream && s.behind ? `↓${s.behind}` : ""].filter(Boolean).join(" ");
+}
+
+/** Short-status letter for a change: added, deleted, untracked, else modified. */
+const kindOf = (c: Change) => (c.x === "?" ? "U" : c.x === "A" ? "A" : c.x === "D" || c.y === "D" ? "D" : "M");
+
+function ChangeCounts(props: { s: GitStatus }) {
+  const parts = () => {
+    const n = { A: 0, M: 0, D: 0, U: 0 };
+    for (const c of props.s.files) n[kindOf(c)]++;
+    return ([["A", "+"], ["M", "~"], ["D", "−"], ["U", "?"]] as const).filter(([k]) => n[k]).map(([k, sym]) => ({ k, t: `${sym}${n[k]}` }));
+  };
+  return (
+    <Show when={parts().length}>
+      <span class="cnt"><For each={parts()}>{(x) => <span class={x.k}>{x.t}</span>}</For></span>
+    </Show>
+  );
+}
+
+function GitStatusPop(props: { s: GitStatus; at: DOMRect }) {
+  const s = () => props.s;
+  const sections = () => [
+    { title: "Staged", list: s().files.filter(isStaged), code: (c: Change) => c.x },
+    { title: "Changes", list: s().files.filter((c) => isUnstaged(c) && c.x !== "?"), code: (c: Change) => c.y },
+    { title: "Untracked", list: s().files.filter((c) => c.x === "?"), code: () => "?" },
+  ].filter((x) => x.list.length);
+  const tracking = () =>
+    !s().branch ? `detached at ${s().commits[0]?.sha.slice(0, 7) ?? "HEAD"}`
+    : !s().upstream ? "no upstream · not pushed yet"
+    : `tracking ${s().upstream}${s().ahead || s().behind ? ` · ↑${s().ahead} ↓${s().behind}` : " · up to date"}`;
+  const cls = (code: string) => (code === "?" ? "U" : code === "A" || code === "D" ? code : "M");
+  return (
+    <div class="gstat-pop" style={{ left: `${Math.min(props.at.left, window.innerWidth - 392)}px`, bottom: `${window.innerHeight - props.at.top + 6}px` }}>
+      <div class="ph">
+        <b>{s().branch ?? "HEAD"}</b>
+        <span>{tracking()}</span>
+      </div>
+      <Show when={s().files.length} fallback={<div class="clean">Nothing to commit, working tree clean.</div>}>
+        <For each={sections()}>
+          {(sec) => (
+            <>
+              <div class="sec">{sec.title} · {sec.list.length}</div>
+              <For each={sec.list.slice(0, 8)}>
+                {(c) => <div class="f"><span class={`s ${cls(sec.code(c))}`}>{sec.code(c)}</span><span class="p">{c.path}</span></div>}
+              </For>
+              <Show when={sec.list.length > 8}><div class="more">+{sec.list.length - 8} more</div></Show>
+            </>
+          )}
+        </For>
+      </Show>
+      <div class="pf">Click to open the git window · Alt+C</div>
+    </div>
   );
 }

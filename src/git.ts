@@ -93,6 +93,25 @@ export function stepOf(g: GitUi): "commit" | "push" | "pr" | "merge" | "done" {
   return "pr";
 }
 
+// ── status line ─────────────────────────────────────────────────────
+
+/** The status line's view of each project: null when it is not a repo (or can't be reached). */
+export const [branchStatus, setBranchStatus] = createStore<Record<string, GitStatus | null>>({});
+const peeking = new Set<string>();
+
+/** git_status alone, without the git window's diff and PR lookups. */
+export async function peekStatus(p: Project): Promise<void> {
+  if (peeking.has(p.id)) return;
+  peeking.add(p.id);
+  try {
+    setBranchStatus(p.id, await invoke<GitStatus>("git_status", args(p)));
+  } catch {
+    setBranchStatus(p.id, null);
+  } finally {
+    peeking.delete(p.id);
+  }
+}
+
 // ── loading ─────────────────────────────────────────────────────────
 
 export async function refresh(p: Project): Promise<void> {
@@ -109,8 +128,10 @@ export async function refresh(p: Project): Promise<void> {
         g.sel = first ? { path: first.path, staged: isStaged(first) } : undefined;
       }
     });
+    setBranchStatus(p.id, status);
   } catch (e) {
     set(p, (g) => { g.error = String(e); g.status = undefined; });
+    setBranchStatus(p.id, null);
   } finally {
     set(p, (g) => { g.loading = false; });
   }
