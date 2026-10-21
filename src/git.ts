@@ -315,7 +315,9 @@ export function linkedIssue(p: Project): { slug: string; title: string; link: st
   const list = inProgress(repoOf(p).id);
   const branch = (gitOf(p.id).status?.branch ?? "").toLowerCase();
   const d = devOf(repoOf(p).id);
-  const hit = list.find((i) => branch.includes(slugOf(d, i).toLowerCase())) ?? list[0];
+  // A bare number (GitHub's #231 once a branch drops the #, or an unprefixed Local issue) only counts at the start of the branch name.
+  const named = (slug: string) => /^\d+$/.test(slug) ? new RegExp(`(^|/)${slug}-`).test(branch) : branch.includes(slug);
+  const hit = list.find((i) => named(slugOf(d, i).toLowerCase().replace(/^#/, ""))) ?? list[0];
   return hit && { slug: slugOf(d, hit), title: hit.title, link: hit.link };
 }
 

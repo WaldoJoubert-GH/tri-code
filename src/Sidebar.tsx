@@ -7,7 +7,7 @@ import {
 import { closeBrowser, setBrowsersCovered } from "./browsers";
 import { closeSession } from "./terms";
 import { appearanceOpen, closeAppearance, forgetBgImage, openAppearance } from "./Appearance";
-import { dev, forgetProject, isActive } from "./issues";
+import { dev, forgetProject, isActive, sourcesOf, stateOf } from "./issues";
 import { IconFace, forgetIcon } from "./icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { openProjectDialog } from "./OpenProject";
@@ -165,15 +165,16 @@ export default function Sidebar() {
     void invoke("env_forget_lock", { host });
   };
 
-  /** Active Plane issues per State, in Plane's colours (the pi-todos widget). */
+  /** Active issues per State, in each Source's colours (the pi-todos widget). */
   const miniBar = (p: Project) => {
     const d = dev[p.id];
     if (!d?.connected) return [];
+    const on = sourcesOf(d.config);
     const counts = new Map<string, { color: string; name: string; n: number }>();
     for (const i of d.issues) {
-      if (i.source !== "plane" || !isActive(d, i)) continue;
-      const s = d.states.find((x) => x.id === i.state_id);
-      const key = s?.id ?? "?";
+      if (i.source === "sentry" || !on.includes(i.source) || !isActive(d, i)) continue;
+      const s = stateOf(d, i);
+      const key = `${i.source}/${s?.id ?? "?"}`;
       const entry = counts.get(key) ?? { color: s?.color ?? "#888", name: s?.name ?? "Unknown", n: 0 };
       entry.n += 1;
       counts.set(key, entry);

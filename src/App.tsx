@@ -302,12 +302,12 @@ function ProjectInProgressChips(props: { p: NonNullable<ReturnType<typeof active
       <div class="prog" role="group" aria-label="In Progress issues">
         <For each={list().slice(0, 2)}>
           {(i) => {
-            const run = () => runningEntry(r!.id)?.issue_id === i.id;
+            const run = () => runningEntry(r!.id)?.issue_id === issueKey(i);
             return (
               <button
                 classList={{ run: run() }}
                 title={`${slugOf(dev[r!.id], i)} · ${i.title} · In Progress${run() ? " · timer running" : ""}. Click to open`}
-                onClick={() => openIssuePanel(p!, i.id)}
+                onClick={() => openIssuePanel(p!, issueKey(i))}
               >
                 <span class="sd" style={{ background: stateOf(dev[r!.id], i)?.color ?? "#f59e0b" }} />
                 <span class="sid">{slugOf(dev[r!.id], i)}</span>

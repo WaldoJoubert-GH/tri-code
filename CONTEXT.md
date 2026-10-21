@@ -7,26 +7,36 @@ A minimal agent development environment. The left sidebar lists projects grouped
 tri-code is the third client of a project's **Dev Directory** (`.dev/`). The other two are pi-todos (a pi extension) and dev-hub (a Claude Code mod). pi-todos' `CONTEXT.md` is the source of the domain language; these terms are the ones tri-code uses for the same files.
 
 **Dev Directory** (`.dev/`):
-The per-project, gitignored folder shared by the three clients: `config.json`, `issues.json`, `plane-states.json`, `plane-labels.json`, `time-entries.json`, `sentry/<id>.json`, and `plane/comments/<issue>.json`. Read and written on the project's host.
+The per-project, gitignored folder shared by the three clients: `config.json`, `issues.json`, `plane-states.json`, `plane-labels.json`, `time-entries.json`, `sentry/<id>.json`, and `plane/comments/<issue>.json`; tri-code adds `local-issues.json`, `github-labels.json` and `github/comments/<n>.json`. Read and written on the project's host.
 _Avoid_: Data dir, cache dir.
 
 **Dev Client**:
 A tool that reads and writes a project's Dev Directory. tri-code is one, alongside pi-todos and dev-hub. Clients must not keep their own copy of the shared data.
 
 **Issues File** (`issues.json`):
-The unified list of Plane Issues and pulled Sentry Issues, with a `source` discriminator. A Plane sync rewrites only the Plane half and preserves the Sentry entries, the same way pi-todos' `replacePlaneIssues` does.
+The unified list of Plane, GitHub and pulled Sentry Issues, with a `source` discriminator. A sync of one Source rewrites only that Source's entries and keeps every other one. Local Issues are not in it.
+
+**Issue Source**:
+Where a project's issues come from: Plane, GitHub or Local, any mix of them, ticked in the Issues Panel's ⚙ form and kept as `sources` in `config.json`. Sentry is pulled beside them and is not a Source. A config with a `plane` section and no `sources` means Plane alone. Chosen from design/issue-providers.html (variant B); see ADR 0002.
+_Avoid_: Provider, tracker, integration.
+
+**GitHub Issue**:
+An issue of the project's GitHub repo, read and changed through `gh` on the project's host with its login. Open or closed only, so the panel maps it to four States: Open, In Progress (open with the In Progress label, `in progress` unless `github.progress_label` says otherwise), Closed and Not planned. Comments are text only.
+
+**Local Issue**:
+An issue that exists only in `.dev/local-issues.json`: a number, a title and one of four States (Todo, In Progress, Done, Cancelled). No account and no sync. Its own file because pi-todos and dev-hub rewrite `issues.json`.
 
 **Issues Panel**:
 A canvas Window, one per project, that renders the project's Dev Directory as a list and a full-width drill-down. New `TabKind` `"issues"`. Plain HTML, not a terminal, so plain keys drive it while it is focused. Addressed with `Alt+I`.
 
 **Slug-ID**:
-`<Project Identifier>-<sequence_id>` for a Plane Issue (e.g. `TRI-12`); `S-<sentry_id>` for a Sentry Issue. The stable key for selection, copy and the "send to agent" text.
+`<Project Identifier>-<sequence_id>` for a Plane Issue (e.g. `TRI-12`); `#<number>` for a GitHub Issue; `<prefix>-<number>` for a Local Issue, or the bare number when the project's Local prefix is empty; `S-<sentry_id>` for a Sentry Issue. What the user copies and sends to an agent; selection and Time Entries use the issue key (`gh231`, `lo3`, the Plane UUID).
 
 **State Pill**:
-A Plane State rendered with its State Hex as the fill and black or white text by relative luminance. The fill does not follow the theme. In the panel it is also the control that opens the State Dropdown.
+A State rendered with its State Hex as the fill (a GitHub or Local Issue's States have fixed colours) and black or white text by relative luminance. The fill does not follow the theme. In the panel it is also the control that opens the State Dropdown.
 
 **State Dropdown**:
-The popup anchored under a State Pill that lists every workspace State grouped by State Group. `d` opens it; arrows move, Enter confirms and PATCHes Plane.
+The popup anchored under a State Pill that lists every State of the issue's Source grouped by State Group. `d` opens it; arrows move, Enter confirms and PATCHes Plane, runs `gh`, or rewrites `local-issues.json`.
 _Avoid_: State picker, status menu.
 
 **Label**:
@@ -39,7 +49,7 @@ A Plane work item comment: an author, a timestamp, `comment_html` and its images
 The single un-stopped Time Entry across the workspace. Shown on the row, in the In Progress chips and in the status line; persisted in `time-entries.json`.
 
 **In Progress Chip**:
-A toolbar chip for each Plane Issue whose State is named exactly `"In Progress"`, the running one first then by priority. Two chips show, then `+N`. A click drills into that issue in the Issues Panel.
+A toolbar chip for each issue, from any ticked Source, whose State is named exactly `"In Progress"`, the running one first then by priority. Two chips show, then `+N`. A click drills into that issue in the Issues Panel.
 
 **Environment**:
 Where projects run: `local`, or an ssh destination (an alias from `~/.ssh/config` or `user@host`). Kept as an ordered list in `state.json`, so one can exist with no projects; the sidebar shows one section per Environment. A project's `host` is its Environment. Each can have a display name (double-click its header) and a lucide icon (click the icon); both are labels only, kept in `envStyles` by host, so a rename never changes where projects run.

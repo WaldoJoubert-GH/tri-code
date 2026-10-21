@@ -6,6 +6,7 @@ mod envs;
 mod envssh;
 mod fs;
 mod git;
+mod github;
 mod plane;
 mod pty;
 mod remote;
@@ -92,6 +93,13 @@ pub fn run() {
             plane::plane_add_comment,
             plane::plane_upload_asset,
             plane::plane_check_token,
+            github::gh_repo,
+            github::gh_issues_sync,
+            github::gh_issue_create,
+            github::gh_issue_set_state,
+            github::gh_issue_labels,
+            github::gh_issue_comments,
+            github::gh_issue_comment,
             store::state_load,
             store::state_save,
             tour::tour_folder,

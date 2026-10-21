@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tri-code · issue providers prototype</title>
+<!--
+  PROTOTYPE — throwaway. Not imported by the app; open this file directly in a browser.
+  Question: "How do we add GitHub Issues next to Plane, and let a project choose
+  Plane, GitHub or Local as where its issues live?"
+
+  CHOSEN: B, with two changes: Local's prefix is the user's to set (empty = plain numbers, `3`),
+  and Local issues live in .dev/local-issues.json rather than issues.json, because pi-todos and
+  dev-hub rewrite issues.json on every Plane sync. GitHub stays `#231`. See docs/adr/0002-issue-sources.md.
+
+  Three variants, switchable from the floating bar at the bottom (also ← / → keys).
+  URL keeps the choice: issue-providers.html?variant=B (served) or issue-providers.html#B (file://).
+    A · One tracker per project   — the setup form becomes a three-way choice; a "via GitHub ▾" chip switches it.
+    B · Sources, tick any         — Plane, GitHub and Local are independent sources; the panel merges them.
+    C · App default + override    — Settings picks a default (Local works with zero setup); a project can override it.
+
+  The right-hand column is the point: it shows what each variant would write to .dev/config.json,
+  what lands in .dev/issues.json, and which calls go out (Plane REST via Rust, `gh` on the project's host).
+  Everything is in memory; nothing is called.
+
+  Mapping each provider onto the panel's existing ideas (State Pill, State Group, Slug-ID, In Progress Chip):
+    Plane   TRI-12   States from plane-states.json, as today.
+    GitHub  #123     open / closed(completed) / closed(not planned) → unstarted / completed / cancelled.
+                     "In Progress" has no GitHub equivalent: shown here as a label (toggle the alternative,
+                     a Projects v2 Status field, in the GitHub card). Runs `gh` on the project's host, so it
+                     uses the user's existing gh login — no token in tri-code, same as the Git Window.
+    Local    L-3     Lives only in .dev/issues.json with source "local". Four fixed States. No sync, no network.
+    Sentry   S-4412  Unchanged: pulled alongside whatever tracker is chosen.
+
+  Contract note (ADR 0001): issues.json is shared with pi-todos and dev-hub. A new `source` value
+  ("github", "local") and a `tracker` key in config.json must land in pi-todos first.
+-->
+<style>
+:root {
+  --bg: #fbfbfc; --panel: #f1f2f5; --canvas: #e6e8ed; --line: #d9dce3; --hover: #e6e8ee;
+  --raised: #dfe2ea; --text: #23262d; --muted: #6b7080; --warn: #9a6400; --ok: #3d7a1c;
+  --bad: #c4314b; --violet: #7c4dbd; --shadow: rgba(30,34,44,.22);
+  --accent-raw: #7aa2f7; --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  --ui: system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f12; --panel: #15171c; --canvas: #0b0c0f; --line: #24272f; --hover: #1c1f26;
+    --raised: #232733; --text: #d6d8de; --muted: #7d828f; --warn: #e0af68; --ok: #9ece6a;
+    --bad: #f7768e; --violet: #bb9af7; --shadow: rgba(0,0,0,.8); --accent: var(--accent-raw);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--canvas); color: var(--text); font: 13px/1.4 var(--ui); overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+input { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 7px; }
+kbd { font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--panel); }
+code { font: 11.5px var(--mono); background: var(--raised); padding: 0 3px; border-radius: 3px; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 10px; height: calc(100% - 56px); padding: 10px; }
+@media (max-width: 900px) { .stage { grid-template-columns: 1fr; overflow: auto; } }
+
+/* ---- canvas window ---- */
+.win { display: flex; flex-direction: column; min-height: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 1px 3px var(--shadow); overflow: hidden; }
+.wbar { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); flex: none; }
+.wbar b { color: var(--text); font-weight: 600; }
+.wbar .sp { flex: 1; }
+.via { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border-radius: 3px; border: 1px solid var(--line); font-size: 11.5px; color: var(--text); }
+.via:hover { background: var(--hover); }
+
+.itools { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--line); flex: none; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-right: 4px; }
+.seg button { padding: 1px 8px; font-size: 12px; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); }
+.isearch { flex: 1; min-width: 60px; font-size: 12px; padding: 2px 7px; }
+.ib { width: 24px; height: 22px; border-radius: 4px; color: var(--muted); }
+.ib:hover { background: var(--hover); color: var(--text); }
+
+.ilist { flex: 1; overflow: auto; min-height: 0; }
+.irow { display: grid; grid-template-columns: 18px 64px minmax(0, 1fr) auto 70px; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
+.irow:hover { background: var(--hover); }
+.irow.closed .tt { color: var(--muted); text-decoration: line-through; }
+.sid { font: 11.5px var(--mono); color: var(--muted); }
+.tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { font: 600 10.5px/17px var(--ui); padding: 0 6px; border-radius: 3px; white-space: nowrap; cursor: pointer; }
+.pill:hover { box-shadow: 0 0 0 2px var(--line); }
+.pill.ghost { background: var(--raised); color: var(--muted); }
+.srcdot { width: 14px; height: 14px; border-radius: 3px; display: grid; place-items: center; font: 700 9px var(--ui); color: #fff; justify-self: end; }
+.lb { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 9px; padding: 0 6px; margin-left: 6px; }
+.idate { font-size: 11px; color: var(--muted); text-align: right; }
+.inew { display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.inew input { flex: 1; }
+.dest { font-size: 11.5px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 3px; white-space: nowrap; }
+.dest:hover { background: var(--hover); }
+.iempty { padding: 30px; text-align: center; color: var(--muted); }
+.ihint { display: flex; gap: 12px; align-items: center; padding: 4px 10px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); flex: none; }
+.ihint .src { margin-left: auto; font-family: var(--mono); }
+
+/* ---- setup / chooser ---- */
+.isetup { flex: 1; overflow: auto; padding: 24px; display: grid; place-items: start center; }
+.isetup .box { max-width: 640px; width: 100%; }
+.isetup h3 { margin: 0 0 4px; font-size: 15px; }
+.isetup p { margin: 0 0 14px; color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 700px) { .cards { grid-template-columns: 1fr; } }
+.card { text-align: left; border: 1px solid var(--line); border-radius: 6px; padding: 12px; background: var(--panel); display: flex; flex-direction: column; gap: 6px; }
+.card:hover { border-color: var(--accent); }
+.card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.card .h { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.card .d { color: var(--muted); font-size: 12px; }
+.card .f { font: 11px var(--mono); color: var(--muted); margin-top: auto; padding-top: 6px; border-top: 1px dashed var(--line); }
+.card .ok { color: var(--ok); font-size: 12px; }
+.form { margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 8px; }
+.form label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.form .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.go { background: var(--accent); color: #fff; border-radius: 4px; padding: 5px 14px; font-weight: 600; justify-self: start; }
+.btn { border: 1px solid var(--line); border-radius: 4px; padding: 3px 10px; background: var(--bg); }
+.btn:hover { background: var(--hover); }
+.radio { display: flex; gap: 6px; align-items: center; color: var(--text); font-size: 12px; cursor: pointer; }
+.chk { display: flex; align-items: center; gap: 8px; }
+.chk input { width: auto; }
+
+/* ---- switch sheet ---- */
+.sheet { position: absolute; inset: 0; background: rgba(0,0,0,.25); display: grid; place-items: center; }
+.sheet .box { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 16px; width: min(460px, 92%); box-shadow: 0 8px 30px var(--shadow); }
+.sheet h4 { margin: 0 0 6px; }
+.sheet p { margin: 0 0 10px; color: var(--muted); }
+.opt { display: block; width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 5px; padding: 8px 10px; margin-top: 6px; }
+.opt:hover { border-color: var(--accent); }
+.opt small { display: block; color: var(--muted); }
+
+/* ---- settings (variant C) ---- */
+.settings { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
+.settings h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.settings table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.settings td { padding: 4px 6px; border-top: 1px solid var(--line); }
+.settings select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; }
+.settings .eff { color: var(--muted); font-size: 11px; }
+.settings tr.cur td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* ---- inspector ---- */
+.insp { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; }
+.insp section { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.insp h5 { margin: 0; padding: 6px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+.insp pre { margin: 0; padding: 8px 10px; font: 11.5px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word; }
+.insp .log div { padding: 3px 10px; font: 11.5px var(--mono); border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
+.insp .log .w { color: var(--ok); }
+.insp .log .n { color: var(--accent); }
+.insp .log .x { color: var(--warn); }
+.insp .q { padding: 8px 10px; font-size: 12px; }
+.insp .q li { margin-bottom: 4px; }
+
+/* ---- variant bar ---- */
+.vbar { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px var(--shadow); font-size: 12px; max-width: calc(100% - 32px); }
+.vbar .v { padding: 3px 9px; border-radius: 4px; white-space: nowrap; }
+.vbar .v[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.vbar .keys { color: var(--muted); padding: 0 6px; white-space: nowrap; }
+.vbar .reset { color: var(--muted); }
+@media (max-width: 700px) { .vbar .keys, .vbar .v span { display: none; } }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="win" style="position:relative" id="win"></div>
+  <div class="insp" id="insp"></div>
+</div>
+<div class="vbar">
+  <button class="arrow" id="prev" title="Previous variant (←)">‹</button>
+  <button class="v" data-v="A">A<span> · one tracker</span></button>
+  <button class="v" data-v="B">B<span> · tick any</span></button>
+  <button class="v" data-v="C">C<span> · default + override</span></button>
+  <button class="arrow" id="next" title="Next variant (→)">›</button>
+  <span class="keys">← → switch</span>
+  <button class="reset" id="reset" title="Back to a project with nothing configured">reset</button>
+</div>
+<script>
+// ── providers ───────────────────────────────────────────────────────
+const P = {
+  plane:  { name: "Plane",  mark: "P", color: "#3f76ff", blurb: "A Plane workspace project. States, labels, comments and timers as today.",
+            files: "config.json · plane-states.json · plane-labels.json · ~/.pi/agent/secrets/plane.json" },
+  github: { name: "GitHub", mark: "G", color: "#24292f", blurb: "This repo's GitHub Issues, through gh on the project's host. Uses your gh login; no token here.",
+            files: "config.json · github-labels.json · (gh auth on host)" },
+  local:  { name: "Local",  mark: "L", color: "#6b7080", blurb: "Issues that live only in .dev/issues.json. No account, no sync. Good for a scratch repo or offline.",
+            files: "config.json · issues.json only" },
+  sentry: { name: "Sentry", mark: "S", color: "#7c4dbd" },
+};
+const TRACKERS = ["plane", "github", "local"];
+
+// Each provider's States, already mapped to the panel's State Groups.
+const STATES = {
+  plane:  [["Backlog","backlog","#a3a3a3"],["Todo","unstarted","#3f76ff"],["In Progress","started","#f59e0b"],["Done","completed","#16a34a"],["Cancelled","cancelled","#9ca3af"]],
+  github: [["Open","unstarted","#1a7f37"],["In Progress","started","#bf8700"],["Closed","completed","#8250df"],["Not planned","cancelled","#6e7781"]],
+  local:  [["Todo","unstarted","#6b7080"],["In Progress","started","#f59e0b"],["Done","completed","#16a34a"],["Cancelled","cancelled","#9ca3af"]],
+};
+const ACTIVE = new Set(["backlog", "unstarted", "started", "triage"]);
+
+const seed = () => ({
+  plane: [
+    { n: 12, title: "Carousel gutter setting ignores mono layout", st: "In Progress", lb: "bug" },
+    { n: 14, title: "Git Window: PR review drafts", st: "Todo", lb: "feature" },
+    { n: 9,  title: "Worktree tiles in collapsed rail", st: "Done" },
+  ],
+  github: [
+    { n: 231, title: "Windows: ssh key path with spaces fails", st: "Open", lb: "bug" },
+    { n: 228, title: "Support GitHub Issues in the issues panel", st: "In Progress", lb: "enhancement" },
+    { n: 219, title: "Loading line flickers on fast pages", st: "Closed" },
+  ],
+  local: [
+    { n: 1, title: "Try the new logo on the About page", st: "Todo" },
+    { n: 2, title: "Write ADR for issue providers", st: "In Progress" },
+  ],
+  sentry: [{ n: 4412, title: "TypeError: cannot read 'tabs' of undefined", st: "unresolved" }],
+});
+
+// ── state ───────────────────────────────────────────────────────────
+const fresh = () => ({
+  v: st?.v ?? "A",
+  data: seed(),
+  // A: single tracker; B: set of enabled sources; C: app default + per-project override
+  tracker: null, enabled: {}, appDefault: "local", override: { "tri-code": null, "pi-todos": "plane", "scratch": null },
+  picking: null,         // provider whose form is open in the chooser
+  switching: null,       // A: provider being switched to
+  creating: false, dest: null,
+  src: "all",
+  ghInProgress: "label", // "label" | "project"
+  orphan: "keep",        // what happened to the previous tracker's issues
+  log: [],
+});
+let st = null; st = fresh();
+const PROJECT = "tri-code";
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const log = (kind, text) => { st.log.unshift({ kind, text }); st.log = st.log.slice(0, 14); };
+const stateOf = (src, name) => (STATES[src] || []).find((s) => s[0] === name);
+const fg = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.55 ? "#000" : "#fff"; };
+const slug = (src, n) => src === "plane" ? `TRI-${n}` : src === "github" ? `#${n}` : src === "local" ? `L-${n}` : `S-${n}`;
+
+/** Which trackers are live for this project in the current variant. */
+function live() {
+  if (st.v === "A") return st.tracker ? [st.tracker] : [];
+  if (st.v === "B") return TRACKERS.filter((t) => st.enabled[t]);
+  const t = st.override[PROJECT] ?? st.appDefault;
+  return t && (t === "local" || st.enabled[t]) ? [t] : [];
+}
+/** The configured tracker in C, even if it still needs its connection form. */
+const wantedC = () => st.override[PROJECT] ?? st.appDefault;
+
+function configJson() {
+  const c = {};
+  if (st.v === "A" && st.tracker) c.tracker = st.tracker;
+  if (st.v === "B") c.sources = TRACKERS.filter((t) => st.enabled[t]);
+  if (st.v === "C" && st.override[PROJECT]) c.tracker = st.override[PROJECT];
+  const used = st.v === "B" ? c.sources : live();
+  if ((used || []).includes("plane") || st.enabled.plane) c.plane = { workspace_slug: "acme", project_id: "dc6c5b3b-…", project_identifier: "TRI" };
+  if ((used || []).includes("github") || st.enabled.github) c.github = { repo: "WaldoJoubert-GH/tri-code", in_progress: st.ghInProgress === "label" ? { label: "in progress" } : { project: 4, field: "Status" } };
+  if ((used || []).includes("local")) c.local = { next: Math.max(0, ...st.data.local.map((i) => i.n)) + 1 };
+  return c;
+}
+
+function issuesJson() {
+  const srcs = new Set([...live(), "sentry"]);
+  if (st.v === "A" && st.orphan === "keep") for (const t of TRACKERS) if (st.data[t].kept) srcs.add(t);
+  const rows = [];
+  for (const s of srcs) for (const i of st.data[s]) rows.push({ s, i });
+  return rows;
+}
+
+// ── panel ───────────────────────────────────────────────────────────
+function rowsHtml() {
+  const rows = issuesJson().filter(({ s }) => st.src === "all" || st.src === s);
+  if (!rows.length) return `<div class="iempty">No issues${st.src === "all" ? "" : ` from ${P[st.src].name}`}.<br><kbd>n</kbd> creates one</div>`;
+  return rows.map(({ s, i }) => {
+    const sd = stateOf(s, i.st);
+    const closed = sd && !ACTIVE.has(sd[1]);
+    const readonly = st.v === "A" && !live().includes(s) && s !== "sentry";
+    const pill = s === "sentry" ? `<span class="pill ghost">${i.st}</span>`
+      : `<span class="pill" data-cycle="${s}:${i.n}" style="background:${sd[2]};color:${fg(sd[2])}" title="${readonly ? "read-only: no longer the tracker" : "click: next state (stands in for the State Dropdown)"}">${i.st}</span>`;
+    return `<div class="irow${closed ? " closed" : ""}" ${readonly ? 'style="opacity:.55"' : ""}>
+      <span class="srcdot" style="background:${P[s].color}" title="${P[s].name}">${P[s].mark}</span>
+      <span class="sid">${slug(s, i.n)}</span>
+      <span class="tt">${esc(i.title)}${i.lb ? `<span class="lb">${i.lb}</span>` : ""}</span>
+      ${pill}
+      <span class="idate">${readonly ? "read-only" : s === "sentry" ? "37×" : ""}</span>
+    </div>`;
+  }).join("");
+}
+
+function segHtml() {
+  const keys = ["all", ...live(), "sentry"];
+  if (st.v === "A") for (const t of TRACKERS) if (st.data[t].kept && !keys.includes(t)) keys.splice(-1, 0, t);
+  if (!keys.includes(st.src)) st.src = "all";
+  return `<div class="seg">${keys.map((k) => `<button data-src="${k}" aria-pressed="${st.src === k}">${k === "all" ? "All" : P[k].name}</button>`).join("")}</div>`;
+}
+
+function newRowHtml() {
+  if (!st.creating) return "";
+  const targets = live();
+  const dest = st.dest && targets.includes(st.dest) ? st.dest : targets[0];
+  st.dest = dest;
+  const cmd = dest === "github" ? "gh issue create" : dest === "plane" ? "POST Plane" : "write issues.json";
+  return `<div class="inew">
+    <input id="newt" placeholder="New issue title · Enter creates · Esc cancels" autofocus>
+    ${targets.length > 1
+      ? `<button class="dest" data-dest title="Tab cycles where it goes">→ ${P[dest].name} ▾</button>`
+      : `<span class="dest" style="border-style:dashed">→ ${P[dest].name}</span>`}
+    <span class="sid">${cmd}</span>
+  </div>`;
+}
+
+function chooserHtml(multi) {
+  const head = multi
+    ? `<h3>Where do ${PROJECT}'s issues come from?</h3><p>Tick any. The panel merges them into one list, Sentry included. Each source keeps its own Slug-IDs and States.</p>`
+    : `<h3>Pick an issue tracker for ${PROJECT}</h3><p>One per project. Whatever you pick, it lands in <code>.dev/</code>, so pi-todos and dev-hub see the same thing. Sentry is pulled alongside any of them.</p>`;
+  const cards = TRACKERS.map((t) => {
+    const on = multi ? st.enabled[t] : st.picking === t;
+    const ready = t === "github" ? `<span class="ok">✓ gh logged in on local · remote: github.com/WaldoJoubert-GH/tri-code</span>`
+      : t === "plane" ? `<span class="ok">✓ token in ~/.pi/agent/secrets/plane.json</span>` : `<span class="ok">✓ nothing to set up</span>`;
+    return `<button class="card${on ? " on" : ""}" data-card="${t}">
+      <span class="h">${multi ? `<input type="checkbox" ${on ? "checked" : ""} tabindex="-1">` : ""}<span class="srcdot" style="background:${P[t].color}">${P[t].mark}</span>${P[t].name}</span>
+      <span class="d">${P[t].blurb}</span>${ready}
+      <span class="f">${P[t].files}</span>
+    </button>`;
+  }).join("");
+  const formFor = multi ? null : st.picking;
+  return `<div class="isetup"><div class="box">${head}<div class="cards">${cards}</div>
+    ${formFor ? formHtml(formFor) : ""}
+    ${multi ? `<div class="form"><div class="row"><button class="go" data-doneB ${TRACKERS.some((t) => st.enabled[t]) ? "" : "disabled style='opacity:.5'"}>Open the panel</button><span class="sid">tick at least one</span></div></div>` : ""}
+  </div></div>`;
+}
+
+function formHtml(t) {
+  if (t === "plane") return `<div class="form"><label>Workspace slug<input value="acme"></label><label>Project ID<input value="dc6c5b3b-7f09-4ebf-…"></label><button class="go" data-connect="plane">Connect Plane</button></div>`;
+  if (t === "github") return `<div class="form">
+    <label>Repository<input value="WaldoJoubert-GH/tri-code"></label>
+    <div class="sid">from <code>git remote get-url origin</code> on the project's host</div>
+    <div>"In Progress" on GitHub means:</div>
+    <div class="row">
+      <label class="radio"><input type="radio" name="ip" data-ip="label" ${st.ghInProgress === "label" ? "checked" : ""}> the <code>in progress</code> label</label>
+      <label class="radio"><input type="radio" name="ip" data-ip="project" ${st.ghInProgress === "project" ? "checked" : ""}> a Projects v2 Status field</label>
+    </div>
+    <button class="go" data-connect="github">Use GitHub Issues</button></div>`;
+  return `<div class="form"><div>Starts empty. Numbers go L-1, L-2…</div><button class="go" data-connect="local">Use Local issues</button></div>`;
+}
+
+function switchSheet() {
+  if (!st.switching) return "";
+  const from = st.tracker, to = st.switching;
+  const n = st.data[from].length;
+  const pushable = from === "local" && to !== "local";
+  return `<div class="sheet"><div class="box">
+    <h4>Switch ${PROJECT} from ${P[from].name} to ${P[to].name}?</h4>
+    <p>${n} ${P[from].name} issue${n === 1 ? "" : "s"} in <code>.dev/issues.json</code>. Time entries point at their ids.</p>
+    <button class="opt" data-orphan="keep">Keep them, read-only<small>Still listed and filterable, dimmed. Timers and comments on them stop. Undo by switching back.</small></button>
+    ${pushable ? `<button class="opt" data-orphan="move">Move them into ${P[to].name}<small>${to === "github" ? "gh issue create" : "POST Plane"} × ${n}; L-ids are rewritten in time-entries.json.</small></button>` : ""}
+    <button class="opt" data-orphan="drop">Drop them from issues.json<small>${from === "local" ? "Gone for good — Local issues exist nowhere else." : `They stay in ${P[from].name}; only the local copy goes.`}</small></button>
+    <button class="opt" data-cancel style="border-style:dashed">Cancel</button>
+  </div></div>`;
+}
+
+function settingsHtml() {
+  const rows = Object.entries(st.override).map(([p, o]) => {
+    const eff = o ?? st.appDefault;
+    return `<tr class="${p === PROJECT ? "cur" : ""}"><td>${p}</td>
+      <td><select data-ov="${p}"><option value="">app default</option>${TRACKERS.map((t) => `<option value="${t}" ${o === t ? "selected" : ""}>${P[t].name}</option>`).join("")}</select></td>
+      <td class="eff">→ ${P[eff].name}${o ? "" : " (default)"}</td></tr>`;
+  }).join("");
+  return `<div class="settings">
+    <h4>Settings › Issues</h4>
+    <div class="row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">New projects track issues in
+      <select data-default>${TRACKERS.map((t) => `<option value="${t}" ${st.appDefault === t ? "selected" : ""}>${P[t].name}</option>`).join("")}</select>
+      <span class="eff">kept in tri-code's state.json; a project's choice in .dev/config.json wins</span></div>
+    <table>${rows}</table>
+  </div>`;
+}
+
+function render() {
+  document.querySelectorAll(".vbar .v").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === st.v));
+  const win = document.getElementById("win");
+  const t = live();
+  const title = t.length ? `${t.map((x) => x === "plane" ? "TRI" : x === "github" ? "tri-code" : "local").join(" + ")} · ${issuesJson().filter(({ s, i }) => s !== "sentry" && ACTIVE.has(stateOf(s, i.st)?.[1])).length} active` : "not connected";
+  const via = st.v === "A" && st.tracker ? `<button class="via" data-via>via ${P[st.tracker].name} ▾</button>` : "";
+  const viaMenu = st.viaOpen ? `<div style="position:absolute;right:8px;top:28px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px;z-index:2;box-shadow:0 4px 12px var(--shadow)">
+      ${TRACKERS.filter((x) => x !== st.tracker).map((x) => `<button class="opt" style="margin:2px 0;border:0" data-switch="${x}">Switch to ${P[x].name}</button>`).join("")}</div>` : "";
+
+  let body;
+  const needsSetup = st.v === "A" ? !st.tracker : st.v === "B" ? !st.doneB : !live().length;
+  if (needsSetup) {
+    if (st.v === "C") { st.picking = wantedC(); body = `<div class="isetup"><div class="box"><h3>${PROJECT} uses ${P[wantedC()].name}${st.override[PROJECT] ? "" : " (the app default)"}</h3><p>Connect it once; change the default or this project's choice in Settings above.</p>${formHtml(wantedC())}</div></div>`; }
+    else body = chooserHtml(st.v === "B");
+  } else {
+    body = `<div class="itools">${segHtml()}<input class="isearch" placeholder="/ filter">
+        <button class="ib" title="Sync (r)" data-sync>⟳</button>
+        <button class="ib" title="New issue (n)" data-new>+</button>
+        ${st.v === "B" ? `<button class="ib" title="Sources" data-sources>⚙</button>` : ""}</div>
+      ${newRowHtml()}
+      <div class="ilist">${rowsHtml()}</div>
+      <div class="ihint"><span><kbd>n</kbd> new</span><span><kbd>f</kbd> source</span><span><kbd>r</kbd> sync</span>
+        <span>click a pill: next state</span><span class="src">.dev/issues.json</span></div>`;
+  }
+  win.innerHTML = `${st.v === "C" ? settingsHtml() : ""}
+    <div class="wbar"><b>Issues</b><span>${PROJECT} · ${title}</span><span class="sp"></span>${via}</div>
+    ${viaMenu}${body}${switchSheet()}`;
+  renderInsp();
+  const nt = document.getElementById("newt"); if (nt) nt.focus();
+}
+
+function renderInsp() {
+  const counts = {};
+  for (const { s } of issuesJson()) counts[s] = (counts[s] || 0) + 1;
+  const sample = issuesJson().slice(0, 1).map(({ s, i }) => {
+    const sd = stateOf(s, i.st);
+    if (s === "github") return { source: "github", number: i.n, title: i.title, state: sd[1] === "started" ? "open" : sd[1] === "unstarted" ? "open" : "closed", state_reason: sd[1] === "cancelled" ? "not_planned" : sd[1] === "completed" ? "completed" : null, state_name: i.st, state_group: sd[1], labels: [i.lb, sd[1] === "started" && st.ghInProgress === "label" ? "in progress" : null].filter(Boolean), link: `https://github.com/WaldoJoubert-GH/tri-code/issues/${i.n}` };
+    if (s === "local") return { source: "local", id: `L-${i.n}`, sequence_id: i.n, title: i.title, state_name: i.st, state_group: sd[1], updated_at: "2026-10-21T…" };
+    if (s === "plane") return { source: "plane", id: "9f1c…", sequence_id: i.n, title: i.title, state_name: i.st, state_group: sd[1] };
+    return { source: "sentry", sentry_id: String(i.n), title: i.title };
+  })[0];
+  const questions = {
+    A: ["One tracker keeps the panel's model intact: one State list, one Slug-ID format, In Progress Chips from one place.",
+        "Switching is the hard part — see the sheet's three choices. Is \"keep read-only\" worth its code?",
+        "Sentry stays a second source, as today: is that the only exception?"],
+    B: ["Merging works for the list, but the State Dropdown, Labels and the new-issue row now need a per-source branch.",
+        "Slug-IDs must stay unambiguous across sources: TRI-12, #228, L-2 do; two GitHub repos would not.",
+        "Does anyone actually want Plane and GitHub on the same repo, or is this solving a case nobody has?"],
+    C: ["Zero-setup Local as the app default means a new project has a working panel immediately.",
+        "The default lives in state.json (tri-code-only); the project's choice in .dev/config.json — pi-todos must read `tracker` too.",
+        "Same switch problem as A when an override changes; this variant just moves the picker."],
+  }[st.v];
+  document.getElementById("insp").innerHTML = `
+    <section><h5>.dev/config.json <span>${st.v === "C" && !st.override[PROJECT] ? "default from state.json" : ""}</span></h5><pre>${esc(JSON.stringify(configJson(), null, 2))}</pre></section>
+    <section><h5>.dev/issues.json <span>${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(" · ") || "empty"}</span></h5><pre>${sample ? esc(JSON.stringify(sample, null, 2)) + "\n…" : "{ \"issues\": [] }"}</pre></section>
+    <section><h5>Calls &amp; writes</h5><div class="log">${st.log.map((l) => `<div class="${l.kind}">${esc(l.text)}</div>`).join("") || `<div style="color:var(--muted)">nothing yet</div>`}</div></section>
+    <section><h5>What this variant teaches</h5><ul class="q">${questions.map((q) => `<li>${q}</li>`).join("")}</ul></section>`;
+}
+
+// ── actions ─────────────────────────────────────────────────────────
+function connect(t) {
+  if (st.v === "A") { st.tracker = t; st.picking = null; }
+  if (st.v === "C") st.enabled[t] = true;
+  if (t === "github") { log("n", "gh auth status"); log("n", "gh repo view --json nameWithOwner"); log("n", "gh issue list --state all --json number,title,state,stateReason,labels,updatedAt,url"); log("n", "gh label list --json name,color"); }
+  if (t === "plane") log("n", "plane_sync (Rust) → GET states, labels, issues");
+  log("w", `write .dev/config.json · tracker: "${t}"`);
+  log("w", "write .dev/issues.json");
+}
+
+function cycle(src, n) {
+  if (st.v === "A" && !live().includes(src)) return;
+  const issue = st.data[src].find((i) => i.n === n);
+  const list = STATES[src];
+  const k = list.findIndex((s) => s[0] === issue.st);
+  const next = list[(k + 1) % list.length];
+  issue.st = next[0];
+  if (src === "github") {
+    const g = next[1];
+    if (g === "started") log("n", st.ghInProgress === "label" ? `gh issue edit ${n} --add-label "in progress"` : `gh project item-edit … --field Status="In Progress"`);
+    else if (g === "completed") log("n", `gh issue close ${n} --reason completed`);
+    else if (g === "cancelled") log("n", `gh issue close ${n} --reason "not planned"`);
+    else log("n", `gh issue reopen ${n}${st.ghInProgress === "label" ? ` && gh issue edit ${n} --remove-label "in progress"` : ""}`);
+  } else if (src === "plane") log("n", `PATCH Plane TRI-${n} state=${next[0]}`);
+  else log("x", `no network · L-${n} → ${next[0]}`);
+  log("w", "write .dev/issues.json");
+}
+
+function create(title) {
+  const d = st.dest;
+  const n = d === "github" ? Math.max(...st.data.github.map((i) => i.n), 231) + 1 : Math.max(0, ...st.data[d].map((i) => i.n)) + 1;
+  st.data[d].unshift({ n, title, st: STATES[d].find((s) => s[1] === "unstarted")[0] });
+  if (d === "github") log("n", `gh issue create --title "${title}" --body ""`);
+  else if (d === "plane") log("n", `POST Plane issue "${title}"`);
+  else { log("x", `no network · next L-id ${n + 1}`); log("w", "write .dev/config.json (local.next)"); }
+  log("w", "write .dev/issues.json");
+  st.creating = false;
+}
+
+function switchTo(how) {
+  const from = st.tracker, to = st.switching;
+  if (how === "drop") { st.data[from] = []; log("w", `drop ${from} issues from .dev/issues.json`); }
+  if (how === "keep") { st.data[from].kept = true; log("w", `keep ${from} issues, read-only`); }
+  if (how === "move") {
+    for (const i of st.data[from]) { log("n", to === "github" ? `gh issue create --title "${i.title}"` : `POST Plane "${i.title}"`); st.data[to].unshift({ ...i, n: (to === "github" ? 300 : 40) + i.n, st: STATES[to].find((s) => s[1] === (stateOf(from, i.st) || [])[1])?.[0] ?? STATES[to][0][0] }); }
+    st.data[from] = []; log("w", "rewrite time-entries.json ids");
+  }
+  st.data[to].kept = false;
+  st.orphan = how; st.switching = null; st.viaOpen = false;
+  connect(to);
+}
+
+// ── wiring ──────────────────────────────────────────────────────────
+document.addEventListener("click", (e) => {
+  const q = (s) => e.target.closest(s);
+  let el;
+  if ((el = q(".vbar .v"))) return setVariant(el.dataset.v);
+  if (q("#prev")) return step(-1);
+  if (q("#next")) return step(1);
+  if (q("#reset")) { st = fresh(); return render(); }
+  if ((el = q("[data-card]"))) {
+    const t = el.dataset.card;
+    if (st.v === "B") { st.enabled[t] = !st.enabled[t]; log("w", `${st.enabled[t] ? "+" : "−"} ${t} in config.json sources`); if (st.enabled[t] && t !== "local") connect(t); }
+    else st.picking = t;
+    return render();
+  }
+  if ((el = q("[data-ip]"))) { st.ghInProgress = el.dataset.ip; return render(); }
+  if ((el = q("[data-connect]"))) { connect(el.dataset.connect); return render(); }
+  if (q("[data-doneB]")) { if (TRACKERS.some((t) => st.enabled[t])) st.doneB = true; return render(); }
+  if (q("[data-sources]")) { st.doneB = false; return render(); }
+  if ((el = q("[data-src]"))) { st.src = el.dataset.src; return render(); }
+  if ((el = q("[data-cycle]"))) { const [s, n] = el.dataset.cycle.split(":"); cycle(s, +n); return render(); }
+  if (q("[data-new]")) { st.creating = true; return render(); }
+  if (q("[data-dest]")) { const t = live(); st.dest = t[(t.indexOf(st.dest) + 1) % t.length]; return render(); }
+  if (q("[data-sync]")) { for (const t of live()) log("n", t === "github" ? "gh issue list --state all --json …" : t === "plane" ? "plane_sync" : "local: re-read issues.json"); log("w", "write .dev/issues.json (Sentry entries kept)"); return render(); }
+  if (q("[data-via]")) { st.viaOpen = !st.viaOpen; return render(); }
+  if ((el = q("[data-switch]"))) { st.switching = el.dataset.switch; st.viaOpen = false; if (!st.data[st.tracker].length) switchTo("drop"); return render(); }
+  if ((el = q("[data-orphan]"))) { switchTo(el.dataset.orphan); return render(); }
+  if (q("[data-cancel]")) { st.switching = null; return render(); }
+});
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.matches("[data-default]")) { st.appDefault = el.value; log("w", `state.json · issueTracker default: ${el.value}`); render(); }
+  if (el.matches("[data-ov]")) { st.override[el.dataset.ov] = el.value || null; if (el.dataset.ov === PROJECT) log("w", `.dev/config.json · tracker: ${el.value || "(removed → default)"}`); render(); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.target.id === "newt") {
+    if (e.key === "Enter" && e.target.value.trim()) { create(e.target.value.trim()); render(); }
+    else if (e.key === "Escape") { st.creating = false; render(); }
+    else if (e.key === "Tab") { e.preventDefault(); const t = live(); st.dest = t[(t.indexOf(st.dest) + 1) % t.length]; const v = e.target.value; render(); document.getElementById("newt").value = v; }
+    return;
+  }
+  if (e.target.matches("input, select")) return;
+  if (e.key === "ArrowLeft") step(-1);
+  if (e.key === "ArrowRight") step(1);
+  if (e.key === "n" && live().length) { st.creating = true; render(); e.preventDefault(); }
+});
+
+function setVariant(v) {
+  const keep = st.v;
+  st = fresh(); st.v = v;
+  if (location.protocol === "file:") location.hash = v;
+  else { const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null, "", u); }
+  render();
+}
+function step(d) { const vs = ["A", "B", "C"]; setVariant(vs[(vs.indexOf(st.v) + d + 3) % 3]); }
+
+st.v = ((new URLSearchParams(location.search).get("variant") || location.hash.replace(/^#/, "") || "A").toUpperCase());
+if (!["A", "B", "C"].includes(st.v)) st.v = "A";
+render();
+</script>
+</body>
+</html>

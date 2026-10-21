@@ -136,7 +136,7 @@ fn run(mut cmd: Command, input: Option<String>, also_ok: &[i32]) -> Result<Strin
     Err(if err.is_empty() { format!("exit code {code}") } else { err })
 }
 
-fn exec(host: &str, path: &str, program: &str, args: &[&str], input: Option<String>) -> Result<String, String> {
+pub(crate) fn exec(host: &str, path: &str, program: &str, args: &[&str], input: Option<String>) -> Result<String, String> {
     run(command(host, path, program, args)?, input, &[])
 }
 
@@ -217,7 +217,7 @@ fn parse_log(out: &str, unpushed: &str) -> Vec<Commit> {
 }
 
 /// Run `f` off the async runtime: every command here waits on a child process.
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
+pub(crate) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
 }
 

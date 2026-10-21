@@ -191,6 +191,12 @@
 .ib:hover { background: var(--hover); color: var(--text); }
 .ib[aria-pressed="true"] { background: var(--raised); color: var(--text); }
 .ib.spin { animation: spin .8s linear infinite; }
+/* A State Pill while its change is in flight: the State asked for, dimmed, with a spinner */
+.pill.busy { opacity: .7; cursor: progress; }
+.pill .pspin {
+  display: inline-block; width: 7px; height: 7px; margin-right: 4px; vertical-align: -0.5px;
+  border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 .imain { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 .win:not(.focused) .imain { opacity: .8; }
@@ -370,6 +376,20 @@
 .isetup input:focus { border-color: var(--accent); }
 .isetup .go { justify-self: start; margin-top: 2px; padding: 5px 14px; border-radius: 5px; background: var(--accent); color: var(--bg); font-weight: 600; }
 .isetup .files { font: 10.5px/1.7 var(--mono); color: var(--muted); }
+/* The Sources form: one fieldset per Source, its fields shown while ticked */
+.isetup form.isrc { width: min(440px, 100%); }
+.isrc fieldset { display: grid; gap: 8px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.isrc fieldset.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.isrc label.ihead { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 4px 8px; font-size: 12px; cursor: pointer; }
+.isrc label.ihead b { font-size: 13px; color: var(--text); }
+.isrc label.ihead input { align-self: center; margin: 0; }
+.isrc .srow { display: flex; gap: 8px; align-items: center; }
+.isrc .srow .go { margin-top: 0; }
+.isrc .cancel { padding: 5px 12px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); }
+.isrc .cancel:hover { color: var(--text); background: var(--hover); }
+/* New Issue row: where it goes, when the project has more than one Source */
+.inew .idest { flex: none; font-size: 11.5px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); white-space: nowrap; }
+.inew .idest:hover { color: var(--text); background: var(--hover); }
 /* Sidebar: active Plane issues per State, in Plane's colours (the pi-todos widget) */
 .minibar { display: flex; gap: 1px; width: 26px; height: 4px; border-radius: 2px; overflow: hidden; flex: none; }
 .minibar i { height: 100%; }
