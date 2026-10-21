@@ -136,6 +136,11 @@ aside h2 button:hover { background: var(--hover); color: var(--text); }
 .project .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project .count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .project .x { opacity: 0; color: var(--muted); padding: 0 2px; }
+/* dragging a project to reorder it: the row fades and a line marks where it lands */
+.project.lifted { opacity: .45; }
+.project.drop-before { box-shadow: inset 0 2px var(--accent); }
+.project.drop-after, .wts.drop-after { box-shadow: inset 0 -2px var(--accent); }
+body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 .project:hover .x, .project .x:focus-visible { opacity: 1; }
 .project .x:hover { color: var(--text); }
 /* Agent signals (signals.ts): one colour per state, a dot, and a spinner while working */

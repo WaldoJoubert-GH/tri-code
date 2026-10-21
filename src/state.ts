@@ -359,6 +359,20 @@ export function setEnvStyle(host: string, patch: EnvStyle) {
   }));
 }
 
+/** Move a repo project, with its Worktrees, to just before or after another repo project. */
+export function moveProject(id: string, target: string, after: boolean) {
+  setApp(produce((s) => {
+    const family = (p: Project, root: string) => p.id === root || p.parent === root;
+    const moving = s.projects.filter((p) => family(p, id));
+    const rest = s.projects.filter((p) => !family(p, id));
+    let at = -1;
+    rest.forEach((p, i) => { if (family(p, target)) at = after ? i + 1 : at < 0 ? i : at; });
+    if (id === target || !moving.length || at < 0) return;
+    rest.splice(at, 0, ...moving);
+    s.projects = rest;
+  }));
+}
+
 export function removeProject(id: string) {
   setApp(produce((s) => {
     s.projects = s.projects.filter((p) => p.id !== id);

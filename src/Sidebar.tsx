@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
-  Project, app, envIcon, envName, isLocalHost, isTerminal, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
+  Project, app, envIcon, envName, isLocalHost, isTerminal, moveProject, projectById, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
   setSidebarCollapsed, worktreesOf,
 } from "./state";
 import { closeBrowser, setBrowsersCovered } from "./browsers";
@@ -27,6 +27,43 @@ export const sidebarPeek = peek;
 /** Something opened from the peeked list (appearance, icon picker, a rename) holds it open until it closes. */
 const [renaming, setRenaming] = createSignal<string | null>(null);
 const held = () => appearanceOpen() || iconPickerOpen() || renaming() !== null;
+
+// Press and drag a project row to move it within its environment. Pointer events rather than HTML5
+// drag and drop, so a press that barely moves is still a click and the rail works the same way.
+const [dragging, setDragging] = createSignal<string | null>(null);
+const [dropAt, setDropAt] = createSignal<{ id: string; after: boolean } | null>(null);
+/** The click that follows the pointerup of a drag must not select the project. */
+let dragged = false;
+
+function dragProject(e: PointerEvent, p: Project) {
+  if (e.button !== 0 || (e.target as HTMLElement).closest("button, input")) return;
+  const x0 = e.clientX, y0 = e.clientY;
+  const move = (m: PointerEvent) => {
+    if (!dragging()) {
+      if (Math.hypot(m.clientX - x0, m.clientY - y0) < 4) return;
+      setDragging(p.id);
+    }
+    // A repo's Worktree list counts as its lower half, so dropping there lands below the whole family.
+    const el = document.elementFromPoint(m.clientX, m.clientY)?.closest<HTMLElement>("[data-drop]");
+    const q = el && projectById(el.dataset.drop!);
+    if (!el || !q || q.id === p.id || q.host !== p.host) return void setDropAt(null);
+    const r = el.getBoundingClientRect();
+    setDropAt({ id: q.id, after: el.classList.contains("wts") || m.clientY > r.top + r.height / 2 });
+  };
+  const up = () => {
+    removeEventListener("pointermove", move);
+    removeEventListener("pointerup", up);
+    removeEventListener("pointercancel", up);
+    const d = dropAt();
+    if (d) moveProject(p.id, d.id, d.after);
+    if (dragging()) (dragged = true), setTimeout(() => (dragged = false));
+    setDragging(null);
+    setDropAt(null);
+  };
+  addEventListener("pointermove", move);
+  addEventListener("pointerup", up);
+  addEventListener("pointercancel", up);
+}
 
 /** Collapse to the rail, or expand back to the full list. */
 export function toggleSidebar() {
@@ -85,6 +122,7 @@ export default function Sidebar() {
     if (want !== peek()) timer = window.setTimeout(() => setPeek(want), want ? 180 : 260);
   });
   createEffect(() => setBrowsersCovered(peek() ? FULL : 0));
+  createEffect(() => document.body.classList.toggle("dragging-project", dragging() !== null));
   onCleanup(() => clearTimeout(timer));
 
   /** The loudest signal among another project's windows, and how many windows share it. A repo
@@ -206,10 +244,17 @@ export default function Sidebar() {
                 <>
                 <div
                   class="project"
-                  classList={{ active: inFamily(p) }}
+                  classList={{
+                    active: inFamily(p),
+                    lifted: dragging() === p.id,
+                    "drop-before": dropAt()?.id === p.id && !dropAt()!.after,
+                    "drop-after": dropAt()?.id === p.id && dropAt()!.after && !worktreesOf(p.id).length,
+                  }}
+                  data-drop={p.id}
                   style={{ "--pa": p.accent }}
                   title={[app.sidebarCollapsed && !peek() ? `${p.name} · ${envName(p.host)} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : "", sigSummary(p)].filter(Boolean).join("\n") || undefined}
-                  onClick={() => !inFamily(p) && setApp("activeProject", p.id)}
+                  onPointerDown={(e) => renaming() !== p.id && dragProject(e, p)}
+                  onClick={() => !dragged && !inFamily(p) && setApp("activeProject", p.id)}
                 >
                   <span class="swatch"><IconFace project={p} /></span>
                   <Show when={badge(p)}>
@@ -258,7 +303,7 @@ export default function Sidebar() {
                 <Show when={worktreesOf(p.id).length}>
                   {/* Every checkout of the repo, the repo's own folder first: one row each, open or
                       collapsed, with the tile in the same place so nothing moves when the rail peeks. */}
-                  <div class="wts">
+                  <div class="wts" classList={{ "drop-after": dropAt()?.id === p.id && dropAt()!.after }} data-drop={p.id}>
                     <For each={[p, ...worktreesOf(p.id)]}>
                       {(w) => (
                         <div
