@@ -2,6 +2,13 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.25 — 2026-10-21
+
+- Browser windows show a thin line under the address bar while a page loads (on the title bar for web apps that hide it), so a slow click no longer looks like nothing happened. Quick loads under 150 ms show nothing.
+- Type any gap between windows, from 0 to 64 px, in Settings or the status line. `Alt+,` and `Alt+.` still step through the presets.
+- Settings › Carousel gutter: how wide the space each side of the centred window is in the carousel layout, where its neighbours peek. Leave it empty for the old automatic width; 0 hides the neighbours.
+- The Settings icon at the foot of the sidebar is centred.
+
 ## 0.1.24 — 2026-10-21
 
 - Choose what opening a file does when a file window is already open: replace its file, open a new window, add it as a tab, or open a preview that the next file replaces until you keep it (double-click its name, or start editing). The first time, the file window asks, with "remember". Change it later from ⋯ in any file window, or from Settings.
