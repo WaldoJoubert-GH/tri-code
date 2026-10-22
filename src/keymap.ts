@@ -44,6 +44,7 @@ export const ACTIONS: Action[] = [
   { id: "files", group: "Windows and links", desc: "Editor", def: [k("KeyE")] },
   { id: "go-to-file", group: "Windows and links", desc: "Go to file", def: [k("KeyT")] },
   { id: "git", group: "Windows and links", desc: "Git", def: [k("KeyC")] },
+  { id: "diff", group: "Windows and links", desc: "Editor: switch between Source and Diff. Git: open the file's diff in the editor", def: [k("KeyD")] },
   { id: "agents", group: "Windows and links", desc: "Agents window", def: [k("Semicolon")] },
   { id: "palette", group: "Windows and links", desc: "Command palette", def: [k("KeyX")] },
   { id: "help", group: "Windows and links", desc: "Hotkeys (this page)", def: [k("Slash")] },

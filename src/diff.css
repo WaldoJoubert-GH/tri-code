@@ -1,0 +1,59 @@
+/* The shared diff body (src/DiffView.tsx): unified rows or two aligned halves. */
+
+.dv-scroll {
+  flex: 1; min-height: 0; overflow: auto; font: 12px/17px var(--mono);
+  padding: 2px 0 12px; user-select: text;
+}
+.dv-scroll:focus { outline: none; }
+.dv-content { width: max-content; min-width: 100%; }
+/* Side by side. Not `.split`: that is the canvas resize handle (canvas.css). */
+.dv-content.sbs { width: 100%; min-width: 0; }
+
+.dv-hunk {
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent);
+  padding: 2px 12px; margin-top: 6px; white-space: pre;
+}
+
+/* Unified: old line, new line, marker, text. */
+.dv-urow {
+  display: grid; grid-template-columns: 40px 40px 14px minmax(0, 1fr);
+  white-space: pre; padding-right: 14px; min-width: 100%; width: max-content;
+}
+.dv-urow > .ln { text-align: right; padding-right: 8px; color: var(--muted); opacity: .6; user-select: none; }
+.dv-urow > .mk { text-align: center; color: var(--muted); user-select: none; }
+.dv-urow > .tx { padding-left: 2px; }
+.dv-urow.a { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.dv-urow.a > .mk { color: var(--ok); }
+.dv-urow.d { background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.dv-urow.d > .mk { color: var(--bad); }
+.dv-urow.sel { box-shadow: inset 2px 0 var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.dv-urow.a.sel { background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.dv-urow.d.sel { background: color-mix(in srgb, var(--bad) 22%, transparent); }
+
+/* Split: the same row, twice. Long lines clip per half (Unified is the escape hatch).
+   Row kinds are s-add / s-del: a bare .add is the sidebar's button (styles.css). */
+.dv-srow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); width: 100%; }
+.dv-half {
+  display: grid; grid-template-columns: 40px 12px minmax(0, 1fr); white-space: pre;
+  overflow: hidden; padding-right: 8px; min-width: 0;
+}
+.dv-half.l { border-right: 1px solid var(--line); }
+.dv-half > .ln { text-align: right; padding-right: 8px; color: var(--muted); opacity: .6; user-select: none; }
+.dv-half > .mk { text-align: center; color: var(--muted); user-select: none; }
+.dv-half > .tx { overflow: hidden; text-overflow: clip; }
+.dv-half.blank {
+  background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--muted) 7%, transparent) 5px 10px);
+}
+.dv-srow.mod-l .dv-half.l, .dv-srow.mod-l .dv-half.r { background: color-mix(in srgb, var(--warn) 9%, transparent); }
+.dv-srow.s-add .dv-half.r { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.dv-srow.s-del .dv-half.l { background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.dv-half.r > .mk { color: var(--ok); }
+.dv-srow.s-del .dv-half.l > .mk { color: var(--bad); }
+.dv-srow.sel .dv-half { box-shadow: inset 2px 0 var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.dv-srow.sel .dv-half.r { box-shadow: inset -2px 0 var(--accent); }
+
+/* The changed span of a paired line. The colors around it still say add/remove. */
+.chg { background: color-mix(in srgb, var(--warn) 34%, transparent); border-radius: 2px; }
+
+.dv-note { padding: 16px 14px; color: var(--muted); font-size: 12px; }
+.dv-note.bad { color: var(--bad); white-space: pre-wrap; }

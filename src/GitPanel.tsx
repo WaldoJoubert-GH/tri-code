@@ -1,20 +1,25 @@
 // The git window: one per project. The commit box and the staged / unstaged lists on the left,
 // the selected file's diff on the right, and the branch's next steps (push, PR, merge) in the
-// header, each opening a drawer over the diff. Chosen from design/git.html (variant B).
+// header, each opening a drawer over the diff. The diff is unified or split (design/diff.html,
+// variant A), and a double-click opens the file in the editor at that line.
+// A folder that is not itself a repo gets an accordion of its nested repos and an active repo;
+// the active repo owns the commit box, commits, PR and push (design/diff.html, folder of repos).
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
-import { type Project, type Tab, isRemote } from "./state";
+import { type Project, type Tab, diffModeOf, isRemote, setProjectDiffMode } from "./state";
 import {
-  type Change, type CtxId, type Drawer, commit, copyFinding, draftCommit, draftPr, gitOf, isStaged, isUnstaged, linkedIssue, loadPr,
-  merge, openDrawer, openPr, push, refresh, review, select, selectCommit, setField, setOpt, stage, stepOf,
+  type Change, type CtxId, type Drawer, type RepoStatus, type Sel, commit, copyFinding, draftCommit, draftPr, gitOf, isStaged, isUnstaged, linkedIssue,
+  loadPr, merge, openDrawer, openPr, push, refresh, repoRoot, review, select, selectCommit, selectRepo, setField, setOpt, stage, stepOf,
   toggleCtx, unpushed, unstage,
 } from "./git";
 import { openFile } from "./files";
 import { openUrlInProject } from "./browsers";
 import { removeWorktree } from "./worktrees";
+import { type DiffMode, diffStats, firstChange, parseUnified } from "./diff";
+import DiffView, { type Drill, diffKeys, stepHunk } from "./DiffView";
+import { flash } from "./ui";
+import { withKey } from "./keymap";
 import "./git.css";
-
-const MAX_LINES = 4000;
 
 function BranchIcon(): JSX.Element {
   return (
@@ -28,36 +33,12 @@ function BranchIcon(): JSX.Element {
 /** The status letter shown for a file in one list. */
 const letter = (c: Change, inStaged: boolean) => (inStaged ? c.x : c.x === "?" ? "U" : c.y);
 
-function Diff(props: { text?: string; error?: string }): JSX.Element {
-  const lines = createMemo(() => {
-    const all = (props.text ?? "").split("\n");
-    const out: { k: "h" | "a" | "d" | "c"; t: string }[] = [];
-    let body = false;
-    for (const l of all.slice(0, MAX_LINES)) {
-      if (l.startsWith("@@")) { body = true; out.push({ k: "h", t: l }); }
-      else if (!body) continue; // diff --git / index / --- / +++ headers
-      else if (l.startsWith("+")) out.push({ k: "a", t: l.slice(1) });
-      else if (l.startsWith("-")) out.push({ k: "d", t: l.slice(1) });
-      else if (l.startsWith("diff --git")) body = false;
-      else out.push({ k: "c", t: l.slice(1) });
-    }
-    return { out, more: all.length > MAX_LINES };
-  });
+/** A row's `+n −n`, from the status batch's numstat; nothing for an untracked or binary file. */
+function RowStat(props: { n?: [number, number] }): JSX.Element {
   return (
-    <div class="g-diff">
-      <Show when={!props.error} fallback={<div class="g-note bad">{props.error}</div>}>
-        <Show when={props.text !== undefined} fallback={<div class="g-note">Loading…</div>}>
-          <Show when={lines().out.length} fallback={<div class="g-note">{props.text ? "Binary or mode-only change." : "No changes."}</div>}>
-            <For each={lines().out}>
-              {(l) =>
-                l.k === "h" ? <div class="g-hunk">{l.t}</div>
-                : <div class={`g-l ${l.k}`}><span class="g-g">{l.k === "a" ? "+" : l.k === "d" ? "−" : ""}</span>{l.t}</div>}
-            </For>
-            <Show when={lines().more}><div class="g-note">… diff cut at {MAX_LINES} lines</div></Show>
-          </Show>
-        </Show>
-      </Show>
-    </div>
+    <Show when={props.n && props.n[0] + props.n[1] > 0}>
+      <span class="g-rstat"><i class="p">+{props.n![0]}</i><i class="m">−{props.n![1]}</i></span>
+    </Show>
   );
 }
 
@@ -66,6 +47,65 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
   const g = () => gitOf(p().id);
   const s = () => g().status;
   const [menu, setMenu] = createSignal(false);
+  const [repoMenu, setRepoMenu] = createSignal(false);
+  /** A folder of repos: one git window with an accordion and an active repo. */
+  const multiRepo = () => (g().repos?.length ?? 0) > 1;
+  const nestedRepo = () => !!g().repo;
+  /** A repo's short name: its folder, or its path when another repo has the same folder name. */
+  const nameOf = (repo: string) => {
+    if (!repo) return p().name;
+    const base = repo.split("/").pop()!;
+    return (g().repos ?? []).some((r) => r.repo !== repo && r.repo.split("/").pop() === base) ? repo : base;
+  };
+  const repoName = () => nameOf(g().repo);
+  /** The diff pane's width: split falls back to unified in a narrow window. */
+  const [paneW, setPaneW] = createSignal(0);
+  let rightEl: HTMLDivElement | undefined;
+  let diffEl: HTMLDivElement | undefined;
+
+  const wantedMode = (): DiffMode => diffModeOf(p());
+  const splitFits = () => paneW() === 0 || paneW() >= 660;
+  const mode = (): DiffMode => (wantedMode() === "unified" || !splitFits() ? "unified" : "split");
+  const setMode = (m: DiffMode) => setProjectDiffMode(p().id, m);
+  const hunks = createMemo(() => (g().diff?.text ? parseUnified(g().diff!.text!) : []));
+  const stat = createMemo(() => diffStats(hunks()));
+  const first = () => firstChange(hunks());
+  /** A deleted file has no working copy to open; its diff still shows. */
+  const deleted = () => {
+    const c = g().status?.files.find((f) => f.path === g().sel?.path);
+    return !!c && (c.x === "D" || c.y === "D");
+  };
+  const abs = (sel: Sel) => `${repoRoot(p(), sel.repo)}/${sel.path}`;
+  const drill: Drill = (line, _hunk, how) => {
+    const sel = g().sel;
+    if (!sel) return;
+    if (deleted()) return flash("deleted: there is no working copy to open");
+    openFile(p(), abs(sel), { from: props.tab.id, at: { line, mode: how.diff ? "diff" : "source" } });
+  };
+  const openAt = (m: "source" | "diff") => {
+    const line = first();
+    if (line) drill(line, 0, { diff: m === "diff" });
+  };
+  const nav = (d: 1 | -1) => diffEl && stepHunk(diffEl, d);
+  // Alt+D (keymap "diff"): the selected file's diff in the editor, at its first change.
+  onMount(() => {
+    diffKeys.set(props.tab.id, () => {
+      if (!g().sel || g().commit || !first()) return false;
+      if (deleted()) {
+        flash("deleted: there is no working copy to open");
+        return true;
+      }
+      openAt("diff");
+      return true;
+    });
+    onCleanup(() => diffKeys.delete(props.tab.id));
+  });
+  onMount(() => {
+    if (!rightEl) return;
+    const ro = new ResizeObserver(([entry]) => setPaneW(entry.contentRect.width));
+    ro.observe(rightEl);
+    onCleanup(() => ro.disconnect());
+  });
 
   onMount(() => void refresh(p()));
   // Coming back to the window picks up what the agents changed meanwhile.
@@ -77,7 +117,11 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     const t = window.setTimeout(() => void loadPr(p()), 15_000);
     onCleanup(() => clearTimeout(t));
   });
-  const onDown = (e: PointerEvent) => { if (!(e.target as Element).closest(".g-split")) setMenu(false); };
+  const onDown = (e: PointerEvent) => {
+    const el = e.target as Element;
+    if (!el.closest(".g-split")) setMenu(false);
+    if (!el.closest(".g-repo, .g-repomenu")) setRepoMenu(false);
+  };
   onMount(() => document.addEventListener("pointerdown", onDown));
   onCleanup(() => document.removeEventListener("pointerdown", onDown));
 
@@ -113,15 +157,18 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
   const Thinking = (pr: { what: string }) => <span class="g-thinking">{pr.what}</span>;
 
   const FileRow = (fp: { c: Change; inStaged: boolean }) => {
-    const sel = () => g().sel?.path === fp.c.path && g().sel?.staged === fp.inStaged;
+    const sel = () => g().sel?.path === fp.c.path && g().sel?.staged === fp.inStaged && g().sel?.repo === g().repo;
     const i = fp.c.path.lastIndexOf("/");
     return (
       <div
         class="g-frow"
         classList={{ sel: sel() }}
         title={fp.c.path}
-        onClick={() => select(p(), { path: fp.c.path, staged: fp.inStaged })}
-        onDblClick={() => openFile(p(), `${p().path.replace(/[\\/]+$/, "")}/${fp.c.path}`, { from: props.tab.id })}
+        onClick={() => select(p(), { repo: g().repo, path: fp.c.path, staged: fp.inStaged })}
+        onDblClick={() => {
+          if (fp.c.x === "D" || fp.c.y === "D") return flash("deleted: there is no working copy to open");
+          openFile(p(), abs({ repo: g().repo, path: fp.c.path, staged: fp.inStaged }), { from: props.tab.id });
+        }}
       >
         <input
           type="checkbox"
@@ -134,6 +181,64 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         />
         <span class={`g-st s-${letter(fp.c, fp.inStaged)}`}>{letter(fp.c, fp.inStaged)}</span>
         <span class="g-fp"><span class="d">{i >= 0 ? fp.c.path.slice(0, i + 1) : ""}</span>{fp.c.path.slice(i + 1)}</span>
+        <RowStat n={fp.inStaged ? fp.c.index : fp.c.work} />
+      </div>
+    );
+  };
+
+  const Lists = (lp: { sub?: boolean }) => (
+    <>
+      <div class="g-sec" classList={{ sub: lp.sub }}>Staged <span class="n">{stagedList().length}</span>
+        <button title="Unstage all" onClick={() => unstage(p(), stagedList().map((c) => c.path))}>− all</button>
+      </div>
+      <For each={stagedList()}>{(c) => <FileRow c={c} inStaged={true} />}</For>
+      <div class="g-sec" classList={{ sub: lp.sub }}>Changes <span class="n">{unstagedList().length}</span>
+        <button title="Stage all" onClick={() => stage(p(), unstagedList().map((c) => c.path))}>+ all</button>
+      </div>
+      <For each={unstagedList()}>{(c) => <FileRow c={c} inStaged={false} />}</For>
+      <Show when={s() && !s()!.files.length && !g().loading}><div class="g-hint pad">Working tree clean.</div></Show>
+      <div class="g-sec" classList={{ sub: lp.sub }}>Commits</div>
+      <For each={s()?.commits ?? []}>
+        {(c) => (
+          <div
+            class="g-commit pad"
+            classList={{ sel: g().commit?.key === c.sha }}
+            title={`${c.sha}\n${c.when}`}
+            onClick={() => selectCommit(p(), c.sha)}
+          >
+            <span class="sha">{c.sha.slice(0, 7)}</span><span class="s">{c.subject}</span>
+            <span class="w">{c.pushed ? c.when : "local"}</span>
+          </div>
+        )}
+      </For>
+    </>
+  );
+
+  const RepoSection = (rp: { r: RepoStatus }) => {
+    const active = () => rp.r.repo === g().repo;
+    const rs = () => rp.r.status;
+    const n = () => rs()?.files.length ?? 0;
+    return (
+      <div class="g-reposec">
+        <div class="g-repohead" classList={{ on: active() }} title={`${rp.r.repo || p().name}${rs()?.branch ? ` · ${rs()!.branch}` : ""}`} onClick={() => selectRepo(p(), rp.r.repo)}>
+          <span class="cv">{active() ? "▾" : "▸"}</span>
+          <b>{rp.r.repo || p().name}</b>
+          <span class="br">{rs()?.branch ?? "—"}</span>
+          <Show when={rs()?.ahead}><span class="ab">↑{rs()!.ahead}</span></Show>
+          <span class="ct" classList={{ bad: !!rp.r.error }}>{rp.r.error ? "error" : n() ? `${n()} changed` : "clean"}</span>
+        </div>
+        <Show when={active()} fallback={
+          <Show when={n()}>
+            <div class="g-reppeek">
+              <For each={rs()!.files.slice(0, 3)}>{(f) => <span>{f.path}</span>}</For>
+              <Show when={n() > 3}><span>+{n() - 3}</span></Show>
+            </div>
+          </Show>
+        }>
+          <Show when={!g().repoError} fallback={<div class="g-note bad">{g().repoError}</div>}>
+            <Lists sub />
+          </Show>
+        </Show>
       </div>
     );
   };
@@ -248,7 +353,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               <Show when={d().stat}><pre class="g-cstat">{d().stat}</pre></Show>
             </div>
             <div class="g-changes-head">Changes</div>
-            <Diff text={d().diff} />
+            <DiffView text={d().diff} mode={mode()} onMode={setMode} />
           </>
         )}
       </Show>
@@ -350,8 +455,35 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
 
   return (
     <div class="gitwin">
-      <div class="g-head">
-        <Show when={s()} fallback={<span class="g-hint">{isRemote(p()) ? `${p().host}:` : ""}{p().path}</span>}>
+      <div class="g-head" classList={{ "g-head-open": repoMenu() }}>
+        <Show when={multiRepo()}>
+          <button class="g-repo" title="Active repo: click to switch" aria-haspopup="menu" aria-expanded={repoMenu()} onClick={() => setRepoMenu(!repoMenu())}>
+            <b>{repoName()}</b><span class="k">{g().repos!.length} repos</span><span class="cv">▾</span>
+          </button>
+          <Show when={repoMenu()}>
+            <div class="g-repomenu" role="menu">
+              <For each={g().repos ?? []}>
+                {(r) => (
+                  <button
+                    class="g-repoitem"
+                    classList={{ on: r.repo === g().repo }}
+                    role="menuitem"
+                    onClick={() => { selectRepo(p(), r.repo); setRepoMenu(false); }}
+                  >
+                    <span class="nm">{r.repo || p().name}</span>
+                    <span class="br">{r.status?.branch ?? "—"}</span>
+                    <span class="ct" classList={{ bad: !!r.error }}>{r.error ? "error" : `${r.status?.files.length ?? 0} changed`}</span>
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+        </Show>
+        <Show when={nestedRepo() && !multiRepo()}>
+          <span class="g-branch repo" title={g().repo}>{repoName()}</span>
+          <span class="g-arrow">·</span>
+        </Show>
+        <Show when={s()} fallback={<span class="g-hint" classList={{ bad: !!g().repoError }}>{g().repoError ?? (isRemote(p()) ? `${p().host}:${p().path}` : p().path)}</span>}>
           <span class="g-branch"><BranchIcon /> {s()!.branch ?? "detached HEAD"}</span>
           <span class="g-arrow">→</span>
           <span class="g-branch base">{s()!.base}</span>
@@ -398,10 +530,13 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         <div class="g-main">
           <div class="g-left">
             <div class="g-cbox">
+              <Show when={nestedRepo()}>
+                <div class="g-cbox-repo">Commit to <b>{repoName()}</b><span class="k">{s()?.branch ?? g().repo}</span></div>
+              </Show>
               <textarea
                 class="g-in g-msg"
                 classList={{ ghost: g().msgAi, tall: !!g().msg }}
-                placeholder="Message (Ctrl+Enter commits, Ctrl+Shift+Enter also pushes)"
+                placeholder={`Message${nestedRepo() ? ` for ${repoName()}` : ""} (Ctrl+Enter commits, Ctrl+Shift+Enter also pushes)`}
                 value={g().msg}
                 onInput={(e) => setField(p(), "msg", e.currentTarget.value)}
                 onKeyDown={onMsgKey}
@@ -430,40 +565,52 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               <Chips />
             </div>
             <div class="g-lists">
-              <div class="g-sec">Staged <span class="n">{stagedList().length}</span>
-                <button title="Unstage all" onClick={() => unstage(p(), stagedList().map((c) => c.path))}>− all</button>
-              </div>
-              <For each={stagedList()}>{(c) => <FileRow c={c} inStaged={true} />}</For>
-              <div class="g-sec">Changes <span class="n">{unstagedList().length}</span>
-                <button title="Stage all" onClick={() => stage(p(), unstagedList().map((c) => c.path))}>+ all</button>
-              </div>
-              <For each={unstagedList()}>{(c) => <FileRow c={c} inStaged={false} />}</For>
-              <Show when={s() && !s()!.files.length}><div class="g-hint pad">Working tree clean.</div></Show>
-              <div class="g-sec">Commits</div>
-              <For each={s()?.commits ?? []}>
-                {(c) => (
-                  <div
-                    class="g-commit pad"
-                    classList={{ sel: g().commit?.key === c.sha }}
-                    title={`${c.sha}\n${c.when}`}
-                    onClick={() => selectCommit(p(), c.sha)}
-                  >
-                    <span class="sha">{c.sha.slice(0, 7)}</span><span class="s">{c.subject}</span>
-                    <span class="w">{c.pushed ? c.when : "local"}</span>
-                  </div>
-                )}
-              </For>
+              <Show when={multiRepo()} fallback={<Lists />}>
+                <For each={g().repos ?? []}>{(r) => <RepoSection r={r} />}</For>
+              </Show>
             </div>
           </div>
-          <div class="g-right">
+          <div class="g-right" ref={(el) => (rightEl = el)}>
             <Show when={g().commit} fallback={
               <>
                 <div class="g-diffhead">
-                  <b>{g().sel?.path ?? "—"}</b>
+                  <Show when={nestedRepo()}><span class="g-repochip" title={g().repo}>{repoName()}</span></Show>
+                  <b title={g().sel?.path}>{(() => {
+                    const rel = g().sel?.path ?? "";
+                    const cut = rel.lastIndexOf("/");
+                    if (cut < 0) return <span class="f">{rel || "—"}</span>;
+                    return <><span class="d">{rel.slice(0, cut + 1)}</span><span class="f">{rel.slice(cut + 1)}</span></>;
+                  })()}</b>
+                  <Show when={g().sel && hunks().length}>
+                    <span class="g-stat"><i class="p">+{stat().added}</i> <i class="m">−{stat().removed}</i></span>
+                  </Show>
                   <span class="grow" />
-                  <Show when={g().sel}><span>{g().sel!.staged ? "staged" : "not staged"}</span></Show>
+                  <Show when={g().sel}><span class="g-side">{g().sel!.staged ? "staged" : "not staged"}</span></Show>
+                  <span class="g-hunks">
+                    <button class="g-icon" title="Previous hunk (P)" disabled={!hunks().length} onClick={() => nav(-1)}>⌃</button>
+                    <button class="g-icon" title="Next hunk (N)" disabled={!hunks().length} onClick={() => nav(1)}>⌄</button>
+                  </span>
+                  <span class="g-seg" role="group" aria-label="Diff orientation">
+                    <button aria-pressed={mode() === "unified"} title="A stacked diff" onClick={() => setMode("unified")}>☰<span class="lbl"> Unified</span></button>
+                    <button
+                      aria-pressed={mode() === "split"}
+                      title={wantedMode() === "split" && !splitFits() ? "Split needs about 660px: this pane shows unified" : "Side by side"}
+                      onClick={() => setMode("split")}
+                    >▥<span class="lbl"> Split</span></button>
+                  </span>
+                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : "Open the file at its first change"} onClick={() => openAt("source")}>↗ Editor</button>
+                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : withKey("Open the editor in its diff view", "diff")} onClick={() => openAt("diff")}>Diff</button>
                 </div>
-                <Diff text={g().sel ? g().diff?.text : ""} error={g().diff?.error} />
+                <Show when={!g().repoError} fallback={<div class="g-note bad">{g().repoError}</div>}>
+                  <DiffView
+                    text={g().sel ? g().diff?.text : ""}
+                    error={g().diff?.error}
+                    mode={mode()}
+                    onMode={setMode}
+                    onDrill={drill}
+                    ref={(el) => (diffEl = el)}
+                  />
+                </Show>
               </>
             }>
               {(c) => <CommitView sha={c().key} />}

@@ -31,7 +31,7 @@ import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { keyOf, withKey } from "./keymap";
 import { appVersion, installUpdate, startUpdateChecks, updateReady } from "./updater";
-import { type Change, type GitStatus, branchStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
+import { type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
 import {
   clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
 } from "./issues";
@@ -377,9 +377,14 @@ function StatusTimer() {
 function BranchStatus() {
   const [hover, setHover] = createSignal<DOMRect | null>(null);
   const project = () => activeProject();
+  const fl = () => {
+    const p = project();
+    return p ? folderStatus[p.id] : undefined;
+  };
   const st = () => {
     const p = project();
-    return p ? branchStatus[p.id] : undefined;
+    if (!p) return undefined;
+    return branchStatus[p.id] ?? (fl()?.length === 1 ? fl()![0].status : undefined);
   };
   const tick = () => {
     const p = activeProject();
@@ -396,26 +401,87 @@ function BranchStatus() {
   onCleanup(() => (clearInterval(timer), window.removeEventListener("focus", tick)));
 
   return (
-    <Show when={st()}>
-      {(s) => (
-        <>
-          <button
-            class="gstat"
-            aria-label="Git status · open the git window"
-            onClick={() => project() && openGitPanel(project()!)}
-            onMouseEnter={(e) => setHover(e.currentTarget.getBoundingClientRect())}
-            onMouseLeave={() => setHover(null)}
-          >
-            <Icon name="git-branch" size={12} />
-            <span class="nm" classList={{ det: !s().branch }}>{s().branch ?? `HEAD ${s().commits[0]?.sha.slice(0, 7) ?? ""}`}</span>
-            <Show when={s().files.length}><span>*</span></Show>
-            <Show when={aheadBehind(s())}><span class="ab">{aheadBehind(s())}</span></Show>
-            <ChangeCounts s={s()} />
-          </button>
-          <Show when={hover()}>{(r) => <GitStatusPop s={s()} at={r()} />}</Show>
-        </>
-      )}
+    <Show
+      when={fl() && fl()!.length > 1}
+      fallback={
+        <Show when={st()}>
+          {(s) => (
+            <>
+              <button
+                class="gstat"
+                aria-label="Git status · open the git window"
+                onClick={() => project() && openGitPanel(project()!)}
+                onMouseEnter={(e) => setHover(e.currentTarget.getBoundingClientRect())}
+                onMouseLeave={() => setHover(null)}
+              >
+                <Icon name="git-branch" size={12} />
+                <span class="nm" classList={{ det: !s().branch }}>{s().branch ?? `HEAD ${s().commits[0]?.sha.slice(0, 7) ?? ""}`}</span>
+                <Show when={s().files.length}><span>*</span></Show>
+                <Show when={aheadBehind(s())}><span class="ab">{aheadBehind(s())}</span></Show>
+                <ChangeCounts s={s()} />
+              </button>
+              <Show when={hover()}>{(r) => <GitStatusPop s={s()} at={r()} />}</Show>
+            </>
+          )}
+        </Show>
+      }
+    >
+      <button
+        class="gstat"
+        aria-label="Git status · a folder of repos · open the git window"
+        onClick={() => project() && openGitPanel(project()!)}
+        onMouseEnter={(e) => setHover(e.currentTarget.getBoundingClientRect())}
+        onMouseLeave={() => setHover(null)}
+      >
+        <Icon name="git-branch" size={12} />
+        <span class="nm">{fl()!.length} repos</span>
+        <Show when={fl()!.some((r) => (r.status?.files.length ?? 0) > 0)}><span>*</span></Show>
+        <FolderCounts repos={fl()!} />
+      </button>
+      <Show when={hover()}>{(r) => <FolderStatusPop repos={fl()!} at={r()} />}</Show>
     </Show>
+  );
+}
+
+/** The sum of a folder's repos' changes, in the same + ~ − ? symbols as ChangeCounts. */
+function FolderCounts(props: { repos: RepoStatus[] }) {
+  const n = () => {
+    const out = { A: 0, M: 0, D: 0, U: 0 };
+    for (const r of props.repos) for (const c of r.status?.files ?? []) out[kindOf(c)]++;
+    return out;
+  };
+  const parts = () =>
+    ([["A", "+"], ["M", "~"], ["D", "−"], ["U", "?"]] as const)
+      .filter(([k]) => n()[k])
+      .map(([k, sym]) => ({ k, t: `${sym}${n()[k]}` }));
+  return (
+    <Show when={parts().length}>
+      <span class="cnt"><For each={parts()}>{(x) => <span class={x.k}>{x.t}</span>}</For></span>
+    </Show>
+  );
+}
+
+function FolderStatusPop(props: { repos: RepoStatus[]; at: DOMRect }) {
+  const changed = () => props.repos.reduce((n, r) => n + (r.status?.files.length ?? 0), 0);
+  return (
+    <div class="gstat-pop" style={{ left: `${Math.min(props.at.left, window.innerWidth - 392)}px`, bottom: `${window.innerHeight - props.at.top + 6}px` }}>
+      <div class="ph">
+        <b>{props.repos.length} repos</b>
+        <span>{changed() ? `${changed()} changed across the folder` : "nothing to commit anywhere"}</span>
+      </div>
+      <For each={props.repos}>
+        {(r) => (
+          <div class="repo-line">
+            <span class="rn">{r.repo || "project"}</span>
+            <span class="rb">{r.status?.branch ?? "—"}</span>
+            <span class="rc" classList={{ warn: (r.status?.files.length ?? 0) > 0, bad: !!r.error }}>
+              {r.error ? "error" : r.status?.files.length ? `${r.status.files.length} changed` : "clean"}
+            </span>
+          </div>
+        )}
+      </For>
+      <div class="pf">Click to open the git window{keyOf("git") ? ` · ${keyOf("git")}` : ""}</div>
+    </div>
   );
 }
 

@@ -2,7 +2,8 @@
 // rendered preview for Markdown, HTML and SVG and a player for images, video and audio. A click in
 // the tree opens a preview tab (italic) that the next click replaces; a double-click, or an edit,
 // keeps it. Ctrl+click opens a second editor beside this one. Chosen from design/editor.html
-// (variant B).
+// (variant B). A changed file also has a Source | Diff mode comparing HEAD with the live buffer
+// (design/diff.html, variant A); a drill from the git window opens either mode at a line.
 //
 // Each open file is an EditorState, kept per window outside the component, so switching tabs keeps
 // its undo history and a closed window brought back with undo still has its unsaved edits.
@@ -11,17 +12,20 @@ import { For, Show, createEffect, createMemo, createResource, createSignal, on, 
 import { createStore } from "solid-js/store";
 import type { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { type Project, type Tab, focusTab, setEditorTab } from "./state";
+import { type Project, type Tab, diffModeOf, focusTab, setEditorTab, setProjectDiffMode } from "./state";
 import {
   CHANGED, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
   markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor,
 } from "./files";
-import { createState, fromBody, indentText, languageOf, toBody } from "./cm";
+import { createState, fromBody, indentText, languageOf, showChanges, toBody } from "./cm";
 import FileTree, { FileIcon } from "./FileList";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { openExternal, openUrlInProject } from "./browsers";
-import { capsOf } from "./keymap";
+import { capsOf, withKey } from "./keymap";
 import { flash } from "./ui";
+import { type DiffMode, changeMarks, diffStats, makePatch, parseUnified, sameText } from "./diff";
+import DiffView, { diffKeys, stepHunk } from "./DiffView";
+import { headText, repoEpoch, repoOfFile, type RepoRef } from "./repos";
 import "./files.css";
 
 type Preview = "md" | "html" | "svg";
@@ -94,8 +98,9 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   const [ready, setReady] = createSignal("");
   const [cursor, setCursor] = createSignal({ line: 1, col: 1, sel: 0 });
   /** Preview or source, per file; Markdown, HTML and SVG start as preview. */
-  const [modes, setModes] = createStore<Record<string, "preview" | "source">>({});
+  const [modes, setModes] = createStore<Record<string, "preview" | "source" | "diff">>({});
   const previewing = () => !!kind() && (modes[path()] ?? "preview") === "preview";
+  const diffing = () => modes[path()] === "diff";
   /** Bumped by Reload so a media file is read again. */
   const [reloads, setReloads] = createSignal(0);
 
@@ -201,7 +206,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     });
   });
 
-  const showingEditor = () => !!path() && !media() && !previewing() && ready() === path() && !!text()?.file && !text()!.file!.binary;
+  const showingEditor = () => !!path() && !media() && !previewing() && !diffing() && ready() === path() && !!text()?.file && !text()!.file!.binary;
   // The view measures itself; one shown again after being hidden (or a window made visible) re-measures.
   createEffect(on(showingEditor, (on) => on && view?.requestMeasure()));
 
@@ -261,6 +266,228 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
 
   const source = () => (rev(), mine.get(path())?.state.doc.toString() ?? text()?.file?.text ?? "");
 
+  // ---- the file's changes, for Source | Diff ------------------------------------------------
+
+  /** HEAD's text for this file, when it is in a repo; `text` null means new / untracked (all added),
+   *  and `from` is the path HEAD has it under after a staged rename. */
+  type Head = { key: string; ref: RepoRef; text: string | null; from?: string | null };
+  const [head, setHead] = createSignal<Head | null>(null);
+  const [headTried, setHeadTried] = createSignal("");
+  const [headNote, setHeadNote] = createSignal("");
+  const [focusLine, setFocusLine] = createSignal<number | undefined>();
+  const [paneW, setPaneW] = createSignal(0);
+  const [queued, setQueued] = createSignal<number | null>(null);
+  const [headTick, setHeadTick] = createSignal(0);
+  let mainEl: HTMLDivElement | undefined;
+  let diffEl: HTMLDivElement | undefined;
+  let headSeq = 0;
+
+  // HEAD can move while the editor is not looking (a commit in the git window, an agent's checkout).
+  createEffect(on(() => props.focused, (f) => { if (f) setHeadTick((n) => n + 1); }, { defer: true }));
+
+  // HEAD comes from a per-file cache (repos.ts), so switching tabs is free. Focus re-reads the shown
+  // file, keeping the old HEAD on screen until the new one is in.
+  createEffect(on(
+    () => [path(), text()?.file?.binary, text()?.file?.truncated, repoEpoch(), headTick()] as const,
+    async ([f, binary, truncated, , tick], prev) => {
+      const seq = ++headSeq;
+      const fresh = !!prev && prev[0] === f && prev[4] !== tick;
+      if (!prev || prev[0] !== f) {
+        setHead(null);
+        setHeadTried("");
+        setHeadNote("");
+      }
+      if (!f || media() || binary) return;
+      if (truncated || (text()?.file?.size ?? 0) > 1_500_000) {
+        setHeadTried(f);
+        setHeadNote("This file is too large to diff.");
+        return;
+      }
+      try {
+        const ref = await repoOfFile(props.project, f);
+        if (seq !== headSeq) return;
+        if (!ref) {
+          setHeadTried(f);
+          setHeadNote("This file is not in a git repository.");
+          return;
+        }
+        const at = await headText(props.project, ref, fresh);
+        if (seq !== headSeq) return;
+        setHead({ key: f, ref, text: at.text, from: at.from });
+        setHeadNote("");
+        setHeadTried(f);
+      } catch (e) {
+        if (seq !== headSeq) return;
+        setHead(null);
+        setHeadTried(f);
+        setHeadNote(String(e));
+      }
+    },
+  ));
+
+  // Source mode's change bars: HEAD against the live doc, a moment after the last edit. A new
+  // file (nothing at HEAD) gets none rather than one long green bar.
+  let barsTimer = 0;
+  /** How many changed regions the bars show, for the Diff button. */
+  const [barCount, setBarCount] = createSignal(0);
+  createEffect(() => {
+    rev();
+    const f = path();
+    const h = head();
+    window.clearTimeout(barsTimer);
+    if (!view || !f || ready() !== f) return;
+    if (!h || h.key !== f || h.text === null) {
+      if (headTried() === f) {
+        setBarCount(0);
+        setBars(f, null);
+      }
+      return;
+    }
+    const was = h.text;
+    barsTimer = window.setTimeout(() => {
+      if (!view || current !== f) return;
+      const patch = makePatch(h.ref.rel, was, view.state.doc.toString(), 150);
+      const hunks = patch === undefined ? [] : parseUnified(patch);
+      setBarCount(hunks.length);
+      setBars(f, patch === undefined ? null : changeMarks(hunks));
+    }, 200);
+  });
+  onCleanup(() => window.clearTimeout(barsTimer));
+
+  /** Put the bars in the view, and in the file's kept state so showing it again keeps them. */
+  const setBars = (f: string, m: ReturnType<typeof changeMarks> | null) => {
+    if (!view || current !== f) return;
+    showChanges(view, m);
+    const d = mine.get(f);
+    if (d) d.state = view.state;
+  };
+
+  /** The live doc against HEAD, so unsaved edits are part of the patch. */
+  const diffable = () => {
+    const h = head();
+    if (!h || h.key !== path()) return false;
+    const src = source();
+    return h.text === null ? src.length > 0 : !sameText(src, h.text);
+  };
+
+  const patch = createMemo(() => {
+    if (!diffing()) return "";
+    const h = head();
+    if (!h || h.key !== path()) return undefined;
+    return makePatch(h.from ?? h.ref.rel, h.text ?? "", source());
+  });
+  const patchHunks = createMemo(() => (patch() ? parseUnified(patch()!) : []));
+  const patchStats = createMemo(() => diffStats(patchHunks()));
+
+  const wantedMode = (): DiffMode => diffModeOf(props.project);
+  const diffMode = (): DiffMode => (wantedMode() === "unified" || (paneW() > 0 && paneW() < 660) ? "unified" : "split");
+  const setDiffMode = (m: DiffMode) => setProjectDiffMode(props.project.id, m);
+
+  // A clean file has nothing to diff: go back to the source instead of an empty pane.
+  createEffect(() => {
+    if (!diffing()) return;
+    const h = head();
+    if (!h || h.key !== path()) return;
+    if (!diffable()) setModes(path(), "source");
+  });
+
+  const applyJump = (line: number) => {
+    const d = mine.get(path());
+    if (!view || !d || !showingEditor()) return;
+    const n = Math.min(Math.max(1, line), view.state.doc.lines);
+    const pos = view.state.doc.line(n).from;
+    view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: "center" }) });
+    setQueued(null);
+    setFocusLine(undefined);
+    if (props.focused) view.focus();
+  };
+
+  // A queued drill waits for the file's doc to be in the view.
+  createEffect(() => {
+    const line = queued();
+    if (line == null || !showingEditor()) return;
+    requestAnimationFrame(() => applyJump(line));
+  });
+
+  // A drill from the git window (or the editor's own diff): show source or diff, then jump.
+  createEffect(on(() => props.tab.at?.seq, () => {
+    const at = props.tab.at;
+    const f = path();
+    if (!at || !f) return;
+    if (at.mode === "diff") {
+      setModes(f, "diff");
+      setFocusLine(at.line);
+    } else {
+      setModes(f, "source");
+      setFocusLine(undefined);
+      setQueued(at.line);
+    }
+    setEditorTab(props.project.id, tabId, { at: undefined });
+  }));
+
+  // Alt+D (keymap "diff"): Source ⇄ Diff for a changed file.
+  onMount(() => {
+    diffKeys.set(tabId, () => {
+      const f = path();
+      if (!f) return false;
+      if (diffing()) {
+        setModes(f, "source");
+        requestAnimationFrame(() => view?.focus());
+        return true;
+      }
+      if (!diffable()) return false;
+      // The diff opens where the cursor is.
+      setFocusLine(cursor().line);
+      setModes(f, "diff");
+      requestAnimationFrame(() => diffEl?.focus());
+      return true;
+    });
+    onCleanup(() => diffKeys.delete(tabId));
+  });
+
+  onMount(() => {
+    if (!mainEl) return;
+    const ro = new ResizeObserver(([entry]) => setPaneW(entry.contentRect.width));
+    ro.observe(mainEl);
+    onCleanup(() => ro.disconnect());
+  });
+
+  const diffPane = () => {
+    const h = head();
+    if (!h) return <div class="fnote">{headTried() === path() ? headNote() || "Checking HEAD…" : "Checking HEAD…"}</div>;
+    return (
+      <div class="ediff">
+        <div class="ediff-head">
+          <Show when={h.ref.repo}><span class="fchip">{h.ref.repo}</span></Show>
+          <span class="fchip on" title={h.from ? `Renamed from ${h.from} (staged)` : undefined}>
+            {h.from ? `HEAD:${h.from} → buffer` : h.text === null ? "new file → buffer" : "HEAD → buffer"}
+          </span>
+          <span class="ediff-stat"><i class="p">+{patchStats().added}</i> <i class="m">−{patchStats().removed}</i></span>
+          <span class="fnote-inline">{patchHunks().length} hunk{patchHunks().length === 1 ? "" : "s"}</span>
+          <span class="ediff-sp" />
+          <button class="ehunk" title="Previous hunk (P)" disabled={!patchHunks().length} onClick={() => diffEl && stepHunk(diffEl, -1)}>⌃</button>
+          <button class="ehunk" title="Next hunk (N)" disabled={!patchHunks().length} onClick={() => diffEl && stepHunk(diffEl, 1)}>⌄</button>
+          <div class="seg" role="group" aria-label="Diff orientation">
+            <button aria-pressed={diffMode() === "unified"} title="A stacked diff" onClick={() => setDiffMode("unified")}>☰<span class="lbl"> Unified</span></button>
+            <button
+              aria-pressed={diffMode() === "split"}
+              title={wantedMode() === "split" && diffMode() === "unified" ? "Split needs about 660px: this pane shows unified" : "Side by side"}
+              onClick={() => setDiffMode("split")}
+            >▥<span class="lbl"> Split</span></button>
+          </div>
+        </div>
+        <DiffView
+          text={patch()}
+          mode={diffMode()}
+          focusLine={focusLine()}
+          onMode={setDiffMode}
+          onDrill={(line) => { setModes(path(), "source"); setFocusLine(undefined); setQueued(line); }}
+          ref={(el) => (diffEl = el)}
+        />
+      </div>
+    );
+  };
+
   const openLink = (e: MouseEvent) => {
     const a = (e.target as HTMLElement).closest("a");
     if (!a) return;
@@ -313,6 +540,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     const f = st?.file;
     if (!f) return <div class="fnote">{st?.loading ? "Loading…" : "No file."}</div>;
     if (f.binary) return <div class="fnote">Binary file · {bytes(f.size)}</div>;
+    if (diffing()) return diffPane();
     if (!previewing()) return ready() === path() ? null : <div class="fnote">Loading…</div>;
     const t = source();
     if (!t) return <div class="fnote">Empty file.</div>;
@@ -340,7 +568,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
           <FileTree project={props.project} shown={path() || undefined} open={open} ref={(el) => (treeEl = el)} />
         </div>
       </Show>
-      <div class="edmain">
+      <div class="edmain" ref={(el) => (mainEl = el)}>
         <div class="ftabs" role="tablist">
           <button class="ftree-tg" title={tree() ? "Hide the file tree" : "Show the file tree"} aria-pressed={tree()} onClick={() => setTree(!tree())}>
             ▤
@@ -383,10 +611,20 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
                 )}
               </For>
             </span>
-            <Show when={kind() && text()?.file && !text()!.file!.binary}>
+            <Show when={text()?.file && !text()!.file!.binary && (!!kind() || diffable() || diffing())}>
               <div class="seg" role="group" aria-label="View mode">
-                <button aria-pressed={previewing()} onClick={() => setModes(path(), "preview")}>Preview</button>
-                <button aria-pressed={!previewing()} onClick={() => (setModes(path(), "source"), requestAnimationFrame(() => view?.focus()))}>Source</button>
+                <Show when={kind()}>
+                  <button aria-pressed={previewing()} onClick={() => setModes(path(), "preview")}>Preview</button>
+                </Show>
+                <button
+                  aria-pressed={!previewing() && !diffing()}
+                  onClick={() => (setModes(path(), "source"), requestAnimationFrame(() => view?.focus()))}
+                >Source</button>
+                <Show when={diffable()}>
+                  <button aria-pressed={diffing()} title={withKey("HEAD → buffer", "diff")} onClick={() => setModes(path(), "diff")}>
+                    Diff<Show when={barCount()}><span class="segn">{barCount()}</span></Show>
+                  </button>
+                </Show>
               </div>
             </Show>
             <Show when={kind() === "html" && props.project.host === "local" && fileUrl()}>

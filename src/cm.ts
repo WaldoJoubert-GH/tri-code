@@ -2,9 +2,9 @@
 // tri-code's CSS variables (so it follows light / dark and the project accent with no JS),
 // languages loaded per file type, and the line ending, BOM and indent a file is saved back with.
 
-import { EditorState, type Extension, Text } from "@codemirror/state";
+import { EditorState, type Extension, RangeSet, StateEffect, StateField, Text } from "@codemirror/state";
 import {
-  EditorView, crosshairCursor, drawSelection, dropCursor, highlightActiveLine, highlightActiveLineGutter,
+  EditorView, GutterMarker, crosshairCursor, drawSelection, dropCursor, gutter, highlightActiveLine, highlightActiveLineGutter,
   highlightSpecialChars, keymap, lineNumbers, rectangularSelection,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, moveLineDown, moveLineUp, copyLineDown, copyLineUp } from "@codemirror/commands";
@@ -14,6 +14,7 @@ import {
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
+import type { ChangeMarks } from "./diff";
 
 /** The look: plain CSS with tri-code's variables, so every editor follows the theme and accent. */
 const theme = EditorView.theme({
@@ -45,7 +46,56 @@ const theme = EditorView.theme({
   ".cm-tooltip": { backgroundColor: "var(--panel)", border: "1px solid var(--line)", borderRadius: "6px", color: "var(--text)" },
   ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "color-mix(in srgb, var(--accent) 22%, transparent)", color: "var(--text)" },
   ".cm-specialChar": { color: "var(--bad)" },
+  ".cm-changes .cm-gutterElement": { width: "4px", padding: "0", position: "relative" },
+  ".cm-chg": { position: "absolute", inset: "1px 0 1px 0", borderRadius: "1px" },
+  ".cm-chg.add": { backgroundColor: "var(--ok)" },
+  ".cm-chg.mod": { backgroundColor: "var(--warn)" },
+  ".cm-chg.del": {
+    inset: "-4px auto auto 0", width: "0", height: "0", borderRadius: "0",
+    borderTop: "4px solid transparent", borderBottom: "4px solid transparent", borderLeft: "4px solid var(--bad)",
+  },
 });
+
+// ---- change bars: where the buffer differs from HEAD, in a thin gutter beside the line numbers
+
+class ChangeBar extends GutterMarker {
+  constructor(readonly kind: "add" | "mod" | "del") { super(); }
+  eq(o: ChangeBar) { return o.kind === this.kind; }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = `cm-chg ${this.kind}`;
+    el.title = this.kind === "add" ? "Added since HEAD" : this.kind === "mod" ? "Changed since HEAD" : "Lines deleted above";
+    return el;
+  }
+}
+const BARS = { add: new ChangeBar("add"), mod: new ChangeBar("mod"), del: new ChangeBar("del") };
+
+const setMarks = StateEffect.define<ChangeMarks | null>();
+
+/** The bars, kept in place through edits until the editor sends fresh ones (debounced). */
+const marksField = StateField.define<RangeSet<GutterMarker>>({
+  create: () => RangeSet.empty,
+  update(set, tr) {
+    for (const e of tr.effects) if (e.is(setMarks)) return barsOf(tr.state.doc, e.value);
+    return tr.docChanged ? set.map(tr.changes) : set;
+  },
+});
+
+function barsOf(doc: Text, m: ChangeMarks | null): RangeSet<GutterMarker> {
+  if (!m) return RangeSet.empty;
+  const at = new Map<number, ChangeBar>();
+  // A deletion's caret yields to a bar on the same line.
+  for (const n of m.del) at.set(Math.min(Math.max(1, n), doc.lines), BARS.del);
+  for (const n of m.add) if (n <= doc.lines) at.set(n, BARS.add);
+  for (const n of m.mod) if (n <= doc.lines) at.set(n, BARS.mod);
+  const lines = [...at.keys()].sort((a, b) => a - b);
+  return RangeSet.of(lines.map((n) => at.get(n)!.range(doc.line(n).from)));
+}
+
+const changeGutter = [marksField, gutter({ class: "cm-changes", markers: (v) => v.state.field(marksField) })];
+
+/** Show (or with null, clear) the change bars of the view's file. */
+export const showChanges = (view: EditorView, m: ChangeMarks | null) => view.dispatch({ effects: setMarks.of(m) });
 
 /** Token colours: the same few as the old highlighter (code.ts) and the Markdown preview. */
 const highlight = HighlightStyle.define([
@@ -156,6 +206,7 @@ export async function createState(s: Setup): Promise<EditorState> {
 function extensions(s: Setup): Extension {
   return [
     lineNumbers(),
+    changeGutter,
     highlightActiveLineGutter(),
     highlightSpecialChars(),
     history(),

@@ -691,6 +691,10 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .skip-row textarea:focus { border-color: var(--accent); }
 .settings-dlg .skip-row .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
 .settings-dlg .skip-row .reset:hover { background: var(--hover); color: var(--text); }
+.settings-dlg .set-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.settings-dlg .set-seg button { padding: 3px 10px; font-size: 12px; color: var(--muted); }
+.settings-dlg .set-seg button + button { border-left: 1px solid var(--line); }
+.settings-dlg .set-seg button[aria-checked="true"] { background: var(--raised); color: var(--text); }
 @media (max-width: 640px) {
   .settings-dlg { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
   .settings-dlg nav { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -755,3 +759,11 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 :is(.pop, .settings-dlg) .px input:focus { border-color: var(--accent); }
 :is(.pop, .settings-dlg) .px input::placeholder { color: var(--muted); }
 :is(.pop, .settings-dlg) .px input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* The status line's popover for a folder of repos. */
+.gstat-pop .repo-line { display: flex; gap: 8px; padding: 3px 10px; font: 11.5px var(--mono); align-items: baseline; }
+.gstat-pop .repo-line .rn { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.gstat-pop .repo-line .rb { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.gstat-pop .repo-line .rc { margin-left: auto; color: var(--muted); flex: none; }
+.gstat-pop .repo-line .rc.warn { color: var(--warn); }
+.gstat-pop .repo-line .rc.bad { color: var(--bad); }

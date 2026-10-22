@@ -17,6 +17,15 @@ pub struct Change {
     pub x: String,
     /// Worktree (unstaged) status, same letters.
     pub y: String,
+    /// Lines added and removed in the index (staged) and in the worktree, from `diff --numstat`.
+    /// None for an untracked or binary file, or no change on that side.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<(u32, u32)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub work: Option<(u32, u32)>,
+    /// A rename's or copy's original path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub orig: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -187,7 +196,7 @@ fn parse_status(out: &str, s: &mut Status) {
                 }
             }
         } else if let Some(p) = rec.strip_prefix("? ") {
-            s.files.push(Change { path: p.into(), x: "?".into(), y: "?".into() });
+            s.files.push(Change { path: p.into(), x: "?".into(), y: "?".into(), index: None, work: None, orig: None });
         } else if rec.starts_with("1 ") || rec.starts_with("2 ") || rec.starts_with("u ") {
             // 1 XY sub mH mI mW hH hI path / 2 … X<score> path NUL orig / u XY sub m1 m2 m3 mW h1 h2 h3 path
             let fields = match &rec[..1] { "1" => 9, "2" => 10, _ => 11 };
@@ -197,12 +206,34 @@ fn parse_status(out: &str, s: &mut Status) {
             }
             let xy: Vec<char> = parts[1].chars().collect();
             let (x, y) = if rec.starts_with('u') { ('U', 'U') } else { (xy[0], xy[1]) };
-            s.files.push(Change { path: parts[fields - 1].into(), x: x.into(), y: y.into() });
-            if rec.starts_with('2') {
-                it.next(); // the rename's original path
-            }
+            let orig = if rec.starts_with('2') { it.next().map(String::from) } else { None };
+            s.files.push(Change { path: parts[fields - 1].into(), x: x.into(), y: y.into(), index: None, work: None, orig });
         }
     }
+}
+
+/// Parse `git diff --numstat -z`: `added TAB removed TAB path NUL`, or for a rename an empty
+/// path then `old NUL new NUL`. A binary file prints `-` for both counts and is left out.
+fn parse_numstat(out: &str) -> std::collections::HashMap<String, (u32, u32)> {
+    let mut map = std::collections::HashMap::new();
+    let mut it = out.split('\0');
+    while let Some(rec) = it.next() {
+        let mut f = rec.trim_start_matches('\n').splitn(3, '\t');
+        let (Some(a), Some(d), Some(p)) = (f.next(), f.next(), f.next()) else { continue };
+        let path = if p.is_empty() {
+            it.next();
+            match it.next() {
+                Some(new) => new,
+                None => break,
+            }
+        } else {
+            p
+        };
+        if let (Ok(a), Ok(d)) = (a.parse(), d.parse()) {
+            map.insert(path.to_string(), (a, d));
+        }
+    }
+    map
 }
 
 fn parse_log(out: &str, unpushed: &str) -> Vec<Commit> {
@@ -221,28 +252,105 @@ pub(crate) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, St
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
 }
 
+const STATUS_CMDS: &[&[&str]] = &[
+    &["status", "--porcelain=v2", "--branch", "-z"],
+    &["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+    &["log", "-n", "12", "--format=%H%x1f%s%x1f%cr"],
+    &["rev-list", "HEAD", "--not", "--remotes", "-n", "200"],
+    &["diff", "--numstat", "-z", "--cached"],
+    &["diff", "--numstat", "-z"],
+];
+
+/// Parse one repo's status outputs (the commands in STATUS_CMDS).
+fn status_from(r: &[Result<String, i32>]) -> Result<Status, String> {
+    let status = match r.first() {
+        Some(Ok(s)) => s,
+        _ => return Err("not a git repository".into()),
+    };
+    let mut s = Status::default();
+    parse_status(status, &mut s);
+    let base = r.get(1).and_then(|x| x.as_ref().ok()).map(|b| b.trim().to_string()).unwrap_or_default();
+    s.base = base.split_once('/').map(|(_, b)| b.to_string()).filter(|b| !b.is_empty()).unwrap_or_else(|| "main".into());
+    let ok = |i: usize| r.get(i).and_then(|x| x.as_ref().ok()).map(String::as_str).unwrap_or("");
+    s.commits = parse_log(ok(2), ok(3));
+    let (index, work) = (parse_numstat(ok(4)), parse_numstat(ok(5)));
+    for c in &mut s.files {
+        c.index = index.get(&c.path).copied();
+        c.work = work.get(&c.path).copied();
+    }
+    Ok(s)
+}
+
 #[tauri::command]
 pub async fn git_status(host: String, path: String) -> Result<Status, String> {
     blocking(move || {
-        let r = multi(&host, &path, &[
-            &["status", "--porcelain=v2", "--branch", "-z"],
-            &["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
-            &["log", "-n", "12", "--format=%H%x1f%s%x1f%cr"],
-            &["rev-list", "HEAD", "--not", "--remotes", "-n", "200"],
-        ])?;
-        let status = match r.first() {
-            Some(Ok(s)) => s,
-            _ => return Err(format!("{path} is not a git repository")),
-        };
-        let mut s = Status::default();
-        parse_status(status, &mut s);
-        let base = r.get(1).and_then(|x| x.as_ref().ok()).map(|b| b.trim().to_string()).unwrap_or_default();
-        s.base = base.split_once('/').map(|(_, b)| b.to_string()).filter(|b| !b.is_empty()).unwrap_or_else(|| "main".into());
-        let ok = |i: usize| r.get(i).and_then(|x| x.as_ref().ok()).map(String::as_str).unwrap_or("");
-        s.commits = parse_log(ok(2), ok(3));
-        Ok(s)
+        let r = multi(&host, &path, STATUS_CMDS)?;
+        status_from(&r).map_err(|_| format!("{path} is not a git repository"))
     })
     .await
+}
+
+#[derive(Debug, Serialize)]
+pub struct RepoStatus {
+    /// The repo's path relative to the project folder.
+    pub repo: String,
+    pub status: Option<Status>,
+    pub error: Option<String>,
+}
+
+/// The status of every repo nested in a folder, in one batch (one ssh round trip when remote).
+/// A repo that cannot be read gets its own error; the others still load.
+#[tauri::command]
+pub async fn folder_status(host: String, path: String) -> Result<Vec<RepoStatus>, String> {
+    blocking(move || folder_statuses(&host, &path)).await
+}
+
+fn folder_statuses(host: &str, path: &str) -> Result<Vec<RepoStatus>, String> {
+    let repos = crate::folders::repos_in(host, path)?;
+    if repos.is_empty() {
+        return Ok(Vec::new());
+    }
+    let n = STATUS_CMDS.len();
+    let outs = if matches!(host, "" | "local") {
+        // Locally each command is a process: run the repos side by side, a few at a time.
+        let base = std::path::PathBuf::from(expand_home(path));
+        let mut outs = Vec::with_capacity(repos.len() * n);
+        for chunk in repos.chunks(6) {
+            let done: Vec<Vec<Result<String, i32>>> = std::thread::scope(|sc| {
+                let jobs: Vec<_> = chunk
+                    .iter()
+                    .map(|r| {
+                        let dir = base.join(r).to_string_lossy().into_owned();
+                        sc.spawn(move || multi("local", &dir, STATUS_CMDS).unwrap_or_default())
+                    })
+                    .collect();
+                jobs.into_iter().map(|j| j.join().unwrap_or_default()).collect()
+            });
+            for mut r in done {
+                r.resize_with(n, || Err(-1));
+                outs.extend(r);
+            }
+        }
+        outs
+    } else {
+        let mut sets: Vec<Vec<&str>> = Vec::with_capacity(repos.len() * n);
+        for r in &repos {
+            for cmd in STATUS_CMDS {
+                let mut args: Vec<&str> = vec!["-C", r.as_str()];
+                args.extend(cmd.iter().copied());
+                sets.push(args);
+            }
+        }
+        let cmds: Vec<&[&str]> = sets.iter().map(|v| v.as_slice()).collect();
+        multi(host, path, &cmds)?
+    };
+    Ok(repos.iter().enumerate().map(|(i, repo)| {
+        let slice = outs.get(i * n..(i + 1) * n).unwrap_or(&[]);
+        match status_from(slice) {
+            Ok(status) => RepoStatus { repo: repo.clone(), status: Some(status), error: None },
+            Err(e) => RepoStatus { repo: repo.clone(), status: None, error: Some(e) },
+        }
+    }).collect())
 }
 
 #[derive(Debug, Serialize)]
@@ -300,9 +408,10 @@ pub async fn project_files(host: String, path: String, skip: Option<Vec<String>>
 }
 
 /// The diff of one file (or, with no `file`, of everything) in the index or the worktree.
-/// An untracked file is diffed against nothing so it reads as all-added.
+/// An untracked file is diffed against nothing so it reads as all-added; a rename names its
+/// `orig` path too, so git pairs the two instead of showing the new name as all-added.
 #[tauri::command]
-pub async fn git_diff(host: String, path: String, file: Option<String>, staged: bool, untracked: bool) -> Result<String, String> {
+pub async fn git_diff(host: String, path: String, file: Option<String>, staged: bool, untracked: bool, orig: Option<String>) -> Result<String, String> {
     blocking(move || {
         if untracked {
             let f = file.unwrap_or_default();
@@ -314,9 +423,90 @@ pub async fn git_diff(host: String, path: String, file: Option<String>, staged: 
             args.push("--cached");
         }
         if let Some(f) = file.as_deref() {
-            args.extend(["--", f]);
+            match orig.as_deref() {
+                Some(o) => args.extend(["-M", "--", o, f]),
+                None => args.extend(["--", f]),
+            }
         }
         exec(&host, &path, "git", &args, None)
+    })
+    .await
+}
+
+/// Whether `path` sits inside a git work tree (a repo project, or a subfolder of one).
+#[tauri::command]
+pub async fn git_is_repo(host: String, path: String) -> Result<bool, String> {
+    blocking(move || {
+        Ok(exec(&host, &path, "git", &["rev-parse", "--is-inside-work-tree"], None)
+            .map(|o| o.trim() == "true")
+            .unwrap_or(false))
+    })
+    .await
+}
+
+#[derive(Debug, Serialize)]
+pub struct HeadFile {
+    /// The file's text at HEAD; None when HEAD or the path does not exist yet (untracked, new file).
+    pub text: Option<String>,
+    /// For the target of a staged rename, the path HEAD has the file under (relative to `path`).
+    pub from: Option<String>,
+}
+
+/// `git show HEAD:./file`: Some(text), None when HEAD or the path does not exist there yet.
+fn show_head(host: &str, path: &str, file: &str) -> Result<Option<String>, String> {
+    let spec = format!("HEAD:./{file}");
+    match exec(host, path, "git", &["show", "--no-color", &spec], None) {
+        Ok(text) => Ok(Some(text)),
+        // A new file or an empty repo is all additions, not an error. Anything else
+        // (an unreachable host, a broken worktree) must not look like a new file.
+        Err(e)
+            if e.contains("does not exist in")
+                || e.contains("exists on disk, but not in")
+                || e.contains("unknown revision")
+                || e.contains("invalid object name")
+                || e.contains("ambiguous argument") =>
+        {
+            Ok(None)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// The source of a staged rename to `file`, from `diff --cached --name-status -z`
+/// (`R<score> NUL old NUL new NUL`, other records `<status> NUL path NUL`).
+fn renamed_from(name_status: &str, file: &str) -> Option<String> {
+    let mut it = name_status.split('\0');
+    while let Some(st) = it.next() {
+        let st = st.trim_start_matches('\n');
+        if st.starts_with('R') || st.starts_with('C') {
+            let (old, new) = (it.next()?, it.next()?);
+            if new == file && st.starts_with('R') {
+                return Some(old.to_string());
+            }
+        } else if !st.is_empty() {
+            it.next();
+        }
+    }
+    None
+}
+
+/// The file's text at HEAD, for the editor's HEAD → buffer diff. `file` is relative to `path`,
+/// so `HEAD:./file` resolves it from a subfolder as well as from the repo root.
+#[tauri::command]
+pub async fn git_head_text(host: String, path: String, file: String) -> Result<HeadFile, String> {
+    blocking(move || {
+        if let Some(text) = show_head(&host, &path, &file)? {
+            return Ok(HeadFile { text: Some(text), from: None });
+        }
+        // Not at HEAD under this name: a staged rename diffs against the old one. `--relative`
+        // keeps the paths relative to `path`, like `file`.
+        let ns = exec(&host, &path, "git", &["diff", "--cached", "-M", "--name-status", "-z", "--relative"], None).unwrap_or_default();
+        if let Some(old) = renamed_from(&ns, &file) {
+            if let Some(text) = show_head(&host, &path, &old)? {
+                return Ok(HeadFile { text: Some(text), from: Some(old) });
+            }
+        }
+        Ok(HeadFile { text: None, from: None })
     })
     .await
 }
@@ -571,6 +761,30 @@ mod tests {
     }
 
     #[test]
+    fn status_keeps_a_renames_original_path() {
+        let mut s = Status::default();
+        parse_status("2 R. N... 100644 100644 100644 a b R100 new.rs\0old.rs\0", &mut s);
+        assert_eq!(s.files[0].orig.as_deref(), Some("old.rs"));
+    }
+
+    #[test]
+    fn numstat_reads_counts_renames_and_skips_binaries() {
+        let m = parse_numstat(concat!("3\t1\tsrc/a b.ts\0", "-\t-\tlogo.png\0", "5\t0\t\0old.rs\0new.rs\0"));
+        assert_eq!(m.get("src/a b.ts"), Some(&(3, 1)));
+        assert_eq!(m.get("new.rs"), Some(&(5, 0)));
+        assert_eq!(m.get("logo.png"), None);
+        assert_eq!(m.len(), 2);
+    }
+
+    #[test]
+    fn rename_source_from_name_status() {
+        let ns = "M\0a.ts\0R087\0src/old.ts\0src/new.ts\0A\0b.ts\0";
+        assert_eq!(renamed_from(ns, "src/new.ts").as_deref(), Some("src/old.ts"));
+        assert_eq!(renamed_from(ns, "b.ts"), None);
+        assert_eq!(renamed_from("", "x"), None);
+    }
+
+    #[test]
     fn detached_head_has_no_branch() {
         let mut s = Status::default();
         parse_status("# branch.head (detached)\0", &mut s);
@@ -649,7 +863,7 @@ mod tests {
         let r = multi("local", p, &[&["status", "--porcelain=v2", "--branch", "-z"]]).unwrap();
         let mut s = Status::default();
         parse_status(r[0].as_ref().unwrap(), &mut s);
-        assert_eq!(s.files, vec![Change { path: "it's.txt".into(), x: "?".into(), y: "?".into() }]);
+        assert_eq!(s.files, vec![Change { path: "it's.txt".into(), x: "?".into(), y: "?".into(), index: None, work: None, orig: None }]);
 
         let diff = run(command("local", p, "git", &["diff", "--no-color", "--no-index", "--", "/dev/null", "it's.txt"]).unwrap(), None, &[1]).unwrap();
         assert!(diff.contains("+hi"));
@@ -696,5 +910,44 @@ mod tests {
         assert!(r[0].as_ref().unwrap().contains("# branch.head main"));
         assert!(r[1].is_err());
         assert_eq!(r[2].as_deref(), Ok("Add a file\n"));
+    }
+    #[cfg(unix)]
+    #[test]
+    fn folder_status_reads_each_nested_repo_with_line_counts() {
+        let dir = std::env::temp_dir().join(format!("tri-folder-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for r in ["api", "web/app"] {
+            let p = dir.join(r);
+            std::fs::create_dir_all(&p).unwrap();
+            let p = p.to_str().unwrap();
+            let git = |args: &[&str]| exec("local", p, "git", args, None).unwrap();
+            git(&["init", "-q", "-b", "main"]);
+            git(&["config", "user.email", "t@example.com"]);
+            git(&["config", "user.name", "T"]);
+            std::fs::write(format!("{p}/a.txt"), "one\ntwo\n").unwrap();
+            git(&["add", "a.txt"]);
+            git(&["commit", "-q", "-m", "first"]);
+        }
+        std::fs::write(dir.join("api/a.txt"), "one\nTWO\nthree\n").unwrap();
+        exec("local", dir.join("web/app").to_str().unwrap(), "git", &["mv", "a.txt", "b.txt"], None).unwrap();
+        std::fs::write(dir.join("notes.md"), "not in a repo").unwrap();
+
+        let mut got = folder_statuses("local", dir.to_str().unwrap()).unwrap();
+        got.sort_by(|a, b| a.repo.cmp(&b.repo));
+        assert_eq!(got.iter().map(|r| r.repo.as_str()).collect::<Vec<_>>(), ["api", "web/app"]);
+        let api = got[0].status.as_ref().unwrap();
+        assert_eq!(api.branch.as_deref(), Some("main"));
+        assert_eq!(api.commits.len(), 1);
+        assert_eq!((api.files[0].path.as_str(), api.files[0].work, api.files[0].index), ("a.txt", Some((2, 1)), None));
+        let web = got[1].status.as_ref().unwrap();
+        assert_eq!((web.files[0].path.as_str(), web.files[0].orig.as_deref(), web.files[0].index), ("b.txt", Some("a.txt"), Some((0, 0))));
+
+        // The rename's target reads its HEAD text under the old name.
+        let w = dir.join("web/app");
+        let ns = exec("local", w.to_str().unwrap(), "git", &["diff", "--cached", "-M", "--name-status", "-z", "--relative"], None).unwrap();
+        assert_eq!(renamed_from(&ns, "b.txt").as_deref(), Some("a.txt"));
+        assert_eq!(show_head("local", w.to_str().unwrap(), "a.txt").unwrap().as_deref(), Some("one\ntwo\n"));
+        assert_eq!(show_head("local", w.to_str().unwrap(), "b.txt").unwrap(), None);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
