@@ -159,6 +159,10 @@ _Avoid_: Notification (that is the desktop popup), attention, status (a tab's st
 What a signal does beyond its badges: the project's sound for it and a desktop notification. When to alert is "away" (only while you aren't looking at that window), "always" or "badge only". App-wide settings sit behind the bell in the status line (`app.notify`); a project overrides any of them in Appearance › Signals (`project.notify`), and Do not disturb makes every project badge only.
 _Avoid_: Notification settings, ping.
 
+**Feedback**:
+A bug report or idea for tri-code itself, written in the popover behind the status line's speech bubble (or "Report a bug or suggest a feature" in the Command Palette). It becomes an issue on tri-code's GitHub repo, filed with the local `gh` login and labelled `bug` or `enhancement` when GitHub allows; without gh, GitHub's new-issue form opens prefilled. The version and OS go with it unless clicked off. Chosen from design/support-widget.html (variant A).
+_Avoid_: Support ticket, bug reporter.
+
 **Worktree**:
 Another checkout of a project's repo on its own branch, made with `git worktree add` in a folder next to the repo (`<repo>.worktrees/<branch>`) on the project's host. In tri-code it is a Project with a `parent` (the repo's project), a `branch` and maybe an `issue` Slug-ID: it has its own windows, workspaces, accent and Agent Signals, and takes its repo's icon, background, Alert settings and Dev Directory. The sidebar lists every checkout under the repo's row, the repo's own folder first; the collapsed rail stacks a small tile per checkout under the project tile (an issue number, or the branch's first letters). `Alt+Shift+W` makes one. Chosen from design/worktrees.html (variant A, "stack" rail).
 _Avoid_: Branch (a Worktree is on one, but switching branch is not what it does), sub-project, workspace (that is the Alt+1–4 canvas).

@@ -23,6 +23,7 @@ import { closePalette, paletteOpen, togglePalette } from "./Palette";
 import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, stepGap, stepProject, workspace } from "./commands";
 import { nextSignal } from "./signals";
 import { closeSignals, signalsOpen } from "./SignalSettings";
+import { closeFeedback, feedbackOpen } from "./Feedback";
 import { flash } from "./ui";
 import { hasSelection } from "./terms";
 import { actionFor } from "./keymap";
@@ -164,6 +165,7 @@ function onKey(e: KeyboardEvent) {
     else if (appearanceOpen()) closeAppearance();
     else if (settingsOpen()) closeSettings();
     else if (signalsOpen()) closeSignals();
+    else if (feedbackOpen()) closeFeedback();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
     else if (goToFileOpen()) closeGoToFile();

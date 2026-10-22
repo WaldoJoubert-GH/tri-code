@@ -145,6 +145,7 @@ pub fn run() {
             github::gh_issue_labels,
             github::gh_issue_comments,
             github::gh_issue_comment,
+            github::gh_feedback,
             store::state_load,
             store::state_save,
             tour::tour_folder,

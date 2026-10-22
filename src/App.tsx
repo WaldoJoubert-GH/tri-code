@@ -6,6 +6,7 @@ import {
 } from "./state";
 import { SIG_TEXT, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
+import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
@@ -100,7 +101,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen()));
+  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen() || feedbackOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   const backdrop = () => {
@@ -140,6 +141,7 @@ export default function App() {
       <NewWorktreeDialog />
       <AboutDialog />
       <SignalsPopover />
+      <FeedbackPopover />
       <IconPicker />
       <Tour />
     </div>
@@ -242,6 +244,17 @@ function StatusBar() {
           </button>
         )}
       </Show>
+      <button
+        class="bellbtn"
+        id="feedbackBtn"
+        title="Report a bug or suggest a feature"
+        aria-label="Feedback"
+        aria-haspopup="dialog"
+        aria-expanded={feedbackOpen()}
+        onClick={(e) => toggleFeedback(e.currentTarget)}
+      >
+        <Icon name="message-square-plus" size={13} />
+      </button>
       <button
         class="bellbtn"
         id="bellBtn"
