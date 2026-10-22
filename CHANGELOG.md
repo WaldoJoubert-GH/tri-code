@@ -2,6 +2,15 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.29 — 2026-10-22
+
+- The files window and file windows are now one editor window per project (`Alt+E`): the file tree, a tab per open file and a real code editor (CodeMirror), with syntax colours for the common languages, search (`Ctrl+F`), multiple cursors, folding and bracket matching. Markdown, HTML and SVG still show rendered, with Source to edit them; images, video and audio still play.
+- One click in the tree, or Go to File, opens a preview tab (in italics) that the next file replaces. Double-click it or start typing to keep it. `Ctrl`+click opens a second editor beside.
+- The status bar shows the line and column, indentation, line endings and language. Files with Windows line endings or a BOM are saved the way they were read.
+- Saving won't overwrite a file that changed on disk since you opened it (an agent wrote to it) without asking, on your machine or over ssh.
+- Move a line with `Ctrl+Shift+↑/↓` (`Alt+↑/↓` move between windows).
+- The "Opening a file" setting is gone, and with it Settings' General page. Open files windows become editors; open file windows become editors with the tree hidden (▤ shows it).
+
 ## 0.1.28 — 2026-10-21
 
 - Worktrees for any folder. New worktree on a folder that isn't a git repo (several repos side by side, or no git at all) copies it to `<folder>.worktrees/<branch>`, so it shows and works like any other worktree; the folder's own row reads `base`. Each repo inside it becomes a git worktree on the same branch, and `node_modules`, `target`, `.venv` and other build folders are skipped, so install again in the copy. Finish (the × on its row) copies the files that changed outside git back, asks which side wins for a file changed in both, removes the nested worktrees (a branch that isn't merged stays) and deletes the copy.
