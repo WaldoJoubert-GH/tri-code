@@ -58,6 +58,43 @@ export async function loadWorktrees(repo: Project): Promise<void> {
   }
 }
 
+/** Add the checkouts already in `<repo>.worktrees/` that the sidebar doesn't list (made with git
+ *  by hand, or before the project was added), so they can be opened and removed like the rest.
+ *  Only folders New worktree would have made count: `worktreeDir(repo, <name>)`. A copy is found
+ *  by its nested repos' worktrees, so a copy of a folder with no repos in it isn't. */
+export async function adoptWorktrees(repo: Project): Promise<void> {
+  const kind = await scanFolder(repo);
+  /** The `<name>` of the folder in `<repo>.worktrees/` that git's `gitPath` (of nested repo `rel`) is in, if it is. */
+  const nameOf = (gitPath: string, rel: string) => {
+    const parts = gitPath.replace(/\\/g, "/").replace(/\/+$/, "").split("/");
+    const name = parts[parts.length - (rel ? rel.split("/").length : 0) - 1];
+    return name && samePath(gitPath, rel ? join(worktreeDir(repo, name), rel) : worktreeDir(repo, name)) ? name : null;
+  };
+  const found = new Map<string, { gitPath: string; branch: string; repos: string[] }>();
+  if (kind.git) {
+    for (const w of listed[repo.id] ?? []) {
+      const name = !w.main && nameOf(w.path, "");
+      if (name) found.set(name, { gitPath: w.path, branch: w.branch ?? name, repos: [] });
+    }
+  } else {
+    for (const r of kind.repos) {
+      const ws = await invoke<GitWorktree[]>("git_worktrees", { host: repo.host, path: join(repo.path, r) }).catch((): GitWorktree[] => []);
+      for (const w of ws) {
+        const name = !w.main && nameOf(w.path, r);
+        if (!name) continue;
+        const f = found.get(name) ?? { gitPath: w.path.slice(0, -r.length - 1), branch: w.branch ?? name, repos: [] };
+        f.repos.push(r);
+        found.set(name, f);
+      }
+    }
+  }
+  for (const [name, f] of found) {
+    const path = worktreeDir(repo, name);
+    if (app.projects.some((p) => p.host === repo.host && (norm(p.path) === norm(path) || samePath(f.gitPath, p.path)))) continue;
+    addWorktree(repo.id, { path, branch: f.branch, ...(kind.git ? {} : { copy: { repos: f.repos } }) }, false);
+  }
+}
+
 /** The branch a checkout is on, as git last said, else the one it was made for. */
 export function branchOf(p: Project): string {
   // A folder that isn't a repo has no branch; its copies do.
@@ -99,7 +136,7 @@ export const newWorktreeOpen = () => newWorktreeFor() !== null;
 
 export function openNewWorktree(p: Project) {
   const repo = repoOf(p);
-  void scanFolder(repo).catch(() => {});
+  void adoptWorktrees(repo).catch(() => {});
   setNewWorktreeFor(repo.id);
 }
 export const closeNewWorktree = () => setNewWorktreeFor(null);
