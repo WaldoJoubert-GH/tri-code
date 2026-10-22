@@ -10,7 +10,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { batch } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { activePage, addPage, addTab, app, focusTab, Page, Project, projectById, setPageUrl, space, Tab, tabName, visibleTabs } from "./state";
-import { agentTarget } from "./agents";
+import { agentTarget, looksLikeUrl } from "./agents";
 import { pasteText, sendText } from "./terms";
 import { flash } from "./ui";
 
@@ -37,7 +37,10 @@ const lastUsed = new Map<string, number>();
 let suspended = false;
 /** The peeked sidebar floats over the canvas from the window's left edge to here; webviews reaching under it hide. */
 let coveredTo = 0;
-const covered = (b: Box) => b.x < coveredTo;
+/** Where the open HTML overlays (menus, popovers, dialogs) are; webviews they overlap hide. */
+let overlays: Box[] = [];
+const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+const covered = (b: Box) => b.x < coveredTo || overlays.some((o) => overlaps(o, b));
 
 const label = (pageId: string) => `browser-${pageId}`;
 const pageIdOf = (lbl: string) => lbl.replace(/^browser-/, "");
@@ -54,9 +57,16 @@ const hostOf = (url: string) => {
 const framedTitle = (url: string) => (url ? url.replace(/^https?:\/\//, "").replace(/\/$/, "") : "New tab");
 const touch = (tabId: string) => lastUsed.set(tabId, Date.now());
 
-/** Fire-and-forget invoke that logs instead of raising unhandled rejections. */
-const send = (cmd: string, args: Record<string, unknown>) =>
-  invoke(cmd, args).catch((e) => console.warn(`${cmd} failed:`, e));
+/** Each page's native calls, in order. Commands run concurrently, so a bounds or hide sent while
+ *  browser_open is still creating the webview would fail ("no browser") and never be retried,
+ *  leaving it at a stale rect, on top of other windows, or hidden (a white window). */
+const queues = new Map<string, Promise<unknown>>();
+
+/** Fire-and-forget call on a page's webview, after its earlier ones; logs instead of raising. */
+function send(pageId: string, cmd: string, args: Record<string, unknown> = {}) {
+  const run = () => invoke(cmd, { label: label(pageId), ...args }).catch((e) => console.warn(`${cmd} failed:`, e));
+  queues.set(pageId, (queues.get(pageId) ?? Promise.resolve()).then(run));
+}
 
 /** The project and browser window a page belongs to. */
 function ownerOf(pageId: string): { project: Project; tab: Tab; page: Page } | undefined {
@@ -74,20 +84,27 @@ function patchInfo(pageId: string, patch: Partial<BrowserInfo>) {
 
 function hide(pageId: string) {
   if (!shown.delete(pageId)) return;
-  send("browser_hide", { label: label(pageId) });
+  send(pageId, "browser_hide");
 }
 
 function show(pageId: string) {
   if (shown.has(pageId)) return;
   shown.add(pageId);
-  send("browser_show", { label: label(pageId) });
+  send(pageId, "browser_show");
 }
 
 function syncBounds(pageId: string, b: Box) {
   const k = key(b);
   if (lastSent.get(pageId) === k) return;
   lastSent.set(pageId, k);
-  send("browser_bounds", { label: label(pageId), ...b });
+  send(pageId, "browser_bounds", b);
+}
+
+/** Put a shown page's webview at `b`; native webviews draw above all HTML, so a covered one hides. */
+function apply(pageId: string, b: Box) {
+  if (covered(b)) return hide(pageId);
+  syncBounds(pageId, b);
+  show(pageId);
 }
 
 // Native events: keep the page URL and title in sync with the webview.
@@ -142,6 +159,16 @@ export function normalizeUrl(s: string): string {
   return `https://${t}`;
 }
 
+const SEARCH = "https://www.google.com/search?q=";
+
+/** What the address field goes to: an address as typed (scheme added), anything else a web search. */
+export function addressToUrl(s: string): string {
+  const t = s.trim();
+  if (!t) return "";
+  const isAddress = !/\s/.test(t) && (looksLikeUrl(t) || /^(about|file|data):/i.test(t) || /^[\w-]+:\d+(\/|$)/.test(t));
+  return isAddress ? normalizeUrl(t) : SEARCH + encodeURIComponent(t);
+}
+
 /** Framed mode: give a page its info and history the first time it is seen. */
 function initFramed(page: Page) {
   if (browserInfo[page.id]) return;
@@ -150,13 +177,12 @@ function initFramed(page: Page) {
   if (url) framedHistory.set(page.id, { list: [url], i: 0 });
 }
 
-/** Create a page's webview at `b`, shown or loading behind the shown page. */
-function create(page: Page, b: Box, hidden: boolean) {
+/** Create a page's webview at `b`, hidden: apply shows the window's shown page. */
+function create(page: Page, b: Box) {
   created.add(page.id);
   setBrowserInfo(page.id, { url: page.url, title: page.url ? hostOf(page.url) : "New tab", loading: !!page.url });
-  send("browser_open", { label: label(page.id), url: page.url, ...b, hidden });
+  send(page.id, "browser_open", { url: page.url, ...b, hidden: true });
   lastSent.set(page.id, key(b));
-  if (!hidden) shown.add(page.id);
 }
 
 /**
@@ -172,13 +198,13 @@ export function placeBrowser(_project: Project, tab: Tab, rect: DOMRect | null):
     for (const page of tab.pages ?? []) initFramed(page);
     return;
   }
-  if (rect && (rect.width < 2 || rect.height < 2)) return;
-  const b = rect ? box(rect) : null;
+  // A zero-sized rect is a window hidden by the layout (display:none): hide, or the webview stays on top.
+  const b = rect && rect.width >= 2 && rect.height >= 2 ? box(rect) : null;
   for (const page of tab.pages ?? []) {
     if (page.id === active.id) continue;
     latest.set(page.id, null);
     hide(page.id);
-    if (b && page.url && !created.has(page.id)) create(page, b, true);
+    if (b && page.url && !created.has(page.id)) create(page, b);
   }
   const id = active.id;
   latest.set(id, b);
@@ -186,12 +212,10 @@ export function placeBrowser(_project: Project, tab: Tab, rect: DOMRect | null):
 
   if (!created.has(id)) {
     touch(tab.id);
-    create(active, b, suspended || covered(b));
-    return;
+    create(active, b);
   }
   if (suspended) return; // remembered; applied when resumed
-  syncBounds(id, b);
-  covered(b) ? hide(id) : show(id);
+  apply(id, b);
 }
 
 /** Record a page's address in the project. */
@@ -224,14 +248,14 @@ export function navigateBrowser(pageId: string, url: string): void {
     });
     return;
   }
-  send("browser_navigate", { label: label(pageId), url });
+  send(pageId, "browser_navigate", { url });
 }
 
 /** Start Select element in a page; the result goes to the agent window "send to agent" would use. */
 export function pickElement(project: Project, pageId: string): void {
   if (!created.has(pageId)) return;
   const agent = agentTarget(project, space(project).focus);
-  send("browser_pick", { label: label(pageId), agent: agent ? tabName(agent) : "", accent: project.accent });
+  send(pageId, "browser_pick", { agent: agent ? tabName(agent) : "", accent: project.accent });
   flash("select element · Esc to stop");
 }
 
@@ -245,22 +269,23 @@ function framedGo(pageId: string, d: number) {
 
 export function browserBack(pageId: string): void {
   if (!nativeBrowsers) return framedGo(pageId, -1);
-  if (created.has(pageId)) send("browser_back", { label: label(pageId) });
+  if (created.has(pageId)) send(pageId, "browser_back");
 }
 
 export function browserForward(pageId: string): void {
   if (!nativeBrowsers) return framedGo(pageId, 1);
-  if (created.has(pageId)) send("browser_forward", { label: label(pageId) });
+  if (created.has(pageId)) send(pageId, "browser_forward");
 }
 
 export function browserReload(pageId: string): void {
   if (!nativeBrowsers) return patchInfo(pageId, { rev: (browserInfo[pageId]?.rev ?? 0) + 1 });
-  if (created.has(pageId)) send("browser_reload", { label: label(pageId) });
+  if (created.has(pageId)) send(pageId, "browser_reload");
 }
 
 /** Close one page's webview. */
 export function closePage(pageId: string): void {
-  if (created.has(pageId)) send("browser_close", { label: label(pageId) });
+  if (created.has(pageId)) send(pageId, "browser_close");
+  queues.delete(pageId); // the close stays queued behind the page's earlier calls
   created.delete(pageId);
   shown.delete(pageId);
   latest.delete(pageId);
@@ -275,29 +300,57 @@ export function closeBrowser(tab: Tab): void {
   lastUsed.delete(tab.id);
 }
 
-/** Hide every native webview while HTML overlays are open; restore the placed ones afterwards. */
+/** Re-place the shown webviews against the current overlays. */
+function reapply() {
+  if (suspended) return;
+  for (const [id, b] of latest) {
+    if (b && created.has(id)) apply(id, b);
+  }
+}
+
+/** Hide every native webview (dragging a window, the tour); restore the placed ones afterwards. */
 export function setBrowsersSuspended(on: boolean): void {
   suspended = on;
-  if (on) {
-    for (const id of [...shown]) hide(id);
-    return;
-  }
-  for (const [id, b] of latest) {
-    if (!b || !created.has(id) || covered(b)) continue;
-    syncBounds(id, b);
-    show(id);
-  }
+  if (on) for (const id of [...shown]) hide(id);
+  else reapply();
 }
 
 /** Hide only the webviews under the sidebar's peek (0 when it folds back), so the rest stay live. */
 export function setBrowsersCovered(right: number): void {
   coveredTo = right;
-  if (suspended) return;
-  for (const [id, b] of latest) {
-    if (!b || !created.has(id)) continue;
-    if (covered(b)) hide(id);
-    else (syncBounds(id, b), show(id));
-  }
+  reapply();
+}
+
+/** The roots of the HTML overlays setBrowsersOverlaid measures. */
+const OVERLAYS = ".tabmenu, .pop, .iconpick, .gtf, .dialog-scrim";
+let overlayRo: ResizeObserver | undefined;
+let overlayRaf = 0;
+
+/**
+ * An HTML overlay opened or closed. Native webviews draw above HTML, so only the ones an overlay
+ * overlaps hide; the rest stay live instead of going white. Some overlays place themselves a
+ * frame after mounting, so they are measured again then, and whenever they resize.
+ */
+export function setBrowsersOverlaid(on: boolean): void {
+  cancelAnimationFrame(overlayRaf);
+  overlayRo?.disconnect();
+  overlayRo = undefined;
+  const measure = () => {
+    const els = on ? [...document.querySelectorAll<HTMLElement>(OVERLAYS)] : [];
+    // Open but not rendered yet: keep every page out of its way until it can be measured.
+    overlays = on && !els.length ? [{ x: -1e6, y: -1e6, width: 2e6, height: 2e6 }] : els.map((el) => box(el.getBoundingClientRect()));
+    reapply();
+    return els;
+  };
+  measure();
+  if (!on) return;
+  overlayRaf = requestAnimationFrame(() => {
+    overlayRaf = requestAnimationFrame(() => {
+      // An overlay that grows (the palette's results) may come to cover another webview.
+      overlayRo = new ResizeObserver(() => measure());
+      for (const el of measure()) overlayRo.observe(el);
+    });
+  });
 }
 
 /**

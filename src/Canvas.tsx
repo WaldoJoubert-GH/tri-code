@@ -10,7 +10,7 @@ import { isKey, withKey } from "./keymap";
 import { Caps } from "./Keys";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
-  normalizeUrl, openExternal, pickElement, placeBrowser, setBrowsersSuspended,
+  addressToUrl, openExternal, pickElement, placeBrowser, setBrowsersSuspended,
 } from "./browsers";
 import { Icon } from "./lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
@@ -182,6 +182,8 @@ export default function Canvas(props: { project: Project }) {
     const rect = () => rectById().get(id) ?? { x: 0, y: 0, w: 0, h: 0 };
     const focused = createMemo(() => space(props.project).focus === id);
     const mono = createMemo(() => space(props.project).mono === id);
+    /** Another window is maximized over this one (it keeps its tiled rect underneath). */
+    const buried = createMemo(() => { const m = space(props.project).mono; return !!m && m !== id; });
     // Mono (carousel) gives every window a rect: the focused one centered, its neighbours
     // in the gutters, the rest zero-sized. Zero-sized windows are hidden; the neighbours dim.
     const hidden = createMemo(() => { const r = rect(); return r.w <= 0 || r.h <= 0; });
@@ -244,8 +246,11 @@ export default function Canvas(props: { project: Project }) {
 
     const blank = () => !url() || url() === "about:blank";
     const isFav = () => !blank() && props.project.favs.some((f) => f.url === url());
-    /** A blank browser shows the start page (favourite tiles), so its webview stays hidden until it has an address. */
-    const place = () => placeBrowser(props.project, tab, blank() ? null : pageEl.getBoundingClientRect());
+    /**
+     * A blank browser shows the start page (favourite tiles), so its webview stays hidden until it has an address.
+     * Native webviews draw above all HTML, so one under a maximized window is hidden too.
+     */
+    const place = () => placeBrowser(props.project, tab, blank() || buried() ? null : pageEl.getBoundingClientRect());
     /** Keep the native webview on the placeholder while the window animates into place. */
     const follow = (ms = 250) => {
       cancelAnimationFrame(placeRaf);
@@ -275,7 +280,11 @@ export default function Canvas(props: { project: Project }) {
     });
 
     if (isBrowser) {
-      createEffect(on([rect, anyDrag, blank, pageId], () => follow(), { defer: true }));
+      createEffect(on([rect, anyDrag, blank, pageId, buried], () => follow(), { defer: true }));
+      // A blank page has nothing to do but take an address.
+      createEffect(() => {
+        if (focused() && blank() && !bare()) requestAnimationFrame(() => inputEl.focus());
+      });
     } else if (!isPanel) {
       createEffect(() => {
         // after mount, so the session element is attached and visible when it takes focus
@@ -300,7 +309,7 @@ export default function Canvas(props: { project: Project }) {
 
     const onUrlKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
-        navigateBrowser(pageId(), normalizeUrl(inputEl.value));
+        navigateBrowser(pageId(), addressToUrl(inputEl.value));
         inputEl.blur();
       } else if (e.key === "Escape") {
         inputEl.value = url();
@@ -474,6 +483,7 @@ export default function Canvas(props: { project: Project }) {
                   ref={inputEl}
                   value={blank() ? "" : url()}
                   onKeyDown={onUrlKey}
+                  onFocus={(e) => e.currentTarget.select()}
                 />
                 <button
                   class="star"

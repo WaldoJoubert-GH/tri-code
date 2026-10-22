@@ -153,6 +153,7 @@ pub fn run() {
             browser::browser_show,
             browser::browser_hide,
             browser::browser_close,
+            browser::browser_close_all,
             browser::browser_navigate,
             browser::browser_pick,
             browser::browser_back,

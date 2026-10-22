@@ -4,7 +4,7 @@
 // lives in state.json as `agents`.
 
 import { createSignal } from "solid-js";
-import { Agent, Hotkey, Project, Tab, addTab, agentOf, app, focusTab, isWebApp, newId } from "./state";
+import { Agent, Hotkey, Project, Tab, addTab, app, focusTab, isWebApp, newId } from "./state";
 import { normalizeUrl } from "./browsers";
 import { flash } from "./ui";
 import { modDown } from "./modkey";
@@ -62,12 +62,8 @@ export function launchAgent(p: Project, a: Agent) {
   flash(`new ${a.name || (isWebApp(a) ? "browser" : "terminal")}`);
 }
 
-/** Alt+Enter: another window like the focused terminal (even if its agent is gone), else a shell. */
-export function newTerminalLike(p: Project, f: Tab | undefined) {
-  if (f?.kind === "term") {
-    const a = agentOf(f) ?? { id: f.agent ?? "", name: f.name ?? "terminal", command: f.cmd ?? "", icon: "" };
-    return launchAgent(p, a);
-  }
+/** Alt+Enter: a plain shell, whatever window is focused. */
+export function newShell(p: Project) {
   const terms = app.agents.filter((a) => !isWebApp(a));
   const shell = terms.find((a) => a.id === "shell") ?? terms.find((a) => !a.command.trim()) ?? terms[0];
   if (shell) launchAgent(p, shell);

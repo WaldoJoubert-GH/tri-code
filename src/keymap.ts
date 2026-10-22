@@ -38,7 +38,7 @@ export const ACTIONS: Action[] = [
   { id: "sidebar", group: "Project", desc: "Collapse or expand the sidebar", def: [k("KeyS")] },
   { id: "new-worktree", group: "Project", desc: "New worktree", def: [sh("KeyW")] },
   { id: "appearance", group: "Project", desc: "Project appearance: name, icon, accent, background", def: [k("KeyP")] },
-  { id: "term-like", group: "Windows and links", desc: "New terminal like the focused one, else a shell", def: [k("Enter"), k("NumpadEnter")] },
+  { id: "term-like", group: "Windows and links", desc: "New shell", def: [k("Enter"), k("NumpadEnter")] },
   { id: "browser", group: "Windows and links", desc: "New browser window", def: [k("KeyB")] },
   { id: "issues", group: "Windows and links", desc: "Issues", def: [k("KeyI")] },
   { id: "files", group: "Windows and links", desc: "Editor", def: [k("KeyE")] },

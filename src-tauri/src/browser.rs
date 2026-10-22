@@ -94,7 +94,9 @@ pub async fn browser_open(
     let url = parse_url(&url)?;
     if let Some(webview) = app.get_webview(&label) {
         webview.navigate(url).map_err(|e| e.to_string())?;
-        return set_bounds(&webview, x, y, width, height);
+        set_bounds(&webview, x, y, width, height)?;
+        let shown = if hidden == Some(true) { webview.hide() } else { webview.show() };
+        return shown.map_err(|e| e.to_string());
     }
     let window = app.get_window("main").ok_or("no main window")?;
     let nav_app = app.clone();
@@ -206,6 +208,18 @@ pub async fn browser_close(app: AppHandle, label: String) -> Result<(), String> 
         Some(webview) => webview.close().map_err(|e| e.to_string()),
         None => Ok(()),
     }
+}
+
+/// Closes every browser webview. Called by the frontend on load: after a webview reload it no
+/// longer knows the old ones, which would stay drawn over the canvas.
+#[tauri::command]
+pub async fn browser_close_all(app: AppHandle) -> Result<(), String> {
+    for (label, webview) in app.webviews() {
+        if label.starts_with("browser-") {
+            webview.close().map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]

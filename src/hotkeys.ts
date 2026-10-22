@@ -17,7 +17,7 @@ import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
-import { agentForKey, launchAgent, newTerminalLike, openAgentsPanel, recording } from "./agents";
+import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";
 import { closeIconPicker, iconPickerOpen } from "./lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";
 import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, stepGap, stepProject, workspace } from "./commands";
@@ -71,7 +71,7 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
 
   switch (id) {
     case "term-like":
-      newTerminalLike(p, f);
+      newShell(p);
       return true;
     case "browser":
       addTab(p.id, "browser");

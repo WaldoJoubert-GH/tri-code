@@ -20,7 +20,7 @@ import { newWorktreeOpen } from "./worktrees";
 import { loadIcons } from "./icons";
 import { installHotkeys } from "./hotkeys";
 import { installClipboardFallback } from "./clipboard";
-import { openExternal, openUrlInProject, setBrowsersSuspended } from "./browsers";
+import { openExternal, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended } from "./browsers";
 import { FavPopover, favEditOpen } from "./favs";
 import { GoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
@@ -50,8 +50,9 @@ export default function App() {
       const owner = app.projects.find((p) => p.tabs.some((t) => t.id === tabId))?.id ?? app.activeProject;
       if (owner) openUrlInProject(owner, url, tabId);
     });
-    // After a webview reload, PTYs from the previous page are unreachable.
+    // After a webview reload, PTYs and browser webviews from the previous page are unreachable.
     await invoke("pty_kill_all");
+    await invoke("browser_close_all").catch((e) => console.warn("browser_close_all failed:", e));
     await loadState();
     await syncEnvs();
     for (const p of app.projects) {
@@ -98,7 +99,9 @@ export default function App() {
   });
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
-  createEffect(() => setBrowsersSuspended(appearanceOpen() || settingsOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen() || tourOpen()));
+  // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
+  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen()));
+  createEffect(() => setBrowsersSuspended(tourOpen()));
 
   const backdrop = () => {
     const p = activeProject();

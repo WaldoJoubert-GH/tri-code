@@ -20,7 +20,7 @@ import { openEditor } from "./files";
 import { openGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { branchOf, openNewWorktree, removeWorktree } from "./worktrees";
-import { hotkeyKeys, hotkeyProblem, launchAgent, newTerminalLike, openAgentsPanel } from "./agents";
+import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, openAgentsPanel } from "./agents";
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
 import { startTour } from "./Tour";
 import { flash } from "./ui";
@@ -115,7 +115,7 @@ export function commands(): Command[] {
         run: () => launchAgent(p, a),
       });
     }
-    add({ id: "term-like", group: "New", title: "New terminal like this one", icon: "copy-plus", keys: capsOf("term-like"), run: () => newTerminalLike(p, f) });
+    add({ id: "term-like", group: "New", title: "New shell", icon: "square-terminal", keys: capsOf("term-like"), run: () => newShell(p) });
     add({ id: "browser", group: "New", title: "New browser", icon: "globe", keys: capsOf("browser"), run: () => { addTab(p.id, "browser"); flash("new browser"); } });
     add({ id: "issues", group: "New", title: "Issues", icon: "list-todo", keys: capsOf("issues"), run: () => openIssuePanel(p) });
     add({ id: "files", group: "New", title: "Editor", icon: "file-code", keys: capsOf("files"), run: () => void openEditor(p) });

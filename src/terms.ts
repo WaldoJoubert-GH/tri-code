@@ -270,7 +270,7 @@ class TermSession {
     const onExit = new Channel<number>();
     onExit.onmessage = (code) => this.exited(code);
 
-    this.fit.proposeDimensions(); // no-op when hidden; size is corrected on show
+    const { cols, rows } = this.term;
     try {
       this.ptyId = await invoke<number>("pty_spawn", {
         spec: {
@@ -279,12 +279,16 @@ class TermSession {
           cmd: this.tab.cmd?.trim() || null,
           session: sessionName(this.project, this.tab),
         },
-        cols: this.term.cols,
-        rows: this.term.rows,
+        cols,
+        rows,
         onData,
         onExit,
       });
       if (this.disposed) return void call("pty_kill", { id: this.ptyId });
+      // The tab is usually shown and fitted while the spawn is in flight, and
+      // refit skips the resize until there is an id; send the real size now.
+      this.lastSize = `${cols}x${rows}`;
+      this.refit();
       // Output can arrive before the id does; Windows ConPTY prints nothing
       // until xterm answers its cursor-position query, so flush that now.
       const queued = this.pending.join("");
