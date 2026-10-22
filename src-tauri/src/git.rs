@@ -221,26 +221,71 @@ pub(crate) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, St
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
 }
 
+const STATUS_CMDS: &[&[&str]] = &[
+    &["status", "--porcelain=v2", "--branch", "-z"],
+    &["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+    &["log", "-n", "12", "--format=%H%x1f%s%x1f%cr"],
+    &["rev-list", "HEAD", "--not", "--remotes", "-n", "200"],
+];
+
+/// Parse one repo's four status outputs (the commands in STATUS_CMDS).
+fn status_from(r: &[Result<String, i32>]) -> Result<Status, String> {
+    let status = match r.first() {
+        Some(Ok(s)) => s,
+        _ => return Err("not a git repository".into()),
+    };
+    let mut s = Status::default();
+    parse_status(status, &mut s);
+    let base = r.get(1).and_then(|x| x.as_ref().ok()).map(|b| b.trim().to_string()).unwrap_or_default();
+    s.base = base.split_once('/').map(|(_, b)| b.to_string()).filter(|b| !b.is_empty()).unwrap_or_else(|| "main".into());
+    let ok = |i: usize| r.get(i).and_then(|x| x.as_ref().ok()).map(String::as_str).unwrap_or("");
+    s.commits = parse_log(ok(2), ok(3));
+    Ok(s)
+}
+
 #[tauri::command]
 pub async fn git_status(host: String, path: String) -> Result<Status, String> {
     blocking(move || {
-        let r = multi(&host, &path, &[
-            &["status", "--porcelain=v2", "--branch", "-z"],
-            &["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
-            &["log", "-n", "12", "--format=%H%x1f%s%x1f%cr"],
-            &["rev-list", "HEAD", "--not", "--remotes", "-n", "200"],
-        ])?;
-        let status = match r.first() {
-            Some(Ok(s)) => s,
-            _ => return Err(format!("{path} is not a git repository")),
-        };
-        let mut s = Status::default();
-        parse_status(status, &mut s);
-        let base = r.get(1).and_then(|x| x.as_ref().ok()).map(|b| b.trim().to_string()).unwrap_or_default();
-        s.base = base.split_once('/').map(|(_, b)| b.to_string()).filter(|b| !b.is_empty()).unwrap_or_else(|| "main".into());
-        let ok = |i: usize| r.get(i).and_then(|x| x.as_ref().ok()).map(String::as_str).unwrap_or("");
-        s.commits = parse_log(ok(2), ok(3));
-        Ok(s)
+        let r = multi(&host, &path, STATUS_CMDS)?;
+        status_from(&r).map_err(|_| format!("{path} is not a git repository"))
+    })
+    .await
+}
+
+#[derive(Debug, Serialize)]
+pub struct RepoStatus {
+    /// The repo's path relative to the project folder.
+    pub repo: String,
+    pub status: Option<Status>,
+    pub error: Option<String>,
+}
+
+/// The status of every repo nested in a folder, in one batch (one ssh round trip when remote).
+/// A repo that cannot be read gets its own error; the others still load.
+#[tauri::command]
+pub async fn folder_status(host: String, path: String) -> Result<Vec<RepoStatus>, String> {
+    blocking(move || {
+        let repos = crate::folders::repos_in(&host, &path)?;
+        if repos.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut sets: Vec<Vec<&str>> = Vec::with_capacity(repos.len() * 4);
+        for r in &repos {
+            for cmd in STATUS_CMDS {
+                let mut args: Vec<&str> = vec!["-C", r.as_str()];
+                args.extend(cmd.iter().copied());
+                sets.push(args);
+            }
+        }
+        let cmds: Vec<&[&str]> = sets.iter().map(|v| v.as_slice()).collect();
+        let outs = multi(&host, &path, &cmds)?;
+        Ok(repos.iter().enumerate().map(|(i, repo)| {
+            let slice = outs.get(i * 4..(i + 1) * 4).unwrap_or(&[]);
+            match status_from(slice) {
+                Ok(status) => RepoStatus { repo: repo.clone(), status: Some(status), error: None },
+                Err(e) => RepoStatus { repo: repo.clone(), status: None, error: Some(e) },
+            }
+        }).collect())
     })
     .await
 }
@@ -317,6 +362,48 @@ pub async fn git_diff(host: String, path: String, file: Option<String>, staged: 
             args.extend(["--", f]);
         }
         exec(&host, &path, "git", &args, None)
+    })
+    .await
+}
+
+/// Whether `path` sits inside a git work tree (a repo project, or a subfolder of one).
+#[tauri::command]
+pub async fn git_is_repo(host: String, path: String) -> Result<bool, String> {
+    blocking(move || {
+        Ok(exec(&host, &path, "git", &["rev-parse", "--is-inside-work-tree"], None)
+            .map(|o| o.trim() == "true")
+            .unwrap_or(false))
+    })
+    .await
+}
+
+#[derive(Debug, Serialize)]
+pub struct HeadFile {
+    /// The file's text at HEAD; None when HEAD or the path does not exist yet (untracked, new file).
+    pub text: Option<String>,
+}
+
+/// The file's text at HEAD, for the editor's HEAD → buffer diff. `file` is relative to `path`,
+/// so `HEAD:./file` resolves it from a subfolder as well as from the repo root.
+#[tauri::command]
+pub async fn git_head_text(host: String, path: String, file: String) -> Result<HeadFile, String> {
+    blocking(move || {
+        let spec = format!("HEAD:./{file}");
+        match exec(&host, &path, "git", &["show", "--no-color", &spec], None) {
+            Ok(text) => Ok(HeadFile { text: Some(text) }),
+            // A new file or an empty repo is all additions, not an error. Anything else
+            // (an unreachable host, a broken worktree) must not look like a new file.
+            Err(e)
+                if e.contains("does not exist in")
+                    || e.contains("exists on disk, but not in")
+                    || e.contains("unknown revision")
+                    || e.contains("invalid object name")
+                    || e.contains("ambiguous argument") =>
+            {
+                Ok(HeadFile { text: None })
+            }
+            Err(e) => Err(e),
+        }
     })
     .await
 }

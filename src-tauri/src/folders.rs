@@ -43,13 +43,14 @@ fn is_local(host: &str) -> bool {
 }
 
 /// The repos nested in `path` (relative, `/`-separated, outermost only), not counting `path` itself.
+pub(crate) fn repos_in(host: &str, path: &str) -> Result<Vec<String>, String> {
+    let found = if is_local(host) { repos_local(Path::new(&expand_home(path))) } else { repos_remote(host, path)? };
+    Ok(outermost(found))
+}
+
 #[tauri::command]
 pub async fn folder_repos(host: String, path: String) -> Result<Vec<String>, String> {
-    blocking(move || {
-        let found = if is_local(&host) { repos_local(Path::new(&expand_home(&path))) } else { repos_remote(&host, &path)? };
-        Ok(outermost(found))
-    })
-    .await
+    blocking(move || repos_in(&host, &path)).await
 }
 
 /// Copy `src` to `dest` (which must not exist), leaving out `skip` (relative paths) and the HEAVY

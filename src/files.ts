@@ -161,7 +161,13 @@ export type OpenHow = {
   preview?: boolean;
   /** In a new editor window beside `from` (Ctrl+click, Ctrl+Enter). */
   beside?: boolean;
+  /** A line to show once the file is open; `mode` also opens its diff (a drill from the git window). */
+  at?: { line: number; mode?: "source" | "diff" };
 };
+
+/** A drill's sequence, so asking for the same line twice still jumps. */
+let drills = 0;
+const atPatch = (how: OpenHow) => (how.at ? { at: { ...how.at, seq: ++drills } } : {});
 
 /**
  * Show `path` in an editor: the one it came from, else the one used last. A file already open
@@ -171,13 +177,17 @@ export type OpenHow = {
 export function openFile(project: Project, path: string, how: OpenHow = {}): void {
   const editors = editorsOf(project);
   const show = (t: Tab, patch: Parameters<typeof setEditorTab>[2]) => {
-    setEditorTab(project.id, t.id, { path, ...patch });
+    setEditorTab(project.id, t.id, { path, ...atPatch(how), ...patch });
     touchEditor(t.id);
     focusTab(project.id, t.id);
   };
   if (how.beside || !editors.length) {
     const id = addTab(project.id, "editor", { path, after: how.from });
-    if (how.preview && !how.beside) setEditorTab(project.id, id, { preview: path });
+    setEditorTab(project.id, id, {
+      path,
+      ...(how.preview && !how.beside ? { preview: path } : {}),
+      ...atPatch(how),
+    });
     touchEditor(id);
     return;
   }

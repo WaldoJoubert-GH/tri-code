@@ -76,7 +76,7 @@ The `Alt+T` box under the toolbar path (a click on the path opens it too). One f
 _Avoid_: Quick open, file palette, Ctrl+P.
 
 **Editor Window**:
-A canvas Window (`TabKind` `"editor"`, `Alt+E`) with the project's file tree, a tab per open file, a CodeMirror 6 editor and a status bar; Markdown, HTML and SVG also show rendered, media files play. Replaced the Files and File Windows; chosen from design/editor.html (variant B). A file opens in the Editor Window it was picked from, else the one used last; `Ctrl`+click opens a second one beside. No extension host: language smarts are to come from language servers run on the project's host.
+A canvas Window (`TabKind` `"editor"`, `Alt+E`) with the project's file tree, a tab per open file, a CodeMirror 6 editor and a status bar; Markdown, HTML and SVG also show rendered, media files play. Replaced the Files and File Windows; chosen from design/editor.html (variant B). A file opens in the Editor Window it was picked from, else the one used last; `Ctrl`+click opens a second one beside. A changed file also has a **Diff** mode beside Source, comparing `HEAD` with the live buffer (unsaved edits and all), unified or side by side; chosen from design/diff.html (variant A). No extension host: language smarts are to come from language servers run on the project's host.
 _Avoid_: Files window, file viewer, IDE.
 
 **Preview Tab**:
@@ -131,8 +131,11 @@ A canvas Window, one per project, that edits the Agent list as a table; rows sav
 _Avoid_: Settings page, preferences.
 
 **Git Window**:
-A canvas Window, one per project, that takes the current branch from changes to a merged PR: stage, commit, push, open a PR, merge. New `TabKind` `"git"`, addressed with `Alt+C`. Runs git and gh on the project's host. Chosen from design/git.html (variant B).
+A canvas Window, one per project, that takes the current branch from changes to a merged PR: stage, commit, push, open a PR, merge. New `TabKind` `"git"`, addressed with `Alt+C`. Runs git and gh on the project's host. Chosen from design/git.html (variant B); its diff reads Unified or Split and drills into the Editor Window (design/diff.html, variant A).
 _Avoid_: Source control panel, VCS view.
+
+**Folder of Repos**:
+A Project whose folder is not itself a repo but holds nested repos (`folder_repos`, outermost only). One Git Window shows them in an accordion with an active repo; the active repo owns the commit box, commits, PR and push, while the editor finds a file's repo by the longest path prefix. The status line shows one repo as before, several as `n repos · n changed`. Not called a workspace, which is one of the four window spaces.
 
 **Draft** (✦):
 Text that `claude -p` writes for the user to edit before it is used: a commit message, a PR title and body, or a Review. Shown tinted until edited; never committed, pushed or posted unseen.

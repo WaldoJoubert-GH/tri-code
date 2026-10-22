@@ -1,6 +1,7 @@
 import { createEffect, on } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
+import type { DiffMode } from "./diff";
 
 export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents";
 
@@ -63,6 +64,8 @@ export type Tab = {
   preview?: string;
   /** Editor tabs only: `false` hides the file tree. */
   tree?: false;
+  /** Editor tabs only: a line a drill asked for, and whether to show its diff. `seq` makes a repeat a new drill. */
+  at?: { line: number; mode?: "source" | "diff"; seq: number };
   /** `term` and browser tabs: the agent (or web app) it was opened from. The name and icon follow the agent. */
   agent?: string;
   /** `term` and browser tabs: the agent's name at launch, shown once the agent is deleted. */
@@ -152,6 +155,8 @@ export type Project = {
   dim: number;
   /** Favourite pages, in bar order; shared by every browser window of the project. */
   favs: Fav[];
+  /** The git window's and the editor diff's orientation; split unless chosen otherwise. */
+  diffMode?: DiffMode;
   icon?: ProjectIcon;
   /** Sounds and alerts for agent signals; a missing field follows the app-wide `notify`. */
   notify?: ProjectNotify;
@@ -679,13 +684,18 @@ export function moveFav(projectId: string, url: string, before: string) {
 }
 
 /** Change what an editor tab shows: its file, its open files, its preview tab, its tree. An `undefined` drops the field. */
-export function setEditorTab(projectId: string, tabId: string, patch: Partial<Pick<Tab, "path" | "files" | "preview" | "tree">>) {
+export function setEditorTab(projectId: string, tabId: string, patch: Partial<Pick<Tab, "path" | "files" | "preview" | "tree" | "at">>) {
   editTab(projectId, tabId, (t) => {
     for (const [k, v] of Object.entries(patch) as [keyof typeof patch, never][]) {
       if (v === undefined) delete t[k];
       else t[k] = v;
     }
   });
+}
+
+/** The git window's and the editor's diff orientation, kept per project. */
+export function setProjectDiffMode(projectId: string, mode: DiffMode) {
+  edit(projectId, (p) => { p.diffMode = mode; });
 }
 
 export function setSettings(patch: Partial<Settings>) {
@@ -768,7 +778,7 @@ function migrate(raw: any): Persisted {
       id: p.id, name: p.name, host: p.host || "local", path: p.path, tabs,
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
-      favs: p.favs ?? [], icon: p.icon, notify: p.notify,
+      favs: p.favs ?? [], diffMode: p.diffMode, icon: p.icon, notify: p.notify,
       ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.copy ? { copy: p.copy } : {}) } : {}),
       ...(p.sample ? { sample: true } : {}),
     };

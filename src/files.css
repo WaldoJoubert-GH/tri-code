@@ -167,3 +167,26 @@
 .estatus .sp { flex: 1; }
 .estatus .warn { color: var(--warn); }
 .estatus .mod { color: var(--warn); }
+
+/* The editor's own changes view (Source | Diff): HEAD → the live buffer, read-only. */
+.ediff { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ediff-head {
+  flex: none; display: flex; align-items: center; gap: 8px; padding: 3px 8px 3px 12px;
+  background: var(--panel); border-bottom: 1px solid var(--line); font: 11px var(--mono);
+  color: var(--muted); white-space: nowrap; overflow: hidden;
+}
+.fchip {
+  display: inline-flex; align-items: center; height: 17px; padding: 0 6px;
+  border: 1px solid var(--line); border-radius: 4px; font: 10.5px var(--mono);
+  color: var(--muted); flex: none;
+}
+.fchip.on {
+  color: var(--violet); border-color: color-mix(in srgb, var(--violet) 45%, var(--line));
+  background: color-mix(in srgb, var(--violet) 8%, transparent);
+}
+.ediff-stat { display: inline-flex; gap: 4px; font: 10.5px var(--mono); flex: none; }
+.ediff-stat .p { color: var(--ok); }
+.ediff-stat .m { color: var(--bad); }
+.fnote-inline { color: var(--muted); font-size: 11px; flex: none; }
+.ediff .seg { flex: none; }
+.ediff .seg button { height: 18px; padding: 0 8px; }

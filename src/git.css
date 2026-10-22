@@ -1,4 +1,5 @@
-/* Git window. See src/GitPanel.tsx; the look comes from design/git.html (variant B). */
+/* Git window. See src/GitPanel.tsx; the look comes from design/git.html (variant B),
+   the diff from design/diff.html (variant A). */
 
 .mark.git { color: var(--violet); }
 
@@ -124,18 +125,16 @@
 
 /* Diff. */
 .g-diffhead {
-  height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+  min-height: 28px; flex: none; display: flex; align-items: center; gap: 6px; padding: 2px 8px 2px 10px;
   border-bottom: 1px solid var(--line); font: 11.5px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden;
 }
-.g-diffhead b { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-.g-diff { flex: 1; min-height: 0; overflow: auto; font: 12px/17px var(--mono); padding: 2px 0 12px; user-select: text; }
-.g-hunk { color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); padding: 2px 12px; margin-top: 6px; white-space: pre; }
-.g-l { display: flex; white-space: pre; padding-right: 12px; width: max-content; min-width: 100%; }
-.g-g { width: 22px; flex: none; text-align: center; color: var(--muted); user-select: none; }
-.g-l.a { background: color-mix(in srgb, var(--ok) 11%, transparent); }
-.g-l.a .g-g { color: var(--ok); }
-.g-l.d { background: color-mix(in srgb, var(--bad) 11%, transparent); }
-.g-l.d .g-g { color: var(--bad); }
+.g-diffhead b { color: var(--text); font-weight: 600; min-width: 0; flex: 0 1 auto; display: flex; align-items: baseline; }
+.g-diffhead b .d { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.g-diffhead b .f { flex: none; }
+.g-diffhead .g-stat { font: 10.5px var(--mono); flex: none; }
+.g-diffhead .g-stat .p { color: var(--ok); }
+.g-diffhead .g-stat .m { color: var(--bad); }
+.g-icon:disabled { opacity: .35; cursor: default; }
 
 /* An opened commit: message at the top, its changes below. */
 .g-cmsg {
@@ -204,3 +203,44 @@
 .g-finding .sev.ok { color: var(--ok); }
 .g-finding .loc { font: 11px var(--mono); color: var(--accent); word-break: break-all; }
 .g-finding p { margin: 2px 0 0; user-select: text; }
+
+/* A folder of repos: the active repo picker and the repo accordion. */
+.g-head { position: relative; }
+.g-head.g-head-open { overflow: visible; z-index: 6; }
+.g-repo {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px; flex: none;
+  border: 1px solid var(--line); border-radius: 5px; background: var(--bg); font: 600 11.5px var(--mono);
+}
+.g-repo:hover { background: var(--hover); }
+.g-repo .k { font: 10px var(--ui); font-weight: 400; color: var(--muted); }
+.g-repo .cv { color: var(--muted); font-size: 10px; }
+.g-repomenu {
+  position: absolute; top: 100%; left: 8px; z-index: 7; min-width: 300px; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 7px;
+  box-shadow: 0 16px 40px -12px var(--shadow);
+}
+.g-repoitem { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; width: 100%; padding: 6px 8px; border-radius: 5px; text-align: left; }
+.g-repoitem:hover, .g-repoitem.on { background: var(--hover); }
+.g-repoitem .nm { font: 600 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+.g-repoitem .br { grid-row: 2; font: 10.5px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.g-repoitem .ct { grid-column: 2; grid-row: 1 / span 2; align-self: center; font: 10.5px var(--mono); color: var(--muted); }
+.g-repoitem .ct.bad { color: var(--bad); }
+.g-reposec { border-bottom: 1px solid var(--line); padding-bottom: 2px; margin-bottom: 2px; }
+.g-repohead { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; white-space: nowrap; cursor: default; }
+.g-repohead:hover { background: var(--hover); }
+.g-repohead.on { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 2px 0 var(--accent); }
+.win:not(.focused) .g-repohead.on { background: var(--hover); box-shadow: inset 2px 0 var(--muted); }
+.g-repohead .cv { width: 11px; flex: none; color: var(--muted); font-size: 10px; }
+.g-repohead b { font-weight: 600; }
+.g-repohead .br { font: 10.5px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.g-repohead .ab { font: 10.5px var(--mono); color: var(--accent); flex: none; }
+.g-repohead .ct { margin-left: auto; font: 10.5px var(--mono); color: var(--muted); flex: none; }
+.g-repohead .ct.bad { color: var(--bad); }
+.g-reppeek { display: flex; gap: 8px; padding: 0 10px 4px 27px; font: 10.5px var(--mono); color: var(--muted); overflow: hidden; white-space: nowrap; }
+.g-reppeek span { overflow: hidden; text-overflow: ellipsis; }
+.g-lists .g-sec.sub { padding-left: 22px; }
+.g-cbox-repo { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.g-cbox-repo b { color: var(--text); font: 600 11.5px var(--mono); }
+.g-cbox-repo .k { font: 10.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+.g-repochip { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; margin-right: 2px; border: 1px solid var(--line); border-radius: 4px; font: 10.5px var(--mono); color: var(--muted); flex: none; }
+.g-branch.repo { font-weight: 600; color: var(--muted); background: none; border: 1px solid var(--line); }
