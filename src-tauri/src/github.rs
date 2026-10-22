@@ -209,6 +209,28 @@ pub async fn gh_issue_comment(host: String, path: String, repo: String, number: 
     blocking(move || gh(&host, &path, &["issue", "comment", &number.to_string(), "-R", &repo, "--body-file", "-"], Some(body)).map(|_| ())).await
 }
 
+/// tri-code's own repo, where the status line's Feedback popover files reports.
+const FEEDBACK_REPO: &str = "WaldoJoubert-GH/tri-code";
+
+/// File a bug or idea on tri-code's repo with the local gh login and return the issue's URL.
+/// Labelling needs triage access, which most reporters don't have, so a refusal is retried
+/// without the label rather than lost.
+#[tauri::command]
+pub async fn gh_feedback(title: String, body: String, label: String) -> Result<String, String> {
+    blocking(move || {
+        let create = |label: Option<&str>| {
+            let mut args = vec!["issue", "create", "-R", FEEDBACK_REPO, "--title", &title, "--body-file", "-"];
+            if let Some(l) = label {
+                args.extend(["--label", l]);
+            }
+            gh("local", "~", &args, Some(body.clone()))
+        };
+        let url = create(Some(&label)).or_else(|_| create(None))?;
+        Ok(url.trim().to_string())
+    })
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

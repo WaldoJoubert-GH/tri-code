@@ -397,6 +397,22 @@ svg.lucide { flex: none; display: block; }
 .status .bellbtn { flex: none; display: grid; place-items: center; width: 24px; height: 20px; border-radius: 4px; color: var(--muted); }
 .status .bellbtn:hover, .status .bellbtn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
 .status .bellbtn.dnd { color: var(--warn); }
+
+/* Feedback popover (status line) */
+.pop.feedback { width: 340px; }
+.pop.feedback .ttl .seg { margin: 0 0 0 auto; }
+.pop.feedback input, .pop.feedback textarea { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; outline: none; }
+.pop.feedback input:focus, .pop.feedback textarea:focus { border-color: var(--accent); }
+.pop.feedback textarea { min-height: 80px; resize: vertical; }
+.pop.feedback .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pop.feedback .chip { font: 11px var(--mono); padding: 1px 7px; border: 1px solid var(--line); border-radius: 10px; }
+.pop.feedback .chip:hover { border-color: var(--accent); }
+.pop.feedback .chip.off { color: var(--muted); text-decoration: line-through; opacity: .7; }
+.pop.feedback .foot { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.pop.feedback .foot span { flex: 1; }
+.pop.feedback .primary { padding: 4px 12px; border-radius: 4px; background: var(--accent); color: var(--bg); white-space: nowrap; }
+.pop.feedback .primary:disabled { opacity: .45; cursor: default; }
+.pop.feedback .primary kbd { font-size: 10px; background: none; color: inherit; border-color: currentColor; opacity: .75; }
 /* Signals settings: Appearance › Signals and the bell's popover */
 .pop .seg.wide { margin: 0; align-self: stretch; }
 .pop .seg.wide button { flex: 1; padding: 3px 6px; }

@@ -13,6 +13,7 @@ import { toggleSignals } from "./SignalSettings";
 import { openSettings, toggleSettings } from "./Settings";
 import { capsOf } from "./keymap";
 import { setAboutOpen } from "./About";
+import { toggleFeedback } from "./Feedback";
 import { openProjectDialog } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./issues";
@@ -180,6 +181,7 @@ export function commands(): Command[] {
   const u = updateReady();
   if (u) add({ id: "update", group: "App", title: `Restart to update to ${u.version}`, icon: "refresh-cw", run: installUpdate });
   else add({ id: "check-updates", group: "App", title: "Check for updates", hint: `v${appVersion}`, icon: "refresh-cw", run: checkForUpdates });
+  add({ id: "feedback", group: "App", title: "Report a bug or suggest a feature", hint: "files a GitHub issue on tri-code", icon: "message-square-plus", run: () => toggleFeedback() });
   add({ id: "about", group: "App", title: "About tri-code", hint: "version, changelog", icon: "info", run: () => setAboutOpen(true) });
 
   if (p) {
