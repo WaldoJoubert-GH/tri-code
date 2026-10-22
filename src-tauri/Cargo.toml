@@ -7,7 +7,9 @@ edition = "2024"
 [lib]
 # The `_lib` suffix avoids a lib/bin name clash on Windows (rust-lang/cargo#8519).
 name = "tri_code_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop only needs the rlib. `cdylib`/`staticlib` are for mobile, and the
+# windows-gnu linker can't build the cdylib (>65535 exports).
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
