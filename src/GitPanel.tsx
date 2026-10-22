@@ -121,7 +121,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         classList={{ sel: sel() }}
         title={fp.c.path}
         onClick={() => select(p(), { path: fp.c.path, staged: fp.inStaged })}
-        onDblClick={() => openFile(p(), `${p().path.replace(/[\\/]+$/, "")}/${fp.c.path}`, props.tab.id)}
+        onDblClick={() => openFile(p(), `${p().path.replace(/[\\/]+$/, "")}/${fp.c.path}`, { from: props.tab.id })}
       >
         <input
           type="checkbox"

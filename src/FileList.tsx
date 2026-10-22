@@ -1,10 +1,11 @@
-// The files window: a tree of the project folder. Directories expand in place;
-// clicking a file shows it in the project's `file` window. Plain keys drive it
-// while the window is focused.
+// The editor's file tree: the project folder, directories expanded in place. A click opens a
+// file in the editor's preview tab, a double-click keeps it, Ctrl+click opens it in a new editor
+// beside. It follows the editor: the file shown is revealed and selected. Plain keys drive it
+// while it has focus.
 
-import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js";
-import { type Project, type Tab, isRemote } from "./state";
-import { dirState, loadDir, openFile, refreshProject } from "./files";
+import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js";
+import { type Project, isRemote } from "./state";
+import { type OpenHow, dirState, loadDir, refreshProject } from "./files";
 import "./files.css";
 
 type Row = { path: string; name: string; dir: boolean; depth: number };
@@ -18,6 +19,7 @@ const EXT: Record<string, [string, string]> = {
   md: ["md", "#7aa87a"], rs: ["rs", "#d08b4a"], toml: ["tm", "#c96a7a"], yaml: ["ya", "#c96a7a"],
   yml: ["ya", "#c96a7a"], sh: ["sh", "#9ece6a"], svg: ["sv", "#a97fd0"], png: ["im", "#a97fd0"],
   jpg: ["im", "#a97fd0"], jpeg: ["im", "#a97fd0"], gif: ["im", "#a97fd0"], lock: ["lk", "#8a8f9c"],
+  py: ["py", "#4d7fd6"], go: ["go", "#3f9fd0"],
 };
 
 export function FileIcon(props: { name: string; dir: boolean }): JSX.Element {
@@ -28,7 +30,13 @@ export function FileIcon(props: { name: string; dir: boolean }): JSX.Element {
   return <span class="fic" style={{ "--fc": color }}>{label}</span>;
 }
 
-export default function FileList(props: { project: Project; tab: Tab; focused: boolean }): JSX.Element {
+export default function FileTree(props: {
+  project: Project;
+  /** The file the editor shows, revealed and selected. */
+  shown?: string;
+  open: (path: string, how: OpenHow & { focus?: boolean }) => void;
+  ref?: (el: HTMLDivElement) => void;
+}): JSX.Element {
   let rootEl!: HTMLDivElement;
   const [open, setOpen] = createSignal<ReadonlySet<string>>(new Set());
   const [sel, setSel] = createSignal("");
@@ -63,9 +71,20 @@ export default function FileList(props: { project: Project; tab: Tab; focused: b
     for (const p of open()) loadDir(props.project, p);
   });
 
-  createEffect(() => {
-    if (props.focused) requestAnimationFrame(() => rootEl?.focus());
-  });
+  // Reveal the file the editor shows: expand its folders and select it.
+  createEffect(on(() => props.shown, (f) => {
+    const root = props.project.path.replace(/[\\/]+$/, "");
+    if (!f || !f.startsWith(`${root}/`)) return;
+    const parts = f.slice(root.length + 1).split("/").slice(0, -1);
+    setOpen((s) => {
+      const n = new Set(s);
+      let dir = root;
+      for (const part of parts) n.add((dir = `${dir}/${part}`));
+      return n;
+    });
+    setSel(f);
+    requestAnimationFrame(() => rootEl?.querySelector(`[data-path="${CSS.escape(f)}"]`)?.scrollIntoView({ block: "nearest" }));
+  }));
 
   const move = (i: number) => {
     const list = rows();
@@ -83,32 +102,41 @@ export default function FileList(props: { project: Project; tab: Tab; focused: b
     else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); move(i - 1); }
     else if (e.key === "ArrowRight" || e.key === "l") { if (at?.dir && !isOpen(at.path)) toggle(at.path); }
     else if (e.key === "ArrowLeft" || e.key === "h") { if (at?.dir && isOpen(at.path)) toggle(at.path); }
-    // Ctrl+Enter (like Ctrl+click) opens a new file window instead of reusing the last one
-    else if (e.key === "Enter") { if (at) at.dir ? toggle(at.path) : openFile(props.project, at.path, props.tab.id, e.ctrlKey || e.metaKey); }
+    // Space previews and stays in the tree; Enter opens and goes to the file; Ctrl+Enter opens it beside
+    else if (e.key === " ") { e.preventDefault(); if (at && !at.dir) props.open(at.path, { preview: true }); }
+    else if (e.key === "Enter") {
+      if (!at) return;
+      if (at.dir) toggle(at.path);
+      else props.open(at.path, e.ctrlKey || e.metaKey ? { beside: true } : { preview: true, focus: true });
+    }
   };
 
   const where = () => `${isRemote(props.project) ? `${props.project.host}:` : ""}${props.project.path}`;
   const root = () => dirState(props.project, props.project.path);
+  const rowOf = (e: MouseEvent) => (e.target as HTMLElement).closest<HTMLElement>("[data-path]");
 
   return (
-    <div class="filewin">
-      <div class="fbar">
-        <span class="proj">{props.project.name}</span>
-        <span class="path" title={where()}>{where()}</span>
+    <div class="ftreewrap">
+      <div class="fthead">
+        <span class="proj" title={where()}>{props.project.name}</span>
         <button title="Refresh (reloads the whole tree and open files)" onClick={() => refreshProject(props.project)}>⟳</button>
       </div>
       <div
         class="ftree"
-        ref={rootEl}
+        ref={(el) => ((rootEl = el), props.ref?.(el))}
         tabIndex={0}
         onKeyDown={onKey}
         onClick={(e) => {
-          const el = (e.target as HTMLElement).closest<HTMLElement>("[data-path]");
+          const el = rowOf(e);
           if (!el) return;
           const path = el.dataset.path!;
           setSel(path);
           if (el.dataset.dir === "1") toggle(path);
-          else openFile(props.project, path, props.tab.id, e.ctrlKey || e.metaKey);
+          else props.open(path, e.ctrlKey || e.metaKey ? { beside: true } : { preview: true });
+        }}
+        onDblClick={(e) => {
+          const el = rowOf(e);
+          if (el && el.dataset.dir !== "1") props.open(el.dataset.path!, { focus: true });
         }}
       >
         <Show
@@ -119,10 +147,10 @@ export default function FileList(props: { project: Project; tab: Tab; focused: b
             {(r) => (
               <div
                 class="frow"
-                classList={{ sel: r.path === sel(), dir: r.dir }}
+                classList={{ sel: r.path === sel(), dir: r.dir, shown: r.path === props.shown }}
                 data-path={r.path}
                 data-dir={r.dir ? "1" : "0"}
-                style={{ "padding-left": `${6 + r.depth * 14}px` }}
+                style={{ "padding-left": `${6 + r.depth * 12}px` }}
               >
                 <span class="fchev">{r.dir ? (isOpen(r.path) ? "▾" : "▸") : ""}</span>
                 <FileIcon name={r.name} dir={r.dir} />

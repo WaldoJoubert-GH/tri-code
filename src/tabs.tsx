@@ -6,7 +6,7 @@
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Project, Tab, TabKind, activePage, addTab, agentOf, app, focusTab, live, projectById, space, tabName, visibleTabs } from "./state";
-import { openFilesPanel } from "./files";
+import { openEditor } from "./files";
 import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
 import { hotkeyProblem, hotkeyText, launchAgent, openAgentsPanel } from "./agents";
@@ -15,23 +15,22 @@ import { SIG_TEXT, sigOf } from "./signals";
 import { flash } from "./ui";
 import { keyOf } from "./keymap";
 
-/** Glyphs of the windows that aren't terminals (those show their agent's icon). A `file`
- *  window shows the file name as its label, so it shares the files glyph. */
+/** Glyphs of the windows that aren't terminals (those show their agent's icon). */
 const GLYPH: Record<Exclude<TabKind, "term">, string> = {
-  browser: "◎", issues: "☑", files: "▤", file: "▤", git: "±", agents: "⚙",
+  browser: "◎", issues: "☑", editor: "▤", git: "±", agents: "⚙",
 };
 
 /** The panels the New window menu offers under the agents, with the key that also opens one. */
-const PANELS: { kind: Exclude<TabKind, "term" | "file">; /** The Keymap action that also opens it. */ key: string }[] = [
+const PANELS: { kind: Exclude<TabKind, "term">; /** The Keymap action that also opens it. */ key: string }[] = [
   { kind: "browser", key: "browser" },
   { kind: "issues", key: "issues" },
-  { kind: "files", key: "files" },
+  { kind: "editor", key: "files" },
   { kind: "git", key: "git" },
   { kind: "agents", key: "agents" },
 ];
 
-/** What the strip shows for a window. `file` windows are named by their file. */
-const label = (t: Tab) => (t.kind === "file" ? (t.path ?? "").split("/").pop() || "file" : tabName(t));
+/** What the strip shows for a window. An editor is named by the file it shows. */
+const label = (t: Tab) => (t.kind === "editor" ? (t.path ?? "").split("/").pop() || "editor" : tabName(t));
 
 /** A window's glyph: its agent's lucide icon for a terminal or web app, else the kind's glyph. */
 function Glyph(props: { tab: Tab }) {
@@ -45,7 +44,7 @@ function Glyph(props: { tab: Tab }) {
 
 /** Tooltip detail: the live process title, the browser address, or the file's path. */
 function hint(t: Tab): string {
-  if (t.kind === "file") return t.path ?? "";
+  if (t.kind === "editor") return t.path ?? "";
   if (t.kind === "browser") return activePage(t)?.url ?? "";
   return live[t.id]?.title ?? "";
 }
@@ -53,7 +52,7 @@ function hint(t: Tab): string {
 /** Open a panel; the singleton ones are opened or focused, never duplicated. */
 function newPanel(p: Project, kind: (typeof PANELS)[number]["kind"]) {
   if (kind === "issues") return openIssuePanel(p);
-  if (kind === "files") return void openFilesPanel(p);
+  if (kind === "editor") return void openEditor(p);
   if (kind === "git") return void openGitPanel(p);
   if (kind === "agents") return void openAgentsPanel(p);
   addTab(p.id, kind);

@@ -41,7 +41,7 @@ export const ACTIONS: Action[] = [
   { id: "term-like", group: "Windows and links", desc: "New terminal like the focused one, else a shell", def: [k("Enter"), k("NumpadEnter")] },
   { id: "browser", group: "Windows and links", desc: "New browser window", def: [k("KeyB")] },
   { id: "issues", group: "Windows and links", desc: "Issues", def: [k("KeyI")] },
-  { id: "files", group: "Windows and links", desc: "Files", def: [k("KeyE")] },
+  { id: "files", group: "Windows and links", desc: "Editor", def: [k("KeyE")] },
   { id: "go-to-file", group: "Windows and links", desc: "Go to file", def: [k("KeyT")] },
   { id: "git", group: "Windows and links", desc: "Git", def: [k("KeyC")] },
   { id: "agents", group: "Windows and links", desc: "Agents window", def: [k("Semicolon")] },

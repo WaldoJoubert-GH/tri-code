@@ -40,6 +40,9 @@ pub struct FileText {
     pub truncated: bool,
     /// `None` for a binary file.
     pub text: Option<String>,
+    /// Modification time and size, as an opaque token. `write_file` compares it to refuse
+    /// overwriting a file that changed since it was read (an agent wrote to it).
+    pub stamp: String,
 }
 
 #[tauri::command]
@@ -119,20 +122,54 @@ pub async fn read_media(host: String, path: String) -> Result<tauri::ipc::Respon
     .map_err(|e| e.to_string())?
 }
 
-/// Overwrite a text file from the file window's editor. Written in place, not via a
-/// temp file and rename, so the file keeps its permissions and a symlink stays a link.
+/// What `write_file` refuses with when the file is not the one that was read.
+pub const CHANGED: &str = "changed on disk";
+
+/// Overwrite a text file from the editor and return its new stamp. Written in place, not via a
+/// temp file and rename, so the file keeps its permissions and a symlink stays a link. With
+/// `stamp` (from `read_file`), a file that changed since it was read is left alone and the
+/// error is `CHANGED`.
 #[tauri::command]
-pub async fn write_file(host: String, path: String, contents: String) -> Result<(), String> {
+pub async fn write_file(host: String, path: String, contents: String, stamp: Option<String>) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || match host.as_str() {
-        "" | "local" => std::fs::write(expand_home(&path), contents).map_err(|e| format!("{path}: {e}")),
+        "" | "local" => {
+            let p = expand_home(&path);
+            if let Some(want) = stamp {
+                let meta = std::fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?;
+                if local_stamp(&meta) != want {
+                    return Err(CHANGED.into());
+                }
+            }
+            std::fs::write(&p, contents).map_err(|e| format!("{path}: {e}"))?;
+            let meta = std::fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?;
+            Ok(local_stamp(&meta))
+        }
         _ => {
-            let inner = format!("p={}; [ -f \"$p\" ] || exit 2; cat > \"$p\"", remote_path(&path));
-            remote::run_stdin(&host, &format!("sh -c {}", sq(&inner)), contents.as_bytes()).map(|_| ())
+            // On a mismatch stdin is still drained, so ssh is not left writing into a closed pipe.
+            let check = match &stamp {
+                Some(want) => format!("[ \"$(st)\" = {} ] || {{ cat > /dev/null; echo {} >&2; exit 4; }}; ", sq(want), sq(CHANGED)),
+                None => String::new(),
+            };
+            let inner = format!("{REMOTE_STAMP} p={}; [ -f \"$p\" ] || exit 2; {check}cat > \"$p\"; st", remote_path(&path));
+            remote::run_stdin(&host, &format!("sh -c {}", sq(&inner)), contents.as_bytes()).map(|s| s.trim().to_string())
         }
     })
     .await
     .map_err(|e| e.to_string())?
 }
+
+/// A local file's stamp: modification time in nanoseconds, and size.
+fn local_stamp(meta: &std::fs::Metadata) -> String {
+    let ns = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_nanos());
+    format!("{ns} {}", meta.len())
+}
+
+/// Defines `st`, which prints `$p`'s stamp: seconds and size from GNU stat, else BSD stat.
+const REMOTE_STAMP: &str = "st() { stat -c '%Y %s' \"$p\" 2>/dev/null || stat -f '%m %z' \"$p\"; };";
 
 fn image_mime(path: &str) -> &'static str {
     match path.rsplit('.').next().unwrap_or("").to_ascii_lowercase().as_str() {
@@ -222,15 +259,17 @@ fn read_local(path: &str) -> Result<FileText, String> {
         binary,
         truncated: size > LIMIT,
         text: if binary { None } else { Some(String::from_utf8_lossy(&buf).into_owned()) },
+        stamp: local_stamp(&meta),
     })
 }
 
 fn read_remote(host: &str, path: &str) -> Result<FileText, String> {
-    // Print the byte size on the first line, then the first LIMIT bytes.
-    let inner = format!("p={}; [ -f \"$p\" ] || exit 2; wc -c < \"$p\"; head -c {LIMIT} \"$p\"", remote_path(path));
+    // Print the stamp ("mtime size") on the first line, then the first LIMIT bytes.
+    let inner = format!("{REMOTE_STAMP} p={}; [ -f \"$p\" ] || exit 2; st; head -c {LIMIT} \"$p\"", remote_path(path));
     let out = remote::run_bytes(host, &format!("sh -c {}", sq(&inner)))?;
     let nl = out.iter().position(|&b| b == b'\n').ok_or("unexpected output from ssh")?;
-    let size: u64 = String::from_utf8_lossy(&out[..nl]).trim().parse().map_err(|_| "unexpected size from ssh")?;
+    let stamp = String::from_utf8_lossy(&out[..nl]).trim().to_string();
+    let size: u64 = stamp.split_whitespace().nth(1).and_then(|s| s.parse().ok()).ok_or("unexpected size from ssh")?;
     let body = &out[nl + 1..];
     let binary = body.contains(&0);
     Ok(FileText {
@@ -239,6 +278,7 @@ fn read_remote(host: &str, path: &str) -> Result<FileText, String> {
         binary,
         truncated: size > LIMIT,
         text: if binary { None } else { Some(String::from_utf8_lossy(body).into_owned()) },
+        stamp,
     })
 }
 
@@ -336,12 +376,30 @@ mod tests {
         std::fs::write(&f, "old").unwrap();
         std::fs::write(root.join("i.svg"), "<svg/>").unwrap();
         let p = f.to_string_lossy().to_string();
-        tauri::async_runtime::block_on(write_file("local".into(), p.clone(), "new".into())).unwrap();
+        tauri::async_runtime::block_on(write_file("local".into(), p.clone(), "new".into(), None)).unwrap();
         let img = tauri::async_runtime::block_on(read_image("local".into(), root.join("i.svg").to_string_lossy().into())).unwrap();
         let text = std::fs::read_to_string(&f).unwrap();
         std::fs::remove_dir_all(&root).ok();
         assert_eq!(text, "new");
         assert_eq!(img, "data:image/svg+xml;base64,PHN2Zy8+");
+    }
+
+    #[test]
+    fn local_write_refuses_a_file_that_changed_since_it_was_read() {
+        let root = tmp("stamp");
+        let f = root.join("a.txt");
+        std::fs::write(&f, "one").unwrap();
+        let p = f.to_string_lossy().to_string();
+        let read = read_local(&p).unwrap();
+        // the stamp a save returns is the one the next save expects
+        let next = tauri::async_runtime::block_on(write_file("local".into(), p.clone(), "two".into(), Some(read.stamp.clone()))).unwrap();
+        // someone else writes (a different size, so the stamp differs even on a coarse clock)
+        std::fs::write(&f, "three!").unwrap();
+        let err = tauri::async_runtime::block_on(write_file("local".into(), p.clone(), "four".into(), Some(next))).unwrap_err();
+        let text = std::fs::read_to_string(&f).unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(err, CHANGED);
+        assert_eq!(text, "three!");
     }
 
     #[test]

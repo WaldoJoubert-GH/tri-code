@@ -65,7 +65,8 @@ export function installClipboardFallback(): void {
   document.addEventListener("keydown", (e) => {
     if (e.altKey || !(e.ctrlKey || e.metaKey)) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest?.(".xterm")) return; // xterm handles its own keys
+    // xterm and CodeMirror handle their own keys (an editor's paste spreads lines over its cursors)
+    if (target?.closest?.(".xterm, .cm-editor")) return;
     if (isKey("copy", e)) {
       const text = selectedText(target);
       if (text) {

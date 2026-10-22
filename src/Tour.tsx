@@ -24,7 +24,7 @@ const demoTab = (p: Project, kind: Tab["demo"]) => p.tabs.find((t) => t.demo ===
 type Base = { terms: number; files: string; accent: string; pi?: number };
 const baseOf = (p: Project): Base => ({
   terms: p.tabs.filter((t) => t.kind === "term").length,
-  files: p.tabs.filter((t) => t.kind === "file").map((t) => t.path).join("|"),
+  files: p.tabs.filter((t) => t.kind === "editor").map((t) => t.path).join("|"),
   accent: p.accent,
   pi: live[demoTab(p, "pi")?.id ?? ""]?.agent?.at,
 });
@@ -50,18 +50,18 @@ const STOPS: Stop[] = [
   },
   {
     target: () => "#spaces", side: "below", title: "Four workspaces per project",
-    body: () => <>Each is a canvas of its own windows. Here claude, a dev server and the files are on 1, and pi is waiting on 2.</>,
+    body: () => <>Each is a canvas of its own windows. Here claude, a dev server and the editor are on 1, and pi is waiting on 2.</>,
     try: { label: () => <>Press <Caps id="ws-2" /> to look, then <Caps id="ws-1" /> to come back</>, done: (p) => p.ws !== 0 },
   },
   {
     target: () => ".top .tabs", side: "below", title: "Windows tile themselves",
-    body: () => <>The tabs are this workspace's windows. <b>+</b> adds claude, pi, a shell, a browser, files, git or issues, and the canvas makes room. No dragging needed.</>,
+    body: () => <>The tabs are this workspace's windows. <b>+</b> adds claude, pi, a shell, a browser, the editor, git or issues, and the canvas makes room. No dragging needed.</>,
     try: { label: () => <>Click <b>+</b> and open a shell</>, done: (p, b) => p.tabs.filter((t) => t.kind === "term").length > b.terms },
   },
   {
     target: () => "#where", side: "below", avoid: ".gtf", title: "Find any file",
-    body: () => <>Click the project path, or press <Caps id="go-to-file" />, and type a few letters of a file name. <K k={["Enter"]} /> opens it in a file window; <K k={["Shift", "Enter"]} /> types <code>@path</code> into the agent instead.</>,
-    try: { label: () => <>Press <Caps id="go-to-file" /> and open <code>Settings.tsx</code></>, done: (p, b) => p.tabs.filter((t) => t.kind === "file").map((t) => t.path).join("|") !== b.files },
+    body: () => <>Click the project path, or press <Caps id="go-to-file" />, and type a few letters of a file name. <K k={["Enter"]} /> opens it in the editor; <K k={["Shift", "Enter"]} /> types <code>@path</code> into the agent instead.</>,
+    try: { label: () => <>Press <Caps id="go-to-file" /> and open <code>Settings.tsx</code></>, done: (p, b) => p.tabs.filter((t) => t.kind === "editor").map((t) => t.path).join("|") !== b.files },
   },
   {
     target: (p) => `.win[data-tab="${demoTab(p, "claude")?.id}"] .bar`, side: "below", title: "Agents say what they're doing",

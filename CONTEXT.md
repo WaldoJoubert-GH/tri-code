@@ -72,8 +72,19 @@ _Avoid_: Onboarding wizard, coach marks.
 The `tour` project (`sample: true`), in `tour/` under the app config dir. Its terminals are Demo Tabs: scripted sessions (`demo.ts`) that write OSC 7501 reports into xterm, so signals, badges and notifications behave as for a real agent. Not added to Recent; closing it loses nothing.
 
 **Go to File**:
-The `Alt+T` box under the toolbar path (a click on the path opens it too). One field that searches the project's File Index by fuzzy match and, when it is empty or ends in `/`, lists that folder. Opens the pick in the project's `file` Window.
+The `Alt+T` box under the toolbar path (a click on the path opens it too). One field that searches the project's File Index by fuzzy match and, when it is empty or ends in `/`, lists that folder. Opens the pick in a Preview Tab of the project's Editor Window (`Ctrl+Enter`: a new Editor Window beside).
 _Avoid_: Quick open, file palette, Ctrl+P.
+
+**Editor Window**:
+A canvas Window (`TabKind` `"editor"`, `Alt+E`) with the project's file tree, a tab per open file, a CodeMirror 6 editor and a status bar; Markdown, HTML and SVG also show rendered, media files play. Replaced the Files and File Windows; chosen from design/editor.html (variant B). A file opens in the Editor Window it was picked from, else the one used last; `Ctrl`+click opens a second one beside. No extension host: language smarts are to come from language servers run on the project's host.
+_Avoid_: Files window, file viewer, IDE.
+
+**Preview Tab**:
+The Editor Window's italic tab for a file opened with one click (or from Go to File); the next file opened that way replaces it. A double-click or an edit keeps it.
+_Avoid_: Temporary tab.
+
+**Stamp**:
+A file's modification time and size when the editor read it. Saving sends it back, and a file changed since (an agent wrote to it) is not overwritten without asking.
 
 **Command Palette**:
 The `Alt+X` box under the toolbar that runs any Command by name. The empty box lists recent picks, then every Command by group; typing fuzzy-matches titles (as Go to File does). Built from `commands.ts` each time it opens, so it only offers what applies now (no "Make main" outside Main + stack). A Command with a hotkey runs the same function the hotkey does.
@@ -105,7 +116,7 @@ A Window taken off the canvas with – or `Alt+N`. It keeps its place in tiling 
 _Avoid_: Hidden window, docked, collapsed.
 
 **New Window Menu**:
-The popup under the Tab Strip's `+`: one row per Agent (with its hotkey), then one per panel kind with the key that also opens it (`Alt+B`, `Alt+I`, `Alt+E`, `Alt+C`, `Alt+;`). Issues, Files, Git and Agents open or focus their one-per-project Window rather than adding a second one.
+The popup under the Tab Strip's `+`: one row per Agent (with its hotkey), then one per panel kind with the key that also opens it (`Alt+B`, `Alt+I`, `Alt+E`, `Alt+C`, `Alt+;`). Issues, Git and Agents open or focus their one-per-project Window rather than adding a second one; the Editor focuses the Editor Window used last.
 
 **Agent**:
 A terminal app the New Window Menu offers: a name, a shell command (empty = the login shell), a lucide icon and an optional Alt hotkey. Global, in `state.json` as `agents`, seeded with claude, pi and shell. A terminal Window (`TabKind` `"term"`) remembers its Agent and the command it was launched with, so editing an Agent changes only new Windows and deleting one leaves its Windows running. "Send to agent" targets terminals with a command, never a plain shell.

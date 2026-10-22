@@ -1,14 +1,16 @@
-// File listing and reading for the files window, plus which `file` window shows
-// what. Listings and file bodies are cached by host + path and refreshed on demand.
+// File listing and reading for the editor, plus which editor window shows what.
+// Listings and file bodies are cached by host + path and refreshed on demand.
 
 import { invoke } from "@tauri-apps/api/core";
-import { createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { type FileOpen, type Project, type Tab, addTab, app, focusTab, projectById, setFileTab, setSettings } from "./state";
+import type { EditorState, Text } from "@codemirror/state";
+import type { Body } from "./cm";
+import { type Project, type Tab, addTab, focusTab, setEditorTab } from "./state";
 
 export type FsEntry = { name: string; dir: boolean; size: number };
 export type FsList = { path: string; entries: FsEntry[] };
-export type FsText = { path: string; size: number; binary: boolean; truncated: boolean; text: string | null };
+/** `stamp` is the file's mtime and size when read; a save sends it back so a file changed since is not overwritten. */
+export type FsText = { path: string; size: number; binary: boolean; truncated: boolean; text: string | null; stamp: string };
 
 type DirState = { loading: boolean; list?: FsList; error?: string };
 type TextState = { loading: boolean; file?: FsText; error?: string };
@@ -60,9 +62,9 @@ export function refreshProject(project: Project): void {
     refreshDir(project, path);
   }
 
-  // Bodies of open file windows reload now; every other cached body is dropped
-  // so it is re-read the next time that file is opened (the window is reused).
-  const shown = new Set(project.tabs.filter((t) => t.kind === "file" && t.path).map((t) => t.path!));
+  // Bodies of files open in an editor reload now; every other cached body is dropped
+  // so it is re-read the next time that file is opened.
+  const shown = new Set(project.tabs.flatMap(filesOf));
   for (const k of Object.keys(texts)) {
     const { host, path } = split(k);
     if (host !== project.host || !under(path) || shown.has(path)) continue;
@@ -89,13 +91,19 @@ export function reloadText(project: Project, path: string): void {
     .catch((e) => setTexts(k, { loading: false, error: String(e) }));
 }
 
-/** Write `text` over the file on disk and make it the cached body. */
-export async function saveText(project: Project, path: string, text: string): Promise<void> {
-  await invoke("write_file", { host: project.host, path, contents: text });
+/** What a save fails with when the file changed on disk since it was read (fs.rs `CHANGED`). */
+export const CHANGED = "changed on disk";
+
+/** Write `text` over the file on disk, make it the cached body and return its new stamp. With the
+ *  `stamp` the text was read with, a file that changed since is left alone and this throws `CHANGED`;
+ *  `null` overwrites whatever is there. */
+export async function saveText(project: Project, path: string, text: string, stamp: string | null): Promise<string> {
+  const next = await invoke<string>("write_file", { host: project.host, path, contents: text, stamp });
   const k = key(project.host, path);
   const file = texts[k]?.file;
   const size = new TextEncoder().encode(text).length;
-  if (file) setTexts(k, "file", { ...file, text, size });
+  if (file) setTexts(k, "file", { ...file, text, size, stamp: next });
+  return next;
 }
 
 /** A repo image as a `data:` URL, for the Markdown preview. */
@@ -128,96 +136,118 @@ export async function loadMedia(project: Project, path: string, mime: string): P
 export const dirState =(project: Project, path: string): DirState | undefined => dirs[key(project.host, full(project, path))];
 export const textState = (project: Project, path: string): TextState | undefined => texts[key(project.host, path)];
 
-/** Open or focus the project's files window. */
-export function openFilesPanel(project: Project): string {
-  const existing = project.tabs.find((t) => t.kind === "files");
-  const id = existing?.id ?? addTab(project.id, "files");
+/** Tabs, by id, ordered most recently used. Picks the editor a file opens in. */
+const lastUsed = new Map<string, number>();
+export const touchEditor = (tabId: string) => lastUsed.set(tabId, Date.now());
+
+/** Every file an editor tab holds, in tab order. */
+export const filesOf = (t: Tab): string[] => (t.kind === "editor" ? t.files ?? [] : []);
+
+const editorsOf = (p: Project) => p.tabs.filter((t) => t.kind === "editor");
+const latest = (tabs: Tab[]) => [...tabs].sort((a, b) => (lastUsed.get(b.id) ?? 0) - (lastUsed.get(a.id) ?? 0))[0];
+
+/** Open or focus the project's editor: the one used last, else a new one. */
+export function openEditor(project: Project): string {
+  const id = latest(editorsOf(project))?.id ?? addTab(project.id, "editor");
+  touchEditor(id);
   focusTab(project.id, id);
   return id;
 }
 
-/** Tabs, by id, ordered most recently opened. Drives `file` window reuse. */
-const lastUsed = new Map<string, number>();
+export type OpenHow = {
+  /** The window it was opened from: an editor opens it there, anything else puts a new editor after it. */
+  from?: string;
+  /** In a preview tab, which the next preview replaces (a click in the tree, Enter in Go to File). */
+  preview?: boolean;
+  /** In a new editor window beside `from` (Ctrl+click, Ctrl+Enter). */
+  beside?: boolean;
+};
 
-/** Every file a `file` tab holds: its tab strip, or just its one file. */
-export const filesOf = (t: Tab): string[] => t.files ?? (t.path ? [t.path] : []);
-
-/** A file waiting on "Replace, beside, as a tab or preview?", asked in the window it would replace. */
-export type Ask = { projectId: string; tabId: string; path: string; fromTabId?: string };
-const [ask, setAsk] = createSignal<Ask | null>(null);
-export { ask };
-export const cancelAsk = () => setAsk(null);
-
-/** Answer the question: open the file that way, and with `remember`, from now on. */
-export function answerAsk(how: Exclude<FileOpen, "ask">, remember: boolean) {
-  const a = ask();
-  const p = a && projectById(a.projectId);
-  setAsk(null);
-  if (!p) return;
-  if (remember) setSettings({ fileOpen: how });
-  openWith(p, a.path, how, a.fromTabId);
-}
-
-/** Show `path` the way Settings says (`fresh`, from Ctrl: a new window, or in "window" mode the last one).
- *  A file that is already open is focused instead. */
-export function openFile(project: Project, path: string, fromTabId?: string, fresh = false): void {
-  const fileTabs = project.tabs.filter((t) => t.kind === "file");
-  const open = fileTabs.find((t) => filesOf(t).includes(path));
-  if (open) {
-    if (open.path !== path) setFileTab(project.id, open.id, { path });
-    lastUsed.set(open.id, Date.now());
-    focusTab(project.id, open.id);
-    return;
-  }
-  const mode = app.settings.fileOpen;
-  openWith(project, path, fresh ? (mode === "window" ? "reuse" : "window") : mode, fromTabId);
-}
-
-function openWith(project: Project, path: string, how: FileOpen, fromTabId?: string) {
-  const fileTabs = project.tabs.filter((t) => t.kind === "file");
-  const last = fileTabs.sort((a, b) => (lastUsed.get(b.id) ?? 0) - (lastUsed.get(a.id) ?? 0))[0];
-  const show = (t: Tab, patch: Parameters<typeof setFileTab>[2]) => {
-    setFileTab(project.id, t.id, patch);
-    lastUsed.set(t.id, Date.now());
+/**
+ * Show `path` in an editor: the one it came from, else the one used last. A file already open
+ * there (or, from elsewhere, in any editor) is shown and kept, unless this is a preview. Otherwise
+ * it opens as a new tab after the shown one, or in place of the preview tab.
+ */
+export function openFile(project: Project, path: string, how: OpenHow = {}): void {
+  const editors = editorsOf(project);
+  const show = (t: Tab, patch: Parameters<typeof setEditorTab>[2]) => {
+    setEditorTab(project.id, t.id, { path, ...patch });
+    touchEditor(t.id);
     focusTab(project.id, t.id);
   };
-  const fresh = (preview: boolean) => {
-    const id = addTab(project.id, "file", { path, after: fromTabId });
-    if (preview) setFileTab(project.id, id, { preview: true });
-    lastUsed.set(id, Date.now());
-  };
-  if (how === "preview") {
-    const pv = fileTabs.find((t) => t.preview);
-    return pv ? show(pv, { path, files: undefined }) : fresh(true);
+  if (how.beside || !editors.length) {
+    const id = addTab(project.id, "editor", { path, after: how.from });
+    if (how.preview && !how.beside) setEditorTab(project.id, id, { preview: path });
+    touchEditor(id);
+    return;
   }
-  if (!last || how === "window") return fresh(false);
-  if (how === "ask") {
-    focusTab(project.id, last.id);
-    return setAsk({ projectId: project.id, tabId: last.id, path, fromTabId });
+  const from = editors.find((t) => t.id === how.from);
+  // From an editor, the file opens there even if another editor has it too.
+  const open = from ? (filesOf(from).includes(path) ? from : undefined) : editors.find((t) => filesOf(t).includes(path));
+  if (open) return show(open, open.preview === path && !how.preview ? { preview: undefined } : {});
+  const t = from ?? latest(editors);
+  const files = filesOf(t);
+  const pv = t.preview && files.includes(t.preview) ? t.preview : undefined;
+  let next: string[];
+  if (pv && how.preview) next = files.map((f) => (f === pv ? path : f));
+  else {
+    const at = t.path ? files.indexOf(t.path) + 1 : files.length;
+    next = [...files.slice(0, at), path, ...files.slice(at)];
   }
-  const files = filesOf(last);
-  // "reuse" swaps the file being shown and leaves the rest of a tab strip alone
-  const next = how === "tabs" ? [...files, path] : files.map((f) => (f === last.path ? path : f));
-  show(last, { path, files: next.length > 1 ? next : undefined, preview: undefined });
+  show(t, { files: next, preview: how.preview ? path : pv });
 }
 
-/** Close one file of a `file` tab's strip; the neighbour to its left (or right) is shown. */
+/** Close one file of an editor; the neighbour to its left (or right) is shown. */
 export function closeFileInTab(project: Project, tab: Tab, path: string) {
   const files = filesOf(tab), i = files.indexOf(path);
   const rest = files.filter((f) => f !== path);
-  if (!rest.length) return;
-  const shown = tab.path === path ? rest[Math.max(0, i - 1)] : tab.path;
-  setFileTab(project.id, tab.id, { path: shown, files: rest.length > 1 ? rest : undefined });
+  const shown = tab.path !== path ? tab.path : rest[Math.max(0, i - 1)];
+  setEditorTab(project.id, tab.id, {
+    files: rest.length ? rest : undefined,
+    path: shown,
+    preview: tab.preview === path ? undefined : tab.preview,
+  });
 }
 
-/** Keep a preview: the next file opened gets a preview window of its own. */
-export function keepPreview(project: Project, tab: Tab) {
-  if (tab.preview) setFileTab(project.id, tab.id, { preview: undefined });
+/** Keep a preview tab: the next file opened gets a tab of its own. */
+export function keepPreview(project: Project, tab: Tab, path = tab.path) {
+  if (path && tab.preview === path) setEditorTab(project.id, tab.id, { preview: undefined });
 }
 
-/** Change the mode. Leaving "preview" keeps every preview window as it is. */
-export function setFileOpen(mode: FileOpen) {
-  setSettings({ fileOpen: mode });
-  if (mode === "preview") return;
-  for (const p of app.projects) for (const t of p.tabs) if (t.preview) setFileTab(p.id, t.id, { preview: undefined });
+// ---- open files of editor windows ------------------------------------------------------------
+// Kept outside Editor.tsx, which is loaded on first use, so closing a window can drop them.
+
+/** One open file of one editor window. */
+export type Doc = {
+  state: EditorState;
+  body: Body;
+  /** The text as last read or saved; the file is modified while the editor's differs. */
+  base: Text;
+  /** The file's stamp when `base` was read or saved, sent with a save (see fs.rs). */
+  stamp: string;
+  /** Scroll position, put back when the tab is shown again. */
+  top: number;
+  /** A save is in flight: the cache it updates is not a change on disk. */
+  saving?: boolean;
+};
+
+const docs = new Map<string, Map<string, Doc>>();
+export const docsOf = (tabId: string) => docs.get(tabId) ?? docs.set(tabId, new Map()).get(tabId)!;
+
+/** Modified files, by editor window then path. */
+export const [dirty, setDirty] = createStore<Record<string, Record<string, true | undefined>>>({});
+export const markDirty = (tabId: string, path: string, on: boolean) => {
+  if (!!dirty[tabId]?.[path] === on) return;
+  setDirty(produce((d) => {
+    const m = (d[tabId] ??= {});
+    if (on) m[path] = true;
+    else delete m[path];
+  }));
+};
+export const dirtyCount = (tabId: string) => Object.keys(dirty[tabId] ?? {}).length;
+
+/** Forget a closed editor window's files and edits (once its undo has expired). */
+export function dropEditor(tabId: string) {
+  docs.delete(tabId);
+  setDirty(produce((d) => { delete d[tabId]; }));
 }

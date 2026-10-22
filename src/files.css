@@ -1,24 +1,10 @@
-/* Files window (tree) and file window (viewer). See src/FileList.tsx, src/FileView.tsx. */
+/* Editor window: file tree, file tabs, CodeMirror, previews. See src/Editor.tsx, src/FileList.tsx, src/cm.ts. */
 
-.mark.files { color: var(--accent); }
+.mark.editor { color: var(--accent); }
 
-.filewin, .filev { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
-/* Header shared by both windows. */
-.fbar {
-  height: 30px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 10px;
-  background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px;
-}
-.fbar .proj { color: var(--text); font-weight: 600; flex: none; }
-.fbar .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); }
-.fbar .fmeta { flex: none; font: 11px var(--mono); color: var(--muted); }
-.fbar button { flex: none; height: 22px; min-width: 22px; padding: 0 6px; border-radius: 4px; color: var(--muted); }
-.fbar button:hover { background: var(--hover); color: var(--text); }
-.fbar .seg { margin: 0 2px; }
-.fbar .seg button { height: auto; padding: 1px 8px; }
 
-/* The project tree. Kept off `.files`: `.mark.files` on a window title bar would inherit
-   this rule's `flex: 1` and stretch the icon across the title. */
+/* The project tree. Kept off `.files`: a `.files` rule would also reach title bar marks. */
 .ftree { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; outline: none; }
 .frow {
   display: flex; align-items: center; gap: 6px; height: 24px; padding-right: 8px;
@@ -49,28 +35,10 @@
 .fnote { padding: 16px 14px; color: var(--muted); font-size: 12px; }
 .fnote.bad { color: var(--bad); white-space: pre-wrap; }
 
-/* Source view. */
-.code { flex: 1; min-height: 0; margin: 0; overflow: auto; padding: 8px 0 14px; font: 12px/17px var(--mono); user-select: text; }
-.cl { display: flex; }
-.cl:hover { background: var(--hover); }
-.ln { flex: none; width: 46px; text-align: right; padding-right: 12px; color: color-mix(in srgb, var(--muted) 75%, transparent); user-select: none; }
-.ct { white-space: pre; }
-.t-c { color: var(--muted); font-style: italic; }
-.t-s { color: var(--ok); }
-.t-k { color: var(--violet); }
-.t-n { color: var(--warn); }
 
 /* HTML preview: a sandboxed iframe. Relative assets do not resolve from srcdoc. */
 .htm { flex: 1; min-height: 0; width: 100%; border: 0; background: #fff; }
 
-/* Editor: the whole body, in the source view's font. */
-.fedit {
-  flex: 1; min-height: 0; width: 100%; margin: 0; resize: none; border: 0; outline: none; tab-size: 4;
-  padding: 8px 14px 14px; background: var(--bg); color: var(--text); font: 12px/17px var(--mono); white-space: pre; user-select: text;
-}
-.fbar .fdirty { color: var(--warn); font-weight: 400; }
-.fbar button.fsave { color: var(--accent); font-weight: 600; }
-.fbar button:disabled { opacity: .6; }
 
 /* Markdown preview. The scroller fills the window so its scrollbar sits on the edge;
    the text inside keeps a readable measure. */
@@ -149,35 +117,53 @@
 .fmedia img, .fmedia video { max-width: 100%; max-height: 100%; object-fit: contain; }
 .fmedia audio { width: min(480px, 100%); }
 
-/* File window: preview, tab strip, the ⋯ menu and the "how should it open?" card. See Settings.tsx. */
-.filev { position: relative; }
-.fbar .path.pv { font-style: italic; }
-.pvtag { flex: none; font: 600 10px var(--mono); color: var(--violet); border: 1px solid color-mix(in srgb, var(--violet) 45%, transparent); border-radius: 3px; padding: 0 4px; }
-.ftabs { display: flex; flex: none; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--line); }
-.ftabs .ft { display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; font: 11.5px var(--mono); color: var(--muted); border-right: 1px solid var(--line); white-space: nowrap; cursor: default; }
+/* Editor window: the tree on the left, then tabs, the breadcrumb bar, the body and a status bar. */
+.edwin { flex: 1; min-height: 0; display: flex; }
+.edtree { width: 220px; flex: none; display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-right: 1px solid var(--line); }
+.edmain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ftreewrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.fthead { height: 28px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 4px 0 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.fthead .proj { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.fthead button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); text-transform: none; }
+.fthead button:hover { background: var(--hover); color: var(--text); }
+.frow.shown:not(.sel) .fname { color: var(--accent); }
+
+.ftabs { display: flex; flex: none; overflow-x: auto; scrollbar-width: none; background: var(--panel); border-bottom: 1px solid var(--line); min-height: 30px; }
+.ftabs .ftree-tg { flex: none; width: 30px; color: var(--muted); border-right: 1px solid var(--line); }
+.ftabs .ftree-tg:hover, .ftabs .ftree-tg[aria-pressed="true"] { color: var(--text); }
+.ftabs .ft { display: flex; align-items: center; gap: 6px; padding: 0 4px 0 10px; font-size: 12px; color: var(--muted); border-right: 1px solid var(--line); white-space: nowrap; cursor: default; }
 .ftabs .ft:hover { color: var(--text); }
 .ftabs .ft.on { background: var(--bg); color: var(--text); box-shadow: inset 0 2px var(--accent); }
-.ftabs .ft .fdirty { font-size: 8px; }
-.ftabs .ft button { width: 16px; height: 16px; border-radius: 3px; color: var(--muted); font-size: 10px; line-height: 1; }
+.win:not(.focused) .ftabs .ft.on { box-shadow: inset 0 2px var(--muted); }
+.ftabs .ft.pv .ftn { font-style: italic; }
+.ftabs .ft button { width: 18px; height: 18px; border-radius: 3px; color: var(--muted); font-size: 10px; line-height: 1; display: grid; place-items: center; }
 .ftabs .ft button:hover { background: var(--hover); color: var(--text); }
-.fmenu {
-  position: absolute; z-index: 5; top: 30px; right: 6px; min-width: 190px; padding: 4px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 32px -10px var(--shadow);
-}
-.fmenu h6 { margin: 4px 8px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.fmenu button { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 8px; border-radius: 5px; text-align: left; font-size: 12px; }
-.fmenu button:hover { background: var(--hover); }
-.fmenu .ck { width: 12px; color: var(--accent); }
-.fmenu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
-.fask {
-  position: absolute; z-index: 4; top: 36px; left: 8px; right: 8px; padding: 10px 12px;
-  background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 14px 36px -12px var(--shadow); font-size: 12.5px;
-}
-.fask p { margin: 0 0 8px; }
-.fask code { font: 12px var(--mono); }
-.fask .opts { display: flex; flex-wrap: wrap; gap: 6px; }
-.fask .opts button { padding: 3px 10px; border: 1px solid var(--line); border-radius: 5px; }
-.fask .opts button:hover { border-color: var(--accent); }
-.fask .opts .primary { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
-.fask .opts .x { margin-left: auto; border-color: transparent; color: var(--muted); }
-.fask label { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+/* The close button shows ● for a modified file and ✕ on hover, as VS Code does. */
+.ftabs .ft button .dot, .ftabs .ft button.dirty .x { display: none; }
+.ftabs .ft button.dirty .dot { display: inline; font-size: 9px; color: var(--text); }
+.ftabs .ft button.dirty:hover .dot { display: none; }
+.ftabs .ft button.dirty:hover .x { display: inline; }
+.ftabs .ft:not(.on):not(:hover) button:not(.dirty) { visibility: hidden; }
+
+.crumbs { height: 26px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+.crumbs .cpath { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crumbs .cpath i { font-style: normal; opacity: .55; margin: 0 5px; }
+.crumbs .cpath .last { color: var(--text); }
+.crumbs button { flex: none; height: 20px; min-width: 20px; padding: 0 6px; border-radius: 4px; color: var(--muted); }
+.crumbs button:hover { background: var(--hover); color: var(--text); }
+.crumbs button.fsave { color: var(--accent); font-weight: 600; }
+.crumbs .seg { display: flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.crumbs .seg button { border-radius: 0; height: 18px; padding: 0 8px; }
+.crumbs .seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+
+.edbody { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.cmhost { flex: 1; min-height: 0; user-select: text; }
+.cmhost .cm-editor { height: 100%; }
+.fempty { margin: auto; text-align: center; color: var(--muted); font-size: 12.5px; }
+.fempty p { margin: 4px 0; }
+
+.estatus { height: 22px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 10px; font: 11px var(--mono); color: var(--muted);
+  background: var(--panel); border-top: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+.estatus .sp { flex: 1; }
+.estatus .warn { color: var(--warn); }
+.estatus .mod { color: var(--warn); }

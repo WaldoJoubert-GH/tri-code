@@ -2,7 +2,7 @@ import { createEffect, on } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 
-export type TabKind = "term" | "browser" | "issues" | "files" | "file" | "git" | "agents";
+export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents";
 
 /** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
@@ -43,8 +43,8 @@ export type Page = {
 };
 
 /** A window on the canvas. Terminals run a PTY; browsers are native child webviews;
- *  issues panels render the project's `.dev/`; files lists the project folder,
- *  file shows one file, git takes the branch from changes to a merged PR and
+ *  issues panels render the project's `.dev/`; an editor is the project's file tree
+ *  with a tab per open file; git takes the branch from changes to a merged PR and
  *  agents edits the agent list. */
 export type Tab = {
   id: string;
@@ -55,12 +55,14 @@ export type Tab = {
   pages?: Page[];
   /** Browser tabs only: the id of the page that is shown. */
   page?: string;
-  /** `file` tabs only: the path being viewed. */
+  /** Editor tabs only: the file shown, one of `files` (unset when none is open). */
   path?: string;
-  /** `file` tabs only, with more than one file: every file in the window's tab strip, `path` among them. */
+  /** Editor tabs only: the open files, in tab order. */
   files?: string[];
-  /** `file` tabs only: a preview, replaced by the next file opened until it is kept. */
-  preview?: boolean;
+  /** Editor tabs only: the file in the preview tab, which the next file opened replaces until it is kept. */
+  preview?: string;
+  /** Editor tabs only: `false` hides the file tree. */
+  tree?: false;
   /** `term` and browser tabs: the agent (or web app) it was opened from. The name and icon follow the agent. */
   agent?: string;
   /** `term` and browser tabs: the agent's name at launch, shown once the agent is deleted. */
@@ -84,7 +86,7 @@ export const isTerminal = (t: Tab) => t.kind === "term";
 
 export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
 
-const PANEL_ICON = { browser: "globe", issues: "list-todo", files: "folder-tree", file: "file-text", git: "git-branch", agents: "settings-2" };
+const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2" };
 
 /** A window's lucide icon: its agent's for a terminal or web app, else its kind's. */
 export const tabIcon = (t: Tab) =>
@@ -214,12 +216,7 @@ type Persisted = {
   settings: Settings;
 };
 
-/** What opening a file (a click in the files window, Enter in Go to File) does with a file window already open:
- *  ask which, replace its file, open a new window, add a tab to it, or replace the preview window. */
-export type FileOpen = "ask" | "reuse" | "window" | "tabs" | "preview";
-
 export type Settings = {
-  fileOpen: FileOpen;
   /** Carousel (mono) layout: px each side of the centred window, where its neighbours peek.
    *  Unset is auto: the window takes 62% of the width, up to MONO_MAX. */
   monoGutter?: number;
@@ -229,7 +226,7 @@ export type Settings = {
   hotkeys?: Record<string, Chord[]>;
 };
 
-const defaultSettings = (): Settings => ({ fileOpen: "ask", modKey: "alt" });
+const defaultSettings = (): Settings => ({ modKey: "alt" });
 
 export type TabStatus = "connecting" | "running" | "reconnecting" | "exited";
 
@@ -305,14 +302,14 @@ export function addProject(name: string, host: string, path: string): string {
 
 /**
  * Add the tour's sample project at `path` and make it active: claude at work, a dev server and
- * the files window on workspace 1, pi on workspace 2. Not added to Recent. Returns its id.
+ * the editor on workspace 1, pi on workspace 2. Not added to Recent. Returns its id.
  */
 export function addSampleProject(path: string): string {
   const id = newId();
   const agent = (a: string) => app.agents.find((x) => x.id === a);
   const term = (space: number, demo: DemoKind, a: string, name: string, cmd: string): Tab =>
     ({ id: newId(), kind: "term", space, demo, agent: agent(a)?.id, name, cmd });
-  const tabs = [term(0, "claude", "claude", "claude", "claude"), term(0, "server", "shell", "shell", ""), { id: newId(), kind: "files", space: 0 } as Tab, term(1, "pi", "pi", "pi", "pi")];
+  const tabs = [term(0, "claude", "claude", "claude", "claude"), term(0, "server", "shell", "shell", ""), { id: newId(), kind: "editor", space: 0 } as Tab, term(1, "pi", "pi", "pi", "pi")];
   const spaces = Array.from({ length: SPACES }, newSpace);
   spaces[0].focus = tabs[0].id;
   spaces[1].focus = tabs[3].id;
@@ -424,7 +421,7 @@ export function addTab(projectId: string, kind: TabKind, opts: { url?: string; p
     const tab: Tab = {
       id, kind, space: p.ws,
       ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}) } : {}),
-      ...(kind === "file" ? { path: opts.path ?? "" } : {}),
+      ...(kind === "editor" && opts.path ? { path: opts.path, files: [opts.path] } : {}),
       ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "" } : {}),
     };
     const i = opts.after ? p.tabs.findIndex((t) => t.id === opts.after) : -1;
@@ -663,8 +660,8 @@ export function moveFav(projectId: string, url: string, before: string) {
   });
 }
 
-/** Change what a `file` tab shows: its file, its tab strip, whether it is a preview. An `undefined` drops the field. */
-export function setFileTab(projectId: string, tabId: string, patch: Pick<Tab, "path" | "files" | "preview">) {
+/** Change what an editor tab shows: its file, its open files, its preview tab, its tree. An `undefined` drops the field. */
+export function setEditorTab(projectId: string, tabId: string, patch: Partial<Pick<Tab, "path" | "files" | "preview" | "tree">>) {
   editTab(projectId, tabId, (t) => {
     for (const [k, v] of Object.entries(patch) as [keyof typeof patch, never][]) {
       if (v === undefined) delete t[k];
@@ -725,6 +722,13 @@ function migrateTab(t: any): Tab {
   if (t.kind === "claude" || t.kind === "pi" || t.kind === "shell") {
     Object.assign(tab, { kind: "term", agent: t.kind, name: t.kind, cmd: t.kind === "shell" ? "" : t.kind });
   }
+  // The files window (a tree) and file windows (one file, or a strip of them) became editors.
+  if (t.kind === "files") tab.kind = "editor";
+  if (t.kind === "file") {
+    const files: string[] = t.files ?? (t.path ? [t.path] : []);
+    Object.assign(tab, { kind: "editor", files, path: t.path || undefined, preview: t.preview ? t.path : undefined, tree: false });
+    if (!files.length) delete tab.files;
+  }
   // Browser windows had one address before they had pages.
   if (t.kind === "browser" && !t.pages) {
     Object.assign(tab, { pages: [{ id: t.id, url: t.url ?? "" }], page: t.id });
@@ -762,7 +766,8 @@ function migrate(raw: any): Persisted {
     notify: { ...defaultNotify(), ...raw.notify },
     // Anyone with a state file from before the tour already knows their way around.
     toured: raw.toured ?? true,
-    settings: { ...defaultSettings(), ...raw.settings },
+    // `fileOpen` chose how a file window opened the next file; the editor's preview tab replaced it.
+    settings: (({ fileOpen: _, ...rest }) => ({ ...defaultSettings(), ...rest }))(raw.settings ?? {}),
   };
 }
 

@@ -8,7 +8,7 @@ import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMou
 import { createStore } from "solid-js/store";
 import { type Project, activeProject, focusTab, focusedTab, isRemote, projectById, space, tabName } from "./state";
 import { agentTarget } from "./agents";
-import { openFile } from "./files";
+import { filesOf, openFile } from "./files";
 import { FileIcon } from "./FileList";
 import { sendText } from "./terms";
 import { flash } from "./ui";
@@ -117,10 +117,10 @@ function Box(props: { project: Project }) {
     }
     return [...out];
   });
-  const openPaths = () => new Set(p.tabs.filter((t) => t.kind === "file" && t.path).map((t) => relTo(p, t.path!)));
+  const openPaths = () => new Set(p.tabs.flatMap(filesOf).map((f) => relTo(p, f)));
   const recentFiles = () => {
     const picked = recent.get(p.id) ?? [];
-    const fromTabs = p.tabs.filter((t) => t.kind === "file" && t.path).map((t) => relTo(p, t.path!)).filter((x): x is string => !!x);
+    const fromTabs = p.tabs.flatMap(filesOf).map((f) => relTo(p, f)).filter((x): x is string => !!x);
     return [...new Set([...picked, ...fromTabs])].filter((f) => fileSet().has(f)).slice(0, 5);
   };
 
@@ -176,7 +176,7 @@ function Box(props: { project: Project }) {
       focusTab(p.id, t.id);
       return flash(`typed @${it.path} into ${tabName(t)}, not sent`);
     }
-    openFile(p, join(p.path, it.path), focusedTab(p)?.id, how === "new");
+    openFile(p, join(p.path, it.path), { from: focusedTab(p)?.id, beside: how === "new", preview: how !== "new" });
   }
 
   const onKey = (e: KeyboardEvent) => {

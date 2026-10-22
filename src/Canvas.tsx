@@ -1,5 +1,5 @@
 import "./canvas.css";
-import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
 import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isTerminal, live, projectById, removePage,
   canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, toggleMono, visibleTabs,
@@ -15,8 +15,10 @@ import {
 import { Icon } from "./lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
 import IssuesPanel from "./IssuesPanel";
-import FileList from "./FileList";
-import FileView from "./FileView";
+import { dirtyCount, dropEditor } from "./files";
+
+/** CodeMirror and its languages load the first time an editor window opens. */
+const Editor = lazy(() => import("./Editor"));
 import GitPanel from "./GitPanel";
 import AgentsPanel from "./AgentsPanel";
 import { gitOf } from "./git";
@@ -165,11 +167,10 @@ export default function Canvas(props: { project: Project }) {
     const id = tab.id;
     const isBrowser = tab.kind === "browser";
     const isIssues = tab.kind === "issues";
-    const isFiles = tab.kind === "files";
-    const isFile = tab.kind === "file";
+    const isEditor = tab.kind === "editor";
     const isGit = tab.kind === "git";
     const isAgents = tab.kind === "agents";
-    const isPanel = isIssues || isFiles || isFile || isGit || isAgents;
+    const isPanel = isIssues || isEditor || isGit || isAgents;
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -217,8 +218,7 @@ export default function Canvas(props: { project: Project }) {
     const title = () =>
       isBrowser ? (browserInfo[pageId()]?.title ?? "")
       : isIssues ? panelTitle(repoOf(props.project))
-      : isFiles ? `${props.project.name} files`
-      : isFile ? ((tab.path ?? "").split("/").pop() ?? "")
+      : isEditor ? (tab.path ? `${tab.path.split("/").pop()}${dirtyCount(id) ? ` · ${dirtyCount(id)} modified` : ""}` : props.project.name)
       : isGit ? `${props.project.name} · ${gitOf(props.project.id).status?.branch ?? ""}`
       : isAgents ? "shared by every project"
       : (live[id]?.title ?? "");
@@ -410,7 +410,7 @@ export default function Canvas(props: { project: Project }) {
             class={`mark ${
               isBrowser ? "web"
               : isIssues ? `plane${dev[repoOf(props.project).id]?.syncing ? " syncing" : ""}`
-              : isFiles || isFile ? "files"
+              : isEditor ? "editor"
               : isGit ? "git"
               : isAgents ? "agents"
               : (live[id]?.status ?? "connecting")
@@ -509,10 +509,8 @@ export default function Canvas(props: { project: Project }) {
           </>
         ) : isIssues ? (
           <IssuesPanel project={repoOf(props.project)} home={props.project} tab={tab} focused={focused()} />
-        ) : isFiles ? (
-          <FileList project={props.project} tab={tab} focused={focused()} />
-        ) : isFile ? (
-          <FileView project={props.project} tab={tab} />
+        ) : isEditor ? (
+          <Editor project={props.project} tab={tab} focused={focused()} />
         ) : isGit ? (
           <GitPanel project={props.project} tab={tab} focused={focused()} />
         ) : isAgents ? (
@@ -596,8 +594,7 @@ export function requestClose(projectId: string, tabId: string): void {
   // Read the title first: removeTab drops the live entry.
   const title =
     tab.kind === "browser" ? browserInfo[activePage(tab)?.id ?? ""]?.title
-    : tab.kind === "file" ? tab.path
-    : tab.kind === "files" ? `${p.name} files`
+    : tab.kind === "editor" ? tab.path ?? p.name
     : tab.kind === "git" ? `${p.name} git`
     : isTerminal(tab) ? live[tabId]?.title
     : undefined;
@@ -607,6 +604,6 @@ export function requestClose(projectId: string, tabId: string): void {
       msg: `Closed ${tabName(tab)}${title ? " · " + title : ""}.`,
       undo: () => restoreTab(projectId, tab, index),
     },
-    () => (tab.kind === "browser" ? closeBrowser(tab) : isTerminal(tab) ? closeSession(tabId) : undefined),
+    () => (tab.kind === "browser" ? closeBrowser(tab) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : undefined),
   );
 }

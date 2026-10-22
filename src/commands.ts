@@ -16,7 +16,7 @@ import { setAboutOpen } from "./About";
 import { openProjectDialog } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./issues";
-import { openFilesPanel } from "./files";
+import { openEditor } from "./files";
 import { openGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { branchOf, openNewWorktree, removeWorktree } from "./worktrees";
@@ -97,7 +97,7 @@ export function sendWindow(p: Project, f: Tab, i: number) {
 }
 
 /** What a window is called in the palette: a file window by its file. */
-const windowTitle = (t: Tab) => (t.kind === "file" ? (t.path ?? "").split("/").pop() || "file" : tabName(t));
+const windowTitle = (t: Tab) => (t.kind === "editor" ? (t.path ?? "").split("/").pop() || "editor" : tabName(t));
 
 /** Every command that makes sense right now, in the order the empty palette lists them. */
 export function commands(): Command[] {
@@ -118,7 +118,7 @@ export function commands(): Command[] {
     add({ id: "term-like", group: "New", title: "New terminal like this one", icon: "copy-plus", keys: capsOf("term-like"), run: () => newTerminalLike(p, f) });
     add({ id: "browser", group: "New", title: "New browser", icon: "globe", keys: capsOf("browser"), run: () => { addTab(p.id, "browser"); flash("new browser"); } });
     add({ id: "issues", group: "New", title: "Issues", icon: "list-todo", keys: capsOf("issues"), run: () => openIssuePanel(p) });
-    add({ id: "files", group: "New", title: "Files", icon: "folder-tree", keys: capsOf("files"), run: () => void openFilesPanel(p) });
+    add({ id: "files", group: "New", title: "Editor", icon: "file-code", keys: capsOf("files"), run: () => void openEditor(p) });
     add({ id: "git", group: "New", title: "Git", icon: "git-branch", keys: capsOf("git"), run: () => void openGitPanel(p) });
     add({ id: "agents", group: "New", title: "Agents", hint: "edit the + menu", icon: "settings-2", keys: capsOf("agents"), run: () => void openAgentsPanel(p) });
     add({ id: "go-to-file", group: "New", title: "Go to file", icon: "search", keys: capsOf("go-to-file"), run: openGoToFile });
@@ -185,7 +185,7 @@ export function commands(): Command[] {
   if (p) {
     for (const t of p.tabs) {
       if (t.id === space(p).focus && t.space === p.ws) continue;
-      const detail = t.kind === "file" ? t.path : t.kind === "browser" ? activePage(t)?.url : live[t.id]?.title;
+      const detail = t.kind === "editor" ? t.path : t.kind === "browser" ? activePage(t)?.url : live[t.id]?.title;
       add({
         id: `tab:${t.id}`, group: "Go to window", title: windowTitle(t), icon: tabIcon(t),
         hint: [t.space === p.ws ? "" : `workspace ${t.space + 1}`, t.min ? "minimised" : "", detail].filter(Boolean).join(" · ") || undefined,

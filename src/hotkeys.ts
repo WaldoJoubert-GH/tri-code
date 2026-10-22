@@ -14,7 +14,7 @@ import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees"
 import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { openIssuePanel } from "./issues";
-import { ask, cancelAsk, openFilesPanel } from "./files";
+import { openEditor } from "./files";
 import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { agentForKey, launchAgent, newTerminalLike, openAgentsPanel, recording } from "./agents";
@@ -81,7 +81,7 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
       openIssuePanel(p);
       return true;
     case "files":
-      openFilesPanel(p);
+      openEditor(p);
       return true;
     case "go-to-file":
       toggleGoToFile();
@@ -163,7 +163,6 @@ function onKey(e: KeyboardEvent) {
     else if (newWorktreeOpen()) closeNewWorktree();
     else if (appearanceOpen()) closeAppearance();
     else if (settingsOpen()) closeSettings();
-    else if (ask()) cancelAsk();
     else if (signalsOpen()) closeSignals();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
