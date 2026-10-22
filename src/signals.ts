@@ -4,7 +4,8 @@
 // The reports travel in the pty, so they work locally and over ssh and shpool; tmux drops them.
 
 import { invoke } from "@tauri-apps/api/core";
-import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isPermissionGranted, onAction, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import {
   AgentState, AlertMode, Project, SoundEvent, Tab, app, focusTab, live, projectById, repoOf, setNotify, setProjectNotify, space, tabName,
 } from "./state";
@@ -144,10 +145,13 @@ export function forgetSounds(projectId: string) {
 
 let permission: Promise<boolean> | undefined;
 
-async function notify(title: string, body: string) {
+/** Which agent a desktop notification is about, carried in its `extra` so a click can go there. */
+type NotifyTarget = { projectId: string; tabId: string };
+
+async function notify(title: string, body: string, extra: NotifyTarget) {
   permission ??= (async () => (await isPermissionGranted()) || (await requestPermission()) === "granted")();
   try {
-    if (await permission) sendNotification({ title, body });
+    if (await permission) sendNotification({ title, body, extra });
   } catch (e) {
     console.warn("notification failed:", e);
   }
@@ -167,9 +171,27 @@ export function onSignal(projectId: string, t: Tab, state: AgentState, msg: stri
   void playFor(p, state);
   if (desktopFor(p)) {
     const title = live[t.id]?.title;
-    void notify(`${tabName(t)} ${WHAT[state]}`, [p.name, title, msg && msg !== title ? msg : ""].filter(Boolean).join(" · "));
+    void notify(`${tabName(t)} ${WHAT[state]}`, [p.name, title, msg && msg !== title ? msg : ""].filter(Boolean).join(" · "), { projectId, tabId: t.id });
   }
 }
+
+// A click on a notification raises the app and focuses the agent it was about. Notifications only
+// report clicks when a listener existed as they were shown, so listen from the start.
+onAction(async ({ actionId, notification }) => {
+  if (actionId !== "tap") return;
+  const { projectId, tabId } = (notification?.extra ?? {}) as Partial<NotifyTarget>;
+  const w = getCurrentWindow();
+  try {
+    await w.unminimize();
+    await w.show();
+    await w.setFocus();
+  } catch (e) {
+    console.warn("couldn't raise the window:", e);
+  }
+  const p = projectId ? projectById(projectId) : undefined;
+  if (!p || !p.tabs.some((t) => t.id === tabId)) return flash("that agent is gone");
+  focusTab(p.id, tabId!);
+}).catch((e) => console.warn("notification clicks unavailable:", e));
 
 /** Alt+U: the next agent that needs you, across projects: waiting for input first, then errors, then finished work. */
 export function nextSignal() {
