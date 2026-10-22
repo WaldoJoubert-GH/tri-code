@@ -1,10 +1,10 @@
 // The New Worktree dialog (Alt+W): a branch name, or an In Progress issue to name it after,
 // and the agent to open in the new checkout. Creating it runs `git worktree add` on the
-// project's host and switches to the Worktree.
+// project's host (or, for a folder that isn't a repo, copies it) and switches to the Worktree.
 
 import { For, Show, createSignal } from "solid-js";
 import { app, projectById, worktreesOf } from "./state";
-import { closeNewWorktree, createWorktree, issueBranch, newWorktreeFor, toBranch, worktreeDir } from "./worktrees";
+import { closeNewWorktree, createWorktree, issueBranch, kinds, newWorktreeFor, toBranch, worktreeDir } from "./worktrees";
 import { dev, inProgress, slugOf } from "./issues";
 import { gitOf } from "./git";
 import { Icon } from "./lucide";
@@ -23,6 +23,11 @@ export function NewWorktreeDialog() {
         const base = () => gitOf(repo.id).status?.base ?? "main";
         const issues = () => inProgress(repo.id);
         const taken = () => worktreesOf(repo.id).some((w) => w.branch === branch());
+        /** The repos inside a folder that isn't one, which a copy adds back as worktrees; null for a repo. */
+        const nested = () => {
+          const k = kinds[repo.id];
+          return k && !k.git ? k.repos : null;
+        };
 
         const create = async () => {
           if (!branch() || busy()) return;
@@ -89,8 +94,21 @@ export function NewWorktreeDialog() {
                   in it
                 </label>
                 <div class="where">
-                  <Show when={branch()} fallback={<span>git worktree add -b &lt;branch&gt; {worktreeDir(repo, "<branch>")} {base()}</span>}>
-                    git worktree add -b {branch()} {worktreeDir(repo, branch())} {base()}
+                  <Show when={kinds[repo.id]} fallback={<span>checking {repo.path}…</span>}>
+                    <Show
+                      when={nested()}
+                      fallback={<span>git worktree add -b {branch() || "<branch>"} {worktreeDir(repo, branch() || "<branch>")} {base()}</span>}
+                    >
+                      {(repos) => (
+                        <>
+                          <span>not a git repo: copy {repo.path} → {worktreeDir(repo, branch() || "<branch>")}</span>
+                          <Show when={repos().length}>
+                            <span>{repos().join(", ")}: git worktree add -b {branch() || "<branch>"}</span>
+                          </Show>
+                          <span>skips node_modules, target, .venv and other build folders: install again in the copy</span>
+                        </>
+                      )}
+                    </Show>
                   </Show>
                 </div>
                 <Show when={taken()}><div class="note">{branch()} already has a worktree; Create switches to it.</div></Show>

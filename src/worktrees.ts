@@ -2,6 +2,12 @@
 // (`<repo>.worktrees/<branch>`), so several agents can work on different branches at once.
 // A Worktree is a Project with a `parent`: its own windows, workspaces and signals, listed
 // under the repo's row in the sidebar. The backend is git_worktree_* in src-tauri/src/git.rs.
+//
+// A folder that is not a repo (several repos side by side, or no git at all) gets the same
+// thing by copying: the folder goes to the same `<folder>.worktrees/<branch>`, each repo nested
+// in it is added back as a git worktree on the branch, and finishing copies what changed outside
+// git back. The copying is folder_* in src-tauri/src/folders.rs. Chosen from
+// design/folder-worktrees.html; see ADR 0003.
 
 import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
@@ -23,6 +29,27 @@ const norm = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "").toLo
 const samePath = (gitPath: string, path: string) =>
   path.startsWith("~") ? norm(gitPath).endsWith(norm(path.slice(1))) : norm(gitPath) === norm(path);
 
+/** What a project's folder is, for New worktree: a repo, or a folder to copy with the repos nested in it. Runtime only. */
+export type FolderKind = { git: true } | { git: false; repos: string[] };
+export const [kinds, setKinds] = createStore<Record<string, FolderKind>>({});
+
+/** Ask the project's host whether its folder is a repo and, if not, which repos are inside it. */
+export async function scanFolder(repo: Project): Promise<FolderKind> {
+  try {
+    setListed(repo.id, await invoke<GitWorktree[]>("git_worktrees", { host: repo.host, path: repo.path }));
+    setKinds(repo.id, { git: true });
+  } catch {
+    const repos = await invoke<string[]>("folder_repos", { host: repo.host, path: repo.path });
+    setKinds(repo.id, { git: false, repos });
+  }
+  return kinds[repo.id];
+}
+
+/** A Worktree of a folder that isn't a repo: a copy. */
+export const isCopy = (p: Project) => !!p.copy;
+
+const join = (dir: string, rel: string) => `${dir.replace(/[\\/]+$/, "")}/${rel}`;
+
 export async function loadWorktrees(repo: Project): Promise<void> {
   try {
     setListed(repo.id, await invoke<GitWorktree[]>("git_worktrees", { host: repo.host, path: repo.path }));
@@ -33,6 +60,8 @@ export async function loadWorktrees(repo: Project): Promise<void> {
 
 /** The branch a checkout is on, as git last said, else the one it was made for. */
 export function branchOf(p: Project): string {
+  // A folder that isn't a repo has no branch; its copies do.
+  if (!p.parent && (kinds[p.id]?.git === false || worktreesOf(p.id).some(isCopy))) return "base";
   const hit = listed[repoOf(p).id]?.find((w) => samePath(w.path, p.path));
   if (hit) return hit.branch ?? "detached";
   return p.branch ?? gitOf(p.id).status?.branch ?? "main";
@@ -70,7 +99,7 @@ export const newWorktreeOpen = () => newWorktreeFor() !== null;
 
 export function openNewWorktree(p: Project) {
   const repo = repoOf(p);
-  void loadWorktrees(repo);
+  void scanFolder(repo).catch(() => {});
   setNewWorktreeFor(repo.id);
 }
 export const closeNewWorktree = () => setNewWorktreeFor(null);
@@ -86,17 +115,95 @@ export async function createWorktree(repo: Project, branch: string, opts: { base
     return;
   }
   const dir = worktreeDir(repo, branch);
-  await invoke("git_worktree_add", { host: repo.host, path: repo.path, dir, branch, base: opts.base });
-  const id = addWorktree(repo.id, { path: dir, branch, issue: opts.issue });
+  const kind = kinds[repo.id] ?? (await scanFolder(repo));
+  let copy: { repos: string[] } | undefined;
+  if (kind.git) {
+    await invoke("git_worktree_add", { host: repo.host, path: repo.path, dir, branch, base: opts.base });
+  } else {
+    copy = { repos: await copyFolder(repo, dir, branch, kind.repos) };
+  }
+  const id = addWorktree(repo.id, { path: dir, branch, issue: opts.issue, ...(copy ? { copy } : {}) });
   const p = projectById(id);
   if (p && opts.agent) launchAgent(p, opts.agent);
-  flash(`worktree ${branch} · ${dir}`);
+  flash(`${copy ? "copy" : "worktree"} ${branch} · ${dir}`);
   void loadWorktrees(repo);
 }
 
-/** Close a Worktree's windows, delete its folder and, if it is merged or you agree, its branch. */
+/** Copy `repo`'s folder to `dir` without its nested repos, then add each back as a git worktree on
+ *  `branch` (from what that repo has checked out). Returns the repos that made it. */
+async function copyFolder(repo: Project, dir: string, branch: string, repos: string[]): Promise<string[]> {
+  await invoke("folder_copy", { host: repo.host, src: repo.path, dest: dir, skip: repos });
+  const made: string[] = [];
+  for (const r of repos) {
+    try {
+      await invoke("git_worktree_add", { host: repo.host, path: join(repo.path, r), dir: join(dir, r), branch, base: "HEAD" });
+      made.push(r);
+    } catch (e) {
+      flash(`${r}: git worktree add: ${e}`);
+    }
+  }
+  return made;
+}
+
+/** What finishing a copy would carry back to its folder (folders.rs `Changes`). */
+type Changes = { changed: string[]; deleted: string[]; conflicts: string[] };
+
+const listed8 = (files: string[]) => files.slice(0, 8).map((f) => `\n  ${f}`).join("") + (files.length > 8 ? `\n  …and ${files.length - 8} more` : "");
+
+/** Finish a copy: copy what changed outside git back to the folder (asking about files changed on
+ *  both sides), remove the nested repos' worktrees, delete the copy. */
+async function finishCopy(p: Project, repo: Project): Promise<void> {
+  const repos = p.copy?.repos ?? [];
+  const branch = p.branch ?? "";
+  const dirty: string[] = [];
+  for (const r of repos) {
+    const n = await invoke<{ files: unknown[] }>("git_status", { host: p.host, path: join(p.path, r) }).then((s) => s.files.length, () => 0);
+    if (n) dirty.push(`${r} (${n})`);
+  }
+  let ch: Changes;
+  try {
+    ch = await invoke<Changes>("folder_changes", { host: p.host, src: repo.path, dest: p.path, skip: repos });
+  } catch (e) {
+    if (!confirm(`Can't tell what changed in ${p.path} (${e}). Delete the copy anyway, copying nothing back?`)) return;
+    ch = { changed: [], deleted: [], conflicts: [] };
+  }
+  const what = [
+    p.tabs.length ? `close its ${p.tabs.length} window${p.tabs.length > 1 ? "s" : ""}` : "",
+    ch.changed.length ? `copy ${ch.changed.length} file${ch.changed.length > 1 ? "s" : ""} back to ${repo.name}:${listed8(ch.changed)}\n` : "",
+    ch.deleted.length ? `delete ${ch.deleted.length} file${ch.deleted.length > 1 ? "s" : ""} the copy deleted:${listed8(ch.deleted)}\n` : "",
+    repos.length ? `remove the worktrees of ${repos.join(", ")} (branch ${branch} stays where it isn't merged)` : "",
+    dirty.length ? `throw away uncommitted changes in ${dirty.join(", ")}` : "",
+    `delete ${p.path}`,
+  ].filter(Boolean).join("; ");
+  if (!confirm(`Finish ${branch}? This will ${what}.`)) return;
+  // Changed on both sides: no git to merge them, so one side wins.
+  const theirs = ch.conflicts.length && confirm(
+    `${ch.conflicts.length} file${ch.conflicts.length > 1 ? "s" : ""} changed in ${repo.name} too since the copy was made:${listed8(ch.conflicts)}\n\nOK keeps the copy's version. Cancel keeps ${repo.name}'s.`,
+  ) ? ch.conflicts : [];
+
+  if (app.activeProject === p.id) setApp("activeProject", repo.id);
+  dropProject(p);
+  await new Promise((r) => setTimeout(r, 300));
+  const kept: string[] = [];
+  for (const r of repos) {
+    const path = join(repo.path, r);
+    await invoke("git_worktree_remove", { host: repo.host, path, dir: join(p.path, r), force: true }).catch((e) => flash(`${r}: git worktree remove: ${e}`));
+    await invoke("git_branch_delete", { host: repo.host, path, branch, force: false }).catch(() => kept.push(r));
+  }
+  try {
+    await invoke("folder_finish", { host: repo.host, src: repo.path, dest: p.path, files: [...ch.changed, ...theirs], delete: ch.deleted });
+  } catch (e) {
+    return flash(`finishing ${branch}: ${e}. ${p.path} is still there.`);
+  }
+  const back = ch.changed.length + theirs.length + ch.deleted.length;
+  flash([`finished ${branch}`, back ? `${back} file${back > 1 ? "s" : ""} back in ${repo.name}` : "", kept.length ? `${branch} kept in ${kept.join(", ")} (not merged)` : ""].filter(Boolean).join(" · "));
+}
+
+/** Close a Worktree's windows, delete its folder and, if it is merged or you agree, its branch.
+ *  A copy is finished instead (see finishCopy). */
 export async function removeWorktree(p: Project): Promise<void> {
   const repo = projectById(p.parent ?? "");
+  if (repo && p.copy) return finishCopy(p, repo);
   if (!repo) return;
   const branch = branchOf(p);
   let dirty = 0;

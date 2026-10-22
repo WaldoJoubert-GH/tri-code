@@ -9,6 +9,7 @@ import {
   AgentState, AlertMode, Project, SoundEvent, Tab, app, focusTab, live, projectById, repoOf, setNotify, setProjectNotify, space, tabName,
 } from "./state";
 import { flash } from "./ui";
+import { keyOf } from "./keymap";
 
 /** What a window signals now. `working` only badges the tab strip, title bar and status line. */
 export type Sig = AgentState;
@@ -179,7 +180,7 @@ export function nextSignal() {
   const hit = all[0];
   if (!hit) return flash("no agent needs you");
   focusTab(hit.p.id, hit.t.id);
-  flash(`${hit.p.name} · ${tabName(hit.t)} ${SIG_TEXT[hit.s!]}${all.length > 1 ? ` · ${all.length - 1} more (Alt+U)` : ""}`);
+  flash(`${hit.p.name} · ${tabName(hit.t)} ${SIG_TEXT[hit.s!]}${all.length > 1 ? ` · ${all.length - 1} more${keyOf("next-signal") ? ` (${keyOf("next-signal")})` : ""}` : ""}`);
 }
 
 export function toggleDnd() {

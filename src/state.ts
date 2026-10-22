@@ -4,8 +4,10 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type TabKind = "term" | "browser" | "issues" | "files" | "file" | "git" | "agents";
 
-/** An Alt chord, matched on e.code like every window binding. Alt is implied. */
+/** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
+/** A key of a Keymap action: a Hotkey, or with `bare` a plain Ctrl / Cmd (`meta`) chord, as the text keys are. */
+export type Chord = Hotkey & { meta?: boolean; bare?: boolean };
 
 /** An app the New Window Menu offers: a terminal app (claude, pi, a shell, lazygit, ...) or, with a
  *  `url`, a web app that opens a browser window there. Global, not per project. */
@@ -158,6 +160,9 @@ export type Project = {
   branch?: string;
   /** A Worktree only: the Slug-ID of the issue it was made for, if any. */
   issue?: string;
+  /** A Worktree of a folder that is not a git repo: a copy of the folder. `repos` are the repos
+   *  nested in it, each added back as a git worktree on `branch` (see worktrees.ts). */
+  copy?: { repos: string[] };
   /** The tour's sample project: its terminals are scripted, and it can be closed with nothing lost. */
   sample?: boolean;
 };
@@ -218,9 +223,13 @@ export type Settings = {
   /** Carousel (mono) layout: px each side of the centred window, where its neighbours peek.
    *  Unset is auto: the window takes 62% of the width, up to MONO_MAX. */
   monoGutter?: number;
+  /** The key window hotkeys start with (modkey.ts). */
+  modKey: "alt" | "meta";
+  /** Keymap actions whose keys were changed, by action id (keymap.ts); the rest keep their defaults. */
+  hotkeys?: Record<string, Chord[]>;
 };
 
-const defaultSettings = (): Settings => ({ fileOpen: "ask" });
+const defaultSettings = (): Settings => ({ fileOpen: "ask", modKey: "alt" });
 
 export type TabStatus = "connecting" | "running" | "reconnecting" | "exited";
 
@@ -315,7 +324,7 @@ export function addSampleProject(path: string): string {
 }
 
 /** Add a Worktree under `parentId` and make it active. Returns its id. */
-export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string }): string {
+export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string; copy?: { repos: string[] } }): string {
   const id = newId();
   setApp(produce((s) => {
     const parent = s.projects.find((p) => p.id === parentId);
@@ -328,7 +337,7 @@ export function addWorktree(parentId: string, w: { path: string; branch: string;
     s.projects.splice(at, 0, {
       id, name: w.branch, host: parent.host, path: w.path, tabs: [], ws: 0,
       spaces: Array.from({ length: SPACES }, newSpace), accent, bg: "none", dim: 0, favs: [...parent.favs],
-      parent: parentId, branch: w.branch, ...(w.issue ? { issue: w.issue } : {}),
+      parent: parentId, branch: w.branch, ...(w.issue ? { issue: w.issue } : {}), ...(w.copy ? { copy: w.copy } : {}),
     });
     s.activeProject = id;
   }));
@@ -668,6 +677,16 @@ export function setSettings(patch: Partial<Settings>) {
   setApp(produce((s) => Object.assign(s.settings, patch)));
 }
 
+/** Change an action's keys; undefined goes back to its defaults. */
+export function setHotkeys(id: string, keys: Chord[] | undefined) {
+  setApp(produce((s) => {
+    const h = (s.settings.hotkeys ??= {});
+    if (keys) h[id] = keys;
+    else delete h[id];
+    if (!Object.keys(h).length) delete s.settings.hotkeys;
+  }));
+}
+
 export function addAgent(agent: Agent) {
   setApp(produce((s) => { s.agents.push(agent); }));
 }
@@ -728,7 +747,7 @@ function migrate(raw: any): Persisted {
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
       favs: p.favs ?? [], icon: p.icon, notify: p.notify,
-      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue } : {}),
+      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.copy ? { copy: p.copy } : {}) } : {}),
       ...(p.sample ? { sample: true } : {}),
     };
   });

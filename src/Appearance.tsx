@@ -10,6 +10,7 @@ import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogo
 import { Icon, toggleIconPicker } from "./lucide";
 import { SignalsForm } from "./SignalSettings";
 import { flash } from "./ui";
+import { keyOf } from "./keymap";
 
 const tint = (a: string, p: number) => `color-mix(in srgb, ${a} ${p}%, transparent)`;
 
@@ -206,7 +207,7 @@ export function AppearancePopover() {
                     <input type="range" min="0" max="85" step="5" value={String(p.dim)} onInput={(e) => setAppearance(p.id, { dim: +e.currentTarget.value })} />
                     <span class="val">{p.dim}%</span>
                   </div>
-                  <label class="row" title="Between windows, in every project (Alt+, / Alt+.)">
+                  <label class="row" title={`Between windows, in every project${keyOf("gap-less") || keyOf("gap-more") ? ` (${[keyOf("gap-less"), keyOf("gap-more")].filter(Boolean).join(" / ")})` : ""}`}>
                     Gap
                     <span class="px">
                       <input

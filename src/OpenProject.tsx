@@ -12,7 +12,9 @@ import { Icon } from "./lucide";
 import { autoIcon } from "./icons";
 import { flash } from "./ui";
 
-type DirList = { path: string; dirs: string[]; repos: string[]; drives: string[] };
+type DirList = { path: string; dirs: string[]; repos: string[]; drives: string[]; workspaces: string[] };
+/** A row of the folder list: a folder, or a `.code-workspace` file (`ws`). */
+type Entry = { name: string; ws?: boolean };
 
 /** The selected environment, or NEW for the New environment form. */
 const NEW = "+";
@@ -44,6 +46,9 @@ function open(host: string, path: string) {
   }
   closeOpenProject();
 }
+
+/** A VS Code `.code-workspace` file opens the folder that holds it, as a plain project. */
+const dirOf = (file: string) => file.replace(/[\\/][^\\/]*$/, "") || "/";
 
 export function OpenProjectDialog() {
   return (
@@ -99,13 +104,13 @@ function FolderPane(props: { host: string }) {
             </For>
           </div>
         </Show>
-        <FolderPicker host={props.host} onOpen={(path) => open(props.host, path)} />
+        <FolderPicker host={props.host} onOpen={(path) => open(props.host, path)} onOpenWorkspace={(file) => open(props.host, dirOf(file))} />
       </div>
     </Show>
   );
 }
 
-function FolderPicker(props: { host: string; onOpen: (path: string) => void }) {
+function FolderPicker(props: { host: string; onOpen: (path: string) => void; onOpenWorkspace: (file: string) => void }) {
   const [list, setList] = createSignal<DirList>();
   const [error, setError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
@@ -131,16 +136,20 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void }) {
   onMount(() => go("~"));
 
   const isPath = () => /^[~/]/.test(q()) || /^[a-zA-Z]:([\\/]|$)/.test(q());
-  /** Folders matching the filter, prefix matches first. */
-  const shown = () => {
+  /** `.code-workspace` files first, then folders, matching the filter, prefix matches first. */
+  const shown = (): Entry[] => {
     const l = list();
     if (!l) return [];
+    const all = [...(l.workspaces ?? []).map((name) => ({ name, ws: true })), ...l.dirs.map((name) => ({ name }))];
     const f = q().toLowerCase();
-    if (!f || isPath()) return l.dirs;
-    return l.dirs
-      .filter((d) => d.toLowerCase().includes(f))
-      .sort((a, b) => Number(b.toLowerCase().startsWith(f)) - Number(a.toLowerCase().startsWith(f)));
+    if (!f || isPath()) return all;
+    return all
+      .filter((d) => d.name.toLowerCase().includes(f))
+      .sort((a, b) => Number(b.name.toLowerCase().startsWith(f)) - Number(a.name.toLowerCase().startsWith(f)));
   };
+  /** Go into a folder, or open a workspace file. */
+  const enter = (e: Entry) => (e.ws ? props.onOpenWorkspace(into(e.name)) : go(into(e.name)));
+  const use = (e: Entry) => (e.ws ? props.onOpenWorkspace(into(e.name)) : props.onOpen(into(e.name)));
   const isRepo = (d: string) => list()?.repos.includes(d) ?? false;
   const into = (d: string) => join(list()!.path, d);
   const crumbs = () => {
@@ -156,13 +165,13 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void }) {
     const s = shown(), cur = s[sel()];
     if (e.key === "ArrowDown") setSel(Math.min(sel() + 1, s.length - 1));
     else if (e.key === "ArrowUp") setSel(Math.max(sel() - 1, 0));
-    else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { if (cur) props.onOpen(into(cur)); }
+    else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { if (cur) use(cur); }
     else if (e.key === "Enter") {
       if (isPath()) go(q());
-      else if (q() && cur) go(into(cur));
+      else if (q() && cur) enter(cur);
       else if (!q() && list()) props.onOpen(list()!.path);
     }
-    else if ((e.key === "Tab" || (e.key === "ArrowRight" && input?.selectionStart === q().length)) && cur && !isPath()) go(into(cur));
+    else if ((e.key === "Tab" || (e.key === "ArrowRight" && input?.selectionStart === q().length)) && cur && !cur.ws && !isPath()) go(into(cur.name));
     else if (e.key === "Backspace" && !q() && list()) go(join(list()!.path, ".."));
     else return;
     e.preventDefault();
@@ -209,11 +218,12 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void }) {
           <Show when={list()} fallback={<div class="note">{isLocalHost(props.host) ? "Loading…" : `Connecting to ${props.host}…`}</div>}>
             <For each={shown()} fallback={<div class="note">{q() && !isPath() ? `No folder matches “${q()}”` : isPath() ? "Enter jumps to that path" : "No subfolders"}</div>}>
               {(d, i) => (
-                <div class="row" classList={{ sel: i() === sel() }} onClick={() => go(into(d))} onMouseMove={() => setSel(i())}>
-                  <span class="ic">▸</span>
-                  <span class="nm">{d}</span>
-                  <Show when={isRepo(d)}><span class="git">git</span></Show>
-                  <button type="button" class="use" onClick={(e) => (e.stopPropagation(), props.onOpen(into(d)))}>open</button>
+                <div class="row" classList={{ sel: i() === sel(), ws: d.ws }} onClick={() => enter(d)} onMouseMove={() => setSel(i())}>
+                  <span class="ic">{d.ws ? <Icon name="braces" size={11} /> : "▸"}</span>
+                  <span class="nm">{d.name}</span>
+                  <Show when={isRepo(d.name) && !d.ws}><span class="git">git</span></Show>
+                  <Show when={d.ws}><span class="git" title="A VS Code workspace: opens the folder it is in">workspace</span></Show>
+                  <button type="button" class="use" onClick={(e) => (e.stopPropagation(), use(d))}>open</button>
                 </div>
               )}
             </For>

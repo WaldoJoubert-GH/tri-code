@@ -11,6 +11,7 @@ import { AgentState, Live, Project, Tab, TabStatus, isRemote, isTerminal, live, 
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
 import { Demo, playDemo } from "./demo";
+import { isKey } from "./keymap";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;
@@ -143,7 +144,7 @@ class TermSession {
         this.term.input("\x1b\r");
         return false;
       }
-      if (mod && e.code === "KeyC" && this.term.hasSelection()) {
+      if (isKey("copy", e) && this.term.hasSelection()) {
         copyText(this.term.getSelection());
         return false;
       }
@@ -151,7 +152,7 @@ class TermSession {
         copyText(this.term.getSelection());
         return false;
       }
-      if ((mod && e.code === "KeyV") || (e.shiftKey && e.code === "Insert")) {
+      if (isKey("paste", e) || (e.shiftKey && e.code === "Insert")) {
         // The browser may still fire a paste event for this keystroke. Mark it so
         // the listener below drops that event instead of pasting twice.
         this.ownPasteAt = performance.now();
@@ -334,6 +335,10 @@ class TermSession {
     }
   }
 
+  hasSelection() {
+    return this.term.hasSelection();
+  }
+
   focus() {
     this.term.focus();
   }
@@ -437,6 +442,11 @@ export function unmountSession(tabId: string): void {
   if (!s) return;
   s.setVisible(false);
   parkElement().appendChild(s.el);
+}
+
+/** Is text selected in a tab's terminal? */
+export function hasSelection(tabId: string): boolean {
+  return sessions.get(tabId)?.hasSelection() ?? false;
 }
 
 export function focusSession(tabId: string): void {

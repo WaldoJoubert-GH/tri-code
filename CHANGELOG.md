@@ -2,6 +2,15 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.28 — 2026-10-21
+
+- Worktrees for any folder. New worktree on a folder that isn't a git repo (several repos side by side, or no git at all) copies it to `<folder>.worktrees/<branch>`, so it shows and works like any other worktree; the folder's own row reads `base`. Each repo inside it becomes a git worktree on the same branch, and `node_modules`, `target`, `.venv` and other build folders are skipped, so install again in the copy. Finish (the × on its row) copies the files that changed outside git back, asks which side wins for a file changed in both, removes the nested worktrees (a branch that isn't merged stays) and deletes the copy.
+- Open project lists VS Code `.code-workspace` files above the folders; opening one opens the folder it is in.
+- Every hotkey can be changed in Settings › Hotkeys (the `?` button, or `Alt+/`): pick whether window hotkeys start with `Alt` or `Cmd` / `Win` / `Super`, click a key to rebind it, `+` to add another, Swap when the key is taken, and ↺ or Reset all to go back. It replaces the old hotkey overlay.
+- Settings is now a dialog with General, Windows and Hotkeys pages.
+- Closing a window is now `Alt+W`, and New worktree `Alt+Shift+W`.
+- macOS builds are signed ad hoc, so Gatekeeper no longer reports them as damaged. On macOS the menu bar keeps only About, Quit and Edit, so `Cmd+W`, `Cmd+M` and `Cmd+H` stay free for hotkeys when Cmd is the modifier.
+
 ## 0.1.27 — 2026-10-21
 
 - The status line shows the active project's branch on the left: `*` when it has uncommitted changes, ↑/↓ against its upstream, and counts like `git status --short` (`+` added, `~` modified, `−` deleted, `?` untracked). Hover for the files, click to open the git window. It refreshes when you switch project, when tri-code regains focus, and every 10s (30s over ssh).

@@ -10,6 +10,7 @@ import { openProjectDialog } from "./OpenProject";
 import { dropProject } from "./Sidebar";
 import { askDemo } from "./terms";
 import { flash } from "./ui";
+import { Caps } from "./Keys";
 
 const [step, setStep] = createSignal(0);
 /** "tour" while walking the stops, "end" for the closing card. */
@@ -50,7 +51,7 @@ const STOPS: Stop[] = [
   {
     target: () => "#spaces", side: "below", title: "Four workspaces per project",
     body: () => <>Each is a canvas of its own windows. Here claude, a dev server and the files are on 1, and pi is waiting on 2.</>,
-    try: { label: () => <>Press <K k={["Alt", "2"]} /> to look, then <K k={["Alt", "1"]} /> to come back</>, done: (p) => p.ws !== 0 },
+    try: { label: () => <>Press <Caps id="ws-2" /> to look, then <Caps id="ws-1" /> to come back</>, done: (p) => p.ws !== 0 },
   },
   {
     target: () => ".top .tabs", side: "below", title: "Windows tile themselves",
@@ -59,8 +60,8 @@ const STOPS: Stop[] = [
   },
   {
     target: () => "#where", side: "below", avoid: ".gtf", title: "Find any file",
-    body: () => <>Click the project path, or press <K k={["Alt", "T"]} />, and type a few letters of a file name. <K k={["Enter"]} /> opens it in a file window; <K k={["Shift", "Enter"]} /> types <code>@path</code> into the agent instead.</>,
-    try: { label: () => <>Press <K k={["Alt", "T"]} /> and open <code>Settings.tsx</code></>, done: (p, b) => p.tabs.filter((t) => t.kind === "file").map((t) => t.path).join("|") !== b.files },
+    body: () => <>Click the project path, or press <Caps id="go-to-file" />, and type a few letters of a file name. <K k={["Enter"]} /> opens it in a file window; <K k={["Shift", "Enter"]} /> types <code>@path</code> into the agent instead.</>,
+    try: { label: () => <>Press <Caps id="go-to-file" /> and open <code>Settings.tsx</code></>, done: (p, b) => p.tabs.filter((t) => t.kind === "file").map((t) => t.path).join("|") !== b.files },
   },
   {
     target: (p) => `.win[data-tab="${demoTab(p, "claude")?.id}"] .bar`, side: "below", title: "Agents say what they're doing",
@@ -68,12 +69,12 @@ const STOPS: Stop[] = [
   },
   {
     target: () => ".status .sigs", side: "above", title: "Never miss one waiting on you",
-    body: () => <>The status line counts agents across every project. When one you aren't looking at needs you, tri-code plays a sound and shows a notification, and <K k={["Alt", "U"]} /> takes you to it.</>,
+    body: () => <>The status line counts agents across every project. When one you aren't looking at needs you, tri-code plays a sound and shows a notification, and <Caps id="next-signal" /> takes you to it.</>,
     try: {
       label: () => (
         <>
           <button class="g-btn" onClick={() => { const t = sample() && demoTab(sample()!, "pi"); if (t) askDemo(t.id); }}>Make pi ask</button>{" "}
-          then press <K k={["Alt", "U"]} /> and answer <kbd>y</kbd>
+          then press <Caps id="next-signal" /> and answer <kbd>y</kbd>
         </>
       ),
       done: (p, b) => {
@@ -85,12 +86,12 @@ const STOPS: Stop[] = [
   {
     target: () => "#themeBtn", side: "below", avoid: ".pop", title: "Make each project yours",
     body: () => <>Name, icon, accent colour and background, per project, so you can tell them apart at a glance. tri-code starts with the project's own logo when it finds one.</>,
-    try: { label: () => <>Press <K k={["Alt", "P"]} /> and pick an accent colour</>, done: (p, b) => p.accent !== b.accent },
+    try: { label: () => <>Press <Caps id="appearance" /> and pick an accent colour</>, done: (p, b) => p.accent !== b.accent },
   },
   {
     target: () => "#palBtn", side: "below", avoid: ".pal", title: "Everything has a name",
-    body: () => <><K k={["Alt", "X"]} /> runs any command by name: new windows, layouts, projects, worktrees, this tour. <K k={["Alt", "/"]} /> lists every key.</>,
-    try: { label: () => <>Press <K k={["Alt", "X"]} /></>, done: () => paletteOpen() },
+    body: () => <><Caps id="palette" /> runs any command by name: new windows, layouts, projects, worktrees, this tour. <Caps id="help" /> lists every key.</>,
+    try: { label: () => <>Press <Caps id="palette" /></>, done: () => paletteOpen() },
   },
 ];
 
@@ -224,12 +225,12 @@ export function Tour() {
             <h3>Now open your own</h3>
             <p>
               Pick a folder on this computer or on a server you reach over ssh. The <b>tour</b> project stays in the
-              sidebar until you close it; <K k={["Alt", "X"]} /> › Take the tour replays this.
+              sidebar until you close it; <Caps id="palette" /> › Take the tour replays this.
             </p>
             <div class="row">
               <button class="g-btn quiet" onClick={() => { const p = sample(); setMode(null); if (p) dropProject(p); }}>Close the tour project</button>
               <button class="g-btn" onClick={() => void startTour()}>Replay</button>
-              <button class="g-btn primary" onClick={() => { setMode(null); openProjectDialog(); }}>Open project <K k={["Alt", "O"]} /></button>
+              <button class="g-btn primary" onClick={() => { setMode(null); openProjectDialog(); }}>Open project <Caps id="open-project" /></button>
             </div>
           </div>
         </div>

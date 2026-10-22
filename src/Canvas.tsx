@@ -6,6 +6,8 @@ import {
 } from "./state";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
+import { isKey, withKey } from "./keymap";
+import { Caps } from "./Keys";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
   normalizeUrl, openExternal, pickElement, placeBrowser, setBrowsersSuspended,
@@ -389,7 +391,7 @@ export default function Canvas(props: { project: Project }) {
         onPointerDown={() => focusTab(props.project.id, id)}
         onKeyDown={(e) => {
           // Ctrl+D while the window's own HTML (address, bar) has focus; the webview keeps its own keys.
-          if (isBrowser && e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyD") {
+          if (isBrowser && isKey("favourite", e)) {
             e.preventDefault();
             star();
           }
@@ -453,9 +455,9 @@ export default function Canvas(props: { project: Project }) {
               <Icon name={showAddr() ? "chevron-up" : "ellipsis"} size={13} />
             </button>
           </Show>
-          <button class="mn" title="Minimise (Alt+N)" onClick={() => minimiseTab(props.project.id, id)}>–</button>
-          <button title="Maximize (Alt+F)" onClick={doMax}>▢</button>
-          <button title="Close (Alt+Q)" onClick={() => requestClose(props.project.id, id)}>×</button>
+          <button class="mn" title={withKey("Minimise", "minimise")} onClick={() => minimiseTab(props.project.id, id)}>–</button>
+          <button title={withKey("Maximize", "maximize")} onClick={doMax}>▢</button>
+          <button title={withKey("Close", "close")} onClick={() => requestClose(props.project.id, id)}>×</button>
           <Show when={bare()}>{loadBar()}</Show>
         </div>
         {isBrowser ? (
@@ -478,7 +480,7 @@ export default function Canvas(props: { project: Project }) {
                   ref={starEl}
                   aria-pressed={isFav()}
                   disabled={blank()}
-                  title={isFav() ? "Edit favourite (Ctrl+D)" : "Favourite this page (Ctrl+D)"}
+                  title={withKey(isFav() ? "Edit favourite" : "Favourite this page", "favourite")}
                   onClick={star}
                 >
                   {isFav() ? "★" : "☆"}
@@ -545,8 +547,8 @@ export default function Canvas(props: { project: Project }) {
           fallback={
             <div class="empty">
               <b>Workspace {props.project.ws + 1} of {props.project.name} is empty</b>
-              <div><kbd>Alt</kbd><kbd>Enter</kbd> opens a shell here</div>
-              <div><kbd>Alt</kbd><kbd>Shift</kbd><kbd>{props.project.ws + 1}</kbd> sends the focused window here</div>
+              <div><Caps id="term-like" /> opens a shell here</div>
+              <div><Caps id={`send-${props.project.ws + 1}`} /> sends the focused window here</div>
             </div>
           }
         >
@@ -554,7 +556,7 @@ export default function Canvas(props: { project: Project }) {
             <div class="empty">
               <b>{n() === 1 ? "The window here is" : `All ${n()} windows here are`} minimised</b>
               <div>Click a dimmed tab in the toolbar to bring one back</div>
-              <div><kbd>Alt</kbd><kbd>Shift</kbd><kbd>N</kbd> brings back the last one</div>
+              <div><Caps id="restore-last" /> brings back the last one</div>
             </div>
           )}
         </Show>

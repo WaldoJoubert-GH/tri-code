@@ -1,11 +1,15 @@
-// App-wide settings: the Settings button at the foot of the sidebar opens this popover beside it.
-// Settings are also changed where they matter: what opening a file does is asked the first time a
-// second file is opened (FileView's ask card) and is in the ⋯ menu of every file window.
-// Chosen from design/settings.html (variant D), with the settings button moved to the sidebar.
+// App-wide settings: a dialog with a page per topic. The Settings button at the foot of the
+// sidebar opens it on the page used last; the toolbar's ? button and the "help" hotkey open the
+// Hotkeys page. Settings are also changed where they matter: what opening a file does is asked
+// the first time a second file is opened (FileView's ask card) and is in the ⋯ menu of every
+// file window. Chosen from design/settings-hotkeys.html.
 
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { type FileOpen, GAP_MAX, app, setGap, setMonoGutter } from "./state";
 import { setFileOpen } from "./files";
+import { keyOf } from "./keymap";
+import { Icon } from "./lucide";
+import { HotkeysPage } from "./HotkeySettings";
 
 /** The modes in menu order, each with its short name and what it does. */
 export const FILE_OPEN: { mode: FileOpen; name: string; help: string }[] = [
@@ -16,73 +20,122 @@ export const FILE_OPEN: { mode: FileOpen; name: string; help: string }[] = [
   { mode: "preview", name: "Preview", help: "One preview window that the next file replaces. Keep it, or edit it, and the next file opens a new preview." },
 ];
 
-const [anchor, setAnchor] = createSignal<HTMLElement | null>(null);
-export const settingsOpen = () => anchor() !== null;
-export const closeSettings = () => setAnchor(null);
+export type SettingsPage = "general" | "windows" | "hotkeys";
 
-/** Open beside `el` (the sidebar button), or beside wherever that button is when opened from the palette. */
-export function toggleSettings(el?: HTMLElement | null) {
-  if (settingsOpen()) return closeSettings();
-  setAnchor(el ?? document.getElementById("settingsBtn") ?? document.body);
+const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
+  { page: "general", name: "General", icon: "file-text" },
+  { page: "windows", name: "Windows", icon: "layout-panel-left" },
+  { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
+];
+
+const [page, setPage] = createSignal<SettingsPage | null>(null);
+let lastPage: SettingsPage = "general";
+
+export const settingsOpen = () => page() !== null;
+export const hotkeysOpen = () => page() === "hotkeys";
+
+export function closeSettings() {
+  if (page()) lastPage = page()!;
+  setPage(null);
 }
 
-/** Beside the button, bottom edges level, kept on screen. */
-function place(el: HTMLElement, a: HTMLElement) {
-  const r = a.getBoundingClientRect(), h = el.offsetHeight;
-  el.style.left = `${Math.min(r.right + 10, window.innerWidth - el.offsetWidth - 8)}px`;
-  el.style.top = `${Math.max(8, Math.min(r.bottom - h, window.innerHeight - h - 8))}px`;
+/** Open on `page`, or the page used last. */
+export function openSettings(p?: SettingsPage) {
+  setPage(p ?? lastPage);
 }
 
-/** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
-export function SettingsPopover() {
-  const onDown = (e: PointerEvent) => {
-    if (settingsOpen() && !(e.target as Element).closest(".pop.settings, #settingsBtn")) closeSettings();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
+/** The sidebar button, the palette and a file window's ⋯ menu: open on the last page, or close. */
+export function toggleSettings() {
+  if (settingsOpen()) closeSettings();
+  else openSettings();
+}
 
+/** The ? button and the "help" hotkey: open on Hotkeys, or close it. */
+export function toggleHotkeys() {
+  if (hotkeysOpen()) closeSettings();
+  else openSettings("hotkeys");
+}
+
+function GeneralPage() {
   return (
-    <Show when={anchor()} keyed>
-      {(a) => (
-        <div class="pop settings" role="dialog" aria-label="Settings" ref={(el) => requestAnimationFrame(() => place(el, a))}>
-          <div class="ttl">Settings <span>every project</span></div>
-          <h4>Opening a file</h4>
-          <div class="radios" role="radiogroup" aria-label="Opening a file">
-            <For each={FILE_OPEN}>
-              {(o) => (
-                <label class="radio">
-                  <input type="radio" name="fileOpen" checked={app.settings.fileOpen === o.mode} onChange={() => setFileOpen(o.mode)} />
-                  <span>{o.name}<small>{o.help}</small></span>
-                </label>
-              )}
-            </For>
+    <>
+      <h4>Opening a file</h4>
+      <div class="radios" role="radiogroup" aria-label="Opening a file">
+        <For each={FILE_OPEN}>
+          {(o) => (
+            <label class="radio">
+              <input type="radio" name="fileOpen" checked={app.settings.fileOpen === o.mode} onChange={() => setFileOpen(o.mode)} />
+              <span>{o.name}<small>{o.help}</small></span>
+            </label>
+          )}
+        </For>
+      </div>
+      <p class="note">Ctrl+click, or Ctrl+Enter in Go to File, opens a new window instead (in New window mode, it replaces).</p>
+    </>
+  );
+}
+
+function WindowsPage() {
+  const steps = () => [keyOf("gap-less"), keyOf("gap-more")].filter(Boolean).join(" / ");
+  return (
+    <>
+      <h4>Windows</h4>
+      <label class="row">
+        Gap between windows
+        <span class="px">
+          <input
+            type="number" min={0} max={GAP_MAX} value={app.gap}
+            title={steps() ? `${steps()} step it` : ""}
+            onInput={(e) => e.currentTarget.value !== "" && setGap(+e.currentTarget.value)}
+            onBlur={(e) => (e.currentTarget.value = String(app.gap))}
+          />
+          px
+        </span>
+      </label>
+      <label class="row">
+        Carousel gutter
+        <span class="px">
+          <input
+            type="number" min={0} placeholder="auto" value={app.settings.monoGutter ?? ""}
+            title="Width each side of the centred window, where its neighbours peek. Empty is auto; 0 hides them."
+            onInput={(e) => setMonoGutter(e.currentTarget.value === "" ? undefined : +e.currentTarget.value)}
+          />
+          px
+        </span>
+      </label>
+      <p class="note">The carousel gutter is the space each side of the centred window. Leave it empty for auto; 0 hides the neighbours.</p>
+    </>
+  );
+}
+
+/** Mount once (in App). Closes on a click outside it; Escape is handled in hotkeys.ts. */
+export function SettingsDialog() {
+  return (
+    <Show when={page()}>
+      {(p) => (
+        <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && closeSettings()}>
+          <div class="settings-dlg" role="dialog" aria-label="Settings">
+            <header>
+              Settings <span>every project</span>
+              <button type="button" class="x" title="Close (Esc)" aria-label="Close" onClick={closeSettings}>×</button>
+            </header>
+            <nav aria-label="Settings pages">
+              <For each={PAGES}>
+                {(o) => (
+                  <button type="button" aria-current={p() === o.page ? "page" : undefined} onClick={() => setPage(o.page)}>
+                    <Icon name={o.icon} size={14} />
+                    {o.name}
+                    <Show when={o.page === "hotkeys" && keyOf("help", " ")}>{(k) => <kbd>{k()}</kbd>}</Show>
+                  </button>
+                )}
+              </For>
+            </nav>
+            <section class="settings-page">
+              <Show when={p() === "general"}><GeneralPage /></Show>
+              <Show when={p() === "windows"}><WindowsPage /></Show>
+              <Show when={p() === "hotkeys"}><HotkeysPage /></Show>
+            </section>
           </div>
-          <p class="note">Ctrl+click, or Ctrl+Enter in Go to File, opens a new window instead (in New window mode, it replaces).</p>
-          <h4>Windows</h4>
-          <label class="row">
-            Gap between windows
-            <span class="px">
-              <input
-                type="number" min={0} max={GAP_MAX} value={app.gap}
-                title="Alt+, / Alt+. step it"
-                onInput={(e) => e.currentTarget.value !== "" && setGap(+e.currentTarget.value)}
-                onBlur={(e) => (e.currentTarget.value = String(app.gap))}
-              />
-              px
-            </span>
-          </label>
-          <label class="row">
-            Carousel gutter
-            <span class="px">
-              <input
-                type="number" min={0} placeholder="auto" value={app.settings.monoGutter ?? ""}
-                title="Width each side of the centred window, where its neighbours peek. Empty is auto; 0 hides them."
-                onInput={(e) => setMonoGutter(e.currentTarget.value === "" ? undefined : +e.currentTarget.value)}
-              />
-              px
-            </span>
-          </label>
-          <p class="note">The carousel gutter is the space each side of the centred window. Leave it empty for auto; 0 hides the neighbours.</p>
         </div>
       )}
     </Show>

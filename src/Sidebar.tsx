@@ -14,6 +14,7 @@ import { openProjectDialog } from "./OpenProject";
 import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
 import { branchOf, loadWorktrees, openNewWorktree, removeWorktree, tileLabel } from "./worktrees";
 import { flash } from "./ui";
+import { keyOf, withKey } from "./keymap";
 import { envLocked, lockEnv } from "./envlock";
 import { settingsOpen, toggleSettings } from "./Settings";
 
@@ -190,7 +191,7 @@ export default function Sidebar() {
         <button
           class="collapse"
           onClick={toggleSidebar}
-          title={`${peek() ? "Keep sidebar open" : app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} (Alt+S)`}
+          title={withKey(peek() ? "Keep sidebar open" : app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar", "sidebar")}
           aria-label={peek() ? "Keep sidebar open" : app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!app.sidebarCollapsed || peek()}
         >
@@ -281,7 +282,7 @@ export default function Sidebar() {
                   <Show when={!p.sample}>
                     <button
                       class="gear"
-                      title="New worktree (Alt+W)"
+                      title={withKey("New worktree", "new-worktree")}
                       aria-label={`New worktree of ${p.name}`}
                       onClick={(e) => (e.stopPropagation(), openNewWorktree(p))}
                     >
@@ -322,12 +323,17 @@ export default function Sidebar() {
                           <span class="bn">{branchOf(w)}</span>
                           <span class="count">{w.tabs.length || ""}</span>
                           <Show when={w.parent}>
-                            <button class="x" title="Remove worktree" aria-label={`Remove worktree ${branchOf(w)}`} onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}>×</button>
+                            <button
+                              class="x"
+                              title={w.copy ? "Finish: copy the changes back and delete the copy" : "Remove worktree"}
+                              aria-label={`${w.copy ? "Finish" : "Remove worktree"} ${branchOf(w)}`}
+                              onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}
+                            >×</button>
                           </Show>
                         </div>
                       )}
                     </For>
-                    <button class="wt new" title="New worktree (Alt+W)" onClick={() => openNewWorktree(p)}>
+                    <button class="wt new" title={withKey("New worktree", "new-worktree")} onClick={() => openNewWorktree(p)}>
                       <span class="wtile">+</span><span class="bn">New worktree</span>
                     </button>
                   </div>
@@ -339,15 +345,15 @@ export default function Sidebar() {
         )}
       </For>
       <div class="side-actions">
-        <button class="add" title="Open project (Alt+O)" onClick={() => openProjectDialog()}>
-          <span class="glyph">+</span><span class="label">Open project</span><kbd class="label">Alt O</kbd>
+        <button class="add" title={withKey("Open project", "open-project")} onClick={() => openProjectDialog()}>
+          <span class="glyph">+</span><span class="label">Open project</span><Show when={keyOf("open-project", " ")}>{(k) => <kbd class="label">{k()}</kbd>}</Show>
         </button>
         <button class="add env" title="Add environment" onClick={() => openProjectDialog(undefined, true)}>
           <span class="glyph">⇄</span><span class="label">Add environment</span>
         </button>
       </div>
       <div class="side-foot">
-        <button class="add" id="settingsBtn" title="Settings" aria-expanded={settingsOpen()} onClick={(e) => toggleSettings(e.currentTarget)}>
+        <button class="add" id="settingsBtn" title="Settings" aria-expanded={settingsOpen()} aria-haspopup="dialog" onClick={toggleSettings}>
           <span class="glyph"><Icon name="settings" size={15} /></span><span class="label">Settings</span>
         </button>
       </div>
