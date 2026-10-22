@@ -2,6 +2,13 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.32 — 2026-10-22
+
+- The editor's file tree and tabs show git status: a changed file's name takes the change's colour with its letter beside it (M modified, A added, U untracked, R renamed, ! conflict), and a folder holding changes gets a dot. Saving a file updates them straight away.
+- A changed file in the editor has Source | Diff: Diff compares HEAD with what's in the editor, unsaved edits included. In Source, a thin bar in the gutter marks lines changed since HEAD. `Alt+D` switches between them, and double-clicking a diff line goes back to Source at that line.
+- The git window shows diffs Unified or Split, with +n −n on each file and arrows between hunks. Double-click a line to open it in the editor. In a diff, `J`/`K` move a line, `N`/`P` a hunk, `Enter` opens the line and `U`/`S` switch the layout. Settings › Files › Diffs sets the default layout.
+- A project folder holding several repos gets a repo picker in the git window; commits, PRs and pushes go to the chosen repo. The status line shows how many repos have changes, with a list on hover.
+
 ## 0.1.31 — 2026-10-22
 
 - Feedback: the speech-bubble button beside the bell (or Feedback in the Command Palette) reports a bug or an idea as an issue on tri-code's GitHub, using your `gh` login. Without `gh`, GitHub's new-issue form opens filled in. Your version and OS go with it unless you turn that off.
