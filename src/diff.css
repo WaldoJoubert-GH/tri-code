@@ -4,8 +4,10 @@
   flex: 1; min-height: 0; overflow: auto; font: 12px/17px var(--mono);
   padding: 2px 0 12px; user-select: text;
 }
+.dv-scroll:focus { outline: none; }
 .dv-content { width: max-content; min-width: 100%; }
-.dv-content.split { width: 100%; min-width: 0; }
+/* Side by side. Not `.split`: that is the canvas resize handle (canvas.css). */
+.dv-content.sbs { width: 100%; min-width: 0; }
 
 .dv-hunk {
   color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent);
@@ -28,7 +30,8 @@
 .dv-urow.a.sel { background: color-mix(in srgb, var(--ok) 22%, transparent); }
 .dv-urow.d.sel { background: color-mix(in srgb, var(--bad) 22%, transparent); }
 
-/* Split: the same row, twice. Long lines clip per half (Unified is the escape hatch). */
+/* Split: the same row, twice. Long lines clip per half (Unified is the escape hatch).
+   Row kinds are s-add / s-del: a bare .add is the sidebar's button (styles.css). */
 .dv-srow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); width: 100%; }
 .dv-half {
   display: grid; grid-template-columns: 40px 12px minmax(0, 1fr); white-space: pre;
@@ -42,10 +45,10 @@
   background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--muted) 7%, transparent) 5px 10px);
 }
 .dv-srow.mod-l .dv-half.l, .dv-srow.mod-l .dv-half.r { background: color-mix(in srgb, var(--warn) 9%, transparent); }
-.dv-srow.add .dv-half.r { background: color-mix(in srgb, var(--ok) 12%, transparent); }
-.dv-srow.del .dv-half.l { background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.dv-srow.s-add .dv-half.r { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.dv-srow.s-del .dv-half.l { background: color-mix(in srgb, var(--bad) 12%, transparent); }
 .dv-half.r > .mk { color: var(--ok); }
-.dv-srow.del .dv-half.l > .mk { color: var(--bad); }
+.dv-srow.s-del .dv-half.l > .mk { color: var(--bad); }
 .dv-srow.sel .dv-half { box-shadow: inset 2px 0 var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
 .dv-srow.sel .dv-half.r { box-shadow: inset -2px 0 var(--accent); }
 

@@ -17,6 +17,7 @@ import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
+import { diffKeys } from "./DiffView";
 import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";
 import { closeIconPicker, iconPickerOpen } from "./lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";
@@ -92,6 +93,9 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
       return true;
     case "agents":
       openAgentsPanel(p);
+      return true;
+    case "diff":
+      if (!f || !diffKeys.get(f.id)?.()) flash(f?.kind === "editor" ? "no changes since HEAD" : "no diff here");
       return true;
     case "close":
       if (!f) return false;

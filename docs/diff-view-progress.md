@@ -1,7 +1,8 @@
 # Diff views — progress and handoff
 
-Status: **feature works in the preview harness and compiles; not yet exercised in a running Tauri app
-or covered by automated tests.** This note is for whoever picks the work up next.
+Status: **feature-complete for the first pass's follow-ups; unit and Rust tests pass, the UI was driven
+end to end in headless Chromium with a mocked backend. Not yet run in a live Tauri window.** This
+note is for whoever picks the work up next.
 
 Reference design: `design/diff.html` (gitignored, present in this worktree). Variant **A** was chosen:
 `Source | Diff` in the editor's breadcrumb bar, plus the git window's unified/split diff and
@@ -101,33 +102,65 @@ one active repo).
 The temporary harnesses were deleted. `design/diff.html` is intentionally not committed
 (`design/` is gitignored).
 
-## Known gaps / next steps (in rough order)
+## Second pass (2026-10-22)
 
-1. **Run it in the real Tauri app** on a repo project and on a folder project. The mocked UI tests do
-   not cover real IPC, ssh paths, `gh`, or the actual editor/CodeMirror focus dance.
-2. **Add source-mode change bars** (thin gutter markers for added lines and a caret for a deletion
-   before a line) using the parsed hunks, likely as a CodeMirror decoration extension.
-3. **Per-file stats in the git lists** (the prototype shows `+n −n` per row). Today only the selected
-   file's stats are in the diff header; fetching every file's diff just for stats is too much.
-4. **Folders: status cost.** Local `folder_status` runs 4 git processes per repo sequentially on each
-   status poll (30s). Consider a single shell script locally, or polling only the active repo plus a
-   cheaper aggregate.
-5. **Folder UX edge cases:** duplicate repo basenames (use the relative path in the picker label),
-   many repos (cap the accordion or make it scroll), a repo that disappears mid-refresh, repos with
-   no HEAD, and a folder whose non-git files change (those belong to Finish for a folder copy).
-6. **Editor HEAD performance:** `git show HEAD:./file` per opened file, no cache. On a slow ssh host the
-   Diff button can take a while to appear; consider lazy-loading HEAD on first Diff click or a small
-   keyed cache invalidated by `repoEpoch`.
-7. **Rename/deleted edge cases:** a renamed file has no HEAD path under its new name, so the editor diff
-   is currently all-added; a deleted file is blocked from drilling. Decide whether to resolve the
-   rename or show a note.
-8. **Tests:** add unit tests for `parseUnified` / `splitRows` / `stats` (a Vitest or `bun test` setup is
-   not present yet) and a Rust test for `folder_status` with two temp repos.
-9. **Remaining design polish:** the hunk arrows are subtle; the repo-menu active row and the
-   `RepoSection` highlight should be checked at real widths; the editor Source/Diff segment could show
-   a change count.
-10. **No keyboard bindings yet** for the diff (design proposed `d`/`j`/`k`/`n`/`p`); the editor should
-    use `Alt+D`-style chords rather than plain keys so CodeMirror keeps them.
+The ten follow-ups from the first pass, in order:
+
+1. **Real app.** Not run in a live Tauri window (this box has no display). Instead the built
+   frontend was driven in headless Chromium with a mocked `invoke`, diffs produced by real
+   `git diff --no-index`: git window (unified, split, keys, rename, deleted file), drill into the
+   editor, typing, `Alt+D`, and a three-repo folder. The backend's new paths are covered by
+   `cargo test` against real temp repos (below). Still to do by hand: ssh hosts, `gh`, and focus
+   handling in the real webview. See "Quick manual check".
+2. **Change bars, done.** `cm.ts` has a `cm-changes` gutter (a `StateField` of markers, mapped
+   through edits); `diff.ts` `changeMarks` turns hunks into add / mod / del lines. The editor
+   recomputes them 200 ms after the last edit with a zero-context `makePatch(…, timeout 150 ms)`,
+   so a huge rewrite gives up instead of blocking. A new file (nothing at HEAD) gets no bars.
+3. **Per-file stats, done.** `STATUS_CMDS` also runs `diff --numstat -z` (index and worktree), so
+   each `Change` carries `index` / `work` `[added, removed]` at no extra round trip; the rows show
+   `+n −n`. Untracked and binary files show none.
+4. **Folder status cost, done.** Locally the repos run side by side (6 threads at a time), each
+   repo's commands still sequential. Remote stays one ssh `multi` batch. `folder_statuses` is a
+   plain function so it can be tested.
+5. **Folder edge cases.** Duplicate folder names show the repo's relative path (picker, header,
+   commit box). The repo menu scrolls (max 60vh); the accordion already scrolled. A repo that
+   disappears or has no HEAD reads as an error or empty log for that repo only. The editor's
+   repo list (`repos.ts`) is invalidated when the git window sees the set of repos change.
+   Not done: non-git files in a folder (Finish for a folder copy).
+6. **HEAD cache, done.** `headText` caches per host + repo + file; `bumpRepoEpoch` clears it.
+   Switching tabs or saving no longer runs `git show`; focusing the editor re-reads only the
+   shown file, keeping the old HEAD on screen meanwhile (no flicker).
+7. **Renames, done for staged renames.** `Change.orig` comes from porcelain v2; `git_diff` passes
+   `-M -- orig new` so the git window shows a rename as one (and "Renamed from …, no content
+   change" when it is pure). `git_head_text` falls back to `diff --cached -M --name-status
+   --relative` and returns `from`; the editor strip reads `HEAD:old → buffer`. An *unstaged*
+   rename is still a deletion plus an untracked file, as git sees it. Double-clicking a deleted
+   file now says why nothing opens.
+8. **Tests, done.** `bun run test` (`src/diff.test.ts`, 18 tests: parser, stats, alignment,
+   fallback, word marks, CRLF/BOM, change marks). Test files are excluded from `tsc`, since there are
+   no bun types. Rust: numstat, rename source, porcelain orig, and a two-repo
+   `folder_statuses` test with a staged rename and line counts.
+9. **Polish.** The hunk arrows are one bordered control; the editor's Diff button shows how many
+   changed regions there are; the diff headers shed labels in a narrow pane (container queries)
+   and the file name ellipsises instead of running under `+n −n`.
+10. **Keys, done.** Keymap action `diff`, `Alt+D`: Source ⇄ Diff in the editor (the diff opens at
+    the cursor line), or the selected file's editor diff from the git window. Inside a focused
+    diff: `J`/`K` (or arrows) a line, `N`/`P` (or `]`/`[`) a hunk, `Enter` opens the line
+    (`Shift+Enter` in the editor's diff), `U`/`S` orientation.
+
+Found on the way: three global classes (`.add` in styles.css, `.split` in canvas.css, `.grow` in
+files.css) were also matching diff elements. Split view's added-only rows rendered as flex
+buttons, and `.dv-content.split` became `position: absolute` over the rows, which swallowed
+double-clicks. The rows are `s-add` / `s-del`, side by side is `.sbs`, and the editor's spacer
+is `.ediff-sp`.
+
+## Still open
+
+- A live run on Windows/macOS and over ssh (item 1).
+- An unstaged rename (delete + untracked) is not paired.
+- Folder copies' non-git files are not part of the git window.
+- The git window's diff and the editor's diff are separate scrollers; a hunk position is not
+  carried across a drill beyond the line.
 
 ## Quick manual check
 
@@ -137,7 +170,9 @@ The temporary harnesses were deleted. `design/diff.html` is intentionally not co
    opens its HEAD → buffer diff.
 3. In the editor, edit the file without saving; switch to Diff: the unsaved line is in the patch.
    Double-click a line in the diff → back to Source at that line.
-4. Open a folder project containing two repos with changes: the git window shows the repo picker and
+4. In the editor's Source, the gutter shows green / amber bars and a red caret for changes since
+   HEAD; `Alt+D` switches to Diff and back. In a diff, `N`, `J`, `Enter` land on the line.
+5. Open a folder project containing two repos with changes: the git window shows the repo picker and
    accordion; the commit box names the active repo; switching a file switches the repo; the status
    line shows `n repos` with the hover list.
 
@@ -150,4 +185,7 @@ src/App.tsx, src/Editor.tsx, src/GitPanel.tsx, src/git.ts, src/files.ts, src/sta
 src/DiffView.tsx, src/diff.ts, src/repos.ts
 src/diff.css, src/files.css, src/git.css, src/styles.css
 README.md, CONTEXT.md
+
+second pass:
+src/cm.ts (change gutter), src/diff.test.ts, src/hotkeys.ts, src/keymap.ts (Alt+D), tsconfig.json
 ```

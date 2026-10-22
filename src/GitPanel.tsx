@@ -16,7 +16,9 @@ import { openFile } from "./files";
 import { openUrlInProject } from "./browsers";
 import { removeWorktree } from "./worktrees";
 import { type DiffMode, diffStats, firstChange, parseUnified } from "./diff";
-import DiffView, { type Drill } from "./DiffView";
+import DiffView, { type Drill, diffKeys, stepHunk } from "./DiffView";
+import { flash } from "./ui";
+import { withKey } from "./keymap";
 import "./git.css";
 
 function BranchIcon(): JSX.Element {
@@ -31,6 +33,15 @@ function BranchIcon(): JSX.Element {
 /** The status letter shown for a file in one list. */
 const letter = (c: Change, inStaged: boolean) => (inStaged ? c.x : c.x === "?" ? "U" : c.y);
 
+/** A row's `+n −n`, from the status batch's numstat; nothing for an untracked or binary file. */
+function RowStat(props: { n?: [number, number] }): JSX.Element {
+  return (
+    <Show when={props.n && props.n[0] + props.n[1] > 0}>
+      <span class="g-rstat"><i class="p">+{props.n![0]}</i><i class="m">−{props.n![1]}</i></span>
+    </Show>
+  );
+}
+
 export default function GitPanel(props: { project: Project; tab: Tab; focused: boolean }): JSX.Element {
   const p = () => props.project;
   const g = () => gitOf(p().id);
@@ -40,12 +51,17 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
   /** A folder of repos: one git window with an accordion and an active repo. */
   const multiRepo = () => (g().repos?.length ?? 0) > 1;
   const nestedRepo = () => !!g().repo;
-  const repoName = () => (g().repo ? g().repo.split("/").pop()! : p().name);
+  /** A repo's short name: its folder, or its path when another repo has the same folder name. */
+  const nameOf = (repo: string) => {
+    if (!repo) return p().name;
+    const base = repo.split("/").pop()!;
+    return (g().repos ?? []).some((r) => r.repo !== repo && r.repo.split("/").pop() === base) ? repo : base;
+  };
+  const repoName = () => nameOf(g().repo);
   /** The diff pane's width: split falls back to unified in a narrow window. */
   const [paneW, setPaneW] = createSignal(0);
   let rightEl: HTMLDivElement | undefined;
   let diffEl: HTMLDivElement | undefined;
-  let hunkAt = 0;
 
   const wantedMode = (): DiffMode => p().diffMode ?? "split";
   const splitFits = () => paneW() === 0 || paneW() >= 660;
@@ -62,20 +78,28 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
   const abs = (sel: Sel) => `${repoRoot(p(), sel.repo)}/${sel.path}`;
   const drill: Drill = (line, _hunk, how) => {
     const sel = g().sel;
-    if (!sel || deleted()) return;
+    if (!sel) return;
+    if (deleted()) return flash("deleted: there is no working copy to open");
     openFile(p(), abs(sel), { from: props.tab.id, at: { line, mode: how.diff ? "diff" : "source" } });
   };
   const openAt = (m: "source" | "diff") => {
     const line = first();
     if (line) drill(line, 0, { diff: m === "diff" });
   };
-  const nav = (d: 1 | -1) => {
-    const n = hunks().length;
-    if (!n) return;
-    hunkAt = Math.max(0, Math.min(n - 1, hunkAt + d));
-    diffEl?.querySelector(`[data-hunk="${hunkAt}"]`)?.scrollIntoView({ block: "start" });
-  };
-  createEffect(on(() => g().diff?.key, () => { hunkAt = 0; }));
+  const nav = (d: 1 | -1) => diffEl && stepHunk(diffEl, d);
+  // Alt+D (keymap "diff"): the selected file's diff in the editor, at its first change.
+  onMount(() => {
+    diffKeys.set(props.tab.id, () => {
+      if (!g().sel || g().commit || !first()) return false;
+      if (deleted()) {
+        flash("deleted: there is no working copy to open");
+        return true;
+      }
+      openAt("diff");
+      return true;
+    });
+    onCleanup(() => diffKeys.delete(props.tab.id));
+  });
   onMount(() => {
     if (!rightEl) return;
     const ro = new ResizeObserver(([entry]) => setPaneW(entry.contentRect.width));
@@ -142,7 +166,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         title={fp.c.path}
         onClick={() => select(p(), { repo: g().repo, path: fp.c.path, staged: fp.inStaged })}
         onDblClick={() => {
-          if (fp.c.x === "D" || fp.c.y === "D") return;
+          if (fp.c.x === "D" || fp.c.y === "D") return flash("deleted: there is no working copy to open");
           openFile(p(), abs({ repo: g().repo, path: fp.c.path, staged: fp.inStaged }), { from: props.tab.id });
         }}
       >
@@ -157,6 +181,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         />
         <span class={`g-st s-${letter(fp.c, fp.inStaged)}`}>{letter(fp.c, fp.inStaged)}</span>
         <span class="g-fp"><span class="d">{i >= 0 ? fp.c.path.slice(0, i + 1) : ""}</span>{fp.c.path.slice(i + 1)}</span>
+        <RowStat n={fp.inStaged ? fp.c.index : fp.c.work} />
       </div>
     );
   };
@@ -328,7 +353,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               <Show when={d().stat}><pre class="g-cstat">{d().stat}</pre></Show>
             </div>
             <div class="g-changes-head">Changes</div>
-            <DiffView text={d().diff} mode={mode()} />
+            <DiffView text={d().diff} mode={mode()} onMode={setMode} />
           </>
         )}
       </Show>
@@ -556,29 +581,32 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                     if (cut < 0) return <span class="f">{rel || "—"}</span>;
                     return <><span class="d">{rel.slice(0, cut + 1)}</span><span class="f">{rel.slice(cut + 1)}</span></>;
                   })()}</b>
-                  <Show when={g().sel && g().diff?.text !== undefined}>
+                  <Show when={g().sel && hunks().length}>
                     <span class="g-stat"><i class="p">+{stat().added}</i> <i class="m">−{stat().removed}</i></span>
                   </Show>
                   <span class="grow" />
-                  <Show when={g().sel}><span>{g().sel!.staged ? "staged" : "not staged"}</span></Show>
-                  <button class="g-icon" title="Previous hunk" disabled={!hunks().length} onClick={() => nav(-1)}>⌃</button>
-                  <button class="g-icon" title="Next hunk" disabled={!hunks().length} onClick={() => nav(1)}>⌄</button>
+                  <Show when={g().sel}><span class="g-side">{g().sel!.staged ? "staged" : "not staged"}</span></Show>
+                  <span class="g-hunks">
+                    <button class="g-icon" title="Previous hunk (P)" disabled={!hunks().length} onClick={() => nav(-1)}>⌃</button>
+                    <button class="g-icon" title="Next hunk (N)" disabled={!hunks().length} onClick={() => nav(1)}>⌄</button>
+                  </span>
                   <span class="g-seg" role="group" aria-label="Diff orientation">
-                    <button aria-pressed={mode() === "unified"} title="A stacked diff" onClick={() => setMode("unified")}>☰ Unified</button>
+                    <button aria-pressed={mode() === "unified"} title="A stacked diff" onClick={() => setMode("unified")}>☰<span class="lbl"> Unified</span></button>
                     <button
                       aria-pressed={mode() === "split"}
                       title={wantedMode() === "split" && !splitFits() ? "Split needs about 660px: this pane shows unified" : "Side by side"}
                       onClick={() => setMode("split")}
-                    >▥ Split</button>
+                    >▥<span class="lbl"> Split</span></button>
                   </span>
                   <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : "Open the file at its first change"} onClick={() => openAt("source")}>↗ Editor</button>
-                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : "Open the editor in its diff view"} onClick={() => openAt("diff")}>Diff</button>
+                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : withKey("Open the editor in its diff view", "diff")} onClick={() => openAt("diff")}>Diff</button>
                 </div>
                 <Show when={!g().repoError} fallback={<div class="g-note bad">{g().repoError}</div>}>
                   <DiffView
                     text={g().sel ? g().diff?.text : ""}
                     error={g().diff?.error}
                     mode={mode()}
+                    onMode={setMode}
                     onDrill={drill}
                     ref={(el) => (diffEl = el)}
                   />

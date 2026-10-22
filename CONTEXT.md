@@ -76,7 +76,7 @@ The `Alt+T` box under the toolbar path (a click on the path opens it too). One f
 _Avoid_: Quick open, file palette, Ctrl+P.
 
 **Editor Window**:
-A canvas Window (`TabKind` `"editor"`, `Alt+E`) with the project's file tree, a tab per open file, a CodeMirror 6 editor and a status bar; Markdown, HTML and SVG also show rendered, media files play. Replaced the Files and File Windows; chosen from design/editor.html (variant B). A file opens in the Editor Window it was picked from, else the one used last; `Ctrl`+click opens a second one beside. A changed file also has a **Diff** mode beside Source, comparing `HEAD` with the live buffer (unsaved edits and all), unified or side by side; chosen from design/diff.html (variant A). No extension host: language smarts are to come from language servers run on the project's host.
+A canvas Window (`TabKind` `"editor"`, `Alt+E`) with the project's file tree, a tab per open file, a CodeMirror 6 editor and a status bar; Markdown, HTML and SVG also show rendered, media files play. Replaced the Files and File Windows; chosen from design/editor.html (variant B). A file opens in the Editor Window it was picked from, else the one used last; `Ctrl`+click opens a second one beside. A changed file also has a **Diff** mode beside Source, comparing `HEAD` with the live buffer (unsaved edits and all), unified or side by side; chosen from design/diff.html (variant A). Source marks the same changes with bars in the gutter. No extension host: language smarts are to come from language servers run on the project's host.
 _Avoid_: Files window, file viewer, IDE.
 
 **Preview Tab**:

@@ -146,12 +146,13 @@ function alignRows(dels: Row[], adds: Row[]): SplitRow[] {
         continue;
       }
     }
-    if (i > 0 && (j === 0 || Math.abs(dp[i][j] - (dp[i - 1][j] - GAP)) < 1e-9)) {
-      rows.push({ left: dels[i - 1], kind: "del", anchor: 0 });
-      i--;
-    } else {
+    // Walking back, take an addition first on a tie, so unpaired deletions read before additions.
+    if (j > 0 && (i === 0 || Math.abs(dp[i][j] - (dp[i][j - 1] - GAP)) < 1e-9)) {
       rows.push({ right: adds[j - 1], kind: "add", anchor: 0 });
       j--;
+    } else {
+      rows.push({ left: dels[i - 1], kind: "del", anchor: 0 });
+      i--;
     }
   }
   return rows.reverse();
@@ -223,6 +224,47 @@ export function normalizeText(s: string): string {
 
 export const sameText = (a: string, b: string) => normalizeText(a) === normalizeText(b);
 
-export function makePatch(path: string, oldText: string, newText: string): string {
-  return createTwoFilesPatch(`a/${path}`, `b/${path}`, normalizeText(oldText), normalizeText(newText), "", "", { context: 3 });
+export function makePatch(path: string, oldText: string, newText: string): string;
+/** With a `timeout` (ms) the diff gives up on a costly pair and returns undefined. */
+export function makePatch(path: string, oldText: string, newText: string, timeout: number): string | undefined;
+export function makePatch(path: string, oldText: string, newText: string, timeout?: number): string | undefined {
+  const a = normalizeText(oldText);
+  const b = normalizeText(newText);
+  if (timeout === undefined) return createTwoFilesPatch(`a/${path}`, `b/${path}`, a, b, "", "", { context: 3 });
+  return createTwoFilesPatch(`a/${path}`, `b/${path}`, a, b, "", "", { context: 0, timeout });
+}
+
+/** What the source gutter draws, by new-side line: added lines, changed lines, and the line a
+ *  deletion sits just above (the last line when the deletion is at the end of the file). */
+export type ChangeMarks = { add: number[]; mod: number[]; del: number[] };
+
+/** A deletion run with additions after it is a change; additions alone are added lines. */
+export function changeMarks(hunks: Hunk[]): ChangeMarks {
+  const out: ChangeMarks = { add: [], mod: [], del: [] };
+  for (const h of hunks) {
+    // A hunk with no new-side lines (`+4,0`) names the line before the deletion, as git does.
+    let nextNew = h.rows.some((r) => r.t !== "-") ? h.newStart : h.newStart + 1;
+    let dels = 0;
+    let adds: number[] = [];
+    const flush = () => {
+      if (adds.length) (dels ? out.mod : out.add).push(...adds);
+      else if (dels) out.del.push(Math.max(1, nextNew));
+      dels = 0;
+      adds = [];
+    };
+    for (const r of h.rows) {
+      if (r.t === "-") {
+        if (adds.length) flush();
+        dels++;
+      } else if (r.t === "+") {
+        adds.push(r.new!);
+        nextNew = r.new! + 1;
+      } else {
+        flush();
+        nextNew = r.new! + 1;
+      }
+    }
+    flush();
+  }
+  return out;
 }

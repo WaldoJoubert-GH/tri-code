@@ -19,7 +19,10 @@ export type ProjectRepos = { root: boolean; repos: string[] };
 
 /** Bumped when HEAD may have moved (a commit, a merge), so the editor re-reads its HEAD blob. */
 export const [repoEpoch, setRepoEpoch] = createSignal(0);
-export const bumpRepoEpoch = () => setRepoEpoch((n) => n + 1);
+export const bumpRepoEpoch = () => {
+  heads.clear();
+  setRepoEpoch((n) => n + 1);
+};
 
 const trim = (p: string) => p.replace(/[\\/]+$/, "");
 const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
@@ -78,10 +81,22 @@ export async function repoOfFile(p: Project, file: string): Promise<RepoRef | nu
   return { repo: best, cwd, rel: relTo(cwd, file) };
 }
 
-/** The file's text at HEAD; null when HEAD or the file does not exist there yet. */
-export async function headText(p: Project, ref: RepoRef): Promise<string | null> {
-  const r = await invoke<{ text: string | null }>("git_head_text", {
-    host: p.host, path: ref.cwd, file: ref.rel,
-  });
-  return r.text;
+/** A file at HEAD. `text` is null when HEAD or the file does not exist there yet; `from` is the
+ *  path HEAD has it under when the file is the target of a staged rename. */
+export type HeadFile = { text: string | null; from?: string | null };
+
+/** HEAD blobs by host, repo and file, so switching tabs does not run `git show` (an ssh round
+ *  trip on a remote host) again. Cleared when HEAD may have moved; `fresh` re-reads one. */
+const heads = new Map<string, Promise<HeadFile>>();
+
+/** The file at HEAD, cached until `bumpRepoEpoch` or a `fresh` read. */
+export function headText(p: Project, ref: RepoRef, fresh = false): Promise<HeadFile> {
+  const k = `${p.host}\u0000${ref.cwd}\u0000${ref.rel}`;
+  const hit = heads.get(k);
+  if (hit && !fresh) return hit;
+  const load = invoke<HeadFile>("git_head_text", { host: p.host, path: ref.cwd, file: ref.rel });
+  heads.set(k, load);
+  // A failed read (an unreachable host) is tried again next time.
+  load.catch(() => heads.get(k) === load && heads.delete(k));
+  return load;
 }

@@ -190,3 +190,13 @@
 .fnote-inline { color: var(--muted); font-size: 11px; flex: none; }
 .ediff .seg { flex: none; }
 .ediff .seg button { height: 18px; padding: 0 8px; }
+.ehunk { width: 22px; height: 18px; border: 1px solid var(--line); border-radius: 5px; color: var(--text); font-size: 11px; flex: none; }
+.ehunk + .ehunk { margin-left: -5px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.ehunk:has(+ .ehunk) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ehunk:disabled { opacity: .35; }
+.crumbs .seg .segn { margin-left: 5px; padding: 0 4px; border-radius: 6px; background: color-mix(in srgb, var(--warn) 22%, transparent); font: 9.5px var(--mono); }
+.ediff { container-type: inline-size; }
+@container (max-width: 480px) {
+  .ediff-head .seg .lbl, .ediff-head .fnote-inline { display: none; }
+}
+.ediff-sp { flex: 1; min-width: 0; }

@@ -10,6 +10,31 @@ import "./diff.css";
 
 export type Drill = (line: number, hunk: number, how: { diff: boolean }) => void;
 
+/** What Alt+D (keymap "diff") does in each window, by tab id; false lets the key through. */
+export const diffKeys = new Map<string, () => boolean>();
+
+/** Where `el` sits in `scroll`'s viewport, in px from its top. */
+const offsetIn = (scroll: HTMLElement, el: Element) => el.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
+
+/** Bring the next (1) or previous (-1) hunk to the top of the diff, from where it is scrolled to now. */
+export function stepHunk(scroll: HTMLElement, d: 1 | -1): HTMLElement | null {
+  const heads = [...scroll.querySelectorAll<HTMLElement>(".dv-hunk")];
+  // A header within a few px of the top (its own margin) counts as the one shown now.
+  const to = d > 0 ? heads.find((h) => offsetIn(scroll, h) > 10) : heads.reverse().find((h) => offsetIn(scroll, h) < -2);
+  if (!to) return null;
+  scroll.scrollTop += offsetIn(scroll, to);
+  return to;
+}
+
+/** Why a patch has no hunks to show. */
+function emptyNote(text: string): string {
+  if (!text) return "No changes.";
+  const from = /^rename from (.*)$/m.exec(text)?.[1];
+  if (from) return `Renamed from ${from}, no content change.`;
+  if (/^Binary files /m.test(text)) return "Binary file changed.";
+  return "Mode-only change.";
+}
+
 /** The part of a paired line that actually changed. */
 function Marked(props: { parts?: [string, string, string]; text: string }): JSX.Element {
   return (
@@ -53,8 +78,8 @@ function SplitRowView(props: {
       class="dv-srow"
       classList={{
         "mod-l": props.row.kind === "mod",
-        add: props.row.kind === "add",
-        del: props.row.kind === "del",
+        "s-add": props.row.kind === "add",
+        "s-del": props.row.kind === "del",
         sel: props.selected,
       }}
       data-anchor={props.row.anchor}
@@ -84,6 +109,8 @@ export default function DiffView(props: {
   /** Scroll this new-side line into view when the patch renders (a drill from the git window). */
   focusLine?: number;
   onDrill?: Drill;
+  /** The U / S keys switch orientation through this. */
+  onMode?: (m: DiffMode) => void;
   /** Gives the caller the scroller, for its hunk navigation. */
   ref?: (el: HTMLDivElement) => void;
 }): JSX.Element {
@@ -116,7 +143,9 @@ export default function DiffView(props: {
       if (!line || !scroll) return;
       requestAnimationFrame(() => {
         const el = scroll?.querySelector(`[data-anchor="${line}"]`);
-        if (el) el.scrollIntoView({ block: "center" });
+        if (!el || !scroll) return;
+        scroll.scrollTop += offsetIn(scroll, el) - scroll.clientHeight / 2;
+        setSel(line);
       });
     },
   ));
@@ -124,12 +153,69 @@ export default function DiffView(props: {
   const select = (at: number) => setSel(at);
   const drill: Drill = (line, hunk, how) => props.onDrill?.(line, hunk, how);
 
+  /** The rows in screen order, one per drill target (a deletion shares its line's). */
+  const rowEls = () => {
+    const seen = new Set<string>();
+    return [...(scroll?.querySelectorAll<HTMLElement>(".dv-urow, .dv-srow") ?? [])].filter((el) => {
+      const a = el.dataset.anchor ?? "";
+      if (seen.has(a)) return false;
+      seen.add(a);
+      return true;
+    });
+  };
+  const show = (el: HTMLElement) => {
+    if (!scroll) return;
+    const y = offsetIn(scroll, el);
+    if (y < 0) scroll.scrollTop += y;
+    else if (y + el.offsetHeight > scroll.clientHeight) scroll.scrollTop += y + el.offsetHeight - scroll.clientHeight;
+    setSel(Number(el.dataset.anchor));
+  };
+  /** First changed row at or after a hunk header. */
+  const changedAfter = (head: Element) => {
+    for (let el = head.nextElementSibling; el && !el.classList.contains("dv-hunk"); el = el.nextElementSibling) {
+      if (el.matches(".dv-urow.a, .dv-urow.d, .dv-srow.s-add, .dv-srow.s-del, .dv-srow.mod-l")) return el as HTMLElement;
+    }
+    return null;
+  };
+
+  /** J/K or ↓/↑ a line, N/P a hunk, Enter opens the line (Shift+Enter in the editor's diff), U/S orientation. */
+  const onKey = (e: KeyboardEvent) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || !scroll) return;
+    const k = e.key.toLowerCase();
+    if (k === "j" || k === "k" || e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const rows = rowEls();
+      if (!rows.length) return;
+      const i = rows.findIndex((el) => Number(el.dataset.anchor) === sel());
+      const down = k === "j" || e.key === "ArrowDown";
+      show(rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (down ? 1 : -1)))]);
+    } else if (k === "n" || k === "p" || e.key === "]" || e.key === "[") {
+      const head = stepHunk(scroll, k === "n" || e.key === "]" ? 1 : -1);
+      const row = head && changedAfter(head);
+      if (row) setSel(Number(row.dataset.anchor));
+    } else if (e.key === "Enter") {
+      const at = sel();
+      const row = at != null ? scroll.querySelector<HTMLElement>(`[data-anchor="${at}"]`) : null;
+      if (!row) return;
+      drill(at!, Number(row.dataset.hunk), { diff: e.shiftKey });
+    } else if ((k === "u" || k === "s") && props.onMode && !e.shiftKey) {
+      props.onMode(k === "u" ? "unified" : "split");
+    } else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
-    <div class="dv-scroll" ref={(el) => { scroll = el; props.ref?.(el); }}>
+    <div
+      class="dv-scroll"
+      tabIndex={0}
+      aria-label="Diff: J and K move a line, N and P a hunk, Enter opens the line, U and S switch unified or split"
+      onKeyDown={onKey}
+      ref={(el) => { scroll = el; props.ref?.(el); }}
+    >
       <Show when={!props.error} fallback={<div class="dv-note bad">{props.error}</div>}>
         <Show when={props.text !== undefined} fallback={<div class="dv-note">Loading…</div>}>
-          <Show when={model().length} fallback={<div class="dv-note">{props.text ? "Binary or mode-only change." : "No changes."}</div>}>
-            <div class="dv-content" classList={{ split: props.mode === "split" }}>
+          <Show when={model().length} fallback={<div class="dv-note">{emptyNote(props.text ?? "")}</div>}>
+            <div class="dv-content" classList={{ sbs: props.mode === "split" }}>
               <For each={model()}>
                 {(h) => (
                   <>

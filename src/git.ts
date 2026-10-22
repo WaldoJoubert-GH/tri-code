@@ -10,9 +10,11 @@ import { type Project, addTab, focusTab, repoOf } from "./state";
 import { copyText } from "./clipboard";
 import { devOf, inProgress, slugOf } from "./issues";
 import { flash } from "./ui";
-import { bumpRepoEpoch } from "./repos";
+import { bumpRepoEpoch, invalidateRepos } from "./repos";
 
-export type Change = { path: string; x: string; y: string };
+/** `index` / `work`: lines added and removed on each side (absent for untracked or binary);
+ *  `orig`: a rename's original path. */
+export type Change = { path: string; x: string; y: string; index?: [number, number]; work?: [number, number]; orig?: string };
 export type Commit = { sha: string; subject: string; when: string; pushed: boolean };
 export type CommitDetail = {
   sha: string; author: string; when: string; message: string; stat: string; diff: string;
@@ -171,6 +173,9 @@ export async function refresh(p: Project): Promise<void> {
     try {
       repos = await invoke<RepoStatus[]>("folder_status", args(p));
       if (!repos.length) throw new Error(`No git repositories in ${p.path}`);
+      // The editor finds a file's repo from its own list: a repo cloned into the folder since joins it.
+      const known = gitOf(p.id).repos?.map((r) => r.repo).join("\n");
+      if (known !== undefined && known !== repos.map((r) => r.repo).join("\n")) invalidateRepos(p);
     } catch (e) {
       set(p, (g) => {
         g.error = String(e);
@@ -317,6 +322,7 @@ export async function loadDiff(p: Project): Promise<void> {
   try {
     const text = await invoke<string>("git_diff", {
       ...argsAt(p, sel.repo), file: sel.path, staged: sel.staged, untracked: !sel.staged && change?.x === "?",
+      orig: sel.staged ? change?.orig ?? null : null,
     });
     set(p, (g) => { if (g.diff?.key === key) g.diff.text = text; });
   } catch (e) {
@@ -531,7 +537,7 @@ async function draft(p: Project, kind: NonNullable<GitUi["busy"]>, prompt: () =>
 
 export function draftCommit(p: Project): Promise<void> {
   return draft(p, "commit", async () => {
-    const diff = await invoke<string>("git_diff", { ...argsAt(p, gitOf(p.id).repo), file: null, staged: true, untracked: false });
+    const diff = await invoke<string>("git_diff", { ...argsAt(p, gitOf(p.id).repo), file: null, staged: true, untracked: false, orig: null });
     const issue = gitOf(p.id).ctx.issue ? linkedIssue(p) : undefined;
     return [
       "Write a git commit message for the staged changes below.",
