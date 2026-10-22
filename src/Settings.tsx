@@ -3,15 +3,16 @@
 // Hotkeys page. Chosen from design/settings-hotkeys.html.
 
 import { For, Show, createSignal } from "solid-js";
-import { GAP_MAX, app, setGap, setMonoGutter } from "./state";
+import { GAP_MAX, app, setGap, setMonoGutter, setSkipFolders, skipFolders } from "./state";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
 
-export type SettingsPage = "windows" | "hotkeys";
+export type SettingsPage = "windows" | "files" | "hotkeys";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "windows", name: "Windows", icon: "layout-panel-left" },
+  { page: "files", name: "Files", icon: "folder-search" },
   { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
 ];
 
@@ -41,6 +42,28 @@ export function toggleSettings() {
 export function toggleHotkeys() {
   if (hotkeysOpen()) closeSettings();
   else openSettings("hotkeys");
+}
+
+function FilesPage() {
+  return (
+    <>
+      <h4>Go to File</h4>
+      <label class="row skip-row">
+        Skip folders
+        <textarea
+          rows={2}
+          spellcheck={false}
+          value={skipFolders().join(", ")}
+          title="Folder names, wherever they are. Gitignored files elsewhere are still found."
+          onChange={(e) => setSkipFolders(e.currentTarget.value.split(/[,\s]+/))}
+        />
+        <Show when={app.settings.skipFolders}>
+          <button type="button" class="reset" title="Back to the default list" onClick={() => setSkipFolders(undefined)}>↺</button>
+        </Show>
+      </label>
+      <p class="note">Folder names, separated by commas or spaces, that Go to File never looks in, gitignored or not. <code>.git</code> is always skipped. Takes effect the next time the box opens.</p>
+    </>
+  );
 }
 
 function WindowsPage() {
@@ -100,6 +123,7 @@ export function SettingsDialog() {
             </nav>
             <section class="settings-page">
               <Show when={p() === "windows"}><WindowsPage /></Show>
+              <Show when={p() === "files"}><FilesPage /></Show>
               <Show when={p() === "hotkeys"}><HotkeysPage /></Show>
             </section>
           </div>

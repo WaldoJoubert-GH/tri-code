@@ -99,7 +99,7 @@ Every action a hotkey runs (focus left, close window, go to workspace 2, copy, .
 _Avoid_: Keybindings, shortcuts (in code and docs; the UI says hotkeys).
 
 **File Index**:
-A project's files for Go to File, as relative paths: `git ls-files --cached --others --exclude-standard` on the project's host, or a walk that skips dependency folders when the folder is not a repo. Fetched each time the box opens; the last one shows meanwhile.
+A project's files for Go to File, as relative paths: `git ls-files --cached --others --exclude-standard` on the project's host plus the ignored files, walking into wholly ignored folders but not the skipped ones (Settings › Files; by default dependency and build folders like `node_modules`, `.venv`, `target`), or a walk that skips the same folders when the folder is not a repo. Fetched each time the box opens; the last one shows meanwhile.
 
 **Folder Picker**:
 The path field that is also the folder list: typing filters, `Enter` goes in or opens, `Backspace` on empty goes up, a `~` or `/` path jumps.

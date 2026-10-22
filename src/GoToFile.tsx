@@ -6,7 +6,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Project, activeProject, focusTab, focusedTab, isRemote, projectById, space, tabName } from "./state";
+import { type Project, activeProject, focusTab, focusedTab, isRemote, projectById, skipFolders, space, tabName } from "./state";
 import { agentTarget } from "./agents";
 import { filesOf, openFile } from "./files";
 import { FileIcon } from "./FileList";
@@ -23,7 +23,7 @@ const [indexes, setIndexes] = createStore<Record<string, IndexState>>({});
 function loadIndex(p: Project) {
   if (indexes[p.id]?.loading) return;
   setIndexes(p.id, { loading: true });
-  invoke<FileIndex>("project_files", { host: p.host, path: p.path })
+  invoke<FileIndex>("project_files", { host: p.host, path: p.path, skip: skipFolders() })
     .then((index) => setIndexes(p.id, { loading: false, index, error: undefined }))
     .catch((e) => setIndexes(p.id, { loading: false, error: String(e) }));
 }
@@ -285,7 +285,7 @@ function Box(props: { project: Project }) {
         <span><kbd>Ctrl</kbd><kbd>Enter</kbd> new window</span>
         <span><kbd>Tab</kbd> complete</span>
         <Show when={agent()}>{(t) => <span><kbd>Shift</kbd><kbd>Enter</kbd> @ to {t().kind}</span>}</Show>
-        <span class="src" title="git ls-files: tracked files plus new ones that are not ignored">{status()}</span>
+        <span class="src" title="git ls-files: tracked, new and ignored files, minus the folders skipped in Settings › Files">{status()}</span>
       </div>
     </div>
   );

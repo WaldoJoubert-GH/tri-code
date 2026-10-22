@@ -220,6 +220,8 @@ export type Settings = {
   /** Carousel (mono) layout: px each side of the centred window, where its neighbours peek.
    *  Unset is auto: the window takes 62% of the width, up to MONO_MAX. */
   monoGutter?: number;
+  /** Folder names Go to File leaves out wherever they are. Unset is SKIP_FOLDERS. */
+  skipFolders?: string[];
   /** The key window hotkeys start with (modkey.ts). */
   modKey: "alt" | "meta";
   /** Keymap actions whose keys were changed, by action id (keymap.ts); the rest keep their defaults. */
@@ -555,6 +557,17 @@ export function setGap(gap: number) {
 /** Carousel gutter in px each side, or undefined for auto. */
 export function setMonoGutter(px: number | undefined) {
   setApp("settings", "monoGutter", px === undefined ? undefined : Math.round(Math.max(0, px)));
+}
+
+/** Go to File's default skip list; the same as `fs::SKIP` in fs.rs. `.git` is always skipped. */
+export const SKIP_FOLDERS = ["node_modules", "target", "dist", "build", ".venv", "venv", "__pycache__", ".next", ".cache"];
+
+export const skipFolders = () => app.settings.skipFolders ?? SKIP_FOLDERS;
+
+/** Folder names Go to File leaves out, or undefined for the default list. */
+export function setSkipFolders(names: string[] | undefined) {
+  const clean = names && [...new Set(names.map((n) => n.trim().replace(/^\/+|\/+$/g, "")).filter(Boolean))];
+  setApp("settings", "skipFolders", clean);
 }
 
 export function setSidebarCollapsed(collapsed: boolean) {

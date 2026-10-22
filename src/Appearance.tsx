@@ -79,12 +79,14 @@ export function toggleAppearance(anchor?: HTMLElement | null) {
   else openAppearance(anchor);
 }
 
-/** Put the popover beside the anchor: under it in the toolbar, to its right when it is a sidebar gear. */
+/** Put the popover beside the anchor: under it in the toolbar, right of the sidebar when it is a sidebar gear. */
 function placePop(el: HTMLElement, a: HTMLElement) {
   const r = a.getBoundingClientRect(), pw = 300, h = el.offsetHeight;
+  const aside = a.closest("aside");
   let left: number, top: number;
-  if (a.closest("aside")) {
-    left = r.right + 10;
+  if (aside) {
+    // the gear sits inside the sidebar, so measure from the sidebar's edge or the panel covers it
+    left = Math.min(aside.getBoundingClientRect().right + 8, window.innerWidth - pw - 8);
     top = Math.max(8, Math.min(r.top - 10, window.innerHeight - h - 8));
   } else {
     left = Math.min(Math.max(8, r.left), window.innerWidth - pw - 8);
@@ -130,7 +132,17 @@ export function AppearancePopover() {
             };
 
             return (
-              <div class="pop" role="dialog" aria-label="Project appearance" ref={(el) => requestAnimationFrame(() => placePop(el, s.anchor))}>
+              <div
+                class="pop"
+                role="dialog"
+                aria-label="Project appearance"
+                ref={(el) => {
+                  // place again whenever it changes size (logos arrive, the tab changes), so it stays on screen
+                  const ro = new ResizeObserver(() => placePop(el, s.anchor));
+                  ro.observe(el);
+                  onCleanup(() => ro.disconnect());
+                }}
+              >
                 <div class="ttl">
                   <input
                     class="name"

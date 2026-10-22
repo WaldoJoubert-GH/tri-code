@@ -257,15 +257,15 @@ pub struct FileIndex {
 
 const INDEX_LIMIT: usize = 50_000;
 
-/// Go to File's index: tracked plus untracked-but-not-ignored files, so a file you just
-/// created is findable and node_modules is not. Ignored files outside ignored folders
-/// (`.env`, `.env.local`) are listed too; a wholly ignored folder is not. A folder that is
-/// not a repo is walked.
+/// Go to File's index: tracked plus untracked files, ignored ones included (`.env`, a
+/// gitignored `.todo/`), except inside the folders named in `skip` (Settings; unset is
+/// `fs::SKIP`: `node_modules`, `.venv`, `target`…). A folder that is not a repo is walked.
 #[tauri::command]
-pub async fn project_files(host: String, path: String) -> Result<FileIndex, String> {
+pub async fn project_files(host: String, path: String, skip: Option<Vec<String>>) -> Result<FileIndex, String> {
+    let skip = skip.unwrap_or_else(|| crate::fs::SKIP.iter().map(|s| s.to_string()).collect());
     const CMDS: &[&[&str]] = &[
         &["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-        // --directory folds a wholly ignored folder into one "dir/" entry, dropped below
+        // --directory folds a wholly ignored folder into one "dir/" entry, walked below
         &["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"],
     ];
     blocking(move || match multi(&host, &path, CMDS).ok().and_then(|r| r.into_iter().map(Result::ok).collect::<Option<Vec<_>>>()) {
@@ -273,13 +273,26 @@ pub async fn project_files(host: String, path: String) -> Result<FileIndex, Stri
             let mut files: Vec<String> = outs[0].split('\0').filter(|f| !f.is_empty()).map(String::from).collect();
             // a conflicted file is listed once per merge stage
             files.dedup();
-            files.extend(outs[1].split('\0').filter(|f| !f.is_empty() && !f.ends_with('/')).map(String::from));
+            let (folded, ignored): (Vec<&str>, Vec<&str>) = outs[1].split('\0').filter(|f| !f.is_empty()).partition(|f| f.ends_with('/'));
+            files.extend(ignored.into_iter().map(String::from));
+            let walk: Vec<String> = folded
+                .into_iter()
+                .map(|d| d.trim_end_matches('/'))
+                .filter(|d| !crate::fs::skipped(&skip, d.rsplit('/').next().unwrap_or(d)))
+                .map(String::from)
+                .collect();
+            if !walk.is_empty() && files.len() <= INDEX_LIMIT {
+                // Git for Windows can list a folded folder's files as well, so drop repeats
+                let seen: std::collections::HashSet<String> = files.iter().cloned().collect();
+                let (more, _) = crate::fs::walk_under(&host, &path, &walk, &skip, INDEX_LIMIT + 1 - files.len()).unwrap_or_default();
+                files.extend(more.into_iter().filter(|f| !seen.contains(f)));
+            }
             let truncated = files.len() > INDEX_LIMIT;
             files.truncate(INDEX_LIMIT);
             Ok(FileIndex { files, git: true, truncated })
         }
         None => {
-            let (files, truncated) = crate::fs::walk(&host, &path, INDEX_LIMIT)?;
+            let (files, truncated) = crate::fs::walk(&host, &path, &skip, INDEX_LIMIT)?;
             Ok(FileIndex { files, git: false, truncated })
         }
     })
