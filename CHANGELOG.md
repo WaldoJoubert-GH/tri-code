@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.31 — 2026-10-22
+
+- Feedback: the speech-bubble button beside the bell (or Feedback in the Command Palette) reports a bug or an idea as an issue on tri-code's GitHub, using your `gh` login. Without `gh`, GitHub's new-issue form opens filled in. Your version and OS go with it unless you turn that off.
+- Clicking a desktop notification brings tri-code forward and focuses the agent it was about. If that agent's window has since closed, a flash says so.
+- When an agent quits, its window carries on as a shell, with the agent's output still above the prompt. Exiting a shell closes its window.
+
 ## 0.1.30 — 2026-10-22
 
 Bug fixes.
