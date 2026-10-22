@@ -2,6 +2,16 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.30 — 2026-10-22
+
+Bug fixes.
+
+- Go to File finds files inside gitignored folders (a `.todo/` or `migrations/` your `.gitignore` leaves out), on your machine as well as over ssh. Dependency and build folders (`node_modules`, `.venv`, `target`…) stay out; change the list in Settings › Files.
+- The Appearance panel opens beside the sidebar instead of over it, stays on screen as its content loads, and no longer scrolls sideways on macOS. The project's logo sits centred in its tile.
+- Agents start at their window's size, instead of small until the window is resized.
+- `Alt+Enter` opens a plain shell instead of a copy of the focused terminal.
+- Browser windows: pages hide under a maximised window and under menus and dialogs that overlap them, a reload no longer leaves a page stuck white, text that isn't an address searches, and a new blank page focuses its address bar.
+
 ## 0.1.29 — 2026-10-22
 
 - The files window and file windows are now one editor window per project (`Alt+E`): the file tree, a tab per open file and a real code editor (CodeMirror), with syntax colours for the common languages, search (`Ctrl+F`), multiple cursors, folding and bracket matching. Markdown, HTML and SVG still show rendered, with Source to edit them; images, video and audio still play.
