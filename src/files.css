@@ -16,6 +16,13 @@
 .fchev { width: 12px; flex: none; color: var(--muted); font-size: 9px; text-align: center; }
 .fname { overflow: hidden; text-overflow: ellipsis; }
 .frow.dir .fname { font-weight: 600; }
+/* Git status: the name in the change's colour and its letter at the right (a dot on a folder). */
+[data-g="M"] { --gc: var(--warn); }
+[data-g="A"], [data-g="U"] { --gc: var(--ok); }
+[data-g="D"], [data-g="C"] { --gc: var(--bad); }
+[data-g="R"] { --gc: var(--accent); }
+.frow[data-g] .fname, .ft[data-g] .ftn { color: var(--gc); }
+.fmark { margin-left: auto; padding-left: 6px; flex: none; font: 600 10.5px var(--mono); color: var(--gc); }
 
 /* File-type chip; folders draw a small folder shape. */
 .fic {

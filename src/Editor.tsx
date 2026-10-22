@@ -18,7 +18,8 @@ import {
   markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor,
 } from "./files";
 import { createState, fromBody, indentText, languageOf, showChanges, toBody } from "./cm";
-import FileTree, { FileIcon } from "./FileList";
+import FileTree, { FileIcon, MARK_TITLE } from "./FileList";
+import { fileMarks, markAt, peekStatus } from "./git";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { openExternal, openUrlInProject } from "./browsers";
 import { capsOf, withKey } from "./keymap";
@@ -206,6 +207,8 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     });
   });
 
+  const marks = createMemo(() => fileMarks(props.project));
+
   const showingEditor = () => !!path() && !media() && !previewing() && !diffing() && ready() === path() && !!text()?.file && !text()!.file!.binary;
   // The view measures itself; one shown again after being hidden (or a window made visible) re-measures.
   createEffect(on(showingEditor, (on) => on && view?.requestMeasure()));
@@ -229,6 +232,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
       d.base = snapshot;
       markDirty(tabId, f, !d.state.doc.eq(snapshot));
       flash(`saved ${name(f)}`);
+      void peekStatus(props.project, true);
     } catch (e) {
       flash(`save failed: ${e}`);
     } finally {
@@ -578,9 +582,10 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
               <span
                 class="ft"
                 classList={{ on: f === path(), pv: props.tab.preview === f }}
+                data-g={markAt(marks(), f)}
                 role="tab"
                 aria-selected={f === path()}
-                title={props.tab.preview === f ? `${f} · preview: double-click to keep` : f}
+                title={[f, markAt(marks(), f) && MARK_TITLE[markAt(marks(), f)!], props.tab.preview === f && "preview: double-click to keep"].filter(Boolean).join(" · ")}
                 onClick={() => pick(f)}
                 onDblClick={() => keepPreview(props.project, props.tab, f)}
                 onAuxClick={(e) => e.button === 1 && closeFile(f)}

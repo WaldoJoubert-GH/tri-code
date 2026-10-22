@@ -137,11 +137,12 @@ const peeking = new Set<string>();
 /** A folder costs one git batch per repo; poll it every 30s, not every 10s like one repo. */
 const lastFolderPeek = new Map<string, number>();
 
-/** git_status alone, without the git window's diff and PR lookups. */
-export async function peekStatus(p: Project): Promise<void> {
+/** git_status alone, without the git window's diff and PR lookups. `now` skips a folder's 30s wait
+ *  (the editor saved a file). */
+export async function peekStatus(p: Project, now = false): Promise<void> {
   if (peeking.has(p.id)) return;
   const folderAt = lastFolderPeek.get(p.id);
-  if (folderAt && Date.now() - folderAt < 30_000) return;
+  if (!now && folderAt && Date.now() - folderAt < 30_000) return;
   peeking.add(p.id);
   try {
     setBranchStatus(p.id, await invoke<GitStatus>("git_status", args(p)));
@@ -159,6 +160,64 @@ export async function peekStatus(p: Project): Promise<void> {
   } finally {
     peeking.delete(p.id);
   }
+}
+
+// ── file marks (the editor's tree and tabs) ─────────────────────────
+
+/** A file's change as the editor marks it: Modified, Added, Untracked, Deleted, Renamed, Conflict. */
+export type FileMark = "M" | "A" | "U" | "D" | "R" | "C";
+export type FileMarks = {
+  /** By absolute path (forward slashes). An untracked folder is listed as itself. */
+  files: Map<string, FileMark>;
+  /** Folders holding a change, with the most pressing one inside. */
+  dirs: Map<string, FileMark>;
+  /** Untracked folders: everything under them is untracked. */
+  untracked: string[];
+};
+
+const RANK: Record<FileMark, number> = { U: 0, A: 1, R: 2, D: 3, M: 4, C: 5 };
+const slashes = (p: string) => trimSep(p).replace(/\\/g, "/");
+
+export function markOf(c: Change): FileMark {
+  if (c.x === "?") return "U";
+  if (c.x === "U" || c.y === "U" || (c.x === "A" && c.y === "A") || (c.x === "D" && c.y === "D")) return "C";
+  if (c.x === "D" || c.y === "D") return "D";
+  if (c.x === "A") return "A";
+  if (c.x === "R" || c.x === "C") return "R";
+  return "M";
+}
+
+/** Every changed file in the project, from the status the status line polls (or the git window's
+ *  refresh), so the tree costs no git calls of its own. */
+export function fileMarks(p: Project): FileMarks {
+  const repos: RepoStatus[] = folderStatus[p.id] ?? (branchStatus[p.id] ? [{ repo: "", status: branchStatus[p.id]! }] : []);
+  const files = new Map<string, FileMark>();
+  const dirs = new Map<string, FileMark>();
+  const untracked: string[] = [];
+  const top = slashes(p.path);
+  for (const r of repos) {
+    const root = slashes(repoRoot(p, r.repo));
+    for (const c of r.status?.files ?? []) {
+      const mark = markOf(c);
+      const path = `${root}/${c.path.replace(/\/$/, "")}`;
+      if (c.path.endsWith("/")) untracked.push(path);
+      files.set(path, mark);
+      for (let d = path.slice(0, path.lastIndexOf("/")); d.length > top.length; d = d.slice(0, d.lastIndexOf("/"))) {
+        const was = dirs.get(d);
+        if (was && RANK[was] >= RANK[mark]) break;
+        dirs.set(d, mark);
+      }
+    }
+  }
+  return { files, dirs, untracked };
+}
+
+/** The mark for a tree row or tab path, if it has one. */
+export function markAt(m: FileMarks, path: string, dir = false): FileMark | undefined {
+  const p = slashes(path);
+  const own = m.files.get(p) ?? (dir ? m.dirs.get(p) : undefined);
+  if (own) return own;
+  return m.untracked.some((u) => p.startsWith(`${u}/`)) ? "U" : undefined;
 }
 
 // ── loading ─────────────────────────────────────────────────────────

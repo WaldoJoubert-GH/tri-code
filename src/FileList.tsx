@@ -1,11 +1,13 @@
 // The editor's file tree: the project folder, directories expanded in place. A click opens a
 // file in the editor's preview tab, a double-click keeps it, Ctrl+click opens it in a new editor
 // beside. It follows the editor: the file shown is revealed and selected. Plain keys drive it
-// while it has focus.
+// while it has focus. Changed files carry their git status letter, and folders a dot for what
+// they hold.
 
-import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js";
 import { type Project, isRemote } from "./state";
 import { type OpenHow, dirState, loadDir, refreshProject } from "./files";
+import { type FileMark, fileMarks, markAt, peekStatus } from "./git";
 import "./files.css";
 
 type Row = { path: string; name: string; dir: boolean; depth: number };
@@ -20,6 +22,10 @@ const EXT: Record<string, [string, string]> = {
   yml: ["ya", "#c96a7a"], sh: ["sh", "#9ece6a"], svg: ["sv", "#a97fd0"], png: ["im", "#a97fd0"],
   jpg: ["im", "#a97fd0"], jpeg: ["im", "#a97fd0"], gif: ["im", "#a97fd0"], lock: ["lk", "#8a8f9c"],
   py: ["py", "#4d7fd6"], go: ["go", "#3f9fd0"],
+};
+
+export const MARK_TITLE: Record<FileMark, string> = {
+  M: "modified", A: "added", U: "untracked", D: "deleted", R: "renamed", C: "conflict",
 };
 
 export function FileIcon(props: { name: string; dir: boolean }): JSX.Element {
@@ -40,6 +46,13 @@ export default function FileTree(props: {
   let rootEl!: HTMLDivElement;
   const [open, setOpen] = createSignal<ReadonlySet<string>>(new Set());
   const [sel, setSel] = createSignal("");
+
+  const marks = createMemo(() => fileMarks(props.project));
+  const markOf = (r: Row) => markAt(marks(), r.path, r.dir);
+  /** A folder that holds changes shows a dot; an untracked folder, like a file, shows its letter. */
+  const letter = (r: Row) => (r.dir && !markAt(marks(), r.path) ? "•" : markOf(r) === "C" ? "!" : markOf(r));
+  // The status line polls only the active project; read this one's status when the tree opens.
+  onMount(() => void peekStatus(props.project));
 
   const isOpen = (p: string) => open().has(p);
   const toggle = (p: string) =>
@@ -147,14 +160,19 @@ export default function FileTree(props: {
             {(r) => (
               <div
                 class="frow"
+                data-g={markOf(r)}
                 classList={{ sel: r.path === sel(), dir: r.dir, shown: r.path === props.shown }}
                 data-path={r.path}
                 data-dir={r.dir ? "1" : "0"}
+                title={markOf(r) ? `${r.name} · ${letter(r) === "•" ? "has changes" : MARK_TITLE[markOf(r)!]}` : undefined}
                 style={{ "padding-left": `${6 + r.depth * 12}px` }}
               >
                 <span class="fchev">{r.dir ? (isOpen(r.path) ? "▾" : "▸") : ""}</span>
                 <FileIcon name={r.name} dir={r.dir} />
                 <span class="fname">{r.name}</span>
+                <Show when={markOf(r)}>
+                  <span class="fmark">{letter(r)}</span>
+                </Show>
               </div>
             )}
           </For>
