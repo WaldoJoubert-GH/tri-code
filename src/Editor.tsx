@@ -12,7 +12,7 @@ import { For, Show, createEffect, createMemo, createResource, createSignal, on, 
 import { createStore } from "solid-js/store";
 import type { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { type Project, type Tab, focusTab, setEditorTab, setProjectDiffMode } from "./state";
+import { type Project, type Tab, diffModeOf, focusTab, setEditorTab, setProjectDiffMode } from "./state";
 import {
   CHANGED, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
   markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor,
@@ -379,7 +379,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   const patchHunks = createMemo(() => (patch() ? parseUnified(patch()!) : []));
   const patchStats = createMemo(() => diffStats(patchHunks()));
 
-  const wantedMode = (): DiffMode => props.project.diffMode ?? "split";
+  const wantedMode = (): DiffMode => diffModeOf(props.project);
   const diffMode = (): DiffMode => (wantedMode() === "unified" || (paneW() > 0 && paneW() < 660) ? "unified" : "split");
   const setDiffMode = (m: DiffMode) => setProjectDiffMode(props.project.id, m);
 

@@ -3,7 +3,7 @@
 // Hotkeys page. Chosen from design/settings-hotkeys.html.
 
 import { For, Show, createSignal } from "solid-js";
-import { GAP_MAX, app, setGap, setMonoGutter, setSkipFolders, skipFolders } from "./state";
+import { GAP_MAX, app, setDiffDefault, setGap, setMonoGutter, setSkipFolders, skipFolders } from "./state";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
@@ -62,6 +62,20 @@ function FilesPage() {
         </Show>
       </label>
       <p class="note">Folder names, separated by commas or spaces, that Go to File never looks in, gitignored or not. <code>.git</code> is always skipped. Takes effect the next time the box opens.</p>
+      <h4>Diffs</h4>
+      <div class="row">
+        Layout
+        <span class="set-seg" role="radiogroup" aria-label="Diff layout">
+          <For each={[["unified", "☰ Unified", "Stacked: removed lines above the added ones"], ["split", "▥ Split", "Side by side: before on the left, after on the right"]] as const}>
+            {([m, label, title]) => (
+              <button type="button" role="radio" aria-checked={(app.settings.diffMode ?? "split") === m} title={title} onClick={() => setDiffDefault(m)}>
+                {label}
+              </button>
+            )}
+          </For>
+        </span>
+      </div>
+      <p class="note">For the git window and the editor's Diff, in every project. The toggle in a diff still switches one project; choosing here resets them all. Split shows unified in a pane narrower than about 660px.</p>
     </>
   );
 }

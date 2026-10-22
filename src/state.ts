@@ -231,6 +231,8 @@ export type Settings = {
   modKey: "alt" | "meta";
   /** Keymap actions whose keys were changed, by action id (keymap.ts); the rest keep their defaults. */
   hotkeys?: Record<string, Chord[]>;
+  /** How diffs read unless a project's own toggle says otherwise. Unset is split. */
+  diffMode?: DiffMode;
 };
 
 const defaultSettings = (): Settings => ({ modKey: "alt" });
@@ -696,6 +698,18 @@ export function setEditorTab(projectId: string, tabId: string, patch: Partial<Pi
 /** The git window's and the editor's diff orientation, kept per project. */
 export function setProjectDiffMode(projectId: string, mode: DiffMode) {
   edit(projectId, (p) => { p.diffMode = mode; });
+}
+
+/** A project's diff orientation: its own toggle, else the Settings default. */
+export const diffModeOf = (p: Project): DiffMode => p.diffMode ?? app.settings.diffMode ?? "split";
+
+/** Settings › Files: the default for every project. Choosing it clears the projects' own toggles,
+ *  so it shows everywhere at once. */
+export function setDiffDefault(mode: DiffMode) {
+  setApp(produce((s) => {
+    s.settings.diffMode = mode;
+    for (const p of s.projects) delete p.diffMode;
+  }));
 }
 
 export function setSettings(patch: Partial<Settings>) {

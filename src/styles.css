@@ -691,6 +691,10 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .skip-row textarea:focus { border-color: var(--accent); }
 .settings-dlg .skip-row .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
 .settings-dlg .skip-row .reset:hover { background: var(--hover); color: var(--text); }
+.settings-dlg .set-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.settings-dlg .set-seg button { padding: 3px 10px; font-size: 12px; color: var(--muted); }
+.settings-dlg .set-seg button + button { border-left: 1px solid var(--line); }
+.settings-dlg .set-seg button[aria-checked="true"] { background: var(--raised); color: var(--text); }
 @media (max-width: 640px) {
   .settings-dlg { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
   .settings-dlg nav { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }

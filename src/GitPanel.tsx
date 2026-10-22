@@ -6,7 +6,7 @@
 // the active repo owns the commit box, commits, PR and push (design/diff.html, folder of repos).
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
-import { type Project, type Tab, isRemote, setProjectDiffMode } from "./state";
+import { type Project, type Tab, diffModeOf, isRemote, setProjectDiffMode } from "./state";
 import {
   type Change, type CtxId, type Drawer, type RepoStatus, type Sel, commit, copyFinding, draftCommit, draftPr, gitOf, isStaged, isUnstaged, linkedIssue,
   loadPr, merge, openDrawer, openPr, push, refresh, repoRoot, review, select, selectCommit, selectRepo, setField, setOpt, stage, stepOf,
@@ -63,7 +63,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
   let rightEl: HTMLDivElement | undefined;
   let diffEl: HTMLDivElement | undefined;
 
-  const wantedMode = (): DiffMode => p().diffMode ?? "split";
+  const wantedMode = (): DiffMode => diffModeOf(p());
   const splitFits = () => paneW() === 0 || paneW() >= 660;
   const mode = (): DiffMode => (wantedMode() === "unified" || !splitFits() ? "unified" : "split");
   const setMode = (m: DiffMode) => setProjectDiffMode(p().id, m);
