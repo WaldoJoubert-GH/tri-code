@@ -12,7 +12,7 @@ import { IconFace, forgetIcon } from "./icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { openProjectDialog } from "./OpenProject";
 import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
-import { branchOf, loadWorktrees, openNewWorktree, removeWorktree, tileLabel } from "./worktrees";
+import { adoptWorktrees, branchOf, loadWorktrees, openNewWorktree, removeWorktree, tileLabel } from "./worktrees";
 import { flash } from "./ui";
 import { keyOf, withKey } from "./keymap";
 import { envLocked, lockEnv } from "./envlock";
@@ -145,6 +145,15 @@ export default function Sidebar() {
   createEffect(() => {
     for (const p of app.projects) {
       if (!p.parent && worktreesOf(p.id).length && !envLocked(p.host)) void loadWorktrees(p);
+    }
+  });
+  // Once a session, pick up the checkouts already in each repo's `.worktrees/` folder.
+  const adopted = new Set<string>();
+  createEffect(() => {
+    for (const p of app.projects) {
+      if (p.parent || p.sample || envLocked(p.host) || adopted.has(p.id)) continue;
+      adopted.add(p.id);
+      void adoptWorktrees(p).catch(() => {});
     }
   });
 

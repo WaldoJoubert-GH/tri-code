@@ -329,8 +329,8 @@ export function addSampleProject(path: string): string {
   return id;
 }
 
-/** Add a Worktree under `parentId` and make it active. Returns its id. */
-export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string; copy?: { repos: string[] } }): string {
+/** Add a Worktree under `parentId` and, unless `activate` is false, make it active. Returns its id. */
+export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string; copy?: { repos: string[] } }, activate = true): string {
   const id = newId();
   setApp(produce((s) => {
     const parent = s.projects.find((p) => p.id === parentId);
@@ -345,7 +345,7 @@ export function addWorktree(parentId: string, w: { path: string; branch: string;
       spaces: Array.from({ length: SPACES }, newSpace), accent, bg: "none", dim: 0, favs: [...parent.favs],
       parent: parentId, branch: w.branch, ...(w.issue ? { issue: w.issue } : {}), ...(w.copy ? { copy: w.copy } : {}),
     });
-    s.activeProject = id;
+    if (activate) s.activeProject = id;
   }));
   return id;
 }
