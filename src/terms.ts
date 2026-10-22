@@ -7,7 +7,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { AgentState, Live, Project, Tab, TabStatus, isRemote, isTerminal, live, sessionName, setLive } from "./state";
+import { AgentState, Live, Project, Tab, TabStatus, becomeShell, isRemote, isTerminal, live, removeTab, sessionName, setLive } from "./state";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
 import { Demo, playDemo } from "./demo";
@@ -80,8 +80,11 @@ class TermSession {
   private writes: Promise<unknown> = Promise.resolve();
   /** The tour's sample project: a scripted session in place of the PTY. */
   private demo?: Demo;
+  /** What the PTY runs ("" = login shell); cleared once an agent quits. */
+  private cmd: string;
 
   constructor(private project: Project, private tab: Tab) {
+    this.cmd = tab.cmd?.trim() ?? "";
     this.el.className = "term";
     this.el.style.cssText = "width:100%;height:100%";
     this.el.style.display = "none";
@@ -276,7 +279,7 @@ class TermSession {
         spec: {
           host: this.project.host,
           cwd: this.project.path,
-          cmd: this.tab.cmd?.trim() || null,
+          cmd: this.cmd || null,
           session: sessionName(this.project, this.tab),
         },
         cols,
@@ -310,6 +313,19 @@ class TermSession {
       setTimeout(() => this.start(), this.backoff);
       this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS);
       return;
+    }
+    if (this.cmd) {
+      // An agent quit: restarting it rarely helps, so carry on in a plain shell.
+      this.term.write(`\r\n\x1b[90m[${this.tab.name ?? "agent"} exited with code ${code}, starting a shell]\x1b[0m\r\n`);
+      this.update({ agent: undefined });
+      becomeShell(this.project.id, this.tab.id);
+      this.cmd = "";
+      return void this.start();
+    }
+    if (this.status === "running") {
+      // The shell was exited: close its window. One that never started stays open to show why.
+      removeTab(this.project.id, this.tab.id);
+      return closeSession(this.tab.id);
     }
     this.term.write(`\r\n\x1b[90m[exited with code ${code}, press Enter to restart]\x1b[0m\r\n`);
     this.update({ status: "exited", agent: undefined });

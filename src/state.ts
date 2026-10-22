@@ -605,6 +605,11 @@ function editTab(projectId: string, tabId: string, fn: (t: Tab) => void) {
   });
 }
 
+/** A terminal whose agent quit carries on as a plain login shell. */
+export function becomeShell(projectId: string, tabId: string) {
+  editTab(projectId, tabId, (t) => Object.assign(t, { agent: undefined, name: "shell", cmd: "" }));
+}
+
 export function setPageUrl(projectId: string, tabId: string, pageId: string, url: string) {
   editTab(projectId, tabId, (t) => {
     const pg = t.pages?.find((x) => x.id === pageId);
