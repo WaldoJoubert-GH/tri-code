@@ -281,7 +281,9 @@ function StatusBar() {
       <button class="ver" title="About tri-code: check for updates, changelog" onClick={() => setAboutOpen(true)}>
         v{appVersion}
       </button>
-      <ClaudeUsage />
+      <Show when={app.settings.claudeUsage !== false}>
+        <ClaudeUsage />
+      </Show>
     </div>
   );
 }

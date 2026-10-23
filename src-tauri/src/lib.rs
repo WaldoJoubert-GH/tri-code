@@ -124,6 +124,8 @@ pub fn run() {
             git::gh_pr_create,
             git::gh_pr_merge,
             git::git_worktrees,
+            git::git_branches,
+            git::git_fetch,
             git::git_worktree_add,
             git::git_worktree_remove,
             git::git_branch_delete,

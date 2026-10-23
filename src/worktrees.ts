@@ -134,9 +134,36 @@ export function worktreeDir(repo: Project, branch: string): string {
 export const [newWorktreeFor, setNewWorktreeFor] = createSignal<string | null>(null);
 export const newWorktreeOpen = () => newWorktreeFor() !== null;
 
+/** A branch New worktree can check out (git.rs `Branch`): `remote` when only a remote has it. */
+export type Branch = { name: string; remote: string | null };
+/** Each repo project's branches, by its id, as of the last New worktree. Runtime only. */
+export const [branches, setBranches] = createStore<Record<string, Branch[]>>({});
+
+/** The repo project whose remotes New worktree is fetching, if any. Runtime only. */
+export const [fetching, setFetching] = createSignal<string | null>(null);
+
+const loadBranches = (repo: Project) =>
+  invoke<Branch[]>("git_branches", { host: repo.host, path: repo.path }).then((b) => setBranches(repo.id, b), () => {});
+
+/** List the branches git already knows, then fetch and list them again with what was pushed since. */
+async function fetchBranches(repo: Project): Promise<void> {
+  await loadBranches(repo);
+  if (kinds[repo.id]?.git === false) return;
+  setFetching(repo.id);
+  try {
+    await invoke("git_fetch", { host: repo.host, path: repo.path });
+    await loadBranches(repo);
+  } catch (e) {
+    if (kinds[repo.id]?.git) flash(`git fetch: ${e}`);
+  } finally {
+    if (fetching() === repo.id) setFetching(null);
+  }
+}
+
 export function openNewWorktree(p: Project) {
   const repo = repoOf(p);
   void adoptWorktrees(repo).catch(() => {});
+  void fetchBranches(repo);
   setNewWorktreeFor(repo.id);
 }
 export const closeNewWorktree = () => setNewWorktreeFor(null);

@@ -343,7 +343,7 @@ export default function Sidebar() {
                       )}
                     </For>
                     <button class="wt new" title={withKey("New worktree", "new-worktree")} onClick={() => openNewWorktree(p)}>
-                      <span class="wtile">+</span><span class="bn">New worktree</span>
+                      <span class="wtile"><Icon name="git-branch-plus" size={12} /></span><span class="bn">New worktree</span>
                     </button>
                   </div>
                 </Show>

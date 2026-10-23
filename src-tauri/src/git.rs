@@ -680,20 +680,66 @@ pub async fn git_worktrees(host: String, path: String) -> Result<Vec<Worktree>, 
     blocking(move || exec(&host, &path, "git", &["worktree", "list", "--porcelain"], None).map(|o| parse_worktrees(&o))).await
 }
 
-/// Check out `branch` in a new folder `dir`, creating the branch from `base` when it does not
-/// exist yet (from HEAD when there is no local `base` either).
+#[derive(Debug, Serialize, PartialEq)]
+pub struct Branch {
+    /// Without `refs/heads/` or the remote's name.
+    pub name: String,
+    /// Only on a remote (`origin/<name>`) so far: checking it out makes a local branch tracking it.
+    pub remote: Option<String>,
+}
+
+/// Parse `git for-each-ref --format=%(refname) refs/heads refs/remotes`: the local branches, then
+/// the remote ones with no local branch of the same name (once, the first remote's).
+fn parse_branches(out: &str) -> Vec<Branch> {
+    let mut local: Vec<Branch> = Vec::new();
+    let mut remote: Vec<Branch> = Vec::new();
+    for r in out.lines().map(str::trim) {
+        if let Some(name) = r.strip_prefix("refs/heads/") {
+            local.push(Branch { name: name.to_string(), remote: None });
+        } else if let Some((at, name)) = r.strip_prefix("refs/remotes/").and_then(|r| r.split_once('/')) {
+            if name != "HEAD" && !remote.iter().any(|b| b.name == name) {
+                remote.push(Branch { name: name.to_string(), remote: Some(at.to_string()) });
+            }
+        }
+    }
+    remote.retain(|b| !local.iter().any(|l| l.name == b.name));
+    local.extend(remote);
+    local
+}
+
+/// Fetch every remote, dropping branches deleted there, so New worktree lists what was pushed since.
+#[tauri::command]
+pub async fn git_fetch(host: String, path: String) -> Result<(), String> {
+    blocking(move || exec(&host, &path, "git", &["fetch", "--all", "--prune", "--quiet"], None).map(|_| ())).await
+}
+
+/// The branches a Worktree could check out, local and remote.
+#[tauri::command]
+pub async fn git_branches(host: String, path: String) -> Result<Vec<Branch>, String> {
+    blocking(move || exec(&host, &path, "git", &["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"], None).map(|o| parse_branches(&o))).await
+}
+
+/// Check out `branch` in a new folder `dir`. A branch only on a remote gets a local branch tracking
+/// it; one that does not exist yet is made from `base` (from HEAD when there is no local `base` either).
 #[tauri::command]
 pub async fn git_worktree_add(host: String, path: String, dir: String, branch: String, base: String) -> Result<(), String> {
     blocking(move || {
         let has = |r: &str| exec(&host, &path, "git", &["rev-parse", "--verify", "--quiet", r], None).is_ok();
-        let exists = has(&format!("refs/heads/{branch}"));
-        let base = if has(&format!("refs/heads/{base}")) { base } else { "HEAD".to_string() };
-        let args: Vec<&str> = if exists {
-            vec!["worktree", "add", &dir, &branch]
-        } else {
-            vec!["worktree", "add", "-b", &branch, &dir, &base]
+        if has(&format!("refs/heads/{branch}")) {
+            return exec_with_paths(&host, &path, &["worktree", "add", &dir, &branch], &[2]).map(|_| ());
+        }
+        let refs = exec(&host, &path, "git", &["for-each-ref", "--format=%(refname)", "refs/remotes"], None).unwrap_or_default();
+        let (start, tracks) = match parse_branches(&refs).into_iter().find(|b| b.name == branch).and_then(|b| b.remote) {
+            Some(at) => (format!("{at}/{branch}"), true),
+            None if has(&format!("refs/heads/{base}")) => (base, false),
+            None => ("HEAD".to_string(), false),
         };
-        let at = if exists { 2 } else { 4 };
+        let mut args = vec!["worktree", "add"];
+        if tracks {
+            args.push("--track");
+        }
+        args.extend(["-b", &branch, &dir, &start]);
+        let at = args.len() - 2;
         exec_with_paths(&host, &path, &args, &[at]).map(|_| ())
     })
     .await
@@ -812,6 +858,22 @@ mod tests {
             Worktree { path: "/r".into(), branch: Some("main".into()), main: true },
             Worktree { path: "/r.worktrees/feat-x".into(), branch: Some("feat/x".into()), main: false },
             Worktree { path: "/tmp/d".into(), branch: None, main: false },
+        ]);
+    }
+
+    #[test]
+    fn branches_list_local_then_remote_only_ones() {
+        let b = parse_branches("refs/heads/main
+refs/heads/feat/x
+refs/remotes/origin/HEAD
+refs/remotes/origin/main
+refs/remotes/origin/agents-revamp
+refs/remotes/fork/agents-revamp
+");
+        assert_eq!(b, vec![
+            Branch { name: "main".into(), remote: None },
+            Branch { name: "feat/x".into(), remote: None },
+            Branch { name: "agents-revamp".into(), remote: Some("origin".into()) },
         ]);
     }
 

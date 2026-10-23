@@ -3,7 +3,7 @@
 // Hotkeys page. Chosen from design/settings-hotkeys.html.
 
 import { For, Show, createSignal } from "solid-js";
-import { GAP_MAX, GIT_TINT, GitColor, app, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setSkipFolders, skipFolders } from "./state";
+import { GAP_MAX, GIT_TINT, GitColor, app, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setSkipFolders, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
@@ -128,6 +128,16 @@ function GitPage() {
         </For>
       </div>
       <p class="note">Used by the git window, diffs, the file tree's status marks and the status line. A colour you pick is kept in light and dark; ↺ goes back to the theme's.</p>
+      <h4>Worktrees</h4>
+      <label class="row wt-agent">
+        New worktree opens
+        <select value={worktreeAgent()} onChange={(e) => setWorktreeAgent(e.currentTarget.value)}>
+          <For each={app.agents}>{(a) => <option value={a.id}>{a.name || "untitled"}</option>}</For>
+          <option value="">nothing</option>
+        </select>
+        <button type="button" class="reset" title="Back to the first agent with a command" disabled={app.settings.worktreeAgent === undefined} onClick={() => setWorktreeAgent(undefined)}>↺</button>
+      </label>
+      <p class="note">The agent the New worktree dialog starts on; you can still pick another there.</p>
     </>
   );
 }
@@ -161,6 +171,20 @@ function WindowsPage() {
         </span>
       </label>
       <p class="note">The carousel gutter is the space each side of the centred window. Leave it empty for auto; 0 hides the neighbours.</p>
+      <h4>Status line</h4>
+      <div class="row">
+        Claude usage
+        <span class="set-seg" role="radiogroup" aria-label="Claude usage">
+          <For each={[[true, "Show"], [false, "Hide"]] as const}>
+            {([on, label]) => (
+              <button type="button" role="radio" aria-checked={(app.settings.claudeUsage !== false) === on} onClick={() => setClaudeUsage(on)}>
+                {label}
+              </button>
+            )}
+          </For>
+        </span>
+      </div>
+      <p class="note">The session and weekly limits at the bottom right, read with Claude Code's login every 5 minutes. Hidden, it isn't fetched.</p>
     </>
   );
 }

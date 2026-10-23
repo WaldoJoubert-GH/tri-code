@@ -190,7 +190,7 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 .wt:hover .x, .wt .x:focus-visible { opacity: 1; }
 .wt .x:hover { color: var(--text); }
 .wt.new { color: var(--muted); }
-.wt.new .wtile { background: var(--panel); border: 1px dashed var(--line); color: var(--muted); font: 400 13px var(--ui); }
+.wt.new .wtile { background: var(--panel); border: 1px dashed var(--line); color: var(--muted); }
 .wt.new:hover, .wt.new:hover .wtile { color: var(--text); }
 .wt > .sb {
   position: absolute; left: 23px; top: -1px; z-index: 2; min-width: 12px; height: 12px; padding: 0 3px; border-radius: 6px;
@@ -750,12 +750,14 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
   .hk-list dt { border-bottom: 0; padding-bottom: 0; }
 }
 .settings-dlg .git-color input[type="color"] { margin-left: auto; width: 34px; height: 22px; padding: 0 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); cursor: pointer; }
-.settings-dlg .git-color .reset, .settings-dlg .git-tint .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
-.settings-dlg .git-color .reset:hover, .settings-dlg .git-tint .reset:hover { background: var(--hover); color: var(--text); }
-.settings-dlg .git-color .reset:disabled, .settings-dlg .git-tint .reset:disabled { visibility: hidden; }
+.settings-dlg .git-color .reset, .settings-dlg .git-tint .reset, .settings-dlg .wt-agent .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+.settings-dlg .git-color .reset:hover, .settings-dlg .git-tint .reset:hover, .settings-dlg .wt-agent .reset:hover { background: var(--hover); color: var(--text); }
+.settings-dlg .git-color .reset:disabled, .settings-dlg .git-tint .reset:disabled, .settings-dlg .wt-agent .reset:disabled { visibility: hidden; }
 .settings-dlg .git-color .g-st { width: 14px; }
 .settings-dlg .git-tint input[type="range"] { margin-left: auto; accent-color: var(--accent); }
 .settings-dlg .git-tint .val { width: 34px; text-align: right; font: 11px var(--mono); }
+.settings-dlg .wt-agent select { margin-left: auto; height: 24px; padding: 0 4px; font: 12px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; outline: none; }
+.settings-dlg .wt-agent select:focus { border-color: var(--accent); }
 .settings-dlg .git-preview { margin-top: 10px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 0; background: var(--bg); font: 12px/17px var(--mono); overflow: hidden; user-select: none; }
 :is(.pop, .settings-dlg) .radios { display: grid; gap: 1px; }
 :is(.pop, .settings-dlg) .radio { display: flex; align-items: flex-start; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; }

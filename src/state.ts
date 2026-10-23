@@ -237,6 +237,10 @@ export type Settings = {
   gitColors?: Partial<Record<GitColor, string>>;
   /** How strongly diff lines are tinted, %. Unset is GIT_TINT. */
   gitTint?: number;
+  /** The agent New worktree opens in the new checkout, by id; "" opens nothing. Unset is worktreeAgent's default. */
+  worktreeAgent?: string;
+  /** false hides Claude's session and weekly usage in the status line (and stops fetching it). Unset shows it. */
+  claudeUsage?: boolean;
 };
 
 export type GitColor = "add" | "del" | "mod" | "ren";
@@ -586,6 +590,24 @@ export function setGitColor(key: GitColor, color: string | undefined) {
 /** Diff line tint in %, or undefined for GIT_TINT. */
 export function setGitTint(pct: number | undefined) {
   setApp("settings", "gitTint", pct === undefined ? undefined : Math.round(Math.min(60, Math.max(0, pct))));
+}
+
+/** The agent New worktree opens by default: the one picked in Settings › Git if it is still there,
+ *  else the first with a command (claude, usually). "" opens nothing. */
+export function worktreeAgent(): string {
+  const id = app.settings.worktreeAgent;
+  if (id === "" || app.agents.some((a) => a.id === id)) return id!;
+  return app.agents.find((a) => a.command.trim())?.id ?? "";
+}
+
+/** The agent New worktree opens by default, "" for nothing, or undefined for the first with a command. */
+export function setWorktreeAgent(id: string | undefined) {
+  setApp("settings", "worktreeAgent", id);
+}
+
+/** Show or hide Claude's usage in the status line. */
+export function setClaudeUsage(on: boolean) {
+  setApp("settings", "claudeUsage", on ? undefined : false);
 }
 
 /** Go to File's default skip list; the same as `fs::SKIP` in fs.rs. `.git` is always skipped. */
