@@ -136,9 +136,12 @@ export default function DiffView(props: {
 
   createEffect(on(() => props.text, () => setSel(null)));
 
-  // Split: each side scrolls sideways on its own, from its own bar under the diff. The rows keep both halves
-  // (so they stay lined up as the diff scrolls down); a side's text moves by --sx-l / --sx-r.
+  // Split: the sides scroll sideways together, from either bar under the diff. The rows keep both halves
+  // (so they stay lined up as the diff scrolls down); a side's text moves by --sx-l / --sx-r, each
+  // stopping where its own longest line ends.
   let barL: HTMLDivElement | undefined, barR: HTMLDivElement | undefined;
+  /** How far the sides are scrolled sideways, px, before each side's own limit. */
+  let sx = 0;
   /** How far each side's longest line runs past its half, px; 0 when every line fits. */
   const [wide, setWide] = createSignal<[number, number]>([0, 0]);
   const measure = () => {
@@ -151,32 +154,43 @@ export default function DiffView(props: {
       return Math.max(0, Math.ceil(max - tx.clientWidth));
     };
     const w: [number, number] = [side("l"), side("r")];
-    // a side that fits again has no bar to bring its text back, so put it back here
-    if (!w[0]) scroll.style.setProperty("--sx-l", "0");
-    if (!w[1]) scroll.style.setProperty("--sx-r", "0");
+    // with nothing to scroll the bars go away, so start from the left when they come back
+    if (!Math.max(...w)) sx = 0;
     setWide(w);
+    place();
   };
-  const slide = (s: "l" | "r", bar?: HTMLDivElement) => scroll?.style.setProperty(`--sx-${s}`, String(bar?.scrollLeft ?? 0));
-  createEffect(on(() => props.text, () => {
-    if (barL) barL.scrollLeft = 0;
-    if (barR) barR.scrollLeft = 0;
-    slide("l"); slide("r");
-  }));
+  /** Move both sides (and both bars) to `sx`, each held to its own limit. */
+  const place = () => {
+    const [l, r] = wide();
+    scroll?.style.setProperty("--sx-l", String(Math.min(sx, l)));
+    scroll?.style.setProperty("--sx-r", String(Math.min(sx, r)));
+    for (const bar of [barL, barR]) {
+      if (bar && bar.scrollLeft !== Math.min(sx, bar.scrollWidth - bar.clientWidth)) bar.scrollLeft = sx;
+    }
+  };
+  const slide = (bar?: HTMLDivElement) => {
+    if (!bar) return;
+    // a bar we just moved echoes back its own (possibly clamped) position; only a new one is a scroll
+    if (bar.scrollLeft === Math.min(sx, bar.scrollWidth - bar.clientWidth)) return;
+    sx = bar.scrollLeft;
+    place();
+  };
+  createEffect(on(() => props.text, () => { sx = 0; place(); }));
   createEffect(on(() => [model(), props.mode, props.error] as const, () => requestAnimationFrame(measure)));
   onMount(() => {
     const ro = new ResizeObserver(() => measure());
     if (scroll) ro.observe(scroll);
     onCleanup(() => ro.disconnect());
   });
-  /** A sideways wheel (or Shift+wheel) over a half scrolls that side. */
+  /** A sideways wheel (or Shift+wheel) over the diff scrolls both sides. */
   const onWheel = (e: WheelEvent) => {
     if (props.mode !== "split") return;
     // mostly-sideways only, so a diagonal trackpad swipe still scrolls down
     const dx = e.shiftKey ? e.deltaX || e.deltaY : Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
-    if (!dx) return;
-    const bar = (e.target as Element).closest(".dv-half.r") ? barR : barL;
-    if (!bar) return;
-    bar.scrollLeft += dx;
+    const max = Math.max(...wide());
+    if (!dx || !max) return;
+    sx = Math.max(0, Math.min(max, Math.min(sx, max) + dx));
+    place();
     e.preventDefault();
   };
 
@@ -301,8 +315,8 @@ export default function DiffView(props: {
     </div>
     <Show when={props.mode === "split" && (wide()[0] || wide()[1])}>
       <div class="dv-hbars">
-        <div ref={barL} onScroll={() => slide("l", barL)}><div style={{ width: `calc(100% + ${wide()[0]}px)` }} /></div>
-        <div ref={barR} onScroll={() => slide("r", barR)}><div style={{ width: `calc(100% + ${wide()[1]}px)` }} /></div>
+        <div ref={barL} onScroll={() => slide(barL)}><div style={{ width: `calc(100% + ${wide()[0]}px)` }} /></div>
+        <div ref={barR} onScroll={() => slide(barR)}><div style={{ width: `calc(100% + ${wide()[1]}px)` }} /></div>
       </div>
     </Show>
     </>
