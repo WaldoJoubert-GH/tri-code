@@ -1,5 +1,6 @@
 // Settings › Hotkeys: the Hotkey Modifier, then every Keymap action and every agent with the keys
-// it has now. Click a key to change it, + to add another; a key another action or agent has
+// it has now. Click a key to change it, + to add another (an Editor action's key can be two in a
+// row, like VS Code's Ctrl+K Ctrl+[); a key another action or agent has
 // offers Swap (or Move here, when adding). Changed rows show a dot and ↺; Reset all puts every
 // action back. Agents keep their one hotkey on the agent (also edited in the agents window).
 
@@ -7,16 +8,16 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "so
 import { type Chord, type Hotkey, app, setSettings, updateAgent } from "./state";
 import { metaName, modLabel } from "./modkey";
 import {
-  ACTIONS, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,
+  ACTIONS, THEN, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,
 } from "./keymap";
 import { recording, setRecording } from "./agents";
 import { flash } from "./ui";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph", "OS"]);
-const GROUPS = ["Focus", "Arrange", "Project", "Windows and links", "Signals", "Agents", "Text"];
+const GROUPS = ["Focus", "Arrange", "Project", "Windows and links", "Signals", "Agents", "Editor", "Text"];
 
 /** A row: a Keymap action, or an agent (one hotkey, kept on the agent). */
-type Row = { kind: "action" | "agent"; id: string; desc: string; keys: Chord[]; text?: boolean; changed: boolean };
+type Row = { kind: "action" | "agent"; id: string; desc: string; keys: Chord[]; text?: boolean; seq?: boolean; changed: boolean };
 /** Who has a chord: an action's key, or an agent's hotkey. */
 type Holder = { kind: "action"; id: string; index: number } | { kind: "agent"; id: string };
 type Clash = { row: Row; i: number; chord?: Chord; other?: Holder; blocked?: string };
@@ -28,7 +29,7 @@ const holderName = (h: Holder) => (h.kind === "action" ? actionById(h.id)!.desc 
 
 function rows(): Row[] {
   return [
-    ...ACTIONS.map((a): Row => ({ kind: "action", id: a.id, desc: a.desc, keys: keysOf(a.id), text: a.text, changed: changed(a.id) })),
+    ...ACTIONS.map((a): Row => ({ kind: "action", id: a.id, desc: a.desc, keys: keysOf(a.id), text: a.text, seq: a.seq, changed: changed(a.id) })),
     ...app.agents.map((a): Row => ({ kind: "agent", id: a.id, desc: a.name || "untitled", keys: a.hotkey ? [a.hotkey] : [], changed: false })),
   ];
 }
@@ -91,19 +92,29 @@ function settle(swap: boolean) {
 
 const slotId = (row: Row, i: number) => `hk:${row.kind}:${row.id}:${i}`;
 
-/** One key of a row, or the slot being recorded. Click, then press a key; the modifier is implied. */
+/** A chord's labels as <kbd>s, with a gap word between the two keys of a two-key chord. */
+const Caps = (props: { keys: string[] }) => <For each={props.keys}>{(k) => (k === THEN ? <span class="hk-then">then</span> : <kbd>{k}</kbd>)}</For>;
+
+/** One key of a row, or the slot being recorded. Click, then press a key; the modifier is implied.
+ *  An Editor action's slot then waits for a second key; Enter keeps the first alone. */
 function KeySlot(props: { row: Row; i: number; add?: boolean }) {
   const on = () => recording() === slotId(props.row, props.i);
   const chord = () => props.row.keys[props.i];
+  const [first, setFirst] = createSignal<Chord>();
+  const stop = () => { setFirst(undefined); setRecording(null); };
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Tab") return setRecording(null);
+    if (e.key === "Tab") return stop();
     e.preventDefault();
     e.stopPropagation();
     if (MODIFIERS.has(e.key)) return;
-    setRecording(null);
-    if (e.key === "Escape") return;
-    if (e.key === "Backspace" || e.key === "Delete") return chord() && assign(props.row, props.i, undefined);
-    assign(props.row, props.i, recorded(e, !!props.row.text));
+    const one = first();
+    if (e.key === "Escape") return stop();
+    if (!one && (e.key === "Backspace" || e.key === "Delete")) return stop(), chord() && assign(props.row, props.i, undefined);
+    if (one && e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) return stop(), assign(props.row, props.i, one);
+    const c = recorded(e, !!props.row.text);
+    if (props.row.seq && !one) return setFirst(c);
+    stop();
+    assign(props.row, props.i, one ? { ...one, then: c } : c);
   };
   // The window takes the key, so one pressed before the slot has focus still counts.
   createEffect(() => {
@@ -113,6 +124,7 @@ function KeySlot(props: { row: Row; i: number; add?: boolean }) {
   });
   const start = () => {
     setClash(null);
+    setFirst(undefined);
     setRecording(on() ? null : slotId(props.row, props.i));
   };
   return (
@@ -127,7 +139,7 @@ function KeySlot(props: { row: Row; i: number; add?: boolean }) {
               : <button type="button" class="hk none" title="Click to add a hotkey" onClick={start}><span>no hotkey</span></button>
           }
         >
-          {(c) => <button type="button" class="hk" title="Click to change" onClick={start}><For each={chordKeys(c())}>{(k) => <kbd>{k}</kbd>}</For></button>}
+          {(c) => <button type="button" class="hk" title="Click to change" onClick={start}><Caps keys={chordKeys(c())} /></button>}
         </Show>
       }
     >
@@ -136,11 +148,18 @@ function KeySlot(props: { row: Row; i: number; add?: boolean }) {
         class="hk rec"
         title="Press a key · Backspace removes · Esc cancels"
         ref={(el) => requestAnimationFrame(() => el.focus())}
-        onBlur={() => on() && setRecording(null)}
-        onClick={() => setRecording(null)}
+        onBlur={() => on() && stop()}
+        onClick={stop}
       >
-        <Show when={!props.row.text} fallback={<span>press Ctrl or Cmd + a key…</span>}>
-          <kbd>{modLabel()}</kbd><span>+ press a key…</span>
+        <Show
+          when={first()}
+          fallback={
+            <Show when={!props.row.text} fallback={<span>press Ctrl or Cmd + a key…</span>}>
+              <kbd>{modLabel()}</kbd><span>+ press a key…</span>
+            </Show>
+          }
+        >
+          {(c) => <><Caps keys={chordKeys(c())} /><span>then a second key, or Enter for just this one…</span></>}
         </Show>
       </button>
     </Show>

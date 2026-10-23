@@ -6,13 +6,18 @@
 import { type Chord, app, setHotkeys } from "./state";
 import { isMac, metaName, modDown, modLabel } from "./modkey";
 
-export type Action = { id: string; group: string; desc: string; def: Chord[]; text?: true };
+export type Action = { id: string; group: string; desc: string; def: Chord[]; text?: true; seq?: true };
 
 const k = (code: string, more: Partial<Chord> = {}): Chord => ({ code, ...more });
 const sh = (code: string) => k(code, { shift: true });
 const ct = (code: string) => k(code, { ctrl: true });
 /** A text key: Cmd first on a Mac, where Ctrl works too; Ctrl elsewhere. */
 const tx = (code: string) => (isMac ? [k(code, { bare: true, meta: true }), k(code, { bare: true, ctrl: true })] : [k(code, { bare: true, ctrl: true })]);
+/** VS Code's two-key editor chord: Cmd+K then Cmd+<code> on a Mac, Ctrl elsewhere. */
+const vs = (code: string): Chord[] => {
+  const m = isMac ? { bare: true, meta: true } : { bare: true, ctrl: true };
+  return [k("KeyK", { ...m, then: k(code, m) })];
+};
 
 const DIRS = [["left", "H", "ArrowLeft", "to the left"], ["down", "J", "ArrowDown", "below"], ["up", "K", "ArrowUp", "above"], ["right", "L", "ArrowRight", "to the right"]] as const;
 const WS = [1, 2, 3, 4] as const;
@@ -20,6 +25,8 @@ const WS = [1, 2, 3, 4] as const;
 export const ACTIONS: Action[] = [
   ...DIRS.map(([d, l, a, w]) => ({ id: `focus-${d}`, group: "Focus", desc: `Focus the window ${w}`, def: [k("Key" + l), k(a)] })),
   ...WS.map((i) => ({ id: `ws-${i}`, group: "Focus", desc: `Go to workspace ${i}`, def: [k("Digit" + i)] })),
+  { id: "workspace-prev", group: "Focus", desc: "Previous workspace", def: [sh("BracketLeft")] },
+  { id: "workspace-next", group: "Focus", desc: "Next workspace", def: [sh("BracketRight")] },
   { id: "project-prev", group: "Focus", desc: "Previous project", def: [k("BracketLeft")] },
   { id: "project-next", group: "Focus", desc: "Next project", def: [k("BracketRight")] },
   ...DIRS.map(([d, l, a, w]) => ({ id: `swap-${d}`, group: "Arrange", desc: `Swap with the window ${w}`, def: [sh("Key" + l), sh(a)] })),
@@ -49,6 +56,10 @@ export const ACTIONS: Action[] = [
   { id: "palette", group: "Windows and links", desc: "Command palette", def: [k("KeyX")] },
   { id: "help", group: "Windows and links", desc: "Hotkeys (this page)", def: [k("Slash")] },
   { id: "next-signal", group: "Signals", desc: "Go to the next agent that needs you", def: [k("KeyU")] },
+  { id: "fold-recursive", group: "Editor", desc: "Fold the block at the cursor and every block inside it", def: vs("BracketLeft"), text: true, seq: true },
+  { id: "unfold-recursive", group: "Editor", desc: "Unfold the block at the cursor and every block inside it", def: vs("BracketRight"), text: true, seq: true },
+  { id: "fold-all", group: "Editor", desc: "Fold every top-level block", def: vs("Digit0"), text: true, seq: true },
+  { id: "unfold-all", group: "Editor", desc: "Unfold everything", def: vs("KeyJ"), text: true, seq: true },
   { id: "copy", group: "Text", desc: "Copy the selection (sends it on to the app when nothing is selected)", def: tx("KeyC"), text: true },
   { id: "paste", group: "Text", desc: "Paste into the focused window", def: tx("KeyV"), text: true },
   { id: "favourite", group: "Text", desc: "Favourite the browser's page", def: tx("KeyD"), text: true },
@@ -70,16 +81,22 @@ export function keyLabel(code: string): string {
   return KEY_LABELS[code] ?? code;
 }
 
-export const sameChord = (a: Chord, b: Chord) =>
+const sameKey = (a: Chord, b: Chord) =>
   a.code === b.code && !!a.shift === !!b.shift && !!a.ctrl === !!b.ctrl && !!a.meta === !!b.meta && !!a.bare === !!b.bare;
+export const sameChord = (a: Chord, b: Chord): boolean =>
+  sameKey(a, b) && (a.then && b.then ? sameChord(a.then, b.then) : !a.then && !b.then);
 
 /** An action's keys now. */
 export const keysOf = (id: string): Chord[] => app.settings.hotkeys?.[id] ?? BY_ID.get(id)?.def ?? [];
-/** The chord as <kbd> labels, the modifier first. */
-export const chordKeys = (c: Chord) => [
+/** One key of the chord as <kbd> labels, the modifier first. */
+const strokeKeys = (c: Chord) => [
   ...(c.bare ? [] : [modLabel()]), ...(c.ctrl ? ["Ctrl"] : []), ...(c.meta ? [metaName] : []), ...(c.shift ? ["Shift"] : []), keyLabel(c.code),
 ];
-export const chordText = (c: Chord) => chordKeys(c).join("+");
+/** The chord as <kbd> labels; a second key follows a `then` label. */
+export const chordKeys = (c: Chord): string[] => [...strokeKeys(c), ...(c.then ? [THEN, ...strokeKeys(c.then)] : [])];
+/** Stands between a chord's two keys in `chordKeys`, printed as a gap rather than a key. */
+export const THEN = "then";
+export const chordText = (c: Chord) => strokeKeys(c).join("+") + (c.then ? " " + strokeKeys(c.then).join("+") : "");
 /** An action's first key as <kbd> labels, if it has one (the palette shows these). */
 export const capsOf = (id: string) => {
   const c = keysOf(id)[0];
@@ -113,6 +130,7 @@ const OS_KEYS: Record<string, string> = { KeyA: "select all", KeyV: "paste", Key
 
 /** Why a chord can't work now, or "". */
 export function chordProblem(c: Chord): string {
+  if (c.then && !c.then.ctrl && !c.then.meta) return "The second key needs Ctrl or Cmd too.";
   if (c.bare && !c.ctrl && !c.meta) return "Text keys need Ctrl or Cmd, so typing a letter still types it.";
   if (!c.bare && app.settings.modKey === "meta" && !c.ctrl && OS_KEYS[c.code]) return `${chordText(c)} stays ${OS_KEYS[c.code]} while ${metaName} is the modifier.`;
   return "";
@@ -125,12 +143,21 @@ function pressed(e: KeyboardEvent, bare: boolean): Chord {
     : { code: e.code, ...(e.shiftKey ? { shift: true } : {}), ...(e.ctrlKey ? { ctrl: true } : {}) };
 }
 
+/** A text key press as an action's chord would hold it, or undefined with Alt held. */
+export const textPress = (e: KeyboardEvent): Chord | undefined => (e.altKey ? undefined : pressed(e, true));
+
 /** Does this key press run the action? For text actions (terms.ts, clipboard.ts, the browser's Ctrl+D). */
 export function isKey(id: string, e: KeyboardEvent): boolean {
   if (e.altKey) return false;
   const p = pressed(e, true);
   return keysOf(id).some((c) => c.bare && sameChord(c, p));
 }
+
+let editorKeys: ((e: KeyboardEvent) => boolean) | undefined;
+/** cm.ts hands over its Editor actions once the editor has loaded (it is loaded lazily). */
+export const setEditorKeys = (f: (e: KeyboardEvent) => boolean) => { editorKeys = f; };
+/** Did the focused editor take this key press for one of its actions? hotkeys.ts asks first. */
+export const editorKey = (e: KeyboardEvent) => !!editorKeys?.(e);
 
 /** The window action this Hotkey Modifier chord runs, if any (hotkeys.ts). */
 export function actionFor(e: KeyboardEvent): string | undefined {

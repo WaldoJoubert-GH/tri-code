@@ -2,19 +2,21 @@
 // tri-code's CSS variables (so it follows light / dark and the project accent with no JS),
 // languages loaded per file type, and the line ending, BOM and indent a file is saved back with.
 
-import { EditorState, type Extension, RangeSet, StateEffect, StateField, Text } from "@codemirror/state";
+import { EditorState, type Extension, RangeSet, type StateCommand, StateEffect, StateField, Text } from "@codemirror/state";
 import {
   EditorView, GutterMarker, crosshairCursor, drawSelection, dropCursor, gutter, highlightActiveLine, highlightActiveLineGutter,
-  highlightSpecialChars, keymap, lineNumbers, rectangularSelection,
+  type Command, highlightSpecialChars, keymap, lineNumbers, rectangularSelection,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, moveLineDown, moveLineUp, copyLineDown, copyLineUp } from "@codemirror/commands";
 import {
-  HighlightStyle, LanguageDescription, LanguageSupport, StreamLanguage, type StreamParser, bracketMatching, foldGutter, foldKeymap, indentOnInput, indentUnit, syntaxHighlighting,
+  HighlightStyle, LanguageDescription, LanguageSupport, StreamLanguage, type StreamParser, bracketMatching, foldEffect, foldGutter, foldAll, foldKeymap, foldable, foldedRanges, indentOnInput, indentUnit, syntaxHighlighting, unfoldAll, unfoldEffect,
 } from "@codemirror/language";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
 import type { ChangeMarks } from "./diff";
+import { keysOf, sameChord, setEditorKeys, textPress } from "./keymap";
+import type { Chord } from "./state";
 
 /** The look: plain CSS with tri-code's variables, so every editor follows the theme and accent. */
 const theme = EditorView.theme({
@@ -186,6 +188,87 @@ function guessIndent(text: string): string {
 
 /** Describe an indent unit for the status bar. */
 export const indentText = (unit: string) => (unit === "\t" ? "Tabs" : `Spaces: ${unit.length}`);
+
+/** The foldable range around the cursor: the one starting on its line, else the nearest one
+ *  above that reaches past it. */
+function foldAround(state: EditorState): { from: number; to: number } | null {
+  const at = state.doc.lineAt(state.selection.main.head);
+  for (let n = at.number; n >= 1; n--) {
+    const line = state.doc.line(n);
+    const r = foldable(state, line.from, line.to);
+    if (r && r.to > at.from) return r;
+  }
+  return null;
+}
+
+/** Fold the block around the cursor and every block inside it, so unfolding it shows them folded. */
+const foldRecursive: StateCommand = ({ state, dispatch }) => {
+  const outer = foldAround(state);
+  if (!outer) return false;
+  const folded = foldedRanges(state);
+  const effects: StateEffect<unknown>[] = [];
+  const last = state.doc.lineAt(outer.to).number;
+  for (let n = state.doc.lineAt(outer.from).number; n <= last; n++) {
+    const line = state.doc.line(n);
+    const r = foldable(state, line.from, line.to);
+    if (!r || r.from < outer.from || r.to > outer.to) continue;
+    let has = false;
+    folded.between(r.from, r.from, (from, to) => { has ||= from === r.from && to === r.to; });
+    if (!has) effects.push(foldEffect.of(r));
+  }
+  if (!effects.length) return false;
+  dispatch(state.update({ effects }));
+  return true;
+};
+
+/** Unfold the block around the cursor and every fold inside it. */
+const unfoldRecursive: StateCommand = ({ state, dispatch }) => {
+  const outer = foldAround(state);
+  if (!outer) return false;
+  const effects: StateEffect<unknown>[] = [];
+  foldedRanges(state).between(outer.from, outer.to, (from, to) => {
+    if (from >= outer.from && to <= outer.to) effects.push(unfoldEffect.of({ from, to }));
+  });
+  if (!effects.length) return false;
+  dispatch(state.update({ effects }));
+  return true;
+};
+
+/** The Keymap's Editor actions (keymap.ts), so Settings › Hotkeys can change their keys. */
+const EDITOR_ACTIONS: Record<string, Command> = {
+  "fold-recursive": (v) => foldRecursive(v),
+  "unfold-recursive": (v) => unfoldRecursive(v),
+  "fold-all": foldAll,
+  "unfold-all": unfoldAll,
+};
+const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph", "OS"]);
+/** The first key of a two-key chord, waiting for the second. */
+let pending: Chord | undefined;
+
+/** Run the Editor action this key press finishes for the focused editor, or hold the first key of
+ *  a two-key chord. True when the key was the editor's; hotkeys.ts asks before any window hotkey. */
+function editorKey(e: KeyboardEvent): boolean {
+  const dom = document.activeElement?.closest<HTMLElement>(".cm-editor");
+  const view = dom && EditorView.findFromDOM(dom);
+  if (!view) return !!(pending = undefined);
+  if (MODIFIERS.has(e.key)) return !!pending;
+  const p = textPress(e), first = pending;
+  pending = undefined;
+  if (!p) return false;
+  const ids = Object.keys(EDITOR_ACTIONS);
+  // Like VS Code, a second key that finishes no chord is swallowed.
+  if (first) {
+    const id = ids.find((id) => keysOf(id).some((c) => c.then && sameChord({ ...c, then: undefined }, first) && sameChord(c.then, p)));
+    if (id) EDITOR_ACTIONS[id](view);
+    return true;
+  }
+  const id = ids.find((id) => keysOf(id).some((c) => sameChord(c, p)));
+  if (id) return EDITOR_ACTIONS[id](view), true;
+  if (ids.some((id) => keysOf(id).some((c) => c.then && sameChord({ ...c, then: undefined }, p)))) return !!(pending = p);
+  return false;
+}
+
+setEditorKeys(editorKey);
 
 export type Setup = {
   path: string;

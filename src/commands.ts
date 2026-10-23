@@ -91,6 +91,11 @@ export function workspace(p: Project, i: number) {
   flash(`workspace ${i + 1}`);
 }
 
+/** The workspace before or after this one, round from the last to the first. */
+export function stepWorkspace(p: Project, dir: 1 | -1) {
+  workspace(p, (p.ws + dir + SPACES) % SPACES);
+}
+
 export function sendWindow(p: Project, f: Tab, i: number) {
   if (f.space === i) return flash(`already on workspace ${i + 1}`);
   sendTo(p.id, f.id, i);
@@ -156,6 +161,8 @@ export function commands(): Command[] {
       const n = p.tabs.filter((t) => t.space === i).length;
       add({ id: `ws:${i}`, group: "Layout", title: `Workspace ${i + 1}`, hint: n ? `${n} window${n > 1 ? "s" : ""}` : "empty", icon: "square-stack", keys: capsOf(`ws-${i + 1}`), run: () => workspace(p, i) });
     }
+    add({ id: "workspace-prev", group: "Layout", title: "Previous workspace", icon: "chevron-left", keys: capsOf("workspace-prev"), run: () => stepWorkspace(p, -1) });
+    add({ id: "workspace-next", group: "Layout", title: "Next workspace", icon: "chevron-right", keys: capsOf("workspace-next"), run: () => stepWorkspace(p, 1) });
 
     add({ id: "new-worktree", group: "Project", title: "New worktree", hint: "another checkout of the repo, on its own branch", icon: "git-branch-plus", keys: capsOf("new-worktree"), run: () => openNewWorktree(p) });
     if (p.parent) add({

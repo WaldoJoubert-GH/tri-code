@@ -21,13 +21,13 @@ import { diffKeys } from "./DiffView";
 import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";
 import { closeIconPicker, iconPickerOpen } from "./lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";
-import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, stepGap, stepProject, workspace } from "./commands";
+import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, stepGap, stepProject, stepWorkspace, workspace } from "./commands";
 import { nextSignal } from "./signals";
 import { closeSignals, signalsOpen } from "./SignalSettings";
 import { closeFeedback, feedbackOpen } from "./Feedback";
 import { flash } from "./ui";
 import { hasSelection } from "./terms";
-import { actionFor } from "./keymap";
+import { actionFor, editorKey } from "./keymap";
 
 const DIRS: Record<string, [number, number]> = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
 
@@ -143,6 +143,10 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
     case "project-next":
       stepProject(p, id === "project-next" ? 1 : -1);
       return true;
+    case "workspace-prev":
+    case "workspace-next":
+      stepWorkspace(p, id === "workspace-next" ? 1 : -1);
+      return true;
   }
   return false;
 }
@@ -183,9 +187,10 @@ function onKey(e: KeyboardEvent) {
   const f = p && focusedTab(p);
   if (textChord(e, f)) return;
   const id = actionFor(e);
-  let done = false;
-  if (id) done = runAnywhere(id) || (!!p && run(id, p, f));
-  else if (p) {
+  // The focused editor's own actions (fold recursively and the rest) come before window hotkeys.
+  let done = editorKey(e);
+  if (!done && id) done = runAnywhere(id) || (!!p && run(id, p, f));
+  else if (!done && p) {
     const a = agentForKey(e);
     if (a) {
       launchAgent(p, a);

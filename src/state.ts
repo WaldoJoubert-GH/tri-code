@@ -7,8 +7,9 @@ export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents
 
 /** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
-/** A key of a Keymap action: a Hotkey, or with `bare` a plain Ctrl / Cmd (`meta`) chord, as the text keys are. */
-export type Chord = Hotkey & { meta?: boolean; bare?: boolean };
+/** A key of a Keymap action: a Hotkey, or with `bare` a plain Ctrl / Cmd (`meta`) chord, as the text keys are.
+ *  An editor action's chord can take a second key after it (`then`), like VS Code's Ctrl+K Ctrl+[. */
+export type Chord = Hotkey & { meta?: boolean; bare?: boolean; then?: Chord };
 
 /** An app the New Window Menu offers: a terminal app (claude, pi, a shell, lazygit, ...) or, with a
  *  `url`, a web app that opens a browser window there. Global, not per project. */
