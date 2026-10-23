@@ -403,6 +403,8 @@ svg.lucide { flex: none; display: block; }
 .status .bellbtn { flex: none; display: grid; place-items: center; width: 24px; height: 20px; border-radius: 4px; color: var(--muted); }
 .status .bellbtn:hover, .status .bellbtn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
 .status .bellbtn.dnd { color: var(--warn); }
+/* Remote control is on: a green phone, with how many are connected */
+.status .bellbtn.phonebtn { width: auto; min-width: 24px; padding: 0 5px; display: flex; gap: 4px; color: var(--ok); font-size: 11px; }
 
 /* Feedback popover (status line) */
 .pop.feedback { width: 340px; }
@@ -701,6 +703,36 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .set-seg button { padding: 3px 10px; font-size: 12px; color: var(--muted); }
 .settings-dlg .set-seg button + button { border-left: 1px solid var(--line); }
 .settings-dlg .set-seg button[aria-checked="true"] { background: var(--raised); color: var(--text); }
+/* Settings › Remote */
+.settings-dlg .rc-switch { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 12px; }
+.settings-dlg .rc-switch .track { position: relative; width: 26px; height: 15px; border-radius: 999px; background: var(--raised); transition: background .15s; flex: none; }
+.settings-dlg .rc-switch .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--bg); transition: left .15s; }
+.settings-dlg .rc-switch[aria-checked="true"] .track { background: var(--ok); }
+.settings-dlg .rc-switch[aria-checked="true"] .track::after { left: 13px; }
+.settings-dlg .rc-switch:disabled { opacity: .6; cursor: default; }
+.settings-dlg .rc-err { margin: 6px 0; color: var(--bad); font-size: 12px; white-space: pre-wrap; user-select: text; }
+.settings-dlg .rc-url { color: var(--accent); font: 12px var(--mono); user-select: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.settings-dlg .rc-icon { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 4px; color: var(--muted); flex: none; }
+.settings-dlg .rc-icon:hover { background: var(--hover); color: var(--text); }
+.settings-dlg .rc-dev { color: var(--text); }
+.settings-dlg .rc-dev .rc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-dlg .rc-dim { color: var(--muted); font-size: 11.5px; display: inline-flex; }
+.settings-dlg .rc-on { color: var(--ok); font-size: 11.5px; }
+.settings-dlg .rc-btn { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 5px; font-size: 12px; background: var(--raised); color: var(--text); margin-top: 6px; }
+.settings-dlg .rc-btn:hover { background: var(--hover); }
+.settings-dlg .rc-btn.ghost { background: none; border: 1px solid var(--line); color: var(--muted); margin-top: 0; }
+.settings-dlg .rc-btn.ghost:hover { color: var(--text); }
+.settings-dlg .rc-pair { display: flex; gap: 14px; align-items: flex-start; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.settings-dlg .rc-qr { width: 168px; height: 168px; flex: none; background: #fff; border-radius: 6px; overflow: hidden; }
+.settings-dlg .rc-qr svg { width: 100%; height: 100%; display: block; }
+.settings-dlg .rc-pair-text { min-width: 0; font-size: 12px; color: var(--text); }
+.settings-dlg .rc-pair-text p { margin: 0 0 8px; }
+.settings-dlg .rc-pair-text p.rc-dim { display: block; }
+.settings-dlg .rc-code { font: 600 22px var(--mono); letter-spacing: .12em; margin: 2px 0 8px; user-select: text; }
+.settings-dlg .rc-actions { display: flex; gap: 6px; align-items: center; }
+.settings-dlg .rc-actions .rc-btn { margin-top: 0; }
+.settings-dlg .rc-push { gap: 16px; color: var(--text); }
+.settings-dlg .rc-push label { display: flex; align-items: center; gap: 5px; }
 @media (max-width: 640px) {
   .settings-dlg { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
   .settings-dlg nav { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }

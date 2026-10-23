@@ -32,6 +32,14 @@ const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").repl
 const markup = (node: IconNode) =>
   node.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([k, v]) => `${k}="${esc(String(v))}"`).join(" ")}/>`).join("");
 
+/** An icon as SVG markup, for pages outside this webview (the phone). Empty until the set loads. */
+export function iconSvg(name: string): string {
+  const node = icons()?.[name];
+  return node
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${markup(node)}</svg>`
+    : "";
+}
+
 export function Icon(props: { name: string; size?: number; class?: string }) {
   const node = () => icons()?.[props.name];
   return (

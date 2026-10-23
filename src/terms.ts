@@ -3,6 +3,7 @@
 // toggles visibility, so it is instant and scrollback survives.
 
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -288,6 +289,7 @@ class TermSession {
         onExit,
       });
       if (this.disposed) return void call("pty_kill", { id: this.ptyId });
+      this.update({ pty: this.ptyId });
       // The tab is usually shown and fitted while the spawn is in flight, and
       // refit skips the resize until there is an id; send the real size now.
       this.lastSize = `${cols}x${rows}`;
@@ -306,6 +308,7 @@ class TermSession {
   private exited(code: number) {
     this.ptyId = undefined;
     if (this.disposed) return;
+    this.update({ pty: undefined });
     if (isRemote(this.project) && code === SSH_CONNECTION_FAILED) {
       const secs = Math.round(this.backoff / 1000);
       this.term.write(`\r\n\x1b[33m[connection lost, reconnecting in ${secs}s]\x1b[0m\r\n`);
@@ -391,9 +394,17 @@ class TermSession {
     if (!this.visible || !this.fit.proposeDimensions()) return;
     this.fit.fit();
     const size = `${this.term.cols}x${this.term.rows}`;
-    if (size === this.lastSize || this.ptyId === undefined) return;
+    // A phone watching this PTY has given it the phone's size until it lets go.
+    if (size === this.lastSize || this.ptyId === undefined || phoneHeld.has(this.ptyId)) return;
     this.lastSize = size;
     call("pty_resize", { id: this.ptyId, cols: this.term.cols, rows: this.term.rows });
+  }
+
+  /** The last phone stopped watching: give the PTY this window's size back. */
+  restoreSize(pty: number) {
+    if (this.ptyId !== pty) return;
+    this.lastSize = `${this.term.cols}x${this.term.rows}`;
+    call("pty_resize", { id: pty, cols: this.term.cols, rows: this.term.rows });
   }
 
   /** Close the tab: kill the local process and, for remote tabs, the persistent session. */
@@ -419,6 +430,14 @@ function decodeBase64(b64: string): string {
 }
 
 const sessions = new Map<string, TermSession>();
+
+/** PTYs a phone is watching (phone.rs), which keep the phone's size meanwhile. */
+const phoneHeld = new Set<number>();
+listen<{ pty: number; held: boolean }>("phone-hold", ({ payload }) => {
+  if (payload.held) return void phoneHeld.add(payload.pty);
+  phoneHeld.delete(payload.pty);
+  for (const s of sessions.values()) s.restoreSize(payload.pty);
+}).catch((e) => console.warn("phone-hold unavailable:", e));
 
 /** Hidden container that holds the elements of sessions that are not mounted. */
 let park: HTMLElement | undefined;

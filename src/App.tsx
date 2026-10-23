@@ -11,7 +11,8 @@ import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import ClaudeUsage from "./Usage";
-import { SettingsDialog, hotkeysOpen, settingsOpen, toggleHotkeys } from "./Settings";
+import { SettingsDialog, hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./Settings";
+import { phoneStatus, startPhoneSync } from "./phone";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./lucide";
@@ -71,6 +72,7 @@ export default function App() {
     if (!app.toured) void startTour();
   });
   persistChanges(ready);
+  createEffect(on(ready, (r) => r && startPhoneSync(), { defer: true }));
 
   // Start a session for every terminal tab once, including tabs added later.
   const started = new Set<string>();
@@ -254,6 +256,17 @@ function StatusBar() {
             ↻ Restart to update · {u().version}
           </button>
         )}
+      </Show>
+      <Show when={phoneStatus().url}>
+        <button
+          class="bellbtn phonebtn"
+          title={`Remote control is on · ${phoneStatus().devices.filter((d) => d.online).length} phone(s) connected · Settings › Remote`}
+          aria-label="Remote control"
+          onClick={() => openSettings("remote")}
+        >
+          <Icon name="smartphone" size={13} />
+          <Show when={phoneStatus().devices.filter((d) => d.online).length}>{(n) => <span>{n()}</span>}</Show>
+        </button>
       </Show>
       <button
         class="bellbtn"
