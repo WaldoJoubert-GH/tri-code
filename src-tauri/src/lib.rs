@@ -8,6 +8,7 @@ mod folders;
 mod fs;
 mod git;
 mod github;
+mod passwords;
 mod phone;
 mod plane;
 mod pty;
@@ -166,6 +167,12 @@ pub fn run() {
             browser::browser_close,
             browser::browser_close_all,
             browser::browser_navigate,
+            browser::browser_autofill,
+            browser::browser_profile_erase,
+            browser::browser_profiles_supported,
+            passwords::browser_password_answer,
+            passwords::browser_passwords,
+            passwords::browser_password_forget,
             browser::browser_pick,
             browser::browser_back,
             browser::browser_forward,

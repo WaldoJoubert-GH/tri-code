@@ -5,7 +5,8 @@
 // design/agents.html (variant B) and design/webapps.html (variant A).
 
 import { For, Show, createSignal } from "solid-js";
-import { type Agent, type Fav, type Project, addAgent, app, isWebApp, moveAgent, removeAgent, restoreAgent, updateAgent } from "./state";
+import { type Agent, type Fav, type Project, addAgent, app, isWebApp, moveAgent, profileById, removeAgent, restoreAgent, updateAgent } from "./state";
+import { profilesInUse } from "./profiles";
 import { hotkeyKeys, hotkeyProblem, launchAgent, looksLikeUrl, nameProblem, newAgent, recording, setRecording, urlProblem } from "./agents";
 import { normalizeUrl } from "./browsers";
 import { Icon, toggleIconPicker } from "./lucide";
@@ -86,6 +87,17 @@ function TargetField(props: { agent: Agent }) {
           <button classList={{ on: props.agent.bar !== "app" }} onClick={() => updateAgent(props.agent.id, { bar: undefined })}>full</button>
           <button classList={{ on: props.agent.bar === "app" }} onClick={() => updateAgent(props.agent.id, { bar: "app" })}>app</button>
         </span>
+        <Show when={profilesInUse()}>
+          <select
+            class="ag-profile"
+            title="Browser profile: whose cookies and sign-ins its windows use"
+            value={profileById(props.agent.profile)?.id ?? ""}
+            onChange={(e) => updateAgent(props.agent.id, { profile: e.currentTarget.value || undefined })}
+          >
+            <option value="">project's profile</option>
+            <For each={app.profiles}>{(p) => <option value={p.id}>{p.name}</option>}</For>
+          </select>
+        </Show>
       </Show>
     </span>
   );

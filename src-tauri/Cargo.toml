@@ -48,6 +48,20 @@ opt-level = 3
 panic = "abort"
 strip = true
 
+# Browser Profiles: password saving is only reachable through WebView2's own settings (browser.rs).
+# Same versions as wry's, so the controller Tauri hands out is this crate's type.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows-core = "0.62"
+
+# Browser Profiles on macOS: WKWebView can't save passwords, so passwords.rs does, in the
+# Keychain. Same versions as wry's.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSObject", "NSString"] }
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "objc2-app-kit", "block2", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKContentWorld", "WKScriptMessage", "WKScriptMessageHandler", "WKFrameInfo", "WKSecurityOrigin"] }
+security-framework = "3"
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-process = "2"
 # No `zip`: every zip 2–4 release is yanked, and it only handles v1-style zipped

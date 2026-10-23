@@ -13,6 +13,7 @@ import { toggleSidebar } from "./Sidebar";
 import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees";
 import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeFavEdit, favEditOpen } from "./favs";
+import { closeProfileMenu, profileMenuOpen } from "./profiles";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
@@ -176,6 +177,7 @@ function onKey(e: KeyboardEvent) {
     else if (feedbackOpen()) closeFeedback();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
+    else if (profileMenuOpen()) closeProfileMenu();
     else if (goToFileOpen()) closeGoToFile();
     else return;
     e.preventDefault();

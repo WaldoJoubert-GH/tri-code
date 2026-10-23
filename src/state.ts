@@ -25,7 +25,30 @@ export type Agent = {
   /** A lucide icon name, kebab-case. */
   icon: string;
   hotkey?: Hotkey;
+  /** Web apps only: the Browser Profile its windows open in (unset: the project's). */
+  profile?: string;
 };
+
+/** A Browser Profile: a name, an avatar and a colour over its own cookies, logins, history,
+ *  saved passwords and autofill. Global; a project picks the one its browser windows use, and a
+ *  window can use another. Chosen from design/browser-profiles.html (variant B). */
+export type Profile = {
+  id: string;
+  name: string;
+  /** A lucide icon name, kebab-case. */
+  icon: string;
+  /** One of PROFILE_COLORS; drawn from the theme's --p-* tokens. */
+  color: string;
+  /** false stops filling in forms (names, addresses) and remembering what was typed. Unset is on. */
+  autofill?: false;
+  /** false stops offering to save passwords. Unset is on. */
+  passwords?: false;
+};
+
+export const PROFILE_COLORS = ["ocean", "marigold", "terracotta", "moss", "plum", "slate"];
+/** The profile that keeps the browser data from before profiles existed. It can't be deleted. */
+export const DEFAULT_PROFILE = "default";
+const defaultProfiles = (): Profile[] => [{ id: DEFAULT_PROFILE, name: "Personal", icon: "house", color: "ocean" }];
 
 /** What a new state.json starts with: the three terminals tri-code used to hard-code. */
 const defaultAgents = (): Agent[] => [
@@ -57,6 +80,8 @@ export type Tab = {
   pages?: Page[];
   /** Browser tabs only: the id of the page that is shown. */
   page?: string;
+  /** Browser tabs only: a Browser Profile other than the project's. */
+  profile?: string;
   /** Editor tabs only: the file shown, one of `files` (unset when none is open). */
   path?: string;
   /** Editor tabs only: the open files, in tab order. */
@@ -156,6 +181,8 @@ export type Project = {
   dim: number;
   /** Favourite pages, in bar order; shared by every browser window of the project. */
   favs: Fav[];
+  /** The Browser Profile its browser windows open in (unset: the app's default). A Worktree uses its repo's. */
+  profile?: string;
   /** The git window's and the editor diff's orientation; split unless chosen otherwise. */
   diffMode?: DiffMode;
   icon?: ProjectIcon;
@@ -211,6 +238,8 @@ type Persisted = {
   activeProject?: string;
   /** In New Window Menu order. */
   agents: Agent[];
+  /** Browser Profiles in Settings › Browser order; DEFAULT_PROFILE is always one of them. */
+  profiles: Profile[];
   /** Gap between tiled windows and around the edge, px. */
   gap: number;
   sidebarCollapsed: boolean;
@@ -245,6 +274,8 @@ export type Settings = {
   /** Remote Control (phone.ts): the signals that push to a phone (unset: all of them). Whether
    *  it is on lives in phone.json. */
   remote?: { push?: Partial<Record<SoundEvent, boolean>> };
+  /** The Browser Profile of projects that haven't picked one. Unset is DEFAULT_PROFILE. */
+  profile?: string;
 };
 
 export type GitColor = "add" | "del" | "mod" | "ren";
@@ -271,7 +302,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], recent: [], agents: defaultAgents(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, settings: defaultSettings() });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], recent: [], agents: defaultAgents(), profiles: defaultProfiles(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, settings: defaultSettings() });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -445,7 +476,7 @@ export function addTab(projectId: string, kind: TabKind, opts: { url?: string; p
     const a = opts.agent;
     const tab: Tab = {
       id, kind, space: p.ws,
-      ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}) } : {}),
+      ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}), ...(a?.profile ? { profile: a.profile } : {}) } : {}),
       ...(kind === "editor" && opts.path ? { path: opts.path, files: [opts.path] } : {}),
       ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "" } : {}),
     };
@@ -807,6 +838,78 @@ export function moveAgent(id: string, before: string | null) {
   }));
 }
 
+export const profileById = (id: string | undefined) => (id ? app.profiles.find((p) => p.id === id) : undefined);
+
+/** The Browser Profile a project's browser windows open in: its own, its repo's, else the app's default. */
+export const projectProfile = (p: Project): Profile =>
+  profileById(p.profile) ?? profileById(repoOf(p).profile) ?? profileById(app.settings.profile) ?? profileById(DEFAULT_PROFILE) ?? app.profiles[0];
+
+/** The Browser Profile a browser window uses: its own pick, else its project's. */
+export const tabProfile = (p: Project, t: Tab): Profile => profileById(t.profile) ?? projectProfile(p);
+
+/** Add a profile with the next unused colour; returns its id. */
+export function addProfile(): string {
+  const id = newId();
+  setApp(produce((s) => {
+    const used = s.profiles.map((p) => p.color);
+    const color = PROFILE_COLORS.find((c) => !used.includes(c)) ?? PROFILE_COLORS[s.profiles.length % PROFILE_COLORS.length];
+    s.profiles.push({ id, name: `Profile ${s.profiles.length + 1}`, icon: "user", color });
+  }));
+  return id;
+}
+
+export function updateProfile(id: string, patch: Partial<Omit<Profile, "id">>) {
+  setApp(produce((s) => {
+    const p = s.profiles.find((p) => p.id === id);
+    if (!p) return;
+    for (const [k, v] of Object.entries(patch) as [keyof typeof patch, never][]) {
+      if (v === undefined) delete p[k];
+      else p[k] = v;
+    }
+  }));
+}
+
+/** Delete a profile; projects, windows and web apps that used it go back to their default. */
+export function removeProfile(id: string) {
+  if (id === DEFAULT_PROFILE) return;
+  setApp(produce((s) => {
+    s.profiles = s.profiles.filter((p) => p.id !== id);
+    if (s.settings.profile === id) delete s.settings.profile;
+    for (const a of s.agents) if (a.profile === id) delete a.profile;
+    for (const p of s.projects) {
+      if (p.profile === id) delete p.profile;
+      for (const t of p.tabs) if (t.profile === id) delete t.profile;
+    }
+  }));
+}
+
+/** The app-wide default for projects that haven't picked a profile. */
+export function setDefaultProfile(id: string) {
+  setApp("settings", "profile", id === DEFAULT_PROFILE ? undefined : id);
+}
+
+/** A project's profile; a Worktree's is its repo's. Windows that picked the new one drop their pick. */
+export function setProjectProfile(projectId: string, id: string) {
+  const repo = projectById(projectId);
+  if (!repo) return;
+  edit(repoOf(repo).id, (p, s) => {
+    p.profile = id;
+    for (const q of s.projects) {
+      if (q.id !== p.id && q.parent !== p.id) continue;
+      if (q !== p) delete q.profile;
+      for (const t of q.tabs) if (t.profile === id) delete t.profile;
+    }
+  });
+}
+
+/** A window's profile; undefined goes back to the project's. */
+export function setTabProfile(projectId: string, tabId: string, id: string | undefined) {
+  editTab(projectId, tabId, (t) => {
+    if (id) t.profile = id;
+    else delete t.profile;
+  });
+}
+
 /** Tabs from before agents: kind was "claude", "pi" or "shell", and the command came from that. */
 function migrateTab(t: any): Tab {
   const tab = { ...t, space: t.space ?? 0 };
@@ -841,7 +944,7 @@ function migrate(raw: any): Persisted {
       id: p.id, name: p.name, host: p.host || "local", path: p.path, tabs,
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
-      favs: p.favs ?? [], diffMode: p.diffMode, icon: p.icon, notify: p.notify,
+      favs: p.favs ?? [], diffMode: p.diffMode, icon: p.icon, notify: p.notify, profile: p.profile,
       ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.copy ? { copy: p.copy } : {}) } : {}),
       ...(p.sample ? { sample: true } : {}),
     };
@@ -853,7 +956,10 @@ function migrate(raw: any): Persisted {
   for (const p of projects) if (!environments.includes(p.host)) environments.push(p.host);
   return {
     environments, envStyles: raw.envStyles ?? {}, envSsh: raw.envSsh ?? {}, envLocks: raw.envLocks ?? {}, projects, recent: raw.recent ?? [],
-    activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(), gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
+    activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(),
+    // Browser data from before profiles stays in the default profile.
+    profiles: raw.profiles?.some((p: Profile) => p.id === DEFAULT_PROFILE) ? raw.profiles : [...defaultProfiles(), ...(raw.profiles ?? [])],
+    gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
     notify: { ...defaultNotify(), ...raw.notify },
     // Anyone with a state file from before the tour already knows their way around.
     toured: raw.toured ?? true,

@@ -8,13 +8,15 @@ import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./RemoteSettings";
+import { BrowserPage } from "./profiles";
 
-export type SettingsPage = "windows" | "files" | "git" | "remote" | "hotkeys";
+export type SettingsPage = "windows" | "files" | "git" | "browser" | "remote" | "hotkeys";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "windows", name: "Windows", icon: "layout-panel-left" },
   { page: "files", name: "Files", icon: "folder-search" },
   { page: "git", name: "Git", icon: "git-branch" },
+  { page: "browser", name: "Browser", icon: "globe" },
   { page: "remote", name: "Remote", icon: "smartphone" },
   { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
 ];
@@ -217,6 +219,7 @@ export function SettingsDialog() {
               <Show when={p() === "windows"}><WindowsPage /></Show>
               <Show when={p() === "files"}><FilesPage /></Show>
               <Show when={p() === "git"}><GitPage /></Show>
+              <Show when={p() === "browser"}><BrowserPage /></Show>
               <Show when={p() === "remote"}><RemotePage /></Show>
               <Show when={p() === "hotkeys"}><HotkeysPage /></Show>
             </section>

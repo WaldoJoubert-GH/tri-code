@@ -1,6 +1,8 @@
 //! Native browser panes: child webviews embedded in the main window and tiled
 //! by the frontend. Coordinates are logical pixels relative to the main window.
 
+use std::path::PathBuf;
+
 use serde::Serialize;
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewBuilder, WebviewUrl};
@@ -77,8 +79,94 @@ fn set_bounds(webview: &Webview, x: f64, y: f64, width: f64, height: f64) -> Res
     webview.set_size(LogicalSize::new(width, height)).map_err(|e| e.to_string())
 }
 
+/// The Browser Profile that keeps the app's own webview data, so nobody is signed out by profiles.
+const DEFAULT_PROFILE: &str = "default";
+
+/// A Browser Profile's data folder (cookies, storage, history, saved passwords, autofill):
+/// `<app_local_data_dir>/profiles/<id>`, or None for the default profile.
+fn profile_dir(app: &AppHandle, profile: &str) -> Result<Option<PathBuf>, String> {
+    if profile.is_empty() || profile == DEFAULT_PROFILE {
+        return Ok(None);
+    }
+    if !profile.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        return Err(format!("invalid profile id {profile}"));
+    }
+    let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    Ok(Some(dir.join("profiles").join(profile)))
+}
+
+/// WKWebView keeps a profile's data in a store named by 16 bytes rather than a folder.
+#[cfg(target_os = "macos")]
+fn store_id(profile: &str) -> [u8; 16] {
+    use sha2::{Digest, Sha256};
+    let mut id = [0u8; 16];
+    id.copy_from_slice(&Sha256::digest(format!("tri-code profile {profile}"))[..16]);
+    id
+}
+
+/// WKWebView keeps separate data stores only from macOS 14. Before that wry quietly falls back to
+/// the shared store, so profiles other than the default are refused there rather than mixing sign-ins.
+#[cfg(target_os = "macos")]
+fn stores_supported() -> bool {
+    static OK: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *OK.get_or_init(|| {
+        std::process::Command::new("sw_vers")
+            .arg("-productVersion")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .and_then(|v| v.trim().split('.').next()?.parse::<u32>().ok())
+            .is_some_and(|major| major >= 14)
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn stores_supported() -> bool {
+    true
+}
+
+/// Whether this system can keep Browser Profiles apart (false before macOS 14).
+#[tauri::command]
+pub fn browser_profiles_supported() -> bool {
+    stores_supported()
+}
+
+/// Waits off the async runtime's threads (tokio here has no timer).
+async fn pause(ms: u64) {
+    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(std::time::Duration::from_millis(ms))).await;
+}
+
+/// Form autofill and password saving. WebView2 only: the builder can turn off form autofill,
+/// but password saving (off by default) is only reachable through the WebView2 settings.
+#[cfg(windows)]
+fn set_autofill(webview: &Webview, autofill: bool, passwords: bool) -> Result<(), String> {
+    webview
+        .with_webview(move |pw| {
+            use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings4;
+            use windows_core::Interface;
+            let set = || -> windows_core::Result<()> {
+                // SAFETY: COM calls on the webview's own controller, on the thread with_webview runs us on.
+                unsafe {
+                    let settings = pw.controller().CoreWebView2()?.Settings()?.cast::<ICoreWebView2Settings4>()?;
+                    settings.SetIsGeneralAutofillEnabled(autofill)?;
+                    settings.SetIsPasswordAutosaveEnabled(passwords)
+                }
+            };
+            if let Err(e) = set() {
+                eprintln!("browser autofill settings failed: {e}");
+            }
+        })
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(not(windows))]
+fn set_autofill(_webview: &Webview, _autofill: bool, _passwords: bool) -> Result<(), String> {
+    Ok(())
+}
+
 /// Creates the browser webview, or navigates and repositions it if it exists. A `hidden` one
-/// loads behind the shown page (a background tab).
+/// loads behind the shown page (a background tab). `profile` is the Browser Profile whose data
+/// it uses (unset: the default); `autofill` and `passwords` are that profile's switches.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn browser_open(
@@ -90,6 +178,9 @@ pub async fn browser_open(
     width: f64,
     height: f64,
     hidden: Option<bool>,
+    profile: Option<String>,
+    autofill: Option<bool>,
+    passwords: Option<bool>,
 ) -> Result<(), String> {
     let url = parse_url(&url)?;
     if let Some(webview) = app.get_webview(&label) {
@@ -156,7 +247,13 @@ pub async fn browser_open(
             }
             NewWindowResponse::Deny
         })
-        .on_page_load(move |_webview, payload| {
+        .on_page_load(move |webview, payload| {
+            #[cfg(target_os = "macos")]
+            if payload.event() == PageLoadEvent::Finished {
+                crate::passwords::page_loaded(&webview, &nav_label, payload.url());
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = &webview;
             let _ = nav_app.emit(
                 "browser-nav",
                 NavPayload {
@@ -169,9 +266,23 @@ pub async fn browser_open(
         .on_document_title_changed(move |_webview, title| {
             let _ = title_app.emit("browser-title", TitlePayload { label: title_label.clone(), title });
         });
+    let profile = profile.unwrap_or_default();
+    let (autofill, passwords) = (autofill.unwrap_or(true), passwords.unwrap_or(true));
+    let builder = builder.general_autofill_enabled(autofill);
+    let builder = match profile_dir(&app, &profile)? {
+        Some(_) if !stores_supported() => return Err("browser profiles need macOS 14 or later".into()),
+        #[cfg(target_os = "macos")]
+        Some(_) => builder.data_store_identifier(store_id(&profile)),
+        #[cfg(not(target_os = "macos"))]
+        Some(dir) => builder.data_directory(dir),
+        None => builder,
+    };
     let webview = window
         .add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
+    set_autofill(&webview, autofill, passwords)?;
+    #[cfg(target_os = "macos")]
+    crate::passwords::install(&app, &webview, &label, &profile, passwords)?;
     if hidden == Some(true) {
         webview.hide().map_err(|e| e.to_string())?;
     }
@@ -204,6 +315,8 @@ pub async fn browser_hide(app: AppHandle, label: String) -> Result<(), String> {
 /// Closes a browser webview. A missing one is not an error.
 #[tauri::command]
 pub async fn browser_close(app: AppHandle, label: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    crate::passwords::unwatch(&label);
     match app.get_webview(&label) {
         Some(webview) => webview.close().map_err(|e| e.to_string()),
         None => Ok(()),
@@ -216,10 +329,64 @@ pub async fn browser_close(app: AppHandle, label: String) -> Result<(), String> 
 pub async fn browser_close_all(app: AppHandle) -> Result<(), String> {
     for (label, webview) in app.webviews() {
         if label.starts_with("browser-") {
+            #[cfg(target_os = "macos")]
+            crate::passwords::unwatch(&label);
             webview.close().map_err(|e| e.to_string())?;
         }
     }
     Ok(())
+}
+
+/// A profile's autofill switches changed: apply them to one of its open webviews.
+#[tauri::command]
+pub async fn browser_autofill(app: AppHandle, label: String, autofill: bool, passwords: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    crate::passwords::set_enabled(&label, passwords);
+    set_autofill(&find(&app, &label)?, autofill, passwords)
+}
+
+/// Deletes a Browser Profile's data: its folder, or on macOS its WKWebView data store and its
+/// saved passwords in the Keychain. Its
+/// webviews must be closed first; they let go of the data a moment later, so this retries for a
+/// few seconds.
+#[tauri::command]
+pub async fn browser_profile_erase(app: AppHandle, profile: String) -> Result<(), String> {
+    let Some(dir) = profile_dir(&app, &profile)? else {
+        return Err("the default profile's data can't be erased".into());
+    };
+    let mut tries = 0;
+    loop {
+        match erase(&app, &profile, &dir).await {
+            Ok(()) => return Ok(()),
+            Err(e) if tries >= 20 => return Err(format!("couldn't erase {profile}'s data: {e}")),
+            Err(_) => {
+                tries += 1;
+                pause(250).await;
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn erase(app: &AppHandle, profile: &str, _dir: &std::path::Path) -> Result<(), String> {
+    crate::passwords::erase(profile)?;
+    if !stores_supported() {
+        return Ok(()); // no store was ever made
+    }
+    let id = store_id(profile);
+    let stores = app.fetch_data_store_identifiers().await.map_err(|e| e.to_string())?;
+    if !stores.contains(&id) {
+        return Ok(()); // never opened a page
+    }
+    app.remove_data_store(id).await.map_err(|e| e.to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn erase(_app: &AppHandle, _profile: &str, dir: &std::path::Path) -> Result<(), String> {
+    match std::fs::remove_dir_all(dir) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+        _ => Ok(()),
+    }
 }
 
 #[tauri::command]

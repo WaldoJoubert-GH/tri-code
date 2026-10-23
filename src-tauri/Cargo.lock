@@ -5043,10 +5043,14 @@ dependencies = [
  "base64 0.22.1",
  "getrandom 0.2.17",
  "hmac",
+ "objc2",
+ "objc2-foundation",
+ "objc2-web-kit",
  "p256",
  "portable-pty",
  "qrcode",
  "rand_core 0.6.4",
+ "security-framework",
  "serde",
  "serde_json",
  "sha2",
@@ -5059,6 +5063,8 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "ureq",
+ "webview2-com",
+ "windows-core",
 ]
 
 [[package]]

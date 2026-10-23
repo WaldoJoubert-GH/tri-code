@@ -120,11 +120,11 @@ The popup under the Tab Strip's `+`: one row per Agent (with its hotkey), then o
 
 **Agent**:
 A terminal app the New Window Menu offers: a name, a shell command (empty = the login shell), a lucide icon and an optional Alt hotkey. Global, in `state.json` as `agents`, seeded with claude, pi and shell. A terminal Window (`TabKind` `"term"`) remembers its Agent and the command it was launched with, so editing an Agent changes only new Windows and deleting one leaves its Windows running. "Send to agent" targets terminals with a command, never a plain shell.
-_Avoid_: Terminal kind, profile, preset.
+_Avoid_: Terminal kind, profile (a Browser Profile), preset.
 
 **Web App**:
 An Agent with a URL instead of a command: it opens a browser window at that address, and the window takes its name and icon as a terminal takes its Agent's. Same list, menu row and hotkeys as the other Agents; typing an address in the agents window's Command cell makes one. "app" hides the window's address and favourites bars (⋯ in its title bar shows them). The agents window offers the project's Favourites as Web Apps to add. Chosen from design/webapps.html (variant A).
-_Avoid_: Bookmark, site, browser profile.
+_Avoid_: Bookmark, site, browser profile (a Web App can use a Browser Profile, but isn't one).
 
 **Agents Window**:
 A canvas Window, one per project, that edits the Agent list as a table; rows save as you type. New `TabKind` `"agents"`, addressed with `Alt+;`. Chosen from design/agents.html (variant B).
@@ -149,6 +149,10 @@ A Draft over the whole branch diff before merging: findings as `fix`, `note` or 
 **Page**:
 One page of a browser window, with its own native webview so it keeps its state while hidden. Stored on the browser Tab as `pages` and the shown `page`. With two or more, the window's title bar shows them as tabs. A page's Ctrl+click or middle-click opens a background Page after it; `target=_blank` and `window.open` open one and show it; a sized `window.open` (a sign-in popup) is a real OS window instead, so `window.opener` works. A terminal's Ctrl+click adds a Page to the project's last-used browser window.
 _Avoid_: Browser tab (a Tab is a canvas window), sub-tab.
+
+**Browser Profile**:
+Whose cookies, sign-ins, saved passwords, autofill and history a browser window uses: a name, a lucide avatar and a colour over a webview data folder of its own (`<app_local_data_dir>/profiles/<id>`; on macOS a WKWebView data store). Global, in `state.json` as `profiles`, seeded with Personal (`default`), which keeps the data from before profiles and can't be deleted. A project picks one (`Project.profile`, a Worktree uses its repo's; unset is Settings' default), a window can use another (`Tab.profile`), and a Web App can pin one. Switching a window's profile reopens all its Pages in the new one. The avatar in the nav bar switches it; Settings › Browser names, colours and deletes them, with Save passwords and Autofill forms per profile. WebView2 saves and fills passwords itself; on macOS, whose web view can't, tri-code does (`passwords.rs`): a script in its own WebKit content world reports sign-ins, a bar under the address offers Save, and logins go to the Keychain, one item per profile. Profiles need macOS 14 (the first with separate web view data stores); before that, and on Linux, every window uses the default. Once there are two, browser windows show a band in their profile's colour. Chosen from design/browser-profiles.html (variant B).
+_Avoid_: Account, session, container, identity.
 
 **Select element**:
 Pointing an agent at part of a Page: an overlay that `src-tauri/src/pick.js` draws inside the page (tri-code's own HTML cannot paint over a native webview). The picked elements and areas, with the user's comment, become text pasted into the project's agent window (the one "send to agent" uses); Ctrl+Enter also submits it. Text only for now: no screenshot.
