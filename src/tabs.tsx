@@ -5,7 +5,9 @@
 // was already open.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Project, Tab, TabKind, activePage, addTab, agentOf, app, focusTab, live, projectById, space, tabName, visibleTabs } from "./state";
+import { Project, Tab, TabKind, activePage, addTab, agentOf, app, focusTab, live, projectById, space, tabName, tabProfile, visibleTabs } from "./state";
+import { profileColor, profilesInUse } from "./profiles";
+import { nativeBrowsers } from "./browsers";
 import { openEditor } from "./files";
 import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
@@ -150,6 +152,9 @@ export function TabStrip(props: { project: Project }) {
           >
             <Glyph tab={t} />
             {label(t)}
+            <Show when={t.kind === "browser" && nativeBrowsers && profilesInUse()}>
+              <span class="tab-pf" style={{ background: profileColor(tabProfile(props.project, t)) }} title={tabProfile(props.project, t).name} />
+            </Show>
             <Show when={sigOf(t)}>{(s) => <span class={`sg s-${s()}`} aria-hidden="true" />}</Show>
           </button>
         )}

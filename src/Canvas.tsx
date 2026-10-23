@@ -2,15 +2,16 @@ import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
 import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isTerminal, live, projectById, removePage,
-  canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, toggleMono, visibleTabs,
+  canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, tabProfile, toggleMono, visibleTabs,
 } from "./state";
+import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
 import { isKey, withKey } from "./keymap";
 import { Caps } from "./Keys";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
-  addressToUrl, openExternal, pickElement, placeBrowser, setBrowsersSuspended,
+  addressToUrl, answerPassword, openExternal, passwordPrompts, pickElement, placeBrowser, profilesSupported, setBrowsersSuspended,
 } from "./browsers";
 import { Icon } from "./lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
@@ -228,6 +229,8 @@ export default function Canvas(props: { project: Project }) {
     /** Browser windows: the shown page. Back, reload, the address and the star act on it. */
     const page = () => activePage(tab);
     const pageId = () => page()?.id ?? "";
+    /** Browser windows: the Browser Profile its webviews use; switching it remakes them. */
+    const profile = () => tabProfile(props.project, tab);
     const url = () => browserInfo[pageId()]?.url ?? page()?.url ?? "";
     const pageTitle = (pg: Page) => browserInfo[pg.id]?.title || (pg.url ? pg.url.replace(/^https?:\/\//, "") : "New tab");
     /** The shown page's load line: on the nav row, or on the title bar when the nav row is hidden. */
@@ -280,7 +283,7 @@ export default function Canvas(props: { project: Project }) {
     });
 
     if (isBrowser) {
-      createEffect(on([rect, anyDrag, blank, pageId, buried], () => follow(), { defer: true }));
+      createEffect(on([rect, anyDrag, blank, pageId, buried, () => profile().id], () => follow(), { defer: true }));
       // A blank page has nothing to do but take an address.
       createEffect(() => {
         if (focused() && blank() && !bare()) requestAnimationFrame(() => inputEl.focus());
@@ -389,8 +392,10 @@ export default function Canvas(props: { project: Project }) {
           sizing: sized() === id,
           hidden: hidden(),
           peek: peek(),
+          profiled: isBrowser && nativeBrowsers && profilesInUse(),
         }}
         style={{
+          ...(isBrowser ? { "--pc": profileColor(profile()) } : {}),
           left: px(geom().left),
           top: px(geom().top),
           width: px(rect().w),
@@ -501,9 +506,32 @@ export default function Canvas(props: { project: Project }) {
                   <Icon name="crosshair" size={14} />
                 </button>
               </Show>
+              <Show when={nativeBrowsers && profilesSupported()}>
+                <button
+                  class="avbtn"
+                  aria-haspopup="menu"
+                  title={`Profile: ${profile().name} · cookies, sign-ins and autofill are this profile's`}
+                  onClick={(e) => toggleProfileMenu(props.project.id, id, e.currentTarget)}
+                >
+                  <ProfileAvatar profile={profile()} />
+                </button>
+              </Show>
               <button title="Open in system browser" onClick={() => openExternal(url())}>↗</button>
               <Show when={!bare()}>{loadBar()}</Show>
             </div>
+            <Show when={passwordPrompts[pageId()]}>
+              {(p) => (
+                <div class="pwbar" role="alert">
+                  <Icon name="key-round" size={14} />
+                  <span>
+                    {p().update ? "Update the saved password for " : "Save the password for "}
+                    <b>{p().user || "this sign-in"}</b> on {p().origin.replace(/^https?:\/\//, "")} in {profile().name}?
+                  </span>
+                  <button class="primary" onClick={() => answerPassword(pageId(), true)}>{p().update ? "Update" : "Save"}</button>
+                  <button onClick={() => answerPassword(pageId(), false)}>Not now</button>
+                </div>
+              )}
+            </Show>
             <Show when={!bare()}>
               <FavBar projectId={props.project.id} favs={props.project.favs} url={url()} onOpen={open} />
             </Show>

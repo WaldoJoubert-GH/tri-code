@@ -7,9 +7,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { batch } from "solid-js";
+import { batch, createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { activePage, addPage, addTab, app, focusTab, Page, Project, projectById, setPageUrl, space, Tab, tabName, visibleTabs } from "./state";
+import { DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, Page, Profile, Project, profileById, projectById, setPageUrl, space, Tab, tabName, tabProfile, visibleTabs } from "./state";
 import { agentTarget, looksLikeUrl } from "./agents";
 import { pasteText, sendText } from "./terms";
 import { flash } from "./ui";
@@ -22,10 +22,25 @@ export const nativeBrowsers = !/Linux/i.test(navigator.userAgent) || /Android/i.
 const framedHistory = new Map<string, { list: string[]; i: number }>();
 export const [browserInfo, setBrowserInfo] = createStore<Record<string, BrowserInfo>>({});
 
+/** False before macOS 14, whose web view can't keep Browser Profiles apart: every window then
+ *  opens in the default profile, and the profile controls are hidden. */
+export const [profilesSupported, setProfilesSupported] = createSignal(true);
+invoke<boolean>("browser_profiles_supported").then(setProfilesSupported).catch((e) => console.warn("browser_profiles_supported failed:", e));
+
+/** macOS: a sign-in the page's profile could save, by page id. The password stays native (passwords.rs). */
+export type PasswordPrompt = { origin: string; user: string; update: boolean };
+export const [passwordPrompts, setPasswordPrompts] = createStore<Record<string, PasswordPrompt>>({});
+
 type Box = { x: number; y: number; width: number; height: number };
 
 /** Pages whose native webview exists. */
 const created = new Set<string>();
+/** The Browser Profile each created page's webview was made in. A webview can't change profile,
+ *  so a window that switches gets new ones. */
+const madeIn = new Map<string, string>();
+/** How many times a page's webview was remade; part of its label, so a closing webview's late
+ *  events and the new webview's never mix. */
+const gens = new Map<string, number>();
 /** Pages whose native webview is currently shown. */
 const shown = new Set<string>();
 /** Latest rect requested by the canvas per page; null means hidden. */
@@ -42,8 +57,10 @@ let overlays: Box[] = [];
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 const covered = (b: Box) => b.x < coveredTo || overlays.some((o) => overlaps(o, b));
 
-const label = (pageId: string) => `browser-${pageId}`;
-const pageIdOf = (lbl: string) => lbl.replace(/^browser-/, "");
+const label = (pageId: string) => (gens.get(pageId) ? `browser-${pageId}~${gens.get(pageId)}` : `browser-${pageId}`);
+const pageIdOf = (lbl: string) => lbl.replace(/^browser-/, "").replace(/~\d+$/, "");
+/** An event from the page's current webview, not one it replaced. */
+const current = (lbl: string) => lbl.startsWith("browser-") && created.has(pageIdOf(lbl)) && label(pageIdOf(lbl)) === lbl;
 const key = (b: Box) => `${b.x},${b.y},${b.width},${b.height}`;
 const box = (r: DOMRect): Box => ({ x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) });
 const hostOf = (url: string) => {
@@ -64,7 +81,8 @@ const queues = new Map<string, Promise<unknown>>();
 
 /** Fire-and-forget call on a page's webview, after its earlier ones; logs instead of raising. */
 function send(pageId: string, cmd: string, args: Record<string, unknown> = {}) {
-  const run = () => invoke(cmd, { label: label(pageId), ...args }).catch((e) => console.warn(`${cmd} failed:`, e));
+  const lbl = label(pageId); // now: a remade page's close goes to the webview it replaces
+  const run = () => invoke(cmd, { label: lbl, ...args }).catch((e) => console.warn(`${cmd} failed:`, e));
   queues.set(pageId, (queues.get(pageId) ?? Promise.resolve()).then(run));
 }
 
@@ -110,9 +128,8 @@ function apply(pageId: string, b: Box) {
 // Native events: keep the page URL and title in sync with the webview.
 listen<{ label: string; url: string; loading: boolean }>("browser-nav", (e) => {
   const { label: lbl, url, loading } = e.payload;
-  if (!lbl.startsWith("browser-")) return;
+  if (!current(lbl)) return;
   const id = pageIdOf(lbl);
-  if (!created.has(id)) return;
   patchInfo(id, { url, loading });
   const o = ownerOf(id);
   if (o && !loading && url !== "about:blank" && o.page.url !== url) setPageUrl(o.project.id, o.tab.id, id, url);
@@ -120,10 +137,27 @@ listen<{ label: string; url: string; loading: boolean }>("browser-nav", (e) => {
 
 listen<{ label: string; title: string }>("browser-title", (e) => {
   const { label: lbl, title } = e.payload;
-  if (!lbl.startsWith("browser-")) return;
-  const id = pageIdOf(lbl);
-  if (created.has(id)) patchInfo(id, { title });
+  if (current(lbl)) patchInfo(pageIdOf(lbl), { title });
 }).catch((e) => console.warn("listen browser-title failed:", e));
+
+listen<{ label: string; origin: string; user: string; update: boolean }>("browser-password", (e) => {
+  const { label: lbl, origin, user, update } = e.payload;
+  if (current(lbl)) setPasswordPrompts(pageIdOf(lbl), { origin, user, update });
+}).catch((e) => console.warn("listen browser-password failed:", e));
+
+function clearPrompt(pageId: string) {
+  if (passwordPrompts[pageId]) setPasswordPrompts(produce((s) => { delete s[pageId]; }));
+}
+
+/** Save (or update) the sign-in a page's prompt asks about, or let it go. */
+export function answerPassword(pageId: string, save: boolean): void {
+  const p = passwordPrompts[pageId];
+  clearPrompt(pageId);
+  if (!p || !created.has(pageId)) return;
+  invoke("browser_password_answer", { label: label(pageId), save })
+    .then(() => save && flash(`${p.update ? "updated" : "saved"} the password for ${p.user || hostOf(p.origin)}`))
+    .catch((e) => flash(`${e}`));
+}
 
 // A page asked for a new one (target=_blank, window.open, Ctrl+click): add a page after it in its window.
 listen<{ label: string; url: string; background: boolean }>("browser-open", (e) => {
@@ -177,12 +211,43 @@ function initFramed(page: Page) {
   if (url) framedHistory.set(page.id, { list: [url], i: 0 });
 }
 
-/** Create a page's webview at `b`, hidden: apply shows the window's shown page. */
-function create(page: Page, b: Box) {
+/** A profile's switches as browser_open and browser_autofill take them. */
+const autofillOf = (prof: Profile) => ({ autofill: prof.autofill !== false, passwords: prof.passwords !== false });
+
+/** Create a page's webview at `b` in `prof`, hidden: apply shows the window's shown page. */
+function create(page: Page, b: Box, prof: Profile) {
   created.add(page.id);
+  madeIn.set(page.id, prof.id);
   setBrowserInfo(page.id, { url: page.url, title: page.url ? hostOf(page.url) : "New tab", loading: !!page.url });
-  send(page.id, "browser_open", { url: page.url, ...b, hidden: true });
+  send(page.id, "browser_open", { url: page.url, ...b, hidden: true, profile: prof.id, ...autofillOf(prof) });
   lastSent.set(page.id, key(b));
+}
+
+/** Close a page's webview so the next placeBrowser makes it again (in another profile). Its
+ *  calls stay queued, so the new webview opens after the old one is closed. */
+function drop(pageId: string) {
+  if (!created.has(pageId)) return;
+  send(pageId, "browser_close");
+  clearPrompt(pageId);
+  gens.set(pageId, (gens.get(pageId) ?? 0) + 1);
+  created.delete(pageId);
+  shown.delete(pageId);
+  lastSent.delete(pageId);
+  madeIn.delete(pageId);
+}
+
+/** A profile's autofill switches changed: apply them to its open webviews. */
+export function applyProfileAutofill(prof: Profile): void {
+  for (const [id, p] of madeIn) if (p === prof.id) send(id, "browser_autofill", autofillOf(prof));
+}
+
+/** Run `change` (deleting the profile), then close every webview still made in it; resolves once
+ *  they are all closed, so its data can be erased. Windows on screen remake theirs during `change`. */
+export async function leaveProfile(profileId: string, change: () => void): Promise<void> {
+  const ids = [...madeIn].filter(([, p]) => p === profileId).map(([id]) => id);
+  change();
+  for (const id of ids) if (madeIn.get(id) === profileId) drop(id);
+  await Promise.all(ids.map((id) => queues.get(id)));
 }
 
 /**
@@ -190,7 +255,7 @@ function create(page: Page, b: Box) {
  * it is not visible (or blank). Pages in the background stay hidden, but load at the same rect
  * so switching to one is instant.
  */
-export function placeBrowser(_project: Project, tab: Tab, rect: DOMRect | null): void {
+export function placeBrowser(project: Project, tab: Tab, rect: DOMRect | null): void {
   const active = activePage(tab);
   if (!active) return;
   if (!nativeBrowsers) {
@@ -200,11 +265,14 @@ export function placeBrowser(_project: Project, tab: Tab, rect: DOMRect | null):
   }
   // A zero-sized rect is a window hidden by the layout (display:none): hide, or the webview stays on top.
   const b = rect && rect.width >= 2 && rect.height >= 2 ? box(rect) : null;
+  // The window switched profile: every page reloads in the new one.
+  const prof = (profilesSupported() ? undefined : profileById(DEFAULT_PROFILE)) ?? tabProfile(project, tab);
+  if (b) for (const page of tab.pages ?? []) if (created.has(page.id) && madeIn.get(page.id) !== prof.id) drop(page.id);
   for (const page of tab.pages ?? []) {
     if (page.id === active.id) continue;
     latest.set(page.id, null);
     hide(page.id);
-    if (b && page.url && !created.has(page.id)) create(page, b);
+    if (b && page.url && !created.has(page.id)) create(page, b, prof);
   }
   const id = active.id;
   latest.set(id, b);
@@ -212,7 +280,7 @@ export function placeBrowser(_project: Project, tab: Tab, rect: DOMRect | null):
 
   if (!created.has(id)) {
     touch(tab.id);
-    create(active, b);
+    create(active, b, prof);
   }
   if (suspended) return; // remembered; applied when resumed
   apply(id, b);
@@ -290,7 +358,10 @@ export function closePage(pageId: string): void {
   shown.delete(pageId);
   latest.delete(pageId);
   lastSent.delete(pageId);
+  madeIn.delete(pageId);
+  gens.delete(pageId);
   framedHistory.delete(pageId);
+  clearPrompt(pageId);
   setBrowserInfo(produce((s) => { delete s[pageId]; }));
 }
 
@@ -322,7 +393,7 @@ export function setBrowsersCovered(right: number): void {
 }
 
 /** The roots of the HTML overlays setBrowsersOverlaid measures. */
-const OVERLAYS = ".tabmenu, .pop, .iconpick, .gtf, .dialog-scrim";
+const OVERLAYS = ".tabmenu, .pop, .iconpick, .gtf, .dialog-scrim, .profmenu";
 let overlayRo: ResizeObserver | undefined;
 let overlayRaf = 0;
 
