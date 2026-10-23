@@ -8,8 +8,10 @@ mod folders;
 mod fs;
 mod git;
 mod github;
+mod phone;
 mod plane;
 mod pty;
+mod push;
 mod remote;
 mod spawn;
 mod store;
@@ -69,6 +71,8 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(Arc::new(pty::Ptys::default()))
         .setup(|app| {
+            let ptys = Arc::clone(app.state::<Arc<pty::Ptys>>().inner());
+            app.manage(phone::Phone::new(app.handle().clone(), ptys));
             // The main window is built here rather than in tauri.conf.json: browser
             // panes are child webviews, and a plain Window with an auto-resizing
             // main webview is what lets children be positioned freely on every OS.
@@ -175,11 +179,19 @@ pub fn run() {
             bg::sound_load,
             bg::sound_delete,
             usage::claude_usage,
+            phone::phone_start,
+            phone::phone_stop,
+            phone::phone_status,
+            phone::phone_pair,
+            phone::phone_forget,
+            phone::phone_agents,
+            phone::phone_push,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                app.state::<Arc<phone::Phone>>().shutdown();
                 app.state::<Arc<pty::Ptys>>().kill_all();
             }
         });

@@ -241,6 +241,9 @@ export type Settings = {
   worktreeAgent?: string;
   /** false hides Claude's session and weekly usage in the status line (and stops fetching it). Unset shows it. */
   claudeUsage?: boolean;
+  /** Remote Control (phone.ts): the signals that push to a phone (unset: all of them). Whether
+   *  it is on lives in phone.json. */
+  remote?: { push?: Partial<Record<SoundEvent, boolean>> };
 };
 
 export type GitColor = "add" | "del" | "mod" | "ren";
@@ -255,8 +258,9 @@ export type AgentState = "working" | "blocked" | "done" | "error";
 /** The last report; `seen` once its window was on screen after a done or error. */
 export type AgentReport = { state: AgentState; msg: string; at: number; seen: boolean };
 
-/** Runtime-only info about live tabs; never persisted. `attention` is the terminal bell. */
-export type Live = { status: TabStatus; attention: boolean; title: string; agent?: AgentReport };
+/** Runtime-only info about live tabs; never persisted. `attention` is the terminal bell; `pty` is
+ *  the running PTY's id, which phones watch it by. */
+export type Live = { status: TabStatus; attention: boolean; title: string; agent?: AgentReport; pty?: number };
 
 export const SPACES = 4;
 /** Steps for Alt+, / Alt+. ; any whole px up to GAP_MAX can be typed in Settings or the status line. */

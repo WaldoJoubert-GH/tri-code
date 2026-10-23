@@ -1,15 +1,18 @@
 //! PTY sessions: spawn, stream output to the webview, write, resize, kill.
 //!
 //! Output goes over a Tauri `Channel` as raw bytes (an `ArrayBuffer` on the JS
-//! side), so there is no JSON or base64 on the hot path.
+//! side), so there is no JSON or base64 on the hot path. Each session also keeps
+//! its recent output and hands a copy of new output to phones watching it
+//! (phone.rs), so a phone can join a running agent.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use tauri::ipc::{Channel, InvokeResponseBody};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::envssh;
 use crate::spawn::{self, SpawnSpec};
@@ -18,6 +21,27 @@ struct Session {
     master: Mutex<Box<dyn MasterPty + Send>>,
     writer: Mutex<Box<dyn Write + Send>>,
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
+    /// Its own Arc: the reader thread holds it, and must not hold the master (see below).
+    tap: Arc<Mutex<Tap>>,
+}
+
+/// How much recent output a phone gets when it starts watching.
+const SCROLLBACK: usize = 256 * 1024;
+
+/// A session's recent output and the phones watching it.
+#[derive(Default)]
+struct Tap {
+    recent: VecDeque<u8>,
+    watchers: Vec<UnboundedSender<Vec<u8>>>,
+}
+
+impl Tap {
+    fn push(&mut self, bytes: &[u8]) {
+        self.recent.extend(bytes);
+        let over = self.recent.len().saturating_sub(SCROLLBACK);
+        self.recent.drain(..over);
+        self.watchers.retain(|w| w.send(bytes.to_vec()).is_ok());
+    }
 }
 
 #[derive(Default)]
@@ -41,6 +65,28 @@ impl Ptys {
             .get(&id)
             .cloned()
             .ok_or_else(|| format!("no pty {id}"))
+    }
+
+    /// Start watching a session: its recent output, then everything after it. The receiver
+    /// closes when the session ends.
+    pub fn watch(&self, id: u32) -> Result<(Vec<u8>, UnboundedReceiver<Vec<u8>>), String> {
+        let session = self.get(id)?;
+        let mut tap = session.tap.lock().unwrap();
+        let (tx, rx) = unbounded_channel();
+        tap.watchers.push(tx);
+        Ok((tap.recent.iter().copied().collect(), rx))
+    }
+
+    pub fn write(&self, id: u32, data: &[u8]) -> Result<(), String> {
+        let session = self.get(id)?;
+        let mut w = session.writer.lock().unwrap();
+        w.write_all(data).and_then(|_| w.flush()).map_err(|e| e.to_string())
+    }
+
+    pub fn resize(&self, id: u32, cols: u16, rows: u16) -> Result<(), String> {
+        let session = self.get(id)?;
+        let master = session.master.lock().unwrap();
+        master.resize(size(cols, rows)).map_err(|e| e.to_string())
     }
 }
 
@@ -94,7 +140,9 @@ pub async fn pty_spawn(
         master: Mutex::new(pair.master),
         writer: Mutex::new(writer),
         killer: Mutex::new(child.clone_killer()),
+        tap: Arc::default(),
     });
+    let tap = Arc::clone(&session.tap);
     state.sessions.lock().unwrap().insert(id, session);
 
     let reader_thread = std::thread::spawn(move || {
@@ -103,12 +151,15 @@ pub async fn pty_spawn(
             match reader.read(&mut buf) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
+                    tap.lock().unwrap().push(&buf[..n]);
                     if on_data.send(InvokeResponseBody::Raw(buf[..n].to_vec())).is_err() {
                         break;
                     }
                 }
             }
         }
+        // Closes the phones' receivers: the agent is gone.
+        tap.lock().unwrap().watchers.clear();
     });
 
     let ptys = Arc::clone(state.inner());
@@ -128,16 +179,12 @@ pub async fn pty_spawn(
 
 #[tauri::command]
 pub async fn pty_write(state: tauri::State<'_, Arc<Ptys>>, id: u32, data: String) -> Result<(), String> {
-    let session = state.get(id)?;
-    let mut w = session.writer.lock().unwrap();
-    w.write_all(data.as_bytes()).and_then(|_| w.flush()).map_err(|e| e.to_string())
+    state.write(id, data.as_bytes())
 }
 
 #[tauri::command]
 pub async fn pty_resize(state: tauri::State<'_, Arc<Ptys>>, id: u32, cols: u16, rows: u16) -> Result<(), String> {
-    let session = state.get(id)?;
-    let master = session.master.lock().unwrap();
-    master.resize(size(cols, rows)).map_err(|e| e.to_string())
+    state.resize(id, cols, rows)
 }
 
 /// Ends the persistent shpool/tmux session behind a remote tab (closing the

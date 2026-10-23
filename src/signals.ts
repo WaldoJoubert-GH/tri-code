@@ -11,6 +11,7 @@ import {
 } from "./state";
 import { flash } from "./ui";
 import { keyOf } from "./keymap";
+import { pushSignal } from "./phone";
 
 /** What a window signals now. `working` only badges the tab strip, title bar and status line. */
 export type Sig = AgentState;
@@ -161,7 +162,8 @@ const WHAT: Record<SoundEvent, string> = { blocked: "needs input", done: "is don
 
 /**
  * A tab's agent changed state (terms.ts). `looking`: its window was on screen in a focused app.
- * Working never alerts; the rest play the project's sound and notify, by its alert setting.
+ * Working never alerts; the rest play the project's sound and notify, by its alert setting, and
+ * push to paired phones (phone.ts).
  */
 export function onSignal(projectId: string, t: Tab, state: AgentState, msg: string, looking: boolean) {
   const p = projectById(projectId);
@@ -169,10 +171,11 @@ export function onSignal(projectId: string, t: Tab, state: AgentState, msg: stri
   const mode = alertFor(p);
   if (mode === "badge" || (mode === "away" && looking)) return;
   void playFor(p, state);
-  if (desktopFor(p)) {
-    const title = live[t.id]?.title;
-    void notify(`${tabName(t)} ${WHAT[state]}`, [p.name, title, msg && msg !== title ? msg : ""].filter(Boolean).join(" · "), { projectId, tabId: t.id });
-  }
+  const title = live[t.id]?.title;
+  const head = `${tabName(t)} ${WHAT[state]}`;
+  const body = [p.name, title, msg && msg !== title ? msg : ""].filter(Boolean).join(" · ");
+  if (desktopFor(p)) void notify(head, body, { projectId, tabId: t.id });
+  pushSignal(state, t, head, body);
 }
 
 // A click on a notification raises the app and focuses the agent it was about. Notifications only
