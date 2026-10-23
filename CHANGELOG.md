@@ -2,12 +2,21 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.35 — 2026-10-23
+
+- Browser Profiles: each profile keeps its own cookies, sign-ins, history, autofill and saved passwords. A project picks a profile (a worktree uses its repo's), a browser window or Web App can use another, and the avatar in the nav bar switches it, reopening the window's pages in the new profile. Once there are two, browser windows show a band in their profile's colour. Settings › Browser names, colours and deletes profiles and turns Save passwords and Autofill forms on or off for each; deleting a profile erases its data. On macOS 14+ saved logins go to the Keychain, and a bar under the address offers to save or update them. Personal keeps the data from before profiles. ([#20](https://github.com/WaldoJoubert-GH/tri-code/pull/20))
+- `Mod+Shift+[` and `Mod+Shift+]` step to the previous and next workspace, also from the Command Palette.
+- The editor folds on VS Code's chords: `Ctrl+K Ctrl+[` / `]` fold and unfold recursively, `Ctrl+K Ctrl+0` folds all and `Ctrl+K Ctrl+J` unfolds all (`Cmd` on a Mac). They're in a new Editor group in Settings › Hotkeys.
+- In a Split diff both sides scroll sideways together, each stopping where its own longest line ends.
+
 ## 0.1.34 — 2026-10-23
 
+- Remote Control (Settings › Remote): your agents on your phone over Tailscale. Pair a phone with a six-character code or QR, see each project's agent windows with their signals, open one to watch its terminal live and type into it, and get a push when the desktop would alert. Nothing listens on your LAN. ([#17](https://github.com/WaldoJoubert-GH/tri-code/pull/17))
 - On macOS, finishing a copy of a folder that isn't a git repo works again, and so do removing a worktree, a project or an environment, and discarding or overwriting changes in the editor: their questions were answered Cancel without being shown. They now ask in a native dialog on every platform.
 
 ## 0.1.33 — 2026-10-23
 
+- Worktrees already in a repo's `<repo>.worktrees/` folder, made with `git worktree add` by hand or before the project was added, show under the repo in the sidebar and open and remove like the rest. ([#14](https://github.com/WaldoJoubert-GH/tri-code/pull/14))
 - Git colours are easier to see: added and removed lines have a stronger tint and a solid bar down their edge, and in Split a changed line reads red on the left and green on the right, with the words that changed picked out.
 - Settings › Git sets the colours for added, deleted, modified and renamed files and how strongly diff lines are highlighted, with a preview. They apply to the git window, diffs, the editor's file tree and the status line; ↺ goes back to the theme's colour.
 - Long lines in a diff scroll sideways instead of running out of view. In Split each side has its own scrollbar, and a sideways swipe or `Shift`+wheel scrolls the side under the pointer.
