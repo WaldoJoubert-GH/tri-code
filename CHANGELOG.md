@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.33 — 2026-10-23
+
+- Git colours are easier to see: added and removed lines have a stronger tint and a solid bar down their edge, and in Split a changed line reads red on the left and green on the right, with the words that changed picked out.
+- Settings › Git sets the colours for added, deleted, modified and renamed files and how strongly diff lines are highlighted, with a preview. They apply to the git window, diffs, the editor's file tree and the status line; ↺ goes back to the theme's colour.
+- Long lines in a diff scroll sideways instead of running out of view. In Split each side has its own scrollbar, and a sideways swipe or `Shift`+wheel scrolls the side under the pointer.
+
 ## 0.1.32 — 2026-10-22
 
 - The editor's file tree and tabs show git status: a changed file's name takes the change's colour with its letter beside it (M modified, A added, U untracked, R renamed, ! conflict), and a folder holding changes gets a dot. Saving a file updates them straight away.
