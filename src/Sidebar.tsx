@@ -13,7 +13,7 @@ import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { openProjectDialog } from "./OpenProject";
 import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
 import { adoptWorktrees, branchOf, loadWorktrees, openNewWorktree, removeWorktree, tileLabel } from "./worktrees";
-import { flash } from "./ui";
+import { ask, flash } from "./ui";
 import { keyOf, withKey } from "./keymap";
 import { envLocked, lockEnv } from "./envlock";
 import { settingsOpen, toggleSettings } from "./Settings";
@@ -157,18 +157,18 @@ export default function Sidebar() {
     }
   });
 
-  const remove = (p: Project) => {
+  const remove = async (p: Project) => {
     const wts = worktreesOf(p.id);
     const tabs = [p, ...wts].reduce((n, x) => n + x.tabs.length, 0);
-    if (!confirm(`Remove "${p.name}"${wts.length ? ` and its ${wts.length} worktree(s)` : ""} and end its ${tabs} tab(s)? Worktree folders stay on disk.`)) return;
+    if (!await ask(`Remove "${p.name}"${wts.length ? ` and its ${wts.length} worktree(s)` : ""} and end its ${tabs} tab(s)? Worktree folders stay on disk.`)) return;
     wts.forEach(dropProject);
     dropProject(p);
   };
 
-  const removeEnv = (host: string) => {
+  const removeEnv = async (host: string) => {
     const ps = app.projects.filter((p) => p.host === host);
     const tabs = ps.reduce((n, p) => n + p.tabs.length, 0);
-    if (ps.length && !confirm(`Remove environment "${envName(host)}", its ${ps.length} project(s) and ${tabs} tab(s)?`)) return;
+    if (ps.length && !await ask(`Remove environment "${envName(host)}", its ${ps.length} project(s) and ${tabs} tab(s)?`)) return;
     ps.forEach(dropProject);
     removeEnvironment(host);
     void invoke("env_ssh_set", { host, ssh: null });

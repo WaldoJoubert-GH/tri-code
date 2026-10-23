@@ -31,6 +31,7 @@ aes-gcm = "0.10"
 getrandom = "0.2"
 rand_core = { version = "0.6", features = ["getrandom"] }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+tauri-plugin-dialog = "2"
 
 # Dev builds: keep link time and memory low (4 GB build machines).
 [profile.dev]

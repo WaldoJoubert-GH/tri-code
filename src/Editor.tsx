@@ -23,7 +23,7 @@ import { fileMarks, markAt, peekStatus } from "./git";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { openExternal, openUrlInProject } from "./browsers";
 import { capsOf, withKey } from "./keymap";
-import { flash } from "./ui";
+import { ask, flash } from "./ui";
 import { type DiffMode, changeMarks, diffStats, makePatch, parseUnified, sameText } from "./diff";
 import DiffView, { diffKeys, stepHunk } from "./DiffView";
 import { headText, repoEpoch, repoOfFile, type RepoRef } from "./repos";
@@ -225,7 +225,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
         next = await write(d.stamp);
       } catch (e) {
         if (String(e) !== CHANGED) throw e;
-        if (!confirm(`${name(f)} changed on disk since it was opened (an agent may have written to it).\n\nOverwrite it with your version?`)) return;
+        if (!await ask(`${name(f)} changed on disk since it was opened (an agent may have written to it).\n\nOverwrite it with your version?`)) return;
         next = await write(null);
       }
       d.stamp = next;
@@ -240,19 +240,19 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     }
   }
 
-  const reload = () => {
+  const reload = async () => {
     const f = path();
     if (!f) return;
     if (media()) return setReloads((n) => n + 1);
-    if (isDirty(f) && !confirm(`Discard your changes to ${name(f)}?`)) return;
+    if (isDirty(f) && !await ask(`Discard your changes to ${name(f)}?`)) return;
     mine.delete(f);
     markDirty(tabId, f, false);
     setReady("");
     reloadText(props.project, f);
   };
 
-  const closeFile = (f: string) => {
-    if (isDirty(f) && !confirm(`Discard your changes to ${name(f)}?`)) return;
+  const closeFile = async (f: string) => {
+    if (isDirty(f) && !await ask(`Discard your changes to ${name(f)}?`)) return;
     closeFileInTab(props.project, props.tab, f);
   };
 

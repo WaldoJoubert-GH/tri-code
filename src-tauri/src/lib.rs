@@ -65,6 +65,7 @@ pub fn run() {
     #[cfg(target_os = "macos")]
     let builder = builder.menu(mac_menu);
     builder
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

@@ -16,7 +16,7 @@ import { type Agent, type Project, addWorktree, app, projectById, repoOf, setApp
 import { launchAgent } from "./agents";
 import { dropProject } from "./Sidebar";
 import { gitOf } from "./git";
-import { flash } from "./ui";
+import { ask, flash } from "./ui";
 
 /** One entry of `git worktree list`. */
 export type GitWorktree = { path: string; branch: string | null; main: boolean };
@@ -228,7 +228,7 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
   try {
     ch = await invoke<Changes>("folder_changes", { host: p.host, src: repo.path, dest: p.path, skip: repos });
   } catch (e) {
-    if (!confirm(`Can't tell what changed in ${p.path} (${e}). Delete the copy anyway, copying nothing back?`)) return;
+    if (!await ask(`Can't tell what changed in ${p.path} (${e}). Delete the copy anyway, copying nothing back?`)) return;
     ch = { changed: [], deleted: [], conflicts: [] };
   }
   const what = [
@@ -239,9 +239,9 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
     dirty.length ? `throw away uncommitted changes in ${dirty.join(", ")}` : "",
     `delete ${p.path}`,
   ].filter(Boolean).join("; ");
-  if (!confirm(`Finish ${branch}? This will ${what}.`)) return;
+  if (!await ask(`Finish ${branch}? This will ${what}.`)) return;
   // Changed on both sides: no git to merge them, so one side wins.
-  const theirs = ch.conflicts.length && confirm(
+  const theirs = ch.conflicts.length && await ask(
     `${ch.conflicts.length} file${ch.conflicts.length > 1 ? "s" : ""} changed in ${repo.name} too since the copy was made:${listed8(ch.conflicts)}\n\nOK keeps the copy's version. Cancel keeps ${repo.name}'s.`,
   ) ? ch.conflicts : [];
 
@@ -282,7 +282,7 @@ export async function removeWorktree(p: Project): Promise<void> {
     `delete ${p.path}`,
     dirty ? `throw away ${dirty} uncommitted change${dirty > 1 ? "s" : ""}` : "",
   ].filter(Boolean).join(", ");
-  if (!confirm(`Remove worktree ${branch}? This will ${what}.`)) return;
+  if (!await ask(`Remove worktree ${branch}? This will ${what}.`)) return;
 
   if (app.activeProject === p.id) setApp("activeProject", repo.id);
   dropProject(p);
@@ -300,7 +300,7 @@ export async function removeWorktree(p: Project): Promise<void> {
     } catch {
       // Unmerged as far as git knows; a squash-merged PR looks like that too.
       const merged = gitOf(p.id).pr?.state === "MERGED";
-      if (merged || confirm(`Branch ${branch} has commits that are not merged. Delete the branch too?`)) {
+      if (merged || await ask(`Branch ${branch} has commits that are not merged. Delete the branch too?`)) {
         await invoke("git_branch_delete", { host: repo.host, path: repo.path, branch, force: true }).catch((e) => flash(`git branch -D: ${e}`));
       }
     }

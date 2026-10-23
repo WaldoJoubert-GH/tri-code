@@ -1,6 +1,10 @@
 // Small shared UI signals: the status-line flash message and the undo toast.
 
 import { createSignal } from "solid-js";
+import { confirm } from "@tauri-apps/plugin-dialog";
+
+/** Ask OK/Cancel in a native dialog. Not `window.confirm`: macOS's webview answers Cancel without asking. */
+export const ask = (msg: string): Promise<boolean> => confirm(msg, { title: "tri-code" }).catch(() => window.confirm(msg));
 
 const [flashMsg, setFlashMsg] = createSignal("");
 let flashTimer: number | undefined;

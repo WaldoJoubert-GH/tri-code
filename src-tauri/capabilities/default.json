@@ -9,6 +9,7 @@
     "core:window:allow-unminimize",
     "core:window:allow-show",
     "core:window:allow-set-focus",
+    "dialog:allow-message",
     "opener:default",
     "notification:default",
     "updater:default",

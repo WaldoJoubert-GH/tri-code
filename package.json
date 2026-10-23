@@ -32,6 +32,7 @@
     "@codemirror/view": "^6.43.15",
     "@lezer/highlight": "^1.2.5",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "2",
     "@tauri-apps/plugin-notification": "2",
     "@tauri-apps/plugin-opener": "2",
     "@tauri-apps/plugin-process": "2",
