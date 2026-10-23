@@ -162,6 +162,17 @@ _Avoid_: Notification (that is the desktop popup), attention, status (a tab's st
 What a signal does beyond its badges: the project's sound for it and a desktop notification. When to alert is "away" (only while you aren't looking at that window), "always" or "badge only". App-wide settings sit behind the bell in the status line (`app.notify`); a project overrides any of them in Appearance › Signals (`project.notify`), and Do not disturb makes every project badge only.
 _Avoid_: Notification settings, ping.
 
+**Remote Control**:
+The agents on your phone. Turned on in Settings › Remote, it serves a phone page from tri-code itself (`phone.rs`, on `127.0.0.1:7520`) and puts it on the tailnet with `tailscale serve` at `https://<machine>.<tailnet>.ts.net:7443`, never on the LAN. Web Push needs HTTPS, hence Tailscale. The phone lists each project's agent windows (plain shells left out, locked Environments hidden) with their Agent Signals, and shows one agent's live terminal with quick keys and a line to type into. While a phone watches a terminal, its PTY takes the phone's size; the desktop window gets its size back when the last phone stops watching. Stays on across restarts until turned off. Chosen from design/remote-control.html (connection A, desktop B, phone list A).
+_Avoid_: Remote (that is an ssh Environment), mobile app, web UI.
+
+**Paired Phone**:
+A browser that paired with a six-character code from Settings › Remote (QR code or typed, valid ten minutes) and holds a device token; tri-code keeps only the token's hash, in `phone.json` beside its VAPID key. On an iPhone the Home Screen app pairs on first launch, since it doesn't share storage with Safari. Forget revokes it and closes its socket.
+
+**Phone Push**:
+A Web Push of an Alert to every Paired Phone that allowed notifications, sent straight to the phone's push service (Apple's, Google's), encrypted for it and signed with the VAPID key. It goes out whenever the desktop alerts, so it follows the project's Alert setting and Do not disturb, and covers needs input, done and errors unless Settings › Remote unticks some. A tap opens that agent's terminal.
+_Avoid_: Notification (that is the desktop popup).
+
 **Feedback**:
 A bug report or idea for tri-code itself, written in the popover behind the status line's speech bubble (or "Report a bug or suggest a feature" in the Command Palette). It becomes an issue on tri-code's GitHub repo, filed with the local `gh` login and labelled `bug` or `enhancement` when GitHub allows; without gh, GitHub's new-issue form opens prefilled. The version and OS go with it unless clicked off. Chosen from design/support-widget.html (variant A).
 _Avoid_: Support ticket, bug reporter.

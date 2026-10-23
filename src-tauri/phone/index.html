@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The phone page of Remote Control (src-tauri/src/phone.rs serves it). Plain JS, no build. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0e0f12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="tri-code">
+<link rel="apple-touch-icon" href="/icon.png">
+<link id="manifest" rel="manifest" href="/manifest.webmanifest">
+<script>
+  // A Home Screen app added from this page starts with the pair code, so it can pair itself.
+  const code = new URLSearchParams(location.search).get("pair");
+  if (code) document.getElementById("manifest").href = "/manifest.webmanifest?pair=" + encodeURIComponent(code);
+</script>
+<title>tri-code</title>
+<link rel="stylesheet" href="/xterm.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <section id="pair" class="screen" hidden>
+    <div class="pair">
+      <div class="logo">tri</div>
+      <h1>Connect to tri-code</h1>
+      <div id="pair-steps"></div>
+      <form id="pair-form" class="pair-form">
+        <label for="pair-code">Pair code</label>
+        <input id="pair-code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="ABC 123" maxlength="8">
+        <button class="cta" type="submit">Pair</button>
+      </form>
+      <p id="pair-msg" class="msg"></p>
+      <p class="dim">Get a code from tri-code: Settings › Remote › Pair a phone.</p>
+    </div>
+  </section>
+
+  <section id="list" class="screen" hidden>
+    <header class="hd">
+      <h1>Agents</h1>
+      <span id="conn" class="conn">connecting</span>
+    </header>
+    <div id="notify" class="banner" hidden></div>
+    <main id="agents" class="agents"></main>
+  </section>
+
+  <section id="term" class="screen" hidden>
+    <header class="tv-hd">
+      <button id="back" class="back" aria-label="Back to agents">‹</button>
+      <div class="mid">
+        <div class="nm"><span id="tv-name"></span> <span id="tv-sig" class="sig"></span></div>
+        <div id="tv-proj" class="pj"></div>
+      </div>
+    </header>
+    <div id="termhost" class="termhost"></div>
+    <div id="keys" class="keys"></div>
+    <form id="compose" class="compose">
+      <input id="compose-in" placeholder="Type to the agent…" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send">
+      <button class="send" type="submit" aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7M12 19V5"/></svg>
+      </button>
+    </form>
+  </section>
+
+  <script src="/xterm.js"></script>
+  <script src="/addon-fit.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
