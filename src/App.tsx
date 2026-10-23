@@ -91,6 +91,17 @@ export default function App() {
     document.documentElement.style.setProperty("--accent-raw", activeProject()?.accent ?? "#7aa2f7");
   });
 
+  // Git colours changed in Settings → Git override the theme's --git-* tokens.
+  createEffect(() => {
+    const st = document.documentElement.style, c = app.settings.gitColors ?? {};
+    for (const k of ["add", "del", "mod", "ren"] as const) {
+      if (c[k]) st.setProperty(`--git-${k}`, c[k]!);
+      else st.removeProperty(`--git-${k}`);
+    }
+    if (app.settings.gitTint === undefined) st.removeProperty("--git-tint");
+    else st.setProperty("--git-tint", `${app.settings.gitTint}%`);
+  });
+
   // Warm the active project's `.dev/` so the toolbar chips and sidebar bar have data.
   createEffect(() => {
     if (!ready()) return;

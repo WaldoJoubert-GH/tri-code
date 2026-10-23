@@ -16,6 +16,12 @@
   --violet: #7c4dbd;
   --scrim: rgba(30, 34, 44, .35);
   --shadow: rgba(30, 34, 44, .22);
+  /* git: file status letters and diff lines. Settings → Git sets these on <html> to override them. */
+  --git-add: var(--ok);
+  --git-del: var(--bad);
+  --git-mod: var(--warn);
+  --git-ren: var(--violet);
+  --git-tint: 18%;
   --dusk-a: #e6e1f6; --dusk-b: #eedcef; --dusk-c: #f6dfdc; --dusk-d: #f3ece6;
   /* the project's chosen accent; darkened in light mode so borders and text keep contrast */
   --accent-raw: #7aa2f7;
@@ -376,9 +382,9 @@ svg.lucide { flex: none; display: block; }
 .status .gstat .ab { color: var(--muted); }
 .gstat .cnt, .gstat-pop .s { font: 10.5px var(--mono); }
 .gstat .cnt { display: flex; gap: 5px; }
-.gstat .A, .gstat-pop .s.A { color: var(--ok); }
-.gstat .M, .gstat-pop .s.M { color: var(--warn); }
-.gstat .D, .gstat-pop .s.D { color: var(--bad); }
+.gstat .A, .gstat-pop .s.A { color: var(--git-add); }
+.gstat .M, .gstat-pop .s.M { color: var(--git-mod); }
+.gstat .D, .gstat-pop .s.D { color: var(--git-del); }
 .gstat .U, .gstat-pop .s.U { color: var(--muted); }
 .gstat-pop {
   position: fixed; z-index: 50; width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
@@ -743,6 +749,14 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
   .hk-mods, .hk-list { grid-template-columns: 1fr; }
   .hk-list dt { border-bottom: 0; padding-bottom: 0; }
 }
+.settings-dlg .git-color input[type="color"] { margin-left: auto; width: 34px; height: 22px; padding: 0 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); cursor: pointer; }
+.settings-dlg .git-color .reset, .settings-dlg .git-tint .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+.settings-dlg .git-color .reset:hover, .settings-dlg .git-tint .reset:hover { background: var(--hover); color: var(--text); }
+.settings-dlg .git-color .reset:disabled, .settings-dlg .git-tint .reset:disabled { visibility: hidden; }
+.settings-dlg .git-color .g-st { width: 14px; }
+.settings-dlg .git-tint input[type="range"] { margin-left: auto; accent-color: var(--accent); }
+.settings-dlg .git-tint .val { width: 34px; text-align: right; font: 11px var(--mono); }
+.settings-dlg .git-preview { margin-top: 10px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 0; background: var(--bg); font: 12px/17px var(--mono); overflow: hidden; user-select: none; }
 :is(.pop, .settings-dlg) .radios { display: grid; gap: 1px; }
 :is(.pop, .settings-dlg) .radio { display: flex; align-items: flex-start; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; }
 :is(.pop, .settings-dlg) .radio:hover { background: var(--hover); }

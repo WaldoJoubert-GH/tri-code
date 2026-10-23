@@ -178,6 +178,7 @@ export function commands(): Command[] {
   add({ id: "sidebar", group: "App", title: app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar", icon: "panel-left-close", keys: capsOf("sidebar"), run: toggleSidebar });
   add({ id: "tour", group: "App", title: "Take the tour", hint: "a sample project and eight stops", icon: "map", run: () => void startTour() });
   add({ id: "help", group: "App", title: "Hotkeys", icon: "keyboard", keys: capsOf("help"), run: () => openSettings("hotkeys") });
+  add({ id: "git-colors", group: "App", title: "Git colours", hint: "added, deleted, modified, diff highlight", icon: "palette", run: () => openSettings("git") });
   const u = updateReady();
   if (u) add({ id: "update", group: "App", title: `Restart to update to ${u.version}`, icon: "refresh-cw", run: installUpdate });
   else add({ id: "check-updates", group: "App", title: "Check for updates", hint: `v${appVersion}`, icon: "refresh-cw", run: checkForUpdates });

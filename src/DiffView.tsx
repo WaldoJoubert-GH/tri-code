@@ -2,7 +2,7 @@
 // for the git window and the editor's own changes view, so both read the same.
 // Chosen from design/diff.html (variant A): the toggle is in the header the caller draws.
 
-import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import {
   type DiffMode, type Row, type SplitRow, MAX_DIFF_LINES, parseUnified, pairMarks, splitRows,
 } from "./diff";
@@ -90,12 +90,12 @@ function SplitRowView(props: {
       <div class="dv-half l" classList={{ blank: !props.row.left }}>
         <span class="ln">{props.row.left?.old ?? ""}</span>
         <span class="mk">{props.row.left?.t === "-" ? "−" : ""}</span>
-        <span class="tx"><Marked parts={both()?.a} text={props.row.left?.text ?? ""} /></span>
+        <span class="tx"><span class="ti"><Marked parts={both()?.a} text={props.row.left?.text ?? ""} /></span></span>
       </div>
       <div class="dv-half r" classList={{ blank: !props.row.right }}>
         <span class="ln">{props.row.right?.new ?? ""}</span>
         <span class="mk">{props.row.right?.t === "+" ? "+" : ""}</span>
-        <span class="tx"><Marked parts={both()?.b} text={props.row.right?.text ?? ""} /></span>
+        <span class="tx"><span class="ti"><Marked parts={both()?.b} text={props.row.right?.text ?? ""} /></span></span>
       </div>
     </div>
   );
@@ -135,6 +135,50 @@ export default function DiffView(props: {
   }));
 
   createEffect(on(() => props.text, () => setSel(null)));
+
+  // Split: each side scrolls sideways on its own, from its own bar under the diff. The rows keep both halves
+  // (so they stay lined up as the diff scrolls down); a side's text moves by --sx-l / --sx-r.
+  let barL: HTMLDivElement | undefined, barR: HTMLDivElement | undefined;
+  /** How far each side's longest line runs past its half, px; 0 when every line fits. */
+  const [wide, setWide] = createSignal<[number, number]>([0, 0]);
+  const measure = () => {
+    if (!scroll || props.mode !== "split") return setWide([0, 0]);
+    const side = (s: "l" | "r") => {
+      const tx = scroll!.querySelector<HTMLElement>(`.dv-half.${s} > .tx`);
+      if (!tx) return 0;
+      let max = 0;
+      for (const ti of scroll!.querySelectorAll<HTMLElement>(`.dv-half.${s} .ti`)) max = Math.max(max, ti.offsetWidth);
+      return Math.max(0, Math.ceil(max - tx.clientWidth));
+    };
+    const w: [number, number] = [side("l"), side("r")];
+    // a side that fits again has no bar to bring its text back, so put it back here
+    if (!w[0]) scroll.style.setProperty("--sx-l", "0");
+    if (!w[1]) scroll.style.setProperty("--sx-r", "0");
+    setWide(w);
+  };
+  const slide = (s: "l" | "r", bar?: HTMLDivElement) => scroll?.style.setProperty(`--sx-${s}`, String(bar?.scrollLeft ?? 0));
+  createEffect(on(() => props.text, () => {
+    if (barL) barL.scrollLeft = 0;
+    if (barR) barR.scrollLeft = 0;
+    slide("l"); slide("r");
+  }));
+  createEffect(on(() => [model(), props.mode, props.error] as const, () => requestAnimationFrame(measure)));
+  onMount(() => {
+    const ro = new ResizeObserver(() => measure());
+    if (scroll) ro.observe(scroll);
+    onCleanup(() => ro.disconnect());
+  });
+  /** A sideways wheel (or Shift+wheel) over a half scrolls that side. */
+  const onWheel = (e: WheelEvent) => {
+    if (props.mode !== "split") return;
+    // mostly-sideways only, so a diagonal trackpad swipe still scrolls down
+    const dx = e.shiftKey ? e.deltaX || e.deltaY : Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
+    if (!dx) return;
+    const bar = (e.target as Element).closest(".dv-half.r") ? barR : barL;
+    if (!bar) return;
+    bar.scrollLeft += dx;
+    e.preventDefault();
+  };
 
   createEffect(on(
     () => [props.focusLine, props.text, props.mode, props.error] as const,
@@ -205,11 +249,13 @@ export default function DiffView(props: {
   };
 
   return (
+    <>
     <div
       class="dv-scroll"
       tabIndex={0}
       aria-label="Diff: J and K move a line, N and P a hunk, Enter opens the line, U and S switch unified or split"
       onKeyDown={onKey}
+      onWheel={onWheel}
       ref={(el) => { scroll = el; props.ref?.(el); }}
     >
       <Show when={!props.error} fallback={<div class="dv-note bad">{props.error}</div>}>
@@ -253,5 +299,12 @@ export default function DiffView(props: {
         </Show>
       </Show>
     </div>
+    <Show when={props.mode === "split" && (wide()[0] || wide()[1])}>
+      <div class="dv-hbars">
+        <div ref={barL} onScroll={() => slide("l", barL)}><div style={{ width: `calc(100% + ${wide()[0]}px)` }} /></div>
+        <div ref={barR} onScroll={() => slide("r", barR)}><div style={{ width: `calc(100% + ${wide()[1]}px)` }} /></div>
+      </div>
+    </Show>
+    </>
   );
 }

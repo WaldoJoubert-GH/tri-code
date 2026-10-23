@@ -5,9 +5,8 @@
   padding: 2px 0 12px; user-select: text;
 }
 .dv-scroll:focus { outline: none; }
+/* As wide as the longest line, so the whole diff scrolls sideways as one and every row's tint spans it. */
 .dv-content { width: max-content; min-width: 100%; }
-/* Side by side. Not `.split`: that is the canvas resize handle (canvas.css). */
-.dv-content.sbs { width: 100%; min-width: 0; }
 
 .dv-hunk {
   color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent);
@@ -17,43 +16,55 @@
 /* Unified: old line, new line, marker, text. */
 .dv-urow {
   display: grid; grid-template-columns: 40px 40px 14px minmax(0, 1fr);
-  white-space: pre; padding-right: 14px; min-width: 100%; width: max-content;
+  white-space: pre; padding-right: 14px;
 }
 .dv-urow > .ln { text-align: right; padding-right: 8px; color: var(--muted); opacity: .6; user-select: none; }
-.dv-urow > .mk { text-align: center; color: var(--muted); user-select: none; }
+.dv-urow > .mk { text-align: center; color: var(--muted); user-select: none; font-weight: 700; }
 .dv-urow > .tx { padding-left: 2px; }
-.dv-urow.a { background: color-mix(in srgb, var(--ok) 12%, transparent); }
-.dv-urow.a > .mk { color: var(--ok); }
-.dv-urow.d { background: color-mix(in srgb, var(--bad) 12%, transparent); }
-.dv-urow.d > .mk { color: var(--bad); }
+/* A changed line: tinted (--git-tint, Settings → Git), with a solid bar down its edge so it reads even on a weak tint. */
+.dv-urow.a { background: color-mix(in srgb, var(--git-add) var(--git-tint), transparent); box-shadow: inset 3px 0 var(--git-add); }
+.dv-urow.a > .mk { color: var(--git-add); }
+.dv-urow.d { background: color-mix(in srgb, var(--git-del) var(--git-tint), transparent); box-shadow: inset 3px 0 var(--git-del); }
+.dv-urow.d > .mk { color: var(--git-del); }
 .dv-urow.sel { box-shadow: inset 2px 0 var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.dv-urow.a.sel { background: color-mix(in srgb, var(--ok) 22%, transparent); }
-.dv-urow.d.sel { background: color-mix(in srgb, var(--bad) 22%, transparent); }
+.dv-urow.a.sel { background: color-mix(in srgb, var(--git-add) calc(var(--git-tint) + 10%), transparent); }
+.dv-urow.d.sel { background: color-mix(in srgb, var(--git-del) calc(var(--git-tint) + 10%), transparent); }
 
-/* Split: the same row, twice. Long lines clip per half (Unified is the escape hatch).
+/* Split (.sbs; not `.split`, that is the canvas resize handle in canvas.css): the same row, twice.
+   Each side scrolls sideways on its own (the bars in .dv-hbars move its text by --sx-l / --sx-r, in px).
    Row kinds are s-add / s-del: a bare .add is the sidebar's button (styles.css). */
-.dv-srow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); width: 100%; }
+.dv-content.sbs { width: 100%; min-width: 0; }
+.dv-srow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .dv-half {
   display: grid; grid-template-columns: 40px 12px minmax(0, 1fr); white-space: pre;
   overflow: hidden; padding-right: 8px; min-width: 0;
 }
-.dv-half.l { border-right: 1px solid var(--line); }
 .dv-half > .ln { text-align: right; padding-right: 8px; color: var(--muted); opacity: .6; user-select: none; }
-.dv-half > .mk { text-align: center; color: var(--muted); user-select: none; }
-.dv-half > .tx { overflow: hidden; text-overflow: clip; }
+.dv-half > .mk { text-align: center; color: var(--muted); user-select: none; font-weight: 700; }
+.dv-half > .tx { overflow: hidden; }
+.dv-half > .tx > .ti { display: inline-block; }
+.dv-half.l .ti { transform: translateX(calc(var(--sx-l, 0) * -1px)); }
+.dv-half.r .ti { transform: translateX(calc(var(--sx-r, 0) * -1px)); }
+/* One horizontal scrollbar per side, under the diff. */
+.dv-hbars { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid var(--line); }
+.dv-hbars > div { overflow-x: auto; overflow-y: hidden; }
+.dv-hbars > div + div { border-left: 1px solid var(--line); }
+.dv-hbars > div > div { height: 1px; }
 .dv-half.blank {
   background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--muted) 7%, transparent) 5px 10px);
 }
-.dv-srow.mod-l .dv-half.l, .dv-srow.mod-l .dv-half.r { background: color-mix(in srgb, var(--warn) 9%, transparent); }
-.dv-srow.s-add .dv-half.r { background: color-mix(in srgb, var(--ok) 12%, transparent); }
-.dv-srow.s-del .dv-half.l { background: color-mix(in srgb, var(--bad) 12%, transparent); }
-.dv-half.r > .mk { color: var(--ok); }
-.dv-srow.s-del .dv-half.l > .mk { color: var(--bad); }
+/* A changed pair reads as removed on the left and added on the right, like a lone add or delete. */
+.dv-srow:is(.mod-l, .s-del) .dv-half.l { background: color-mix(in srgb, var(--git-del) var(--git-tint), transparent); box-shadow: inset 3px 0 var(--git-del); }
+.dv-srow:is(.mod-l, .s-add) .dv-half.r { background: color-mix(in srgb, var(--git-add) var(--git-tint), transparent); box-shadow: inset 3px 0 var(--git-add); }
+.dv-half.r > .mk { color: var(--git-add); }
+.dv-half.l > .mk { color: var(--git-del); }
 .dv-srow.sel .dv-half { box-shadow: inset 2px 0 var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
 .dv-srow.sel .dv-half.r { box-shadow: inset -2px 0 var(--accent); }
 
-/* The changed span of a paired line. The colors around it still say add/remove. */
-.chg { background: color-mix(in srgb, var(--warn) 34%, transparent); border-radius: 2px; }
+/* The changed span of a paired line: the side's own colour, stronger. */
+.chg { color: inherit; border-radius: 2px; }
+.dv-half.l .chg { background: color-mix(in srgb, var(--git-del) calc(var(--git-tint) * 2 + 4%), transparent); }
+.dv-half.r .chg { background: color-mix(in srgb, var(--git-add) calc(var(--git-tint) * 2 + 4%), transparent); }
 
 .dv-note { padding: 16px 14px; color: var(--muted); font-size: 12px; }
 .dv-note.bad { color: var(--bad); white-space: pre-wrap; }

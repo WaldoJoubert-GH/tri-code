@@ -3,16 +3,17 @@
 // Hotkeys page. Chosen from design/settings-hotkeys.html.
 
 import { For, Show, createSignal } from "solid-js";
-import { GAP_MAX, app, setDiffDefault, setGap, setMonoGutter, setSkipFolders, skipFolders } from "./state";
+import { GAP_MAX, GIT_TINT, GitColor, app, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setSkipFolders, skipFolders } from "./state";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
 
-export type SettingsPage = "windows" | "files" | "hotkeys";
+export type SettingsPage = "windows" | "files" | "git" | "hotkeys";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "windows", name: "Windows", icon: "layout-panel-left" },
   { page: "files", name: "Files", icon: "folder-search" },
+  { page: "git", name: "Git", icon: "git-branch" },
   { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
 ];
 
@@ -80,6 +81,57 @@ function FilesPage() {
   );
 }
 
+const GIT_COLORS: { key: GitColor; name: string; letter: string; cls: string }[] = [
+  { key: "add", name: "Added and untracked", letter: "A", cls: "s-A" },
+  { key: "del", name: "Deleted", letter: "D", cls: "s-D" },
+  { key: "mod", name: "Modified", letter: "M", cls: "s-M" },
+  { key: "ren", name: "Renamed and copied", letter: "R", cls: "s-R" },
+];
+
+/** The theme's colour for a --git-* token, as #rrggbb for the colour input. */
+function themeColor(key: GitColor) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(`--git-${key}`).trim();
+  return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888";
+}
+
+function GitPage() {
+  return (
+    <>
+      <h4>Colours</h4>
+      <For each={GIT_COLORS}>
+        {(c) => (
+          <label class="row git-color">
+            <span class={`g-st ${c.cls}`}>{c.letter}</span>
+            {c.name}
+            <input
+              type="color"
+              value={app.settings.gitColors?.[c.key] ?? themeColor(c.key)}
+              onInput={(e) => setGitColor(c.key, e.currentTarget.value)}
+            />
+            <button type="button" class="reset" title="Back to the theme's colour" disabled={!app.settings.gitColors?.[c.key]} onClick={() => setGitColor(c.key, undefined)}>↺</button>
+          </label>
+        )}
+      </For>
+      <label class="row git-tint">
+        Diff line highlight
+        <input type="range" min="0" max="60" step="2" value={String(app.settings.gitTint ?? GIT_TINT)} onInput={(e) => setGitTint(+e.currentTarget.value)} />
+        <span class="val">{app.settings.gitTint ?? GIT_TINT}%</span>
+        <button type="button" class="reset" title="Back to the default" disabled={app.settings.gitTint === undefined} onClick={() => setGitTint(undefined)}>↺</button>
+      </label>
+      <div class="git-preview" aria-hidden="true">
+        <For each={[["", 41, 41, "export function togglePin(id: string) {"], ["d", 42, "", "  edit(id, (p) => { p.pinned = !p.pinned; });"], ["a", "", 42, "  edit(id, (p) => (p.pinned = !p.pinned));"], ["", 43, 43, "}"]] as const}>
+          {([k, o, n, t]) => (
+            <div class={`dv-urow ${k}`}>
+              <span class="ln">{o}</span><span class="ln">{n}</span><span class="mk">{k === "a" ? "+" : k === "d" ? "−" : ""}</span><span class="tx">{t}</span>
+            </div>
+          )}
+        </For>
+      </div>
+      <p class="note">Used by the git window, diffs, the file tree's status marks and the status line. A colour you pick is kept in light and dark; ↺ goes back to the theme's.</p>
+    </>
+  );
+}
+
 function WindowsPage() {
   const steps = () => [keyOf("gap-less"), keyOf("gap-more")].filter(Boolean).join(" / ");
   return (
@@ -138,6 +190,7 @@ export function SettingsDialog() {
             <section class="settings-page">
               <Show when={p() === "windows"}><WindowsPage /></Show>
               <Show when={p() === "files"}><FilesPage /></Show>
+              <Show when={p() === "git"}><GitPage /></Show>
               <Show when={p() === "hotkeys"}><HotkeysPage /></Show>
             </section>
           </div>

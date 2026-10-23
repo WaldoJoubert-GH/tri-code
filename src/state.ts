@@ -233,7 +233,14 @@ export type Settings = {
   hotkeys?: Record<string, Chord[]>;
   /** How diffs read unless a project's own toggle says otherwise. Unset is split. */
   diffMode?: DiffMode;
+  /** Git status and diff colours that were changed; the rest follow the theme (--git-* in styles.css). */
+  gitColors?: Partial<Record<GitColor, string>>;
+  /** How strongly diff lines are tinted, %. Unset is GIT_TINT. */
+  gitTint?: number;
 };
+
+export type GitColor = "add" | "del" | "mod" | "ren";
+export const GIT_TINT = 18;
 
 const defaultSettings = (): Settings => ({ modKey: "alt" });
 
@@ -564,6 +571,21 @@ export function setGap(gap: number) {
 /** Carousel gutter in px each side, or undefined for auto. */
 export function setMonoGutter(px: number | undefined) {
   setApp("settings", "monoGutter", px === undefined ? undefined : Math.round(Math.max(0, px)));
+}
+
+/** One git colour, or undefined to follow the theme again. */
+export function setGitColor(key: GitColor, color: string | undefined) {
+  setApp(produce((s) => {
+    const c = (s.settings.gitColors ??= {});
+    if (color) c[key] = color;
+    else delete c[key];
+    if (!Object.keys(c).length) delete s.settings.gitColors;
+  }));
+}
+
+/** Diff line tint in %, or undefined for GIT_TINT. */
+export function setGitTint(pct: number | undefined) {
+  setApp("settings", "gitTint", pct === undefined ? undefined : Math.round(Math.min(60, Math.max(0, pct))));
 }
 
 /** Go to File's default skip list; the same as `fs::SKIP` in fs.rs. `.git` is always skipped. */

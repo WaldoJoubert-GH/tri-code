@@ -17,10 +17,10 @@
 .fname { overflow: hidden; text-overflow: ellipsis; }
 .frow.dir .fname { font-weight: 600; }
 /* Git status: the name in the change's colour and its letter at the right (a dot on a folder). */
-[data-g="M"] { --gc: var(--warn); }
-[data-g="A"], [data-g="U"] { --gc: var(--ok); }
-[data-g="D"], [data-g="C"] { --gc: var(--bad); }
-[data-g="R"] { --gc: var(--accent); }
+[data-g="M"] { --gc: var(--git-mod); }
+[data-g="A"], [data-g="U"] { --gc: var(--git-add); }
+[data-g="D"], [data-g="C"] { --gc: var(--git-del); }
+[data-g="R"] { --gc: var(--git-ren); }
 .frow[data-g] .fname, .ft[data-g] .ftn { color: var(--gc); }
 .fmark { margin-left: auto; padding-left: 6px; flex: none; font: 600 10.5px var(--mono); color: var(--gc); }
 
@@ -192,8 +192,8 @@
   background: color-mix(in srgb, var(--violet) 8%, transparent);
 }
 .ediff-stat { display: inline-flex; gap: 4px; font: 10.5px var(--mono); flex: none; }
-.ediff-stat .p { color: var(--ok); }
-.ediff-stat .m { color: var(--bad); }
+.ediff-stat .p { color: var(--git-add); }
+.ediff-stat .m { color: var(--git-del); }
 .fnote-inline { color: var(--muted); font-size: 11px; flex: none; }
 .ediff .seg { flex: none; }
 .ediff .seg button { height: 18px; padding: 0 8px; }

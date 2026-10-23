@@ -104,10 +104,10 @@
 .g-frow input { margin: 0; accent-color: var(--accent); flex: none; }
 .g-fp { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .g-fp .d { color: var(--muted); }
-.g-st { font: 600 10.5px var(--mono); width: 12px; text-align: center; flex: none; color: var(--warn); }
-.g-st.s-A, .g-st.s-U { color: var(--ok); }
-.g-st.s-D { color: var(--bad); }
-.g-st.s-R, .g-st.s-C { color: var(--violet); }
+.g-st { font: 700 10.5px var(--mono); width: 12px; text-align: center; flex: none; color: var(--git-mod); }
+.g-st.s-A, .g-st.s-U { color: var(--git-add); }
+.g-st.s-D { color: var(--git-del); }
+.g-st.s-R, .g-st.s-C { color: var(--git-ren); }
 .g-commit { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; white-space: nowrap; }
 .g-commit:hover { background: var(--hover); }
 .g-commit.sel { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 2px 0 var(--accent); }
@@ -133,8 +133,8 @@
 .g-diffhead b .d { flex: 0 1000 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
 .g-diffhead b .f { flex: 0 1 auto; min-width: 3ch; overflow: hidden; text-overflow: ellipsis; }
 .g-diffhead .g-stat { font: 10.5px var(--mono); flex: none; }
-.g-diffhead .g-stat .p { color: var(--ok); }
-.g-diffhead .g-stat .m { color: var(--bad); }
+.g-diffhead .g-stat .p { color: var(--git-add); }
+.g-diffhead .g-stat .m { color: var(--git-del); }
 .g-icon:disabled { opacity: .35; cursor: default; }
 
 /* An opened commit: message at the top, its changes below. */
@@ -247,8 +247,8 @@
 .g-branch.repo { font-weight: 600; color: var(--muted); background: none; border: 1px solid var(--line); }
 .g-repomenu { max-height: min(60vh, 420px); overflow: auto; }
 .g-rstat { display: inline-flex; gap: 4px; margin-left: auto; padding-left: 6px; font: 10px var(--mono); flex: none; }
-.g-rstat .p { color: var(--ok); }
-.g-rstat .m { color: var(--bad); }
+.g-rstat .p { color: var(--git-add); }
+.g-rstat .m { color: var(--git-del); }
 /* The hunk arrows read as one control, not two stray glyphs. */
 .g-hunks { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; flex: none; }
 .g-hunks .g-icon { width: 22px; height: 18px; border-radius: 0; color: var(--text); font-size: 11px; }
