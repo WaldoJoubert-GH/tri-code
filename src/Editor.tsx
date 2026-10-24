@@ -14,10 +14,12 @@ import type { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { type Project, type Tab, diffModeOf, focusTab, setEditorTab, setProjectDiffMode } from "./state";
 import {
-  CHANGED, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
-  markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor,
+  CHANGED, type Doc, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
+  markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor, watchFiles,
 } from "./files";
-import { createState, fromBody, indentText, languageOf, showChanges, toBody } from "./cm";
+import { createState, editorMenu, fromBody, indentText, languageOf, showChanges, toBody } from "./cm";
+import { type CtxItem, openCtxMenu } from "./ctxmenu";
+import { copyText } from "./clipboard";
 import FileTree, { FileIcon, MARK_TITLE } from "./FileList";
 import { fileMarks, markAt, peekStatus } from "./git";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
@@ -182,9 +184,28 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
         flash(`${name(f)} changed on disk; your edits are kept`);
         return show(f);
       }
+      if (f === current && view && !file.truncated) return fromDisk(d, file);
       void build(f, file);
     },
   ));
+
+  /** The shown file changed on disk and has no edits: change only what differs, so the cursor and
+   *  scroll stay where they were (an agent writing to the file being read). */
+  const fromDisk = (d: Doc, file: FsText) => {
+    const body = toBody(file.text ?? "");
+    const was = view!.state.doc.toString(), now = body.doc.toString();
+    let from = 0;
+    while (from < was.length && from < now.length && was[from] === now[from]) from++;
+    let end = 0;
+    while (end < was.length - from && end < now.length - from && was[was.length - 1 - end] === now[now.length - 1 - end]) end++;
+    d.base = body.doc;
+    d.body = body;
+    d.stamp = file.stamp;
+    if (was !== now) view!.dispatch({ changes: { from, to: was.length - end, insert: now.slice(from, now.length - end) } });
+    markDirty(tabId, current, false);
+  };
+
+  onMount(() => onCleanup(watchFiles(props.project)));
 
   // Drop the docs of files closed out of the window.
   createEffect(() => {
@@ -555,10 +576,30 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
 
   // ---- chrome -------------------------------------------------------------------------------
 
-  const rel = () => {
+  const relOf = (f: string) => {
     const root = props.project.path.replace(/[\\/]+$/, "");
-    return path().startsWith(`${root}/`) ? path().slice(root.length + 1) : path();
+    return f.startsWith(`${root}/`) ? f.slice(root.length + 1) : f;
   };
+  const rel = () => relOf(path());
+  const pathItems = (f: string): CtxItem[] => [
+    { label: "Copy Path", run: () => copyText(f) },
+    { label: "Copy Relative Path", run: () => copyText(relOf(f)) },
+  ];
+  const onEditorMenu = (e: MouseEvent) => {
+    if (!view || !showingEditor()) return;
+    openCtxMenu(e, [...editorMenu(view, e), "sep", ...pathItems(path())]);
+  };
+  const onTabMenu = (e: MouseEvent, f: string) =>
+    openCtxMenu(e, [
+      { label: "Close", run: () => void closeFile(f) },
+      { label: "Close Others", disabled: files().length < 2, run: () => void (async () => {
+        for (const o of files()) if (o !== f) await closeFile(o);
+      })() },
+      { label: "Keep Open", disabled: props.tab.preview !== f, run: () => keepPreview(props.project, props.tab, f) },
+      "sep",
+      ...pathItems(f),
+    ]);
+
   const tree = () => props.tab.tree !== false;
   const setTree = (on: boolean) => {
     setEditorTab(props.project.id, tabId, { tree: on ? undefined : false });
@@ -589,6 +630,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
                 onClick={() => pick(f)}
                 onDblClick={() => keepPreview(props.project, props.tab, f)}
                 onAuxClick={(e) => e.button === 1 && closeFile(f)}
+                onContextMenu={(e) => onTabMenu(e, f)}
               >
                 <FileIcon name={f} dir={false} />
                 <span class="ftn">{name(f)}</span>
@@ -644,7 +686,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
           </div>
         </Show>
         <div class="edbody">
-          <div class="cmhost" ref={host} style={{ display: showingEditor() ? undefined : "none" }} />
+          <div class="cmhost" ref={host} style={{ display: showingEditor() ? undefined : "none" }} onContextMenu={onEditorMenu} />
           {other()}
         </div>
         <Show when={path() && !media()}>

@@ -12,6 +12,7 @@ import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProj
 import { toggleSidebar } from "./Sidebar";
 import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees";
 import { closeTabMenu, tabMenuOpen } from "./tabs";
+import { closeCtxMenu, ctxMenuOpen } from "./ctxmenu";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { closeProfileMenu, profileMenuOpen } from "./profiles";
 import { openIssuePanel } from "./issues";
@@ -165,7 +166,8 @@ function onKey(e: KeyboardEvent) {
   if (recording()) return;
   // Escape closes the overlays first; it is never bound on its own.
   if (e.code === "Escape" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-    if (iconPickerOpen()) closeIconPicker();
+    if (ctxMenuOpen()) closeCtxMenu();
+    else if (iconPickerOpen()) closeIconPicker();
     else if (paletteOpen()) closePalette();
     else if (aboutOpen()) setAboutOpen(false);
     else if (openProjectOpen()) closeOpenProject();

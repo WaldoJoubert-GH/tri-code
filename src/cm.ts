@@ -7,14 +7,19 @@ import {
   EditorView, GutterMarker, crosshairCursor, drawSelection, dropCursor, gutter, highlightActiveLine, highlightActiveLineGutter,
   type Command, highlightSpecialChars, keymap, lineNumbers, rectangularSelection,
 } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab, moveLineDown, moveLineUp, copyLineDown, copyLineUp } from "@codemirror/commands";
+import {
+  defaultKeymap, history, historyKeymap, indentWithTab, moveLineDown, moveLineUp, copyLineDown, copyLineUp, selectAll, toggleBlockComment, toggleComment,
+} from "@codemirror/commands";
 import {
   HighlightStyle, LanguageDescription, LanguageSupport, StreamLanguage, type StreamParser, bracketMatching, foldEffect, foldGutter, foldAll, foldKeymap, foldable, foldedRanges, indentOnInput, indentUnit, syntaxHighlighting, unfoldAll, unfoldEffect,
 } from "@codemirror/language";
-import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
+import { gotoLine, highlightSelectionMatches, openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
 import type { ChangeMarks } from "./diff";
+import type { CtxItem } from "./ctxmenu";
+import { copyText, readText } from "./clipboard";
+import { isMac } from "./modkey";
 import { keysOf, sameChord, setEditorKeys, textPress } from "./keymap";
 import type { Chord } from "./state";
 
@@ -269,6 +274,44 @@ function editorKey(e: KeyboardEvent): boolean {
 }
 
 setEditorKeys(editorKey);
+
+const key = (k: string) => (isMac ? k.replace(/Ctrl\+/, "Cmd+").replace(/Alt\+/, "Opt+") : k);
+
+/** The editor's right-click menu, like VS Code's. A click outside the selection moves the cursor
+ *  there first, so the menu acts on what was clicked. */
+export function editorMenu(view: EditorView, e: MouseEvent): CtxItem[] {
+  const at = view.posAtCoords({ x: e.clientX, y: e.clientY });
+  if (at != null && !view.state.selection.ranges.some((r) => r.from <= at && at <= r.to)) view.dispatch({ selection: { anchor: at } });
+  view.focus();
+  const { state } = view;
+  const ro = state.readOnly;
+  const empty = state.selection.ranges.every((r) => r.empty);
+  const picked = () => state.selection.ranges.filter((r) => !r.empty).map((r) => state.sliceDoc(r.from, r.to)).join(state.lineBreak);
+  const run = (c: Command) => () => (c(view), view.focus());
+  return [
+    { label: "Cut", kbd: key("Ctrl+X"), disabled: ro || empty, run: () => {
+      copyText(picked());
+      view.dispatch(view.state.replaceSelection(""), { userEvent: "delete.cut", scrollIntoView: true });
+      view.focus();
+    } },
+    { label: "Copy", kbd: key("Ctrl+C"), disabled: empty, run: () => (copyText(picked()), view.focus()) },
+    { label: "Paste", kbd: key("Ctrl+V"), disabled: ro, run: () => void readText().then((t) => {
+      if (t) view.dispatch(view.state.replaceSelection(t), { userEvent: "input.paste", scrollIntoView: true });
+      view.focus();
+    }) },
+    "sep",
+    { label: "Select All", kbd: key("Ctrl+A"), run: run(selectAll) },
+    "sep",
+    { label: "Find", kbd: key("Ctrl+F"), run: run(openSearchPanel) },
+    { label: "Go to Line…", kbd: key("Ctrl+Alt+G"), run: run(gotoLine) },
+    "sep",
+    { label: "Toggle Line Comment", kbd: key("Ctrl+/"), disabled: ro, run: run(toggleComment) },
+    { label: "Toggle Block Comment", kbd: "Shift+" + key("Alt+A"), disabled: ro, run: run(toggleBlockComment) },
+    "sep",
+    { label: "Fold All", run: run(foldAll) },
+    { label: "Unfold All", run: run(unfoldAll) },
+  ];
+}
 
 export type Setup = {
   path: string;

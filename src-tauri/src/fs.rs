@@ -158,6 +158,102 @@ pub async fn write_file(host: String, path: String, contents: String, stamp: Opt
     .map_err(|e| e.to_string())?
 }
 
+/// Create an empty file, and the folders above it. Fails when something is already at `path`.
+#[tauri::command]
+pub async fn create_file(host: String, path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || match host.as_str() {
+        "" | "local" => {
+            let p = expand_home(&path);
+            if let Some(dir) = std::path::Path::new(&p).parent() {
+                std::fs::create_dir_all(dir).map_err(|e| format!("{path}: {e}"))?;
+            }
+            std::fs::OpenOptions::new().write(true).create_new(true).open(&p).map_err(|e| match e.kind() {
+                std::io::ErrorKind::AlreadyExists => format!("{path} already exists"),
+                _ => format!("{path}: {e}"),
+            })?;
+            Ok(())
+        }
+        _ => {
+            let inner = format!(
+                "p={}; [ -e \"$p\" ] && {{ echo {} >&2; exit 3; }}; mkdir -p \"$(dirname \"$p\")\" && : > \"$p\"",
+                remote_path(&path),
+                sq(&format!("{path} already exists")),
+            );
+            remote::run(&host, &format!("sh -c {}", sq(&inner))).map(|_| ())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Delete a file or folder (and what it holds): locally to the Recycle Bin / Trash, over ssh for good.
+#[tauri::command]
+pub async fn delete_path(host: String, path: String) -> Result<(), String> {
+    if path.trim_end_matches(['/', '\\']).is_empty() || path == "~" {
+        return Err(format!("won't delete {path:?}"));
+    }
+    tauri::async_runtime::spawn_blocking(move || match host.as_str() {
+        "" | "local" => trash::delete(expand_home(&path)).map_err(|e| format!("{path}: {e}")),
+        _ => {
+            let inner = format!("p={}; [ -e \"$p\" ] || [ -L \"$p\" ] || {{ echo 'no such file' >&2; exit 2; }}; rm -rf -- \"$p\"", remote_path(&path));
+            remote::run(&host, &format!("sh -c {}", sq(&inner))).map(|_| ())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Rename or move a file or folder. Fails when something is already at `to`.
+#[tauri::command]
+pub async fn rename_path(host: String, from: String, to: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || match host.as_str() {
+        "" | "local" => {
+            let (f, t) = (expand_home(&from), expand_home(&to));
+            // A case-only rename (a.ts → A.ts) is the same file on Windows and macOS, not a clash.
+            if std::path::Path::new(&t).exists() && !f.eq_ignore_ascii_case(&t) {
+                return Err(format!("{to} already exists"));
+            }
+            std::fs::rename(&f, &t).map_err(|e| format!("{from}: {e}"))
+        }
+        _ => {
+            let inner = format!(
+                "f={}; t={}; [ -e \"$t\" ] && {{ echo {} >&2; exit 3; }}; mv -- \"$f\" \"$t\"",
+                remote_path(&from),
+                remote_path(&to),
+                sq(&format!("{to} already exists")),
+            );
+            remote::run(&host, &format!("sh -c {}", sq(&inner))).map(|_| ())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// The stamp of each path (as `read_file` gives a file's), or None where nothing is there. The
+/// editor polls its listed folders and open files with this: a folder's stamp moves when an entry
+/// is added, removed or renamed in it. One ssh call for all of them.
+#[tauri::command]
+pub async fn stamps(host: String, paths: Vec<String>) -> Result<Vec<Option<String>>, String> {
+    tauri::async_runtime::spawn_blocking(move || match host.as_str() {
+        "" | "local" => Ok(paths.iter().map(|p| std::fs::metadata(expand_home(p)).ok().map(|m| local_stamp(&m))).collect()),
+        _ => {
+            if paths.is_empty() {
+                return Ok(vec![]);
+            }
+            let list: Vec<String> = paths.iter().map(|p| remote_path(p)).collect();
+            let inner = format!("{REMOTE_STAMP} for p in {}; do st || echo -; done", list.join(" "));
+            let out = remote::run(&host, &format!("sh -c {}", sq(&inner)))?;
+            let lines: Vec<&str> = out.lines().map(str::trim).collect();
+            if lines.len() != paths.len() {
+                return Err(format!("stamps: {} lines for {} paths", lines.len(), paths.len()));
+            }
+            Ok(lines.into_iter().map(|l| (l != "-").then(|| l.to_string())).collect())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// A local file's stamp: modification time in nanoseconds, and size.
 fn local_stamp(meta: &std::fs::Metadata) -> String {
     let ns = meta
