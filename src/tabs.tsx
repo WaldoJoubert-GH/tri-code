@@ -5,13 +5,13 @@
 // was already open.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Project, Tab, TabKind, activePage, addTab, agentOf, app, focusTab, live, projectById, space, tabName, tabProfile, visibleTabs } from "./state";
+import { Project, Tab, TabKind, activePage, addTab, agentOf, focusTab, live, projectById, space, tabName, tabProfile, visibleTabs } from "./state";
 import { profileColor, profilesInUse } from "./profiles";
 import { nativeBrowsers } from "./browsers";
 import { openEditor } from "./files";
 import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
-import { hotkeyProblem, hotkeyText, launchAgent, openAgentsPanel } from "./agents";
+import { hotkeyProblem, hotkeyText, launchAgent, offeredIn, openAgentsPanel } from "./agents";
 import { Icon } from "./lucide";
 import { SIG_TEXT, sigOf } from "./signals";
 import { flash } from "./ui";
@@ -98,7 +98,7 @@ export function TabMenu() {
           {(p) => (
             <div class="tabmenu" role="menu" aria-label="New window" ref={(el) => requestAnimationFrame(() => placeMenu(el, m.anchor))}>
               <div class="mt">New window</div>
-              <For each={app.agents}>
+              <For each={offeredIn(p)}>
                 {(a) => (
                   <button
                     role="menuitem"
@@ -124,7 +124,7 @@ export function TabMenu() {
                     }}
                   >
                     <span class="glyph" aria-hidden="true">{GLYPH[k.kind]}</span>
-                    {k.kind}
+                    {k.kind === "agents" ? "commands" : k.kind}
                     <Show when={keyOf(k.key)}>{(t) => <kbd>{t()}</kbd>}</Show>
                   </button>
                 )}

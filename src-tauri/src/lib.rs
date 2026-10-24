@@ -85,7 +85,9 @@ pub fn run() {
                 .build()?;
             let size = window.inner_size()?.to_logical::<f64>(window.scale_factor()?);
             window.add_child(
-                WebviewBuilder::new("main", WebviewUrl::App(Default::default())).auto_resize(),
+                // Without the native drop handler, HTML drag and drop works on Windows too: reordering
+                // commands and favourites, dropping images on an issue.
+                WebviewBuilder::new("main", WebviewUrl::App(Default::default())).auto_resize().disable_drag_drop_handler(),
                 LogicalPosition::new(0.0, 0.0),
                 size,
             )?;

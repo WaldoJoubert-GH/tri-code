@@ -223,7 +223,7 @@ export default function Canvas(props: { project: Project }) {
       : isIssues ? panelTitle(repoOf(props.project))
       : isEditor ? (tab.path ? `${tab.path.split("/").pop()}${dirtyCount(id) ? ` · ${dirtyCount(id)} modified` : ""}` : props.project.name)
       : isGit ? `${props.project.name} · ${gitOf(props.project.id).status?.branch ?? ""}`
-      : isAgents ? "shared by every project"
+      : isAgents ? "the + menu, for every project"
       : (live[id]?.title ?? "");
 
     /** Browser windows: the shown page. Back, reload, the address and the star act on it. */

@@ -11,12 +11,18 @@ export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
  *  An editor action's chord can take a second key after it (`then`), like VS Code's Ctrl+K Ctrl+[. */
 export type Chord = Hotkey & { meta?: boolean; bare?: boolean; then?: Chord };
 
-/** An app the New Window Menu offers: a terminal app (claude, pi, a shell, lazygit, ...) or, with a
- *  `url`, a web app that opens a browser window there. Global, not per project. */
+/** Which projects offer a Command: unset is every project, `env` the projects on that host, `project`
+ *  one project (by id) and its worktrees. */
+export type Scope = { env: string } | { project: string };
+
+/** A Command, shown as such since the Commands Window replaced the Agents Window: what the New Window
+ *  Menu offers, a terminal app (claude, pi, a shell, lazygit, a multi-line script, ...) or, with a
+ *  `url`, a web app that opens a browser window there. One ordered list; `scope` narrows who offers it. */
 export type Agent = {
   id: string;
   name: string;
-  /** Run in the project folder on the project's host; "" is the login shell. Unused by a web app. */
+  /** Run in the project folder on the project's host; "" is the login shell. Several lines are typed
+   *  into a login shell one after another (see terms.ts). Unused by a web app. */
   command: string;
   /** Set for a web app: the address its browser window opens ("" until typed). */
   url?: string;
@@ -27,6 +33,10 @@ export type Agent = {
   hotkey?: Hotkey;
   /** Web apps only: the Browser Profile its windows open in (unset: the project's). */
   profile?: string;
+  /** Unset: offered in every project. */
+  scope?: Scope;
+  /** Signal sounds of its own (a built-in name or "off"); a missing one plays the project's. */
+  sounds?: Partial<Record<SoundEvent, string>>;
 };
 
 /** A Browser Profile: a name, an avatar and a colour over its own cookies, logins, history,
@@ -98,6 +108,8 @@ export type Tab = {
   name?: string;
   /** `term` tabs only: the command it runs ("" = login shell). Kept from launch, so editing an agent only changes new windows. */
   cmd?: string;
+  /** `term` tabs with a multi-line `cmd`: its lines were typed into the shell, so a restart or reattach doesn't type them again. */
+  typed?: true;
   /** Minimised: when (ms), so Alt+Shift+N brings back the latest. Off the canvas but still in the Tab Strip. */
   min?: number;
   /** `term` tabs of the tour's sample project only: a scripted session played in place of a PTY (see demo.ts). */
@@ -129,6 +141,7 @@ export const isWebApp = (a: Agent) => a.url !== undefined;
 export const tabName = (t: Tab) =>
   t.kind === "term" ? agentOf(t)?.name || t.name || "terminal"
   : t.agent ? agentOf(t)?.name || t.name || t.kind
+  : t.kind === "agents" ? "commands"
   : t.kind;
 
 export type Layout = "master" | "grid" | "mono";
@@ -697,6 +710,11 @@ export function becomeShell(projectId: string, tabId: string) {
   editTab(projectId, tabId, (t) => Object.assign(t, { agent: undefined, name: "shell", cmd: "" }));
 }
 
+/** A multi-line command's lines have been typed into its shell. */
+export function markTyped(projectId: string, tabId: string) {
+  editTab(projectId, tabId, (t) => { t.typed = true; });
+}
+
 export function setPageUrl(projectId: string, tabId: string, pageId: string, url: string) {
   editTab(projectId, tabId, (t) => {
     const pg = t.pages?.find((x) => x.id === pageId);
@@ -806,8 +824,12 @@ export function setHotkeys(id: string, keys: Chord[] | undefined) {
   }));
 }
 
-export function addAgent(agent: Agent) {
-  setApp(produce((s) => { s.agents.push(agent); }));
+/** Add an agent at the end, or right after agent `after`. */
+export function addAgent(agent: Agent, after?: string) {
+  setApp(produce((s) => {
+    const i = after ? s.agents.findIndex((a) => a.id === after) : -1;
+    s.agents.splice(i < 0 ? s.agents.length : i + 1, 0, agent);
+  }));
 }
 
 export function updateAgent(id: string, patch: Partial<Omit<Agent, "id">>) {

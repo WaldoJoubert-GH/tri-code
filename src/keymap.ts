@@ -52,7 +52,7 @@ export const ACTIONS: Action[] = [
   { id: "go-to-file", group: "Windows and links", desc: "Command palette (a second key for it)", def: [k("KeyT")] },
   { id: "git", group: "Windows and links", desc: "Git", def: [k("KeyC")] },
   { id: "diff", group: "Windows and links", desc: "Editor: switch between Source and Diff. Git: open the file's diff in the editor", def: [k("KeyD")] },
-  { id: "agents", group: "Windows and links", desc: "Agents window", def: [k("Semicolon")] },
+  { id: "agents", group: "Windows and links", desc: "Commands window", def: [k("Semicolon")] },
   { id: "palette", group: "Windows and links", desc: "Command palette: run a command or open a file", def: [k("KeyX")] },
   { id: "help", group: "Windows and links", desc: "Hotkeys (this page)", def: [k("Slash")] },
   { id: "next-signal", group: "Signals", desc: "Go to the next agent that needs you", def: [k("KeyU")] },

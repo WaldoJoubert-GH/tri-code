@@ -4,6 +4,7 @@ Each release's section becomes its GitHub Release notes, and tri-code shows this
 
 ## Unreleased
 
+- The agents window is now the Commands window (`Alt+;`). A command can be several lines: its window opens a shell and types them in one after another, so `cd` and `export` carry on and the last line keeps running. Each command has a scope (everywhere, one environment, or one project and its worktrees), and a project's own `claude` replaces the global one there. The copy button (or `Ctrl+D`) duplicates a row, ↑ / ↓ on a focused grip reorders it, and the bell gives a command its own sounds for needs input, done and error, or mutes them.
 - The Command Palette and Go to File are one box: `Alt+X`, `Alt+T` and a click on the project path all open it, and typing finds commands and files together, commands first. `/` browses the project's top folder.
 
 ## 0.1.35 — 2026-10-23
