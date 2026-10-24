@@ -10,6 +10,7 @@ import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
+import { CtxMenu, ctxMenuOpen } from "./ctxmenu";
 import ClaudeUsage from "./Usage";
 import { SettingsDialog, hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { phoneStatus, startPhoneSync } from "./phone";
@@ -115,7 +116,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen() || feedbackOpen()));
+  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen() || feedbackOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   const backdrop = () => {
@@ -146,6 +147,7 @@ export default function App() {
       </div>
       <StatusBar />
       <TabMenu />
+      <CtxMenu />
       <AppearancePopover />
       <SettingsDialog />
       <FavPopover />
