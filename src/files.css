@@ -134,6 +134,7 @@
 .fthead button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); text-transform: none; }
 .fthead button:hover { background: var(--hover); color: var(--text); }
 .frow.shown:not(.sel) .fname { color: var(--accent); }
+.frow.fdraft input, .frow .fren { flex: 1; min-width: 0; height: 20px; padding: 0 5px; border: 1px solid var(--accent); border-radius: 3px; background: var(--bg); color: var(--text); font: inherit; outline: none; }
 
 .ftabs { display: flex; flex: none; overflow-x: auto; scrollbar-width: none; background: var(--panel); border-bottom: 1px solid var(--line); min-height: 30px; }
 .ftabs .ftree-tg { flex: none; width: 30px; color: var(--muted); border-right: 1px solid var(--line); }
