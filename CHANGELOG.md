@@ -2,10 +2,13 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
-## Unreleased
+## 0.1.36 — 2026-10-24
 
-- The agents window is now the Commands window (`Alt+;`). A command can be several lines: its window opens a shell and types them in one after another, so `cd` and `export` carry on and the last line keeps running. Each command has a scope (everywhere, one environment, or one project and its worktrees), and a project's own `claude` replaces the global one there. The copy button (or `Ctrl+D`) duplicates a row, ↑ / ↓ on a focused grip reorders it, and the bell gives a command its own sounds for needs input, done and error, or mutes them.
-- The Command Palette and Go to File are one box: `Alt+X`, `Alt+T` and a click on the project path all open it, and typing finds commands and files together, commands first. `/` browses the project's top folder.
+- The agents window is now the Commands window (`Alt+;`). A command can be several lines: its window opens a shell and types them in one after another, so `cd` and `export` carry on and the last line keeps running. Each command has a scope (everywhere, one environment, or one project and its worktrees), and a project's own `claude` replaces the global one there. The copy button (or `Ctrl+D`) duplicates a row, ↑ / ↓ on a focused grip reorders it, and the bell gives a command its own sounds for needs input, done and error, or mutes them. ([#25](https://github.com/WaldoJoubert-GH/tri-code/pull/25))
+- The Command Palette and Go to File are one box: `Alt+X`, `Alt+T` and a click on the project path all open it, and typing finds commands and files together, commands first. `/` browses the project's top folder. ([#24](https://github.com/WaldoJoubert-GH/tri-code/pull/24))
+- The editor has right-click menus: in the code (Cut, Copy, Paste, Find, Go to Line, comments, folding, Copy Path), on file tabs (Close, Close Others, Keep Open) and in the file tree. The tree can make, rename and delete files: `+` or New File names one in place (`a/b.ts` makes the folders), `F2` renames and `Delete` asks first. Locally a deleted file goes to the Recycle Bin or Trash; over ssh it's removed for good. Open tabs follow a rename and close on a delete. ([#23](https://github.com/WaldoJoubert-GH/tri-code/pull/23))
+- The file tree and open files pick up changes made outside the editor, by an agent or a shell, within a few seconds. A shown file with no unsaved edits updates in place, keeping the cursor and scroll.
+- tri-code has a product page, with the features and a download for each platform: <https://waldojoubert-gh.github.io/tri-code/>. ([#21](https://github.com/WaldoJoubert-GH/tri-code/pull/21))
 
 ## 0.1.35 — 2026-10-23
 
