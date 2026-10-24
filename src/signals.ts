@@ -7,7 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isPermissionGranted, onAction, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import {
-  AgentState, AlertMode, Project, SoundEvent, Tab, app, focusTab, live, projectById, repoOf, setNotify, setProjectNotify, space, tabName,
+  AgentState, AlertMode, Project, SoundEvent, Tab, agentOf, app, focusTab, live, projectById, repoOf, setNotify, setProjectNotify, space, tabName,
 } from "./state";
 import { flash } from "./ui";
 import { keyOf } from "./keymap";
@@ -107,9 +107,9 @@ async function customSound(projectId: string, ev: SoundEvent): Promise<string | 
   }
 }
 
-/** Play the sound a project gives a signal. */
-export async function playFor(p: Project, ev: SoundEvent) {
-  const id = soundFor(p, ev);
+/** Play the sound a project gives a signal, or the one window `t`'s command has of its own. */
+export async function playFor(p: Project, ev: SoundEvent, t?: Tab) {
+  const id = (t && agentOf(t)?.sounds?.[ev]) || soundFor(p, ev);
   playSound(id, id === "custom" ? await customSound(repoOf(p).id, ev) : undefined);
 }
 
@@ -170,7 +170,7 @@ export function onSignal(projectId: string, t: Tab, state: AgentState, msg: stri
   if (!p || state === "working") return;
   const mode = alertFor(p);
   if (mode === "badge" || (mode === "away" && looking)) return;
-  void playFor(p, state);
+  void playFor(p, state, t);
   const title = live[t.id]?.title;
   const head = `${tabName(t)} ${WHAT[state]}`;
   const body = [p.name, title, msg && msg !== title ? msg : ""].filter(Boolean).join(" · ");

@@ -21,7 +21,7 @@ import { openEditor } from "./files";
 import { openGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { branchOf, openNewWorktree, removeWorktree } from "./worktrees";
-import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, openAgentsPanel } from "./agents";
+import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgentsPanel } from "./agents";
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
 import { startTour } from "./Tour";
 import { flash } from "./ui";
@@ -113,10 +113,11 @@ export function commands(): Command[] {
 
   if (p) {
     const f = focusedTab(p);
-    for (const a of app.agents) {
+    for (const a of offeredIn(p)) {
+      const lines = a.command.trim().split("\n");
       add({
         id: `agent:${a.id}`, group: "New", title: `New ${a.name || "untitled"}`, icon: a.icon,
-        hint: a.command.trim() || "login shell",
+        hint: a.url ?? (lines.length > 1 ? `${lines[0]} +${lines.length - 1} lines` : lines[0] || "login shell"),
         keys: a.hotkey && !hotkeyProblem(a) ? hotkeyKeys(a.hotkey) : undefined,
         run: () => launchAgent(p, a),
       });
@@ -126,7 +127,7 @@ export function commands(): Command[] {
     add({ id: "issues", group: "New", title: "Issues", icon: "list-todo", keys: capsOf("issues"), run: () => openIssuePanel(p) });
     add({ id: "files", group: "New", title: "Editor", icon: "file-code", keys: capsOf("files"), run: () => void openEditor(p) });
     add({ id: "git", group: "New", title: "Git", icon: "git-branch", keys: capsOf("git"), run: () => void openGitPanel(p) });
-    add({ id: "agents", group: "New", title: "Agents", hint: "edit the + menu", icon: "settings-2", keys: capsOf("agents"), run: () => void openAgentsPanel(p) });
+    add({ id: "agents", group: "New", title: "Commands", hint: "edit the + menu", icon: "settings-2", keys: capsOf("agents"), run: () => void openAgentsPanel(p) });
     add({ id: "go-to-file", group: "New", title: "Go to file", icon: "search", keys: capsOf("go-to-file"), run: openGoToFile });
 
     if (f) {

@@ -193,7 +193,7 @@ function onKey(e: KeyboardEvent) {
   let done = editorKey(e);
   if (!done && id) done = runAnywhere(id) || (!!p && run(id, p, f));
   else if (!done && p) {
-    const a = agentForKey(e);
+    const a = agentForKey(e, p);
     if (a) {
       launchAgent(p, a);
       done = true;

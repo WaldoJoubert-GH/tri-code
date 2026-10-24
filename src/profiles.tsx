@@ -328,7 +328,7 @@ export function BrowserPage() {
       <p class="note">
         Each profile keeps its own cookies, sign-ins, saved passwords, autofill and history, so a project can stay signed in as a
         different person. A project's browser windows open in its profile (the avatar in a browser window's address bar changes it, for
-        the project or one window); web apps can pick one in the agents window. Personal keeps the browser data from before profiles.
+        the project or one window); web apps can pick one in the commands window. Personal keeps the browser data from before profiles.
         {isMac ? " On macOS tri-code saves passwords itself, in your Keychain; macOS's web view can't fill other forms." : ""}
       </p>
     </Show>

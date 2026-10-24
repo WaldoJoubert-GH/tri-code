@@ -2,6 +2,10 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## Unreleased
+
+- The agents window is now the Commands window (`Alt+;`). A command can be several lines: its window opens a shell and types them in one after another, so `cd` and `export` carry on and the last line keeps running. Each command has a scope (everywhere, one environment, or one project and its worktrees), and a project's own `claude` replaces the global one there. The copy button (or `Ctrl+D`) duplicates a row, ↑ / ↓ on a focused grip reorders it, and the bell gives a command its own sounds for needs input, done and error, or mutes them.
+
 ## 0.1.35 — 2026-10-23
 
 - Browser Profiles: each profile keeps its own cookies, sign-ins, history, autofill and saved passwords. A project picks a profile (a worktree uses its repo's), a browser window or Web App can use another, and the avatar in the nav bar switches it, reopening the window's pages in the new profile. Once there are two, browser windows show a band in their profile's colour. Settings › Browser names, colours and deletes profiles and turns Save passwords and Autofill forms on or off for each; deleting a profile erases its data. On macOS 14+ saved logins go to the Keychain, and a bar under the address offers to save or update them. Personal keeps the data from before profiles. ([#20](https://github.com/WaldoJoubert-GH/tri-code/pull/20))

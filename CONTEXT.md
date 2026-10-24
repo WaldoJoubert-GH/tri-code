@@ -116,18 +116,22 @@ A Window taken off the canvas with – or `Alt+N`. It keeps its place in tiling 
 _Avoid_: Hidden window, docked, collapsed.
 
 **New Window Menu**:
-The popup under the Tab Strip's `+`: one row per Agent (with its hotkey), then one per panel kind with the key that also opens it (`Alt+B`, `Alt+I`, `Alt+E`, `Alt+C`, `Alt+;`). Issues, Git and Agents open or focus their one-per-project Window rather than adding a second one; the Editor focuses the Editor Window used last.
+The popup under the Tab Strip's `+`: one row per Command the project is offered (with its hotkey), in the list's order, then one per panel kind with the key that also opens it (`Alt+B`, `Alt+I`, `Alt+E`, `Alt+C`, `Alt+;`). Issues, Git and Commands open or focus their one-per-project Window rather than adding a second one; the Editor focuses the Editor Window used last.
 
-**Agent**:
-A terminal app the New Window Menu offers: a name, a shell command (empty = the login shell), a lucide icon and an optional Alt hotkey. Global, in `state.json` as `agents`, seeded with claude, pi and shell. A terminal Window (`TabKind` `"term"`) remembers its Agent and the command it was launched with, so editing an Agent changes only new Windows and deleting one leaves its Windows running. "Send to agent" targets terminals with a command, never a plain shell.
-_Avoid_: Terminal kind, profile (a Browser Profile), preset.
+**Command**:
+A terminal app the New Window Menu offers: a name, a shell command (empty = the login shell), a lucide icon, an optional Alt hotkey, a Scope and optional signal sounds. Still `Agent` in code, in `state.json` as `agents` (one ordered list, which is the menu's order), seeded with claude, pi and shell. A command of several lines is a script: its window opens a login shell and types the lines in one after another, once (`typed` on the tab), so a `cd` or `export` carries on and the window ends in whatever the last line runs. Its sounds replace the project's for that signal (a built-in or off); unset follows the project. A terminal Window (`TabKind` `"term"`) remembers its Command and the command it was launched with, so editing a Command changes only new Windows and deleting one leaves its Windows running. "Send to agent" targets terminals with a command, never a plain shell.
+_Avoid_: Agent (in the UI), Terminal kind, profile (a Browser Profile), preset, palette command (a Command Palette entry).
+
+**Scope**:
+Which projects offer a Command: everywhere (unset), every project on one Environment (`{ env: host }`), or one project and its Worktrees (`{ project: id }`). A narrower Command of the same name replaces the wider one where both are offered (devbox's `claude` replaces the global one in devbox's projects); names are unique within a scope. Two Commands some project's menu offers together can't share a hotkey; the first in the list keeps it (`scope.ts`).
+_Avoid_: Visibility, filter.
 
 **Web App**:
-An Agent with a URL instead of a command: it opens a browser window at that address, and the window takes its name and icon as a terminal takes its Agent's. Same list, menu row and hotkeys as the other Agents; typing an address in the agents window's Command cell makes one. "app" hides the window's address and favourites bars (⋯ in its title bar shows them). The agents window offers the project's Favourites as Web Apps to add. Chosen from design/webapps.html (variant A).
+A Command with a URL instead of a command: it opens a browser window at that address, and the window takes its name and icon as a terminal takes its Command's. Same list, menu row, Scope and hotkeys as the other Commands; typing an address in the Commands Window's Command cell makes one. "app" hides the window's address and favourites bars (⋯ in its title bar shows them). The Commands Window offers the project's Favourites as Web Apps to add. Chosen from design/webapps.html (variant A).
 _Avoid_: Bookmark, site, browser profile (a Web App can use a Browser Profile, but isn't one).
 
-**Agents Window**:
-A canvas Window, one per project, that edits the Agent list as a table; rows save as you type. New `TabKind` `"agents"`, addressed with `Alt+;`. Chosen from design/agents.html (variant B).
+**Commands Window**:
+A canvas Window, one per project, that edits the Command list as a table: icon, name, command or URL (a script folds to its first line until focused), Scope, sounds, hotkey; rows save as you type. Drag a grip (or ↑ / ↓ on a focused grip) to reorder, the copy button or `Ctrl+D` to duplicate. Commands the project isn't offered stay listed, dimmed. Formerly the Agents Window; still `TabKind` `"agents"`, addressed with `Alt+;`. Chosen from design/commands.html (variant A), after design/agents.html (variant B).
 _Avoid_: Settings page, preferences.
 
 **Git Window**:

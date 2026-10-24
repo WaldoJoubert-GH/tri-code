@@ -1,23 +1,42 @@
-/* Agents window, and the icon picker it opens. See src/AgentsPanel.tsx, src/lucide.tsx;
-   the look comes from design/agents.html (variant B). */
+/* Commands window, its scope and sound popovers, and the icon picker it opens. See
+   src/AgentsPanel.tsx, src/lucide.tsx; the look comes from design/commands.html (variant A). */
 
 .mark.agents { color: var(--muted); }
 
 .agentswin { flex: 1; min-height: 0; overflow: auto; font-size: 12.5px; }
-.ag-list { padding: 8px 12px 24px; min-width: 480px; }
+.ag-list { padding: 8px 12px 24px; min-width: 700px; }
+
+.ag-tools { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; padding: 0 8px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); }
+.ag-tools:focus-within { border-color: var(--accent); }
+.ag-search { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; outline: none; }
+.ag-search::placeholder { color: var(--muted); }
+.ag-count { flex: none; font-size: 11px; }
+.ag-clear { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border-radius: 4px; color: var(--muted); }
+.ag-clear:hover { background: var(--hover); color: var(--text); }
+.ag-none { border-top: 1px solid var(--line); padding: 10px 0 10px 68px; color: var(--muted); font-style: italic; }
 
 .ag-row {
-  display: grid; align-items: center; column-gap: 6px;
-  grid-template-columns: 16px 32px minmax(64px, 1fr) minmax(150px, 2.2fr) minmax(84px, auto) 50px;
+  display: grid; align-items: start; column-gap: 6px;
+  grid-template-columns: 16px 32px minmax(80px, 1fr) minmax(180px, 2.6fr) 124px 32px 120px 76px;
 }
+.ag-row > * { min-height: 28px; }
+.ag-th { align-items: center; }
+.ag-th > * { min-height: 0; }
+.ag-th-icon { display: grid; place-items: center; }
 .ag-th { padding: 4px 0 6px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .ag-item { border-top: 1px solid var(--line); padding: 4px 0; }
-.ag-item.over { box-shadow: inset 0 2px var(--accent); }
+.ag-item.over, .ag-new.over { box-shadow: inset 0 2px var(--accent); }
+.ag-item.dragging { opacity: .35; }
+.ag-item.off { opacity: .45; }
+.ag-item.off:hover, .ag-item.off:focus-within { opacity: .85; }
+.ag-item { transition: background .4s; }
+.ag-item.fresh { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .ag-new { border-top: 1px solid var(--line); padding: 4px 0; }
 
 .ag-grip { display: grid; place-items: center; height: 28px; color: var(--muted); cursor: grab; opacity: .6; }
-.ag-item:hover .ag-grip { opacity: 1; }
-.ag-icon { display: grid; place-items: center; width: 32px; height: 28px; border-radius: 5px; border: 1px solid transparent; color: var(--text); }
+.ag-item:hover .ag-grip, .ag-grip:focus-visible { opacity: 1; }
+.ag-grip:focus-visible { outline: 2px solid var(--accent); border-radius: 4px; }
+.ag-icon { display: grid; place-items: center; width: 32px; height: 28px; padding: 0; border-radius: 5px; border: 1px solid transparent; color: var(--text); }
 .ag-icon:hover { border-color: var(--line); background: var(--bg); }
 .ag-icon.ghost { color: var(--muted); opacity: .6; }
 
@@ -34,7 +53,7 @@
 .ag-new .ag-in::placeholder { font-style: italic; }
 
 .ag-hk {
-  justify-self: start; display: inline-flex; align-items: center; gap: 3px; height: 26px; padding: 0 7px;
+  justify-self: start; max-width: 100%; overflow: hidden; margin-top: 1px; min-height: 0; display: inline-flex; align-items: center; gap: 3px; height: 26px; padding: 0 7px;
   border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--muted); font-size: 11.5px; white-space: nowrap;
 }
 .ag-hk:hover { border-color: var(--accent); }
@@ -42,15 +61,30 @@
 .ag-hk.rec { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .ag-hk.bad { border-color: var(--bad); }
 
-.ag-ops { display: flex; justify-content: flex-end; gap: 2px; }
-.ag-ops button { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+.ag-ops { display: flex; justify-content: flex-end; gap: 2px; padding-top: 2px; }
+.ag-ops button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 4px; color: var(--muted); }
 .ag-ops button:hover { background: var(--hover); color: var(--text); }
 
-/* Command or URL: the kind chip, the field and, for a web app, its address bar. */
-.ag-target { display: flex; align-items: center; gap: 4px; min-width: 0; }
+/* Command or URL: the kind chip, the field and, for a web app, its address bar. A command
+   is a textarea folded to one line, with a "+2 lines" tag, that grows while focused. */
+.ag-target { position: relative; display: flex; align-items: flex-start; gap: 4px; min-width: 0; }
 .ag-target .ag-in { flex: 1; }
+.ag-target > .ag-seg, .ag-target > .ag-profile { margin-top: 2px; }
+.ag-code {
+  flex: 1; min-width: 0; min-height: 28px; display: block; resize: none; overflow: hidden; overflow-x: auto; white-space: pre;
+  padding: 5px 8px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text);
+  font: 12px/16px var(--mono); outline: none;
+}
+.ag-code.folded { height: 28px; }
+.ag-code:hover { border-color: var(--line); }
+.ag-code:focus { border-color: var(--accent); background: var(--bg); }
+.ag-code::placeholder { color: var(--muted); }
+.ag-more {
+  position: absolute; right: 6px; top: 5px; height: 18px; padding: 0 6px; border-radius: 9px;
+  background: var(--raised); color: var(--muted); font-size: 10.5px; line-height: 18px; pointer-events: none;
+}
 .ag-kind {
-  flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 5px;
+  flex: none; margin-top: 2px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 5px;
   border: 1px solid var(--line); background: var(--bg); color: var(--muted);
 }
 .ag-kind:hover { border-color: var(--accent); color: var(--text); }
@@ -68,11 +102,49 @@
   border: 1px dashed var(--line); border-radius: 11px; color: var(--text); font-size: 11.5px;
 }
 .ag-favs button:hover { border-style: solid; border-color: var(--accent); }
-.ag-note code { font: 11px var(--mono); color: var(--text); }
-
 .ag-msg { padding: 0 0 4px calc(16px + 32px + 12px + 8px); font-size: 11px; color: var(--bad); }
-.ag-note { margin: 14px 0 0; max-width: 62ch; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+.ag-msg.note { color: var(--muted); }
 
+/* Scope chip: muted everywhere, the Environment's blue, the project's violet. */
+.ag-scope {
+  justify-self: start; display: inline-flex; align-items: center; gap: 5px; height: 24px; margin-top: 2px; padding: 0 8px 0 6px;
+  max-width: 100%; min-height: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--muted); font-size: 11.5px;
+}
+.ag-scope span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-scope:hover { border-color: var(--accent); }
+.ag-scope.e { color: var(--p-ocean); border-color: color-mix(in srgb, var(--p-ocean) 40%, var(--line)); }
+.ag-scope.p { color: var(--violet); border-color: color-mix(in srgb, var(--violet) 40%, var(--line)); }
+
+/* Sound bell: faint while it follows the project, the accent once it has its own. */
+.ag-sound {
+  justify-self: center; display: grid; place-items: center; width: 28px; height: 24px; padding: 0; margin-top: 2px; min-height: 0;
+  border: 1px solid transparent; border-radius: 5px; color: var(--muted); opacity: .7;
+}
+.ag-sound:hover { border-color: var(--line); opacity: 1; }
+.ag-sound.own { color: var(--accent); opacity: 1; border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.ag-sound.mute { opacity: 1; border-color: var(--line); }
+
+/* Scope and sound popovers: fixed, above the canvas, like the icon picker. */
+.ag-pop {
+  position: fixed; z-index: 10000; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 18px 50px -12px var(--shadow); font-size: 12.5px; color: var(--text);
+}
+.ag-pop h4 { margin: 6px 6px 3px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.scopepick { width: 250px; max-height: 70vh; overflow-y: auto; }
+.scopepick button { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 8px; border-radius: 5px; text-align: left; }
+.scopepick button:hover { background: var(--hover); }
+.scopepick button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.scopepick .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scopepick small { color: var(--muted); font-size: 11px; }
+.soundpick { width: 300px; padding: 8px; }
+.soundpick h4 { margin: 0 0 6px; }
+.snd { display: grid; grid-template-columns: 84px minmax(0, 1fr) 26px; gap: 6px; align-items: center; height: 32px; }
+.snd select { height: 26px; min-width: 0; padding: 0 4px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--text); font-size: 12px; }
+.snd select.own { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.snd button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 5px; color: var(--muted); }
+.snd button:hover { background: var(--hover); color: var(--text); }
+.soundpick .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.soundpick .foot button { flex: none; color: var(--accent); font-size: 11.5px; }
 /* Icon picker: fixed, above the canvas, like the New Window Menu. */
 .iconpick {
   position: fixed; z-index: 10000; width: 316px; padding: 8px; display: grid; gap: 8px;

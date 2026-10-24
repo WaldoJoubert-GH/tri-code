@@ -8,7 +8,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { AgentState, Live, Project, Tab, TabStatus, becomeShell, isRemote, isTerminal, live, removeTab, sessionName, setLive } from "./state";
+import { AgentState, Live, Project, Tab, TabStatus, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, sessionName, setLive } from "./state";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
 import { Demo, playDemo } from "./demo";
@@ -83,9 +83,16 @@ class TermSession {
   private demo?: Demo;
   /** What the PTY runs ("" = login shell); cleared once an agent quits. */
   private cmd: string;
+  /** A multi-line command's lines, still to be typed into its login shell ("" once typed). */
+  private script: string;
 
   constructor(private project: Project, private tab: Tab) {
-    this.cmd = tab.cmd?.trim() ?? "";
+    // One line runs as the PTY's program; several are typed into a login shell, so a `cd` or
+    // `export` carries on to the next line and the window ends in that shell.
+    const cmd = tab.cmd?.trim() ?? "";
+    const multi = cmd.includes("\n");
+    this.cmd = multi ? "" : cmd;
+    this.script = multi && !tab.typed ? cmd : "";
     this.el.className = "term";
     this.el.style.cssText = "width:100%;height:100%";
     this.el.style.display = "none";
@@ -197,6 +204,14 @@ class TermSession {
     }
   }
 
+  /** Type the script's lines once the shell has printed something, each submitted with Enter. */
+  private typeScript() {
+    const lines = this.script.split("\n").map((l) => l.trimEnd());
+    this.script = "";
+    this.write(lines.map((l) => `${l}\r`).join(""));
+    markTyped(this.project.id, this.tab.id);
+  }
+
   private write(data: string) {
     const id = this.ptyId;
     if (id !== undefined) this.writes = this.writes.then(() => call("pty_write", { id, data }));
@@ -269,6 +284,7 @@ class TermSession {
         this.update({ status: "running" });
         this.backoff = 1000;
       }
+      if (this.script) this.typeScript();
       this.term.write(chunk instanceof ArrayBuffer ? new Uint8Array(chunk) : Uint8Array.from(chunk));
     };
     const onExit = new Channel<number>();

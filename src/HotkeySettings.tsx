@@ -2,7 +2,7 @@
 // it has now. Click a key to change it, + to add another (an Editor action's key can be two in a
 // row, like VS Code's Ctrl+K Ctrl+[); a key another action or agent has
 // offers Swap (or Move here, when adding). Changed rows show a dot and ↺; Reset all puts every
-// action back. Agents keep their one hotkey on the agent (also edited in the agents window).
+// action back. Commands keep their one hotkey on the command (also edited in the commands window).
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { type Chord, type Hotkey, app, setSettings, updateAgent } from "./state";
@@ -10,11 +10,11 @@ import { metaName, modLabel } from "./modkey";
 import {
   ACTIONS, THEN, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,
 } from "./keymap";
-import { recording, setRecording } from "./agents";
+import { offeredTogether, recording, scopeLabel, setRecording } from "./agents";
 import { flash } from "./ui";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph", "OS"]);
-const GROUPS = ["Focus", "Arrange", "Project", "Windows and links", "Signals", "Agents", "Editor", "Text"];
+const GROUPS = ["Focus", "Arrange", "Project", "Windows and links", "Signals", "Commands", "Editor", "Text"];
 
 /** A row: a Keymap action, or an agent (one hotkey, kept on the agent). */
 type Row = { kind: "action" | "agent"; id: string; desc: string; keys: Chord[]; text?: boolean; seq?: boolean; changed: boolean };
@@ -24,22 +24,24 @@ type Clash = { row: Row; i: number; chord?: Chord; other?: Holder; blocked?: str
 
 const [clash, setClash] = createSignal<Clash | null>(null);
 
-const agentName = (id: string) => app.agents.find((a) => a.id === id)?.name || "an agent";
-const holderName = (h: Holder) => (h.kind === "action" ? actionById(h.id)!.desc : `${agentName(h.id)} (agent)`);
+const agentName = (id: string) => app.agents.find((a) => a.id === id)?.name || "a command";
+const holderName = (h: Holder) => (h.kind === "action" ? actionById(h.id)!.desc : `${agentName(h.id)} (command)`);
 
 function rows(): Row[] {
   return [
     ...ACTIONS.map((a): Row => ({ kind: "action", id: a.id, desc: a.desc, keys: keysOf(a.id), text: a.text, seq: a.seq, changed: changed(a.id) })),
-    ...app.agents.map((a): Row => ({ kind: "agent", id: a.id, desc: a.name || "untitled", keys: a.hotkey ? [a.hotkey] : [], changed: false })),
+    ...app.agents.map((a): Row => ({ kind: "agent", id: a.id, desc: `${a.name || "untitled"}${a.scope ? ` · ${scopeLabel(a.scope)}` : ""}`, keys: a.hotkey ? [a.hotkey] : [], changed: false })),
   ];
 }
-const groupOf = (r: Row) => (r.kind === "agent" ? "Agents" : actionById(r.id)!.group);
+const groupOf = (r: Row) => (r.kind === "agent" ? "Commands" : actionById(r.id)!.group);
 
 /** Who else has `c`, other than `row`. */
 function holder(c: Chord, row: Row): Holder | undefined {
   const a = owner(c, row.kind === "action" ? row.id : undefined);
   if (a) return { kind: "action", ...a };
-  const g = app.agents.find((x) => x.hotkey && sameChord(x.hotkey, c) && !(row.kind === "agent" && x.id === row.id));
+  // Commands that no project's menu offers together may share a chord.
+  const mine = row.kind === "agent" ? app.agents.find((x) => x.id === row.id) : undefined;
+  const g = app.agents.find((x) => x.hotkey && sameChord(x.hotkey, c) && x !== mine && (!mine || offeredTogether(mine, x)));
   return g && { kind: "agent", id: g.id };
 }
 
@@ -199,7 +201,7 @@ function KeyRow(props: { row: Row }) {
         <Show when={canAdd()}><KeySlot row={r()} i={r().keys.length} add /></Show>
       </dt>
       <dd>
-        <span class="txt">{r().desc}<Show when={r().kind === "agent"}> <small>agent</small></Show></span>
+        <span class="txt">{r().desc}<Show when={r().kind === "agent"}> <small>command</small></Show></span>
         <Show when={r().changed}>
           <i class="hk-changed" title="Changed" />
           <button type="button" class="hk-reset" title={`Back to ${keysText(def())}`} onClick={() => { setClash(null); setKeys(r().id, def()); }}>↺</button>
