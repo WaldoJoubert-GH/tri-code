@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tri-code — a minimal agent development environment</title>
+  <meta name="description" content="Run Claude Code, pi and your shells side by side, locally or over ssh, with git, an editor, a browser and issues in one window.">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="icon.svg" alt="">tri-code</a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="https://github.com/WaldoJoubert-GH/tri-code">GitHub</a>
+      <a class="btn primary" href="download.html">Download</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Your agents, <em>side by side</em>.</h1>
+    <p class="lede">tri-code is a minimal agent development environment. Run Claude Code, pi and your shells in tiled windows, on your machine or over ssh, with git, an editor, a browser and your issues one keystroke away.</p>
+    <div class="cta">
+      <a class="btn primary" href="download.html">Download for free</a>
+      <a class="btn ghost" href="https://github.com/WaldoJoubert-GH/tri-code">View on GitHub</a>
+    </div>
+    <div class="meta">Windows &amp; macOS · updates itself</div>
+    <img class="shot" src="screenshots/hero.png" width="2880" height="1760" alt="A claude tab, the git window and a shell tiled in one project">
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="eyebrow">Features</div>
+    <h2>Everything an agent session needs, nothing it doesn't.</h2>
+    <p class="section-lede">Projects in the sidebar, terminals that keep running, and the tools you reach for between prompts.</p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <h3>Any agent, tiled</h3>
+        <p>claude, pi, a shell or any terminal app you add. Tile them in layouts and spread them over workspaces.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 6.5h.01M6 17.5h.01"/></svg></div>
+        <h3>Remote that survives</h3>
+        <p>Projects over ssh attach to shpool or tmux sessions, so agents keep working through dropped connections and restarts.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
+        <h3>Agent signals</h3>
+        <p>See which agents are working, waiting for you, done or failed. Get a sound and a notification, then jump to the next one with <kbd>Alt</kbd> <kbd>U</kbd>.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v6M18 9a9 9 0 0 1-9 9"/></svg></div>
+        <h3>Worktrees built in</h3>
+        <p>One branch per agent. New worktree makes the checkout, opens an agent in it, and cleans up when the PR merges.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg></div>
+        <h3>Git with drafts</h3>
+        <p>Stage, diff unified or split, commit, push, open and merge PRs. ✦ drafts the commit message, PR and a branch review with your own Claude login.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg></div>
+        <h3>A real editor</h3>
+        <p>File tree, tabs and CodeMirror with search, multi-cursor and folding. A Diff view against HEAD, and saves that won't clobber an agent's edits.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg></div>
+        <h3>Browser that points</h3>
+        <p>Browser windows with pages and profiles. Select an element, describe the change, and it goes to your agent with its selector, styles and source file.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <h3>Issues next to the code</h3>
+        <p>Plane, GitHub Issues and local issues in one keyboard-driven panel, linked to the branch you're on.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></div>
+        <h3>Keyboard first</h3>
+        <p>A Command Palette for everything (<kbd>Alt</kbd> <kbd>X</kbd>), fuzzy Go to File, and every hotkey rebindable.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap showcase">
+    <div class="row">
+      <div class="text">
+        <div class="eyebrow">Layouts</div>
+        <h3>Run the whole team at once</h3>
+        <p>claude, pi, the issues panel and a shell in one grid. Projects are grouped by where they run: your machine or any ssh host.</p>
+        <ul>
+          <li>Minimise a window without stopping it</li>
+          <li>Four workspaces per project</li>
+          <li>Accent colours and icons per project</li>
+        </ul>
+      </div>
+      <img class="shot" src="screenshots/grid.png" width="2880" height="1760" alt="Grid layout with claude, pi, issues and a shell" loading="lazy">
+    </div>
+    <div class="row">
+      <div class="text">
+        <div class="eyebrow">Git</div>
+        <h3>Review what the agent did</h3>
+        <p>Read the diff, stage what you want, and let ✦ write the commit message from the diff, the issue in progress and your commit style.</p>
+        <ul>
+          <li>Push, open a PR and merge from one window</li>
+          <li>PR checks refresh while they run</li>
+          <li>Branch status always in the status line</li>
+        </ul>
+      </div>
+      <img class="shot" src="screenshots/git.png" width="2880" height="1760" alt="Git window with staged and unstaged changes and a diff" loading="lazy">
+    </div>
+    <div class="row">
+      <div class="text">
+        <div class="eyebrow">Editor</div>
+        <h3>Make the small fix yourself</h3>
+        <p>Open any file in a tab, see Markdown, HTML and SVG rendered, and switch to a diff of your unsaved edits with <kbd>Alt</kbd> <kbd>D</kbd>.</p>
+      </div>
+      <img class="shot" src="screenshots/files.png" width="2880" height="1760" alt="Files window with the README previewed" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2>Free, open source, and ready in a minute.</h2>
+    <p class="section-lede">The first launch opens a short tour with a sample project, so you can try everything before pointing it at your own code.</p>
+    <a class="btn primary" href="download.html">Download tri-code</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="./"><img src="icon.svg" alt="">tri-code</a>
+    <span>Built with Tauri, SolidJS and xterm.js.</span>
+    <div class="links">
+      <a href="download.html">Download</a>
+      <a href="https://github.com/WaldoJoubert-GH/tri-code/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/WaldoJoubert-GH/tri-code">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

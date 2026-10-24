@@ -98,6 +98,10 @@ Installed copies check the latest release's `latest.json` at startup and every 6
 
 The updater checks downloads against the public key in `tauri.conf.json`. The matching private key is the `TAURI_SIGNING_PRIVATE_KEY` repository secret (kept outside the repo at `~/.tauri/tri-code.key` on the machine that made it). If the key is lost, installed copies cannot verify new releases and must be reinstalled by hand. The macOS builds are ad-hoc signed but not notarized, so Gatekeeper blocks the first launch. Open System Settings → Privacy & Security and click Open Anyway, or run `xattr -cr /Applications/tri-code.app`. Builds from before 0.1.28 were unsigned, and macOS reports them as "damaged". The `xattr` command fixes those too.
 
+## Product page
+
+`site/` is the product page: `index.html` (features) and `download.html`, which links each platform's installer from the latest GitHub Release. `.github/workflows/pages.yml` publishes it to GitHub Pages on pushes to `main`, copying in `docs/screenshots/` and `assets/icon.svg`. To preview it, copy those into `site/` the same way (`screenshots/`, `icon.svg`) and open `site/index.html`.
+
 ## Development
 
 Rust tests:
