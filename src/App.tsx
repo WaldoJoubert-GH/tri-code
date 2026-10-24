@@ -10,6 +10,7 @@ import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
+import { CtxMenu, ctxMenuOpen } from "./ctxmenu";
 import ClaudeUsage from "./Usage";
 import { SettingsDialog, hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { phoneStatus, startPhoneSync } from "./phone";
@@ -25,7 +26,6 @@ import { installClipboardFallback } from "./clipboard";
 import { openExternal, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended } from "./browsers";
 import { FavPopover, favEditOpen } from "./favs";
 import { ProfileMenu, profileMenuOpen } from "./profiles";
-import { GoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./Tour";
 import { ensureSession, setLinkHandler } from "./terms";
@@ -115,7 +115,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || openProjectOpen() || newWorktreeOpen() || goToFileOpen() || paletteOpen() || aboutOpen() || signalsOpen() || feedbackOpen()));
+  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || openProjectOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || signalsOpen() || feedbackOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   const backdrop = () => {
@@ -146,11 +146,11 @@ export default function App() {
       </div>
       <StatusBar />
       <TabMenu />
+      <CtxMenu />
       <AppearancePopover />
       <SettingsDialog />
       <FavPopover />
       <ProfileMenu />
-      <GoToFile />
       <Palette />
       <OpenProjectDialog />
       <NewWorktreeDialog />
@@ -218,9 +218,9 @@ function Toolbar() {
         id="where"
         title={where() ? `${where()} · ${withKey("Go to file", "go-to-file")}` : ""}
         aria-haspopup="dialog"
-        aria-expanded={goToFileOpen()}
+        aria-expanded={paletteOpen()}
         disabled={!activeProject()}
-        onClick={toggleGoToFile}
+        onClick={togglePalette}
       >
         <Show when={activeProject()}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>

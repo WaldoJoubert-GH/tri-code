@@ -234,7 +234,7 @@ svg.lucide { flex: none; display: block; }
 .tabs .tab-add { justify-content: center; width: 30px; padding: 0; font-size: 15px; }
 .top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }
 .top .tool:hover { color: var(--text); background: var(--hover); }
-/* The project path is the way into Go to File (GoToFile.tsx): click it, or Alt+T */
+/* The project path is the way into Command Palette (Palette.tsx): click it, or Alt+T */
 .top .where {
   align-self: center; display: flex; align-items: center; gap: 6px; height: 24px; margin: 0 auto 0 6px; padding: 0 8px;
   color: var(--muted); font-size: 11px; min-width: 120px; flex: 1 1 200px; max-width: 420px;
@@ -290,6 +290,9 @@ svg.lucide { flex: none; display: block; }
 .tabmenu button kbd { margin-left: auto; }
 .tabmenu svg.glyph { width: 14px; flex: none; }
 .tabmenu .msep { height: 1px; margin: 4px 2px; background: var(--line); }
+.tabmenu button:disabled { opacity: .45; }
+.ctxmenu button:disabled:hover { background: none; color: var(--muted); }
+.ctxmenu button:focus-visible { outline: none; background: var(--hover); color: var(--text); }
 
 /* Browser Profiles (src/profiles.tsx): the avatar, and the menu under a browser window's avatar */
 .pav { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background: var(--pc); color: #fff; }

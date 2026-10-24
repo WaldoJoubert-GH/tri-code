@@ -2,15 +2,22 @@
 // file in the editor's preview tab, a double-click keeps it, Ctrl+click opens it in a new editor
 // beside. It follows the editor: the file shown is revealed and selected. Plain keys drive it
 // while it has focus. Changed files carry their git status letter, and folders a dot for what
-// they hold.
+// they hold. New File (the header's +, or right-click) names the file in a box at the top of its
+// folder; a name with slashes makes the folders too. Delete (right-click, or the Delete key)
+// asks first, then sends the file or folder to the Recycle Bin, or removes it for good over ssh.
+// Rename (right-click, or F2) edits the name in place.
 
 import { For, Show, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js";
 import { type Project, isRemote } from "./state";
-import { type OpenHow, dirState, loadDir, refreshProject } from "./files";
+import { type OpenHow, createFile, deletePath, dirState, renamePath, loadDir, refreshDir, refreshProject } from "./files";
+import { openCtxMenu } from "./ctxmenu";
+import { copyText } from "./clipboard";
+import { ask, flash } from "./ui";
 import { type FileMark, fileMarks, markAt, peekStatus } from "./git";
 import "./files.css";
 
-type Row = { path: string; name: string; dir: boolean; depth: number };
+/** `draft` is the New File box, in the folder `path`. */
+type Row = { path: string; name: string; dir: boolean; depth: number; draft?: true };
 
 const join = (dir: string, name: string) => (dir.endsWith("/") ? dir + name : `${dir}/${name}`);
 
@@ -46,6 +53,10 @@ export default function FileTree(props: {
   let rootEl!: HTMLDivElement;
   const [open, setOpen] = createSignal<ReadonlySet<string>>(new Set());
   const [sel, setSel] = createSignal("");
+  /** The folder a new file is being named in. */
+  const [draft, setDraft] = createSignal<string | null>(null);
+  /** The file or folder being renamed. */
+  const [renaming, setRenaming] = createSignal<string | null>(null);
 
   const marks = createMemo(() => fileMarks(props.project));
   const markOf = (r: Row) => markAt(marks(), r.path, r.dir);
@@ -68,6 +79,7 @@ export default function FileTree(props: {
     const walk = (dir: string, depth: number) => {
       if (seen.has(dir)) return; // a symlink loop would otherwise recurse forever
       seen.add(dir);
+      if (draft() === dir) out.push({ path: dir, name: "", dir: false, depth, draft: true });
       for (const e of dirState(props.project, dir)?.list?.entries ?? []) {
         const path = join(dir, e.name);
         out.push({ path, name: e.name, dir: e.dir, depth });
@@ -116,6 +128,8 @@ export default function FileTree(props: {
     else if (e.key === "ArrowRight" || e.key === "l") { if (at?.dir && !isOpen(at.path)) toggle(at.path); }
     else if (e.key === "ArrowLeft" || e.key === "h") { if (at?.dir && isOpen(at.path)) toggle(at.path); }
     // Space previews and stays in the tree; Enter opens and goes to the file; Ctrl+Enter opens it beside
+    else if (e.key === "Delete") { if (at) void remove(at); }
+    else if (e.key === "F2") { e.preventDefault(); if (at) setRenaming(at.path); }
     else if (e.key === " ") { e.preventDefault(); if (at && !at.dir) props.open(at.path, { preview: true }); }
     else if (e.key === "Enter") {
       if (!at) return;
@@ -124,14 +138,96 @@ export default function FileTree(props: {
     }
   };
 
-  const where = () => `${isRemote(props.project) ? `${props.project.host}:` : ""}${props.project.path}`;
   const root = () => dirState(props.project, props.project.path);
+  const dirOf = (r: Row | undefined) => (!r ? props.project.path : r.dir ? r.path : r.path.slice(0, r.path.lastIndexOf("/")));
+
+  /** Open the New File box in `dir`, expanding it. */
+  const newFile = (dir: string) => {
+    if (dir !== props.project.path && !isOpen(dir)) toggle(dir);
+    setDraft(dir);
+  };
+
+  const create = async (dir: string, name: string) => {
+    const rel = name.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    setDraft(null);
+    if (!rel) return rootEl.focus();
+    if (rel.split("/").some((p) => p === "" || p === "." || p === "..")) return flash(`not a file name: ${name}`);
+    const path = join(dir, rel);
+    try {
+      await createFile(props.project, path);
+    } catch (e) {
+      return flash(String(e));
+    }
+    // The folder and any folders made on the way are listed again and opened, so the file shows.
+    const dirs = [dir];
+    for (const part of rel.split("/").slice(0, -1)) dirs.push(join(dirs[dirs.length - 1], part));
+    for (const d of dirs) refreshDir(props.project, d);
+    setOpen((s) => new Set([...s, ...dirs.slice(1)]));
+    props.open(path, { focus: true });
+  };
+
+  const remove = async (r: Row) => {
+    const what = `${r.dir ? "the folder " : ""}${relOf(r.path)}${r.dir ? " and everything in it" : ""}`;
+    const note = isRemote(props.project) ? `It is on ${props.project.host}, so this can't be undone.` : "It goes to the Recycle Bin.";
+    if (!await ask(`Delete ${what}?\n\n${note}`)) return;
+    try {
+      await deletePath(props.project, r.path);
+    } catch (e) {
+      return flash(`delete failed: ${e}`);
+    }
+    flash(`deleted ${r.name}`);
+    refreshDir(props.project, dirOf({ ...r, dir: false }));
+    rootEl.focus();
+  };
+
+  const rename = async (r: Row, name: string) => {
+    const to = name.trim();
+    setRenaming(null);
+    rootEl.focus();
+    if (!to || to === r.name) return;
+    if (/[\\/]/.test(to) || to === "." || to === "..") return flash(`not a file name: ${to}`);
+    const parent = dirOf({ ...r, dir: false });
+    const path = join(parent, to);
+    try {
+      await renamePath(props.project, r.path, path);
+    } catch (e) {
+      return flash(`rename failed: ${e}`);
+    }
+    refreshDir(props.project, parent);
+    // A renamed folder stays open, and so do the folders open inside it.
+    const moved = (p: string) => (p === r.path ? path : p.startsWith(`${r.path}/`) ? path + p.slice(r.path.length) : p);
+    setOpen((s) => new Set([...s].map(moved)));
+    setSel(path);
+  };
+
+  const relOf = (f: string) => f.slice(props.project.path.replace(/[\\/]+$/, "").length + 1);
+  const onMenu = (e: MouseEvent) => {
+    const el = rowOf(e);
+    const r = el ? rows().find((x) => !x.draft && x.path === el.dataset.path) : undefined;
+    if (r) setSel(r.path);
+    openCtxMenu(e, [
+      { label: "New File…", run: () => newFile(dirOf(r)) },
+      "sep",
+      ...(r ? [
+        { label: "Copy Path", run: () => copyText(r.path) },
+        { label: "Copy Relative Path", run: () => copyText(relOf(r.path)) },
+        "sep" as const,
+        { label: "Rename…", kbd: "F2", run: () => setRenaming(r.path) },
+        { label: "Delete", kbd: "Delete", run: () => void remove(r) },
+        "sep" as const,
+      ] : []),
+      { label: "Refresh", run: () => refreshProject(props.project) },
+    ]);
+  };
+
+  const where = () => `${isRemote(props.project) ? `${props.project.host}:` : ""}${props.project.path}`;
   const rowOf = (e: MouseEvent) => (e.target as HTMLElement).closest<HTMLElement>("[data-path]");
 
   return (
     <div class="ftreewrap">
       <div class="fthead">
         <span class="proj" title={where()}>{props.project.name}</span>
+        <button title="New file" onClick={() => newFile(dirOf(rows().find((r) => r.path === sel())))}>+</button>
         <button title="Refresh (reloads the whole tree and open files)" onClick={() => refreshProject(props.project)}>⟳</button>
       </div>
       <div
@@ -139,6 +235,7 @@ export default function FileTree(props: {
         ref={(el) => ((rootEl = el), props.ref?.(el))}
         tabIndex={0}
         onKeyDown={onKey}
+        onContextMenu={onMenu}
         onClick={(e) => {
           const el = rowOf(e);
           if (!el) return;
@@ -157,7 +254,23 @@ export default function FileTree(props: {
           fallback={<div class="fnote">{root()?.error ?? (root()?.loading ? "Loading…" : "Empty folder")}</div>}
         >
           <For each={rows()}>
-            {(r) => (
+            {(r) => r.draft ? (
+              <div class="frow fdraft" style={{ "padding-left": `${6 + r.depth * 12}px` }}>
+                <span class="fchev" />
+                <FileIcon name="" dir={false} />
+                <input
+                  aria-label={`New file in ${r.path}`}
+                  placeholder="file name (a/b.ts makes folders)"
+                  ref={(el) => requestAnimationFrame(() => el.focus())}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === "Enter") void create(r.path, e.currentTarget.value);
+                    else if (e.key === "Escape") (setDraft(null), rootEl.focus());
+                  }}
+                  onBlur={(e) => draft() === r.path && void create(r.path, e.currentTarget.value)}
+                />
+              </div>
+            ) : (
               <div
                 class="frow"
                 data-g={markOf(r)}
@@ -169,7 +282,27 @@ export default function FileTree(props: {
               >
                 <span class="fchev">{r.dir ? (isOpen(r.path) ? "▾" : "▸") : ""}</span>
                 <FileIcon name={r.name} dir={r.dir} />
-                <span class="fname">{r.name}</span>
+                <Show when={renaming() === r.path} fallback={<span class="fname">{r.name}</span>}>
+                  <input
+                    class="fren"
+                    aria-label={`Rename ${r.name}`}
+                    value={r.name}
+                    ref={(el) => requestAnimationFrame(() => {
+                      el.focus();
+                      // Like VS Code, the name is selected without its extension.
+                      const dot = r.dir ? -1 : r.name.lastIndexOf(".");
+                      el.setSelectionRange(0, dot > 0 ? dot : r.name.length);
+                    })}
+                    onClick={(e) => e.stopPropagation()}
+                    onDblClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Enter") void rename(r, e.currentTarget.value);
+                      else if (e.key === "Escape") (setRenaming(null), rootEl.focus());
+                    }}
+                    onBlur={(e) => renaming() === r.path && void rename(r, e.currentTarget.value)}
+                  />
+                </Show>
                 <Show when={markOf(r)}>
                   <span class="fmark">{letter(r)}</span>
                 </Show>
