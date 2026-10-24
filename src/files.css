@@ -73,7 +73,7 @@
 .md img { max-width: 100%; height: auto; }
 .md input[type="checkbox"] { margin-right: 6px; }
 
-/* Go to File: the box under the toolbar path (GoToFile.tsx) */
+/* Command Palette (Palette.tsx): commands and files in one box, centered under the toolbar */
 .gtf {
   position: fixed; z-index: 10000; width: 620px; max-width: calc(100vw - 16px); display: flex; flex-direction: column;
   max-height: min(460px, calc(100vh - 60px)); background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
@@ -106,7 +106,6 @@
 .gfoot kbd { font-size: 10px; padding: 0 3px; }
 .gfoot .src { margin-left: auto; font: 10.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
 
-/* Command Palette (Palette.tsx): the Go to File box, centered under the toolbar */
 .gtf.pal { left: 50%; top: 52px; transform: translateX(-50%); width: 640px; }
 .prow .pg { flex: none; width: 14px; text-align: center; color: var(--muted); font-size: 12px; }
 .prow.hi .pg { color: var(--accent); }

@@ -72,7 +72,7 @@ _Avoid_: Onboarding wizard, coach marks.
 The `tour` project (`sample: true`), in `tour/` under the app config dir. Its terminals are Demo Tabs: scripted sessions (`demo.ts`) that write OSC 7501 reports into xterm, so signals, badges and notifications behave as for a real agent. Not added to Recent; closing it loses nothing.
 
 **Go to File**:
-The `Alt+T` box under the toolbar path (a click on the path opens it too). One field that searches the project's File Index by fuzzy match and, when it is empty or ends in `/`, lists that folder. Opens the pick in a Preview Tab of the project's Editor Window (`Ctrl+Enter`: a new Editor Window beside).
+The file half of the Command Palette (`Alt+T` and a click on the toolbar path open it too). Searches the project's File Index by fuzzy match and, when the query is `/` or a folder and `/`, lists that folder. Opens the pick in a Preview Tab of the project's Editor Window (`Ctrl+Enter`: a new Editor Window beside).
 _Avoid_: Quick open, file palette, Ctrl+P.
 
 **Editor Window**:
@@ -87,7 +87,7 @@ _Avoid_: Temporary tab.
 A file's modification time and size when the editor read it. Saving sends it back, and a file changed since (an agent wrote to it) is not overwritten without asking.
 
 **Command Palette**:
-The `Alt+X` box under the toolbar that runs any Command by name. The empty box lists recent picks, then every Command by group; typing fuzzy-matches titles (as Go to File does). Built from `commands.ts` each time it opens, so it only offers what applies now (no "Make main" outside Main + stack). A Command with a hotkey runs the same function the hotkey does.
+The `Alt+X` (or `Alt+T`) box under the toolbar that runs any Command by name and opens files (Go to File). The empty box lists recent picks, Commands and files, then every Command by group; typing fuzzy-matches Command titles and the File Index together, Commands first. Built from `commands.ts` each time it opens, so it only offers what applies now (no "Make main" outside Main + stack). A Command with a hotkey runs the same function the hotkey does.
 _Avoid_: Command menu, launcher, Ctrl+Shift+P (tri-code binds only Alt chords).
 
 **Hotkey Modifier**:

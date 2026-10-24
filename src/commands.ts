@@ -18,7 +18,6 @@ import { openProjectDialog } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
-import { openGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { branchOf, openNewWorktree, removeWorktree } from "./worktrees";
 import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, openAgentsPanel } from "./agents";
@@ -127,7 +126,6 @@ export function commands(): Command[] {
     add({ id: "files", group: "New", title: "Editor", icon: "file-code", keys: capsOf("files"), run: () => void openEditor(p) });
     add({ id: "git", group: "New", title: "Git", icon: "git-branch", keys: capsOf("git"), run: () => void openGitPanel(p) });
     add({ id: "agents", group: "New", title: "Agents", hint: "edit the + menu", icon: "settings-2", keys: capsOf("agents"), run: () => void openAgentsPanel(p) });
-    add({ id: "go-to-file", group: "New", title: "Go to file", icon: "search", keys: capsOf("go-to-file"), run: openGoToFile });
 
     if (f) {
       add({ id: "close", group: "Window", title: `Close ${windowTitle(f)}`, icon: "x", keys: capsOf("close"), run: () => requestClose(p.id, f.id) });

@@ -16,7 +16,6 @@ import { closeFavEdit, favEditOpen } from "./favs";
 import { closeProfileMenu, profileMenuOpen } from "./profiles";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
-import { closeGoToFile, goToFileOpen, toggleGoToFile } from "./GoToFile";
 import { openGitPanel } from "./git";
 import { diffKeys } from "./DiffView";
 import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";
@@ -87,7 +86,7 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
       openEditor(p);
       return true;
     case "go-to-file":
-      toggleGoToFile();
+      togglePalette();
       return true;
     case "git":
       openGitPanel(p);
@@ -178,7 +177,6 @@ function onKey(e: KeyboardEvent) {
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
     else if (profileMenuOpen()) closeProfileMenu();
-    else if (goToFileOpen()) closeGoToFile();
     else return;
     e.preventDefault();
     e.stopPropagation();
