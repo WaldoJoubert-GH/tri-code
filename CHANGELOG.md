@@ -2,6 +2,10 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.37 — 2026-10-24
+
+- The status line shows Command Code's plan usage beside Claude's, both under their agent icons: the 5-hour and weekly limits, plus Command Code's credit pool as dollars left of the plan's monthly grant (`$52.6/$70`), read with Command Code's own login (`~/.commandcode/auth.json`) from the billing endpoints its `/usage` uses. It stays hidden until you are signed in there, Settings › Windows switches it off, and a hidden one is not fetched.
+
 ## 0.1.36 — 2026-10-24
 
 - The agents window is now the Commands window (`Alt+;`). A command can be several lines: its window opens a shell and types them in one after another, so `cd` and `export` carry on and the last line keeps running. Each command has a scope (everywhere, one environment, or one project and its worktrees), and a project's own `claude` replaces the global one there. The copy button (or `Ctrl+D`) duplicates a row, ↑ / ↓ on a focused grip reorders it, and the bell gives a command its own sounds for needs input, done and error, or mutes them. ([#25](https://github.com/WaldoJoubert-GH/tri-code/pull/25))
