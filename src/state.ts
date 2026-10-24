@@ -284,6 +284,8 @@ export type Settings = {
   worktreeAgent?: string;
   /** false hides Claude's session and weekly usage in the status line (and stops fetching it). Unset shows it. */
   claudeUsage?: boolean;
+  /** false hides Command Code's limits in the status line. Unset shows them, when there is a login. */
+  commandCodeUsage?: boolean;
   /** Remote Control (phone.ts): the signals that push to a phone (unset: all of them). Whether
    *  it is on lives in phone.json. */
   remote?: { push?: Partial<Record<SoundEvent, boolean>> };
@@ -657,6 +659,11 @@ export function setWorktreeAgent(id: string | undefined) {
 /** Show or hide Claude's usage in the status line. */
 export function setClaudeUsage(on: boolean) {
   setApp("settings", "claudeUsage", on ? undefined : false);
+}
+
+/** Show or hide Command Code's usage in the status line. */
+export function setCommandCodeUsage(on: boolean) {
+  setApp("settings", "commandCodeUsage", on ? undefined : false);
 }
 
 /** Go to File's default skip list; the same as `fs::SKIP` in fs.rs. `.git` is always skipped. */

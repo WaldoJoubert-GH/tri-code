@@ -11,7 +11,7 @@ import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import { CtxMenu, ctxMenuOpen } from "./ctxmenu";
-import ClaudeUsage from "./Usage";
+import ClaudeUsage, { CommandCodeUsage } from "./Usage";
 import { SettingsDialog, hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { phoneStatus, startPhoneSync } from "./phone";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
@@ -298,6 +298,9 @@ function StatusBar() {
       </button>
       <Show when={app.settings.claudeUsage !== false}>
         <ClaudeUsage />
+      </Show>
+      <Show when={app.settings.commandCodeUsage !== false}>
+        <CommandCodeUsage />
       </Show>
     </div>
   );

@@ -3,7 +3,7 @@
 // Hotkeys page. Chosen from design/settings-hotkeys.html.
 
 import { For, Show, createSignal } from "solid-js";
-import { GAP_MAX, GIT_TINT, GitColor, app, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setSkipFolders, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { GAP_MAX, GIT_TINT, GitColor, app, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSkipFolders, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
@@ -189,6 +189,19 @@ function WindowsPage() {
         </span>
       </div>
       <p class="note">The session and weekly limits at the bottom right, read with Claude Code's login every 5 minutes. Hidden, it isn't fetched.</p>
+      <div class="row">
+        Command Code usage
+        <span class="set-seg" role="radiogroup" aria-label="Command Code usage">
+          <For each={[[true, "Show"], [false, "Hide"]] as const}>
+            {([on, label]) => (
+              <button type="button" role="radio" aria-checked={(app.settings.commandCodeUsage !== false) === on} onClick={() => setCommandCodeUsage(on)}>
+                {label}
+              </button>
+            )}
+          </For>
+        </span>
+      </div>
+      <p class="note">Command Code's 5-hour and weekly limits, read with its own login every 5 minutes. It shows nothing until you're signed in there, and is not fetched when hidden.</p>
     </>
   );
 }

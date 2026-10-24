@@ -193,6 +193,7 @@ pub fn run() {
             bg::sound_load,
             bg::sound_delete,
             usage::claude_usage,
+            usage::command_code_usage,
             phone::phone_start,
             phone::phone_stop,
             phone::phone_status,

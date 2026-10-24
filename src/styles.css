@@ -467,7 +467,9 @@ svg.lucide { flex: none; display: block; }
   color: var(--muted); font-variant-numeric: tabular-nums;
 }
 .usage:hover { color: var(--text); }
-.usage .who { color: var(--text); font-weight: 600; }
+/* Two providers at the end of the status line: a hairline between them */
+.usage + .usage { border-left: 1px solid var(--line); padding-left: 12px; }
+.usage .who { display: flex; align-items: center; color: var(--text); }
 .usage .na { font-style: italic; }
 .usage .meter { display: flex; align-items: center; gap: 5px; }
 .usage .meter i {
