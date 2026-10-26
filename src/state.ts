@@ -282,6 +282,9 @@ export type Settings = {
   gitTint?: number;
   /** The agent New worktree opens in the new checkout, by id; "" opens nothing. Unset is worktreeAgent's default. */
   worktreeAgent?: string;
+  /** The shell command each ✦ Draft runs, by kind (Settings › Git): it reads the prompt on stdin and
+   *  prints the draft. Unset, or emptied, is DRAFT_COMMAND. */
+  draftCommands?: Partial<Record<DraftKind, string>>;
   /** false hides Claude's session and weekly usage in the status line (and stops fetching it). Unset shows it. */
   claudeUsage?: boolean;
   /** false hides Command Code's limits in the status line. Unset shows them, when there is a login. */
@@ -295,6 +298,11 @@ export type Settings = {
 
 export type GitColor = "add" | "del" | "mod" | "ren";
 export const GIT_TINT = 18;
+
+/** The kinds of ✦ Draft, each with its own Draft Command. */
+export type DraftKind = "commit" | "pr" | "review";
+/** The Draft Command a kind uses until Settings › Git sets one. */
+export const DRAFT_COMMAND = "claude -p";
 
 const defaultSettings = (): Settings => ({ modKey: "alt" });
 
@@ -654,6 +662,22 @@ export function worktreeAgent(): string {
 /** The agent New worktree opens by default, "" for nothing, or undefined for the first with a command. */
 export function setWorktreeAgent(id: string | undefined) {
   setApp("settings", "worktreeAgent", id);
+}
+
+/** The Draft Command a ✦ Draft of this kind runs. */
+export function draftCommand(kind: DraftKind): string {
+  return app.settings.draftCommands?.[kind]?.trim() || DRAFT_COMMAND;
+}
+
+/** A kind's Draft Command, or undefined for DRAFT_COMMAND. Kept as typed (a space mid-typing
+ *  must survive); blank means unset. */
+export function setDraftCommand(kind: DraftKind, cmd: string | undefined) {
+  setApp(produce((s) => {
+    const c = (s.settings.draftCommands ??= {});
+    if (cmd?.trim()) c[kind] = cmd;
+    else delete c[kind];
+    if (!Object.keys(c).length) delete s.settings.draftCommands;
+  }));
 }
 
 /** Show or hide Claude's usage in the status line. */

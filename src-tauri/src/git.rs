@@ -1,5 +1,5 @@
 //! The git window's commands: git and gh in the project folder, locally or over ssh, plus
-//! `claude -p` for the ✦ drafts. Remote calls that need several git commands run them in one
+//! the ✦ drafts' commands (Settings › Git). Remote calls that need several git commands run them in one
 //! ssh round trip (see `multi`).
 
 use std::io::Write;
@@ -772,16 +772,61 @@ pub async fn git_push_delete(host: String, path: String, branch: String) -> Resu
     blocking(move || exec(&host, &path, "git", &["push", "origin", "--delete", &branch], None).map(|_| ())).await
 }
 
-/// One ✦ draft: `prompt` on the stdin of `claude -p` in the project folder, so it runs
-/// with the user's own Claude Code login and settings on the project's host.
+/// One ✦ draft: `prompt` on the stdin of `command`, a shell line the user set in Settings › Git
+/// (`claude -p`, `pi -p --model ...`). It runs in the project folder on the project's host, through
+/// the login shell as an agent's command does, so the user's own login and PATH apply.
 #[tauri::command]
-pub async fn claude_draft(host: String, path: String, prompt: String) -> Result<String, String> {
-    blocking(move || exec(&host, &path, "claude", &["-p"], Some(prompt)).map(|s| s.trim().to_string())).await
+pub async fn git_draft(host: String, path: String, command: String, prompt: String) -> Result<String, String> {
+    blocking(move || {
+        let cmd = shell_line(&host, &path, &command)?;
+        run(cmd, Some(prompt), &[]).map(|s| s.trim().to_string())
+    })
+    .await
+}
+
+/// `line` as a shell command in `path` on `host`: cmd.exe on Windows (the line passed verbatim),
+/// else the login shell; over ssh, the same login shell on the remote.
+fn shell_line(host: &str, path: &str, line: &str) -> Result<Command, String> {
+    if !matches!(host, "" | "local") {
+        crate::envssh::check(host)?;
+        return Ok(remote::command(host, &remote_draft_script(path, line)));
+    }
+    #[cfg(windows)]
+    let mut cmd = {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let mut c = Command::new("cmd.exe");
+        c.args(["/d", "/c"]).raw_arg(line).creation_flags(CREATE_NO_WINDOW);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
+        let mut c = Command::new(shell);
+        c.args(["-lc", line]);
+        c
+    };
+    cmd.current_dir(expand_home(path));
+    Ok(cmd)
+}
+
+/// The script ssh runs for a remote draft: `line` in `path`, under the remote login shell.
+fn remote_draft_script(path: &str, line: &str) -> String {
+    let inner = format!("cd {} && {}", remote_path(path), line);
+    format!("exec \"${{SHELL:-/bin/sh}}\" -lc {}", sq(&inner))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn remote_draft_runs_the_line_in_the_folder_under_a_login_shell() {
+        assert_eq!(
+            remote_draft_script("~/my app", "pi -p --model x"),
+            r#"exec "${SHELL:-/bin/sh}" -lc 'cd ~/'\''my app'\'' && pi -p --model x'"#
+        );
+    }
 
     #[test]
     fn status_parses_branch_and_every_record_kind() {

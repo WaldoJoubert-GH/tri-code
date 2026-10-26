@@ -1,12 +1,12 @@
 // The git window's state and actions: one runtime record per project (never persisted).
 // A project is one repo or, when its folder holds several, a list of repos with one active;
 // Status, selection, commit message and PR are per active repo, and every action runs in it.
-// The backend is src-tauri/src/git.rs; ✦ drafts run `claude -p` on the project's host with
+// The backend is src-tauri/src/git.rs; ✦ drafts run the Draft Command set for their kind in Settings › Git on the project's host, with
 // the context the user has switched on (the "context chips").
 
 import { invoke } from "@tauri-apps/api/core";
 import { createStore, produce } from "solid-js/store";
-import { type Project, addTab, focusTab, repoOf } from "./state";
+import { type DraftKind, type Project, addTab, draftCommand, focusTab, repoOf } from "./state";
 import { copyText } from "./clipboard";
 import { devOf, inProgress, slugOf } from "./issues";
 import { flash } from "./ui";
@@ -581,11 +581,11 @@ function context(p: Project, diffLabel: string, diff: string): string {
   return out.join("\n\n");
 }
 
-async function draft(p: Project, kind: NonNullable<GitUi["busy"]>, prompt: () => Promise<string>, done: (text: string) => void) {
+async function draft(p: Project, kind: DraftKind, prompt: () => Promise<string>, done: (text: string) => void) {
   if (gitOf(p.id).busy) return;
   set(p, (g) => { g.busy = kind; });
   try {
-    const text = await invoke<string>("claude_draft", { ...args(p), prompt: await prompt() });
+    const text = await invoke<string>("git_draft", { ...args(p), command: draftCommand(kind), prompt: await prompt() });
     if (text) done(text.replace(/^```[a-z]*\n|\n```$/g, ""));
   } catch (e) {
     flash(`✦ draft failed: ${String(e).split("\n")[0]}`);

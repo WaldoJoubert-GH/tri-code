@@ -728,6 +728,16 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .skip-row textarea:focus { border-color: var(--accent); }
 .settings-dlg .skip-row .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
 .settings-dlg .skip-row .reset:hover { background: var(--hover); color: var(--text); }
+.settings-dlg .draft-row input {
+  flex: 1; min-width: 0; font: 12px var(--mono); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; outline: none; user-select: text;
+}
+.settings-dlg .draft-row input:focus { border-color: var(--accent); }
+.settings-dlg .draft-row .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+.settings-dlg .draft-row .reset:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.settings-dlg .draft-row .reset:disabled { opacity: .35; }
+.settings-dlg .draft-eg { margin: 2px 0 10px; padding: 0 0 0 2px; list-style: none; font: 11px/1.6 var(--mono); color: var(--muted); }
+.settings-dlg .draft-eg li { overflow-wrap: anywhere; }
 .settings-dlg .set-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
 .settings-dlg .set-seg button { padding: 3px 10px; font-size: 12px; color: var(--muted); }
 .settings-dlg .set-seg button + button { border-left: 1px solid var(--line); }

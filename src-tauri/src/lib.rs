@@ -142,7 +142,7 @@ pub fn run() {
             git::git_worktree_remove,
             git::git_branch_delete,
             git::git_push_delete,
-            git::claude_draft,
+            git::git_draft,
             git::project_files,
             devfs::dev_read,
             devfs::dev_write,

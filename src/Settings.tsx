@@ -3,7 +3,7 @@
 // Hotkeys page. Chosen from design/settings-hotkeys.html.
 
 import { For, Show, createSignal } from "solid-js";
-import { GAP_MAX, GIT_TINT, GitColor, app, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSkipFolders, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setDraftCommand, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSkipFolders, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
@@ -98,6 +98,13 @@ function themeColor(key: GitColor) {
   return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888";
 }
 
+/** The three Draft Commands. Each example is a Claude Code command and the same model through pi. */
+const DRAFT_ROWS = [
+  { kind: "commit", name: "Commit message", examples: ['claude -p --model claude-haiku-5-5 --tools ""', "pi -p --model commandcode/claude-haiku-5-5 --no-tools --no-session"] },
+  { kind: "pr", name: "Pull request", examples: ['claude -p --model claude-sonnet-5-5 --tools ""', "pi -p --model commandcode/claude-sonnet-5-5 --no-tools --no-session"] },
+  { kind: "review", name: "Review", examples: ['claude -p --model opus --tools ""', "pi -p --model commandcode/claude-opus-5-5 --no-tools --no-session"] },
+] as const;
+
 function GitPage() {
   return (
     <>
@@ -142,6 +149,28 @@ function GitPage() {
         <button type="button" class="reset" title="Back to the first agent with a command" disabled={app.settings.worktreeAgent === undefined} onClick={() => setWorktreeAgent(undefined)}>↺</button>
       </label>
       <p class="note">The agent the New worktree dialog starts on; you can still pick another there.</p>
+      <h4>Drafts</h4>
+      <For each={DRAFT_ROWS}>
+        {(d) => (
+          <div class="draft-kind">
+            <label class="row draft-row">
+              {d.name}
+              <input
+                type="text"
+                spellcheck={false}
+                aria-label={`${d.name} draft command`}
+                value={app.settings.draftCommands?.[d.kind] ?? DRAFT_COMMAND}
+                onChange={(e) => setDraftCommand(d.kind, e.currentTarget.value)}
+              />
+              <button type="button" class="reset" title={`Back to ${DRAFT_COMMAND}`} disabled={app.settings.draftCommands?.[d.kind] === undefined} onClick={() => setDraftCommand(d.kind, undefined)}>↺</button>
+            </label>
+            <ul class="draft-eg">
+              <For each={d.examples}>{(e) => <li>{e}</li>}</For>
+            </ul>
+          </div>
+        )}
+      </For>
+      <p class="note">Each command runs in the project folder on the project's host, with the prompt on stdin. Its stdout is the draft. A failure on stderr, or a non-zero exit, shows as ✦ draft failed.</p>
     </>
   );
 }

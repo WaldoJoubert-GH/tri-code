@@ -142,7 +142,11 @@ _Avoid_: Source control panel, VCS view.
 A Project whose folder is not itself a repo but holds nested repos (`folder_repos`, outermost only). One Git Window shows them in an accordion with an active repo; the active repo owns the commit box, commits, PR and push, while the editor finds a file's repo by the longest path prefix. The status line shows one repo as before, several as `n repos · n changed`. Not called a workspace, which is one of the four window spaces.
 
 **Draft** (✦):
-Text that `claude -p` writes for the user to edit before it is used: a commit message, a PR title and body, or a Review. Shown tinted until edited; never committed, pushed or posted unseen.
+Text that a Draft Command writes for the user to edit before it is used: a commit message, a PR title and body, or a Review. Shown tinted until edited; never committed, pushed or posted unseen.
+
+**Draft Command**:
+The shell command that writes a Draft, one per kind (commit message, pull request, review), set in Settings › Git and `claude -p` until changed. It gets the prompt on stdin and its stdout is the Draft; it runs in the project folder on the project's host, through the login shell, as an agent's command does.
+_Avoid_: Agent (a terminal Command), model, draft agent.
 
 **Context Chip**:
 One input a Draft is given, shown under "✦ reads" and switched off with a click: the diff, the linked In Progress issue, the recent commit subjects, CONTEXT.md.
