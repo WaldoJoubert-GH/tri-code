@@ -2,6 +2,10 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.38 — 2026-10-26
+
+- The ✦ drafts (commit message, pull request and review) run a command you set for each kind in Settings › Git, instead of always `claude -p`. Unset keeps `claude -p`. The examples there show each Claude command with the same model through pi (`pi -p --model commandcode/… --no-tools --no-session`). A command reads the prompt on stdin and its output is the draft; it runs in the project folder on the project's host, through the login shell, as an agent's command does. ([#26](https://github.com/WaldoJoubert-GH/tri-code/issues/26))
+
 ## 0.1.37 — 2026-10-24
 
 - The status line shows Command Code's plan usage beside Claude's, both under their agent icons: the 5-hour and weekly limits, plus Command Code's credit pool as dollars left of the plan's monthly grant (`$52.6/$70`), read with Command Code's own login (`~/.commandcode/auth.json`) from the billing endpoints its `/usage` uses. It stays hidden until you are signed in there, Settings › Windows switches it off, and a hidden one is not fetched.
