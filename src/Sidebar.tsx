@@ -12,7 +12,10 @@ import { IconFace, forgetIcon } from "./icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { openProjectDialog } from "./OpenProject";
 import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
-import { adoptWorktrees, branchOf, loadWorktrees, openNewWorktree, removeWorktree, tileLabel } from "./worktrees";
+import { adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel } from "./worktrees";
+import { openWorktreeDialog } from "./WorktreeDialog";
+import { type CtxItem, openCtxMenu } from "./ctxmenu";
+import { folderStatus, peekStatus } from "./git";
 import { ask, flash } from "./ui";
 import { keyOf, withKey } from "./keymap";
 import { envLocked, lockEnv } from "./envlock";
@@ -88,6 +91,19 @@ export function dropProject(p: Project) {
   forgetProject(p.id);
   forgetSounds(p.id);
   removeProject(p.id);
+}
+
+/** The right-click menu of a Worktree's row: rename, go back to following its branch, start the next
+ *  feature (a copy's repos), and finish or remove it. */
+function worktreeMenu(e: MouseEvent, w: Project) {
+  const items: CtxItem[] = [
+    { label: "Rename…", run: () => openWorktreeDialog(w.id, "rename") },
+    { label: "Reset to auto", disabled: !w.title, run: () => renameWorktree(w, "") },
+    ...(w.copy ? [{ label: "Start next feature…", disabled: !folderStatus[w.id]?.length, run: () => openWorktreeDialog(w.id, "next") }] : []),
+    "sep",
+    { label: w.copy ? "Finish…" : "Remove worktree…", run: () => openWorktreeDialog(w.id, "finish") },
+  ];
+  openCtxMenu(e, items);
 }
 
 /** Rename in place: Enter or blur saves, Escape cancels. `save` gets the trimmed value, possibly empty. */
@@ -322,20 +338,31 @@ export default function Sidebar() {
                           class="wt"
                           classList={{ active: app.activeProject === w.id }}
                           style={{ "--wa": w.accent }}
-                          title={[`${branchOf(w)} · ${w.path}${w.tabs.length ? ` · ${w.tabs.length} window${w.tabs.length === 1 ? "" : "s"}` : ""}`, sigSummary(w)].filter(Boolean).join("\n")}
-                          onClick={() => setApp("activeProject", w.id)}
+                          title={[...labelOf(w).tip, w.path, `${w.tabs.length ? `${w.tabs.length} window${w.tabs.length === 1 ? "" : "s"}` : ""}`, sigSummary(w)].filter(Boolean).join("\n")}
+                          onClick={() => {
+                            setApp("activeProject", w.id);
+                            // A copy's repos are not polled like one repo's: read them as the copy is picked.
+                            if (w.copy) void peekStatus(w);
+                          }}
+                          onDblClick={() => w.parent && openWorktreeDialog(w.id, "rename")}
+                          onContextMenu={(e) => w.parent && worktreeMenu(e, w)}
                         >
-                          <span class="wtile">{w.parent ? tileLabel(w) : <Icon name="git-branch" size={12} />}</span>
+                          <span class="wtile">
+                            {w.parent ? tileLabel(w) : <Icon name="git-branch" size={12} />}
+                            <Show when={labelOf(w).mark}>
+                              {(m) => <span class={`mark ${m()}`} title={m() === "pin" ? "Pinned name" : "Repos are on different branches"}>{m() === "pin" ? <Icon name="pin" size={8} /> : "≠"}</span>}
+                            </Show>
+                          </span>
                           <Show when={ownBadge(w)}>
                             {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
                           </Show>
-                          <span class="bn">{branchOf(w)}</span>
+                          <span class="bn">{labelOf(w).text}</span>
                           <span class="count">{w.tabs.length || ""}</span>
                           <Show when={w.parent}>
                             <button
                               class="x"
                               title={w.copy ? "Finish: copy the changes back and delete the copy" : "Remove worktree"}
-                              aria-label={`${w.copy ? "Finish" : "Remove worktree"} ${branchOf(w)}`}
+                              aria-label={`${w.copy ? "Finish" : "Remove worktree"} ${labelOf(w).text}`}
                               onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}
                             >×</button>
                           </Show>

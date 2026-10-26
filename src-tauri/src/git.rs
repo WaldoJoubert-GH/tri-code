@@ -766,6 +766,18 @@ pub async fn git_branch_delete(host: String, path: String, branch: String, force
     blocking(move || exec(&host, &path, "git", &["branch", if force { "-D" } else { "-d" }, &branch], None).map(|_| ())).await
 }
 
+/// Fetch origin, then create `branch` from `origin/<base>` and switch to it in the repo at `path`.
+/// Start next feature runs this in each nested repo of a copy, so they all start from the same place.
+#[tauri::command]
+pub async fn git_switch_create(host: String, path: String, branch: String, base: String) -> Result<(), String> {
+    blocking(move || {
+        exec(&host, &path, "git", &["fetch", "--quiet", "origin"], None)?;
+        let start = format!("origin/{base}");
+        exec(&host, &path, "git", &["switch", "-c", &branch, &start], None).map(|_| ())
+    })
+    .await
+}
+
 /// Delete the branch on origin (what `gh pr merge --delete-branch` does, which fails in a worktree).
 #[tauri::command]
 pub async fn git_push_delete(host: String, path: String, branch: String) -> Result<(), String> {

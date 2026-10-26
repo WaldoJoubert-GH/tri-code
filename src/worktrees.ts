@@ -15,7 +15,7 @@ import { createStore } from "solid-js/store";
 import { type Agent, type Project, addWorktree, app, projectById, repoOf, setApp, worktreesOf } from "./state";
 import { launchAgent } from "./agents";
 import { dropProject } from "./Sidebar";
-import { gitOf } from "./git";
+import { folderStatus, gitOf, peekStatus } from "./git";
 import { ask, flash } from "./ui";
 
 /** One entry of `git worktree list`. */
@@ -104,11 +104,69 @@ export function branchOf(p: Project): string {
   return p.branch ?? gitOf(p.id).status?.branch ?? "main";
 }
 
-/** The short label of a Worktree's tile: its issue's number, else the start of its branch. */
+/** A copy's nested repos and the branch each one is on, as folderStatus last read them. */
+export function nestedBranches(p: Project): { repo: string; branch: string }[] {
+  return (folderStatus[p.id] ?? []).map((r) => ({ repo: r.repo, branch: r.status?.branch ?? "detached" }));
+}
+
+/** What the sidebar row, its tooltip, the rail tile and Finish call a Worktree. `mark` is `pin` for a
+ *  name the user chose and `split` when a copy's repos are on different branches. */
+export type Label = { text: string; mark?: "pin" | "split"; tip: string[] };
+
+/** The label rule (CONTEXT.md, Worktree): the title if one is set; a copy's repos' branch (the most
+ *  of them, a tie going to a branch that isn't the copy's first); a plain worktree's branch; a copy
+ *  with no repos in it, its folder. `branchOf` stays the git truth it is built on. */
+export function labelOf(p: Project): Label {
+  const folder = p.path.split(/[\\/]/).pop() || p.path;
+  if (!p.parent) return { text: branchOf(p), tip: [branchOf(p)] };
+  if (p.title) return { text: p.title, mark: "pin", tip: [`${p.title}  (pinned name)`, `folder: ${folder}`, `branch: ${branchOf(p)}`] };
+  if (!p.copy) return { text: branchOf(p), tip: [branchOf(p), `folder: ${folder}`] };
+  const repos = nestedBranches(p);
+  if (!repos.length) return { text: folder, tip: [folder, `folder: ${folder}`, "  no nested repos: nothing to follow"] };
+  const n = new Map<string, number>();
+  for (const r of repos) n.set(r.branch, (n.get(r.branch) ?? 0) + 1);
+  const text = [...n].sort(([a, x], [b, y]) => y - x || Number(a === p.branch) - Number(b === p.branch))[0][0];
+  const split = n.size > 1;
+  return {
+    text,
+    mark: split ? "split" : undefined,
+    tip: [text, `folder: ${folder}`, ...repos.map((r) => `  ${r.repo}: ${r.branch}`)],
+  };
+}
+
+/** The short label of a Worktree's tile: its issue's number while the label still carries it, else the
+ *  start of the label. A pinned name is never the issue's, so it gets its letters. */
 export function tileLabel(p: Project): string {
+  const text = labelOf(p).text;
   const n = p.issue?.match(/-(\d+)$/)?.[1];
-  if (n) return n.length > 3 ? n.slice(-3) : n;
-  return (p.branch ?? "").split("/").pop()!.slice(0, 2) || "?";
+  if (n && !p.title && text.includes(n)) return n.length > 3 ? n.slice(-3) : n;
+  return text.split("/").pop()!.slice(0, 2) || "?";
+}
+
+/** Set a Worktree's name; empty goes back to following the branch. */
+export function renameWorktree(p: Project, title: string): void {
+  setApp("projects", (q) => q.id === p.id, "title", title.trim() || undefined);
+}
+
+/** Start next feature: create `branch` from each nested repo's default branch on origin, in every
+ *  repo that is clean. A repo with uncommitted changes is skipped and named, never stashed. The
+ *  pinned name is cleared, since the work it named is over. */
+export async function startNextFeature(p: Project, branch: string): Promise<void> {
+  const status = folderStatus[p.id] ?? [];
+  if (!status.length) return flash("no nested repos to switch");
+  const dirty = status.filter((r) => (r.status?.files.length ?? 0) > 0).map((r) => r.repo);
+  const made: string[] = [];
+  for (const r of status.filter((r) => !dirty.includes(r.repo))) {
+    try {
+      await invoke("git_switch_create", { host: p.host, path: join(p.path, r.repo), branch, base: r.status?.base || "main" });
+      made.push(r.repo);
+    } catch (e) {
+      flash(`${r.repo}: git switch -c ${branch}: ${e}`);
+    }
+  }
+  renameWorktree(p, "");
+  await peekStatus(p, true);
+  flash([`${branch} in ${made.join(", ") || "no repo"}`, dirty.length ? `${dirty.join(", ")} has uncommitted changes, so it stayed` : ""].filter(Boolean).join(" · "));
 }
 
 /** A branch name from free text: lowercase, words joined by `-`, `/` kept for prefixes. */
@@ -218,7 +276,10 @@ const listed8 = (files: string[]) => files.slice(0, 8).map((f) => `\n  ${f}`).jo
  *  both sides), remove the nested repos' worktrees, delete the copy. */
 async function finishCopy(p: Project, repo: Project): Promise<void> {
   const repos = p.copy?.repos ?? [];
-  const branch = p.branch ?? "";
+  const title = labelOf(p).text;
+  // Each nested repo's current branch and the copy's first one: both go, where merged.
+  const now = nestedBranches(p);
+  const branches = [...new Set([...now.map((r) => r.branch), p.branch ?? ""])].filter((b) => b && b !== "detached");
   const dirty: string[] = [];
   for (const r of repos) {
     const n = await invoke<{ files: unknown[] }>("git_status", { host: p.host, path: join(p.path, r) }).then((s) => s.files.length, () => 0);
@@ -235,11 +296,11 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
     p.tabs.length ? `close its ${p.tabs.length} window${p.tabs.length > 1 ? "s" : ""}` : "",
     ch.changed.length ? `copy ${ch.changed.length} file${ch.changed.length > 1 ? "s" : ""} back to ${repo.name}:${listed8(ch.changed)}\n` : "",
     ch.deleted.length ? `delete ${ch.deleted.length} file${ch.deleted.length > 1 ? "s" : ""} the copy deleted:${listed8(ch.deleted)}\n` : "",
-    repos.length ? `remove the worktrees of ${repos.join(", ")} (branch ${branch} stays where it isn't merged)` : "",
+    repos.length ? `remove the worktrees of ${repos.join(", ")} and delete branches ${branches.join(", ")} where merged` : "",
     dirty.length ? `throw away uncommitted changes in ${dirty.join(", ")}` : "",
     `delete ${p.path}`,
   ].filter(Boolean).join("; ");
-  if (!await ask(`Finish ${branch}? This will ${what}.`)) return;
+  if (!await ask(`Finish ${title}? This will ${what}.`)) return;
   // Changed on both sides: no git to merge them, so one side wins.
   const theirs = ch.conflicts.length && await ask(
     `${ch.conflicts.length} file${ch.conflicts.length > 1 ? "s" : ""} changed in ${repo.name} too since the copy was made:${listed8(ch.conflicts)}\n\nOK keeps the copy's version. Cancel keeps ${repo.name}'s.`,
@@ -252,15 +313,19 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
   for (const r of repos) {
     const path = join(repo.path, r);
     await invoke("git_worktree_remove", { host: repo.host, path, dir: join(p.path, r), force: true }).catch((e) => flash(`${r}: git worktree remove: ${e}`));
-    await invoke("git_branch_delete", { host: repo.host, path, branch, force: false }).catch(() => kept.push(r));
+    // This repo's current branch and the copy's first one (once, when they are the same).
+    const own = [...new Set([now.find((n) => n.repo === r)?.branch, p.branch])].filter((b): b is string => !!b && b !== "detached");
+    for (const branch of own) {
+      await invoke("git_branch_delete", { host: repo.host, path, branch, force: false }).catch(() => kept.push(`${branch} in ${r}`));
+    }
   }
   try {
     await invoke("folder_finish", { host: repo.host, src: repo.path, dest: p.path, files: [...ch.changed, ...theirs], delete: ch.deleted });
   } catch (e) {
-    return flash(`finishing ${branch}: ${e}. ${p.path} is still there.`);
+    return flash(`finishing ${title}: ${e}. ${p.path} is still there.`);
   }
   const back = ch.changed.length + theirs.length + ch.deleted.length;
-  flash([`finished ${branch}`, back ? `${back} file${back > 1 ? "s" : ""} back in ${repo.name}` : "", kept.length ? `${branch} kept in ${kept.join(", ")} (not merged)` : ""].filter(Boolean).join(" · "));
+  flash([`finished ${title}`, back ? `${back} file${back > 1 ? "s" : ""} back in ${repo.name}` : "", kept.length ? `kept ${kept.join(", ")} (not merged)` : ""].filter(Boolean).join(" · "));
 }
 
 /** Close a Worktree's windows, delete its folder and, if it is merged or you agree, its branch.

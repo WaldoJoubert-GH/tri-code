@@ -208,6 +208,9 @@ export type Project = {
   branch?: string;
   /** A Worktree only: the Slug-ID of the issue it was made for, if any. */
   issue?: string;
+  /** A Worktree only: a name the user chose for it, which the sidebar shows instead of the branch
+   *  (a label only: the folder and branches keep their names). Unset follows the branch (labelOf). */
+  title?: string;
   /** A Worktree of a folder that is not a git repo: a copy of the folder. `repos` are the repos
    *  nested in it, each added back as a git worktree on `branch` (see worktrees.ts). */
   copy?: { repos: string[] };
@@ -998,7 +1001,7 @@ function migrate(raw: any): Persisted {
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
       favs: p.favs ?? [], diffMode: p.diffMode, icon: p.icon, notify: p.notify, profile: p.profile,
-      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.copy ? { copy: p.copy } : {}) } : {}),
+      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.title ? { title: p.title } : {}), ...(p.copy ? { copy: p.copy } : {}) } : {}),
       ...(p.sample ? { sample: true } : {}),
     };
   });
