@@ -2,6 +2,13 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.39 — 2026-10-26
+
+- Agents can open and drive their project's windows. A small MCP server bundled with tri-code gives them `open_window`, `list_windows`, `status`, `read`, `send`, `wait_for` and `close_window`, so an agent can start a command, read its terminal, type into it and wait for it to finish. Settings › Agents shows whether it's installed and installs or removes it in Claude's and pi's own configs; a banner offers setup once per local project. An agent opens only Commands with the new Agent toggle on in the Commands window, sees only its own project's windows, and closes only the ones it opened. ([#28](https://github.com/WaldoJoubert-GH/tri-code/pull/28))
+- A worktree can be given a name, shown as a pinned title with a badge, from a dialog opened by double-click or the right-click menu. Without one its label follows the branch; for a Folder Copy it follows the branch its nested repos are on, marked ≠ when they differ. ([#27](https://github.com/WaldoJoubert-GH/tri-code/pull/27))
+- Start next feature creates a branch from `origin/<default>` in each clean nested repo. Repos with uncommitted changes are skipped and named, never stashed.
+- Finish also deletes each nested repo's current branch, not only the copy's first one, where it's merged. Unmerged branches are kept.
+
 ## 0.1.38 — 2026-10-26
 
 - The ✦ drafts (commit message, pull request and review) run a command you set for each kind in Settings › Git, instead of always `claude -p`. Unset keeps `claude -p`. The examples there show each Claude command with the same model through pi (`pi -p --model commandcode/… --no-tools --no-session`). A command reads the prompt on stdin and its output is the draft; it runs in the project folder on the project's host, through the login shell, as an agent's command does. ([#26](https://github.com/WaldoJoubert-GH/tri-code/issues/26))
