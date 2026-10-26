@@ -37,6 +37,8 @@ export type Agent = {
   scope?: Scope;
   /** Signal sounds of its own (a built-in name or "off"); a missing one plays the project's. */
   sounds?: Partial<Record<SoundEvent, string>>;
+  /** Agents in its project's terminals may open it as a window (the Agent toggle; agentwin.ts). Terminal Commands only. */
+  agentRun?: boolean;
 };
 
 /** A Browser Profile: a name, an avatar and a colour over its own cookies, logins, history,
@@ -106,6 +108,8 @@ export type Tab = {
   agent?: string;
   /** `term` and browser tabs: the agent's name at launch, shown once the agent is deleted. */
   name?: string;
+  /** `term` tabs an agent opened (agent windows, agentwin.ts): it can close them, and they are marked in the Tab Strip. */
+  by?: "agent";
   /** `term` tabs only: the command it runs ("" = login shell). Kept from launch, so editing an agent only changes new windows. */
   cmd?: string;
   /** `term` tabs with a multi-line `cmd`: its lines were typed into the shell, so a restart or reattach doesn't type them again. */
@@ -262,6 +266,9 @@ type Persisted = {
   toured: boolean;
   /** App-wide settings (the Settings button at the foot of the sidebar). */
   settings: Settings;
+  /** The answer to "install agent windows for this agent?" (agentsetup.ts): `installed`, or `never`
+   *  for Don't ask again. Unset: not asked yet, or removed since. */
+  agentSetup?: Partial<Record<"claude" | "pi", "installed" | "never">>;
 };
 
 export type Settings = {
@@ -493,7 +500,7 @@ export function removeProject(id: string) {
 }
 
 /** Add a window on the active workspace and focus it. `after` inserts it right after that tab. */
-export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string; agent?: Agent } = {}) {
+export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string; agent?: Agent; by?: "agent" } = {}) {
   const id = newId();
   edit(projectId, (p) => {
     const a = opts.agent;
@@ -501,7 +508,7 @@ export function addTab(projectId: string, kind: TabKind, opts: { url?: string; p
       id, kind, space: p.ws,
       ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}), ...(a?.profile ? { profile: a.profile } : {}) } : {}),
       ...(kind === "editor" && opts.path ? { path: opts.path, files: [opts.path] } : {}),
-      ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "" } : {}),
+      ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "", ...(opts.by ? { by: opts.by } : {}) } : {}),
     };
     const i = opts.after ? p.tabs.findIndex((t) => t.id === opts.after) : -1;
     if (i >= 0) p.tabs.splice(i + 1, 0, tab);
@@ -838,6 +845,13 @@ export function setDiffDefault(mode: DiffMode) {
   setApp(produce((s) => {
     s.settings.diffMode = mode;
     for (const p of s.projects) delete p.diffMode;
+  }));
+}
+
+/** Remembers an agent's answer to the setup question (undefined forgets it, so it is asked again). */
+export function setAgentSetup(agent: "claude" | "pi", answer: "installed" | "never" | undefined) {
+  setApp(produce((s) => {
+    s.agentSetup = { ...s.agentSetup, [agent]: answer };
   }));
 }
 

@@ -26,7 +26,7 @@ base64 = "0.22"
 sha2 = "0.10"
 # Remote Control (phone.rs): the phone page's server, and Web Push (push.rs).
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "ws"] }
-tokio = { version = "1", features = ["macros", "net", "sync"] }
+tokio = { version = "1", features = ["macros", "net", "sync", "time"] }
 p256 = { version = "0.13", features = ["ecdh", "ecdsa"] }
 hmac = "0.12"
 aes-gcm = "0.10"

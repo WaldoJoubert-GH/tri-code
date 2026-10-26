@@ -230,6 +230,8 @@ svg.lucide { flex: none; display: block; }
 .tabs .tab .sg.s-working { width: 8px; height: 8px; }
 /* A minimised window: still listed, dimmed, until a click brings it back. A signal keeps it readable. */
 .tabs .tab.min { opacity: .5; font-style: italic; }
+/* A window an agent opened: an accent rule under its tab. */
+.tabs .tab.by-agent { box-shadow: inset 0 -2px var(--accent); }
 .tabs .tab.min:hover, .tabs .tab.min:has(.sg:not(.s-working)) { opacity: 1; }
 .tabs .tab-add { justify-content: center; width: 30px; padding: 0; font-size: 15px; }
 .top .tool { padding: 0 10px; color: var(--muted); white-space: nowrap; flex: none; }

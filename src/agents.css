@@ -17,8 +17,11 @@
 
 .ag-row {
   display: grid; align-items: start; column-gap: 6px;
-  grid-template-columns: 16px 32px minmax(80px, 1fr) minmax(180px, 2.6fr) 124px 32px 120px 76px;
+  grid-template-columns: 16px 32px minmax(80px, 1fr) minmax(180px, 2.6fr) 124px 32px 120px 74px 76px;
 }
+/* The Agent toggle: whether agents in the project's terminals may open this command as a window. */
+.ag-agent { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--muted); font-size: 11.5px; cursor: pointer; }
+.ag-agent.on { color: var(--accent); border-color: var(--accent); }
 .ag-row > * { min-height: 28px; }
 .ag-th { align-items: center; }
 .ag-th > * { min-height: 0; }
