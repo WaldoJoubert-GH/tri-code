@@ -141,6 +141,7 @@ pub fn run() {
             git::git_worktree_add,
             git::git_worktree_remove,
             git::git_branch_delete,
+            git::git_switch_create,
             git::git_push_delete,
             git::git_draft,
             git::project_files,

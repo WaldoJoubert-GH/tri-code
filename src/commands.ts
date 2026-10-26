@@ -19,7 +19,7 @@ import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { openGitPanel } from "./git";
-import { branchOf, openNewWorktree, removeWorktree } from "./worktrees";
+import { labelOf, openNewWorktree, removeWorktree } from "./worktrees";
 import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgentsPanel } from "./agents";
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
 import { startTour } from "./Tour";
@@ -165,7 +165,7 @@ export function commands(): Command[] {
 
     add({ id: "new-worktree", group: "Project", title: "New worktree", hint: "another checkout of the repo, on its own branch", icon: "git-branch-plus", keys: capsOf("new-worktree"), run: () => openNewWorktree(p) });
     if (p.parent) add({
-      id: "remove-worktree", group: "Project", title: `${p.copy ? "Finish" : "Remove worktree"} ${branchOf(p)}`,
+      id: "remove-worktree", group: "Project", title: `${p.copy ? "Finish" : "Remove worktree"} ${labelOf(p).text}`,
       hint: p.copy ? "copy the changes back, delete the copy" : p.path, icon: "trash-2", run: () => void removeWorktree(p),
     });
     add({ id: "appearance", group: "Project", title: "Appearance", hint: "name, icon, accent, background", icon: "palette", keys: capsOf("appearance"), run: () => toggleAppearance() });

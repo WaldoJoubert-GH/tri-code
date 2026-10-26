@@ -19,6 +19,7 @@ import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
 import { NewWorktreeDialog } from "./NewWorktree";
+import { WorktreeDialog } from "./WorktreeDialog";
 import { newWorktreeOpen } from "./worktrees";
 import { loadIcons } from "./icons";
 import { installHotkeys } from "./hotkeys";
@@ -154,6 +155,7 @@ export default function App() {
       <Palette />
       <OpenProjectDialog />
       <NewWorktreeDialog />
+      <WorktreeDialog />
       <AboutDialog />
       <SignalsPopover />
       <FeedbackPopover />
