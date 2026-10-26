@@ -26,6 +26,9 @@
       "icons/icon.ico"
     ],
     "createUpdaterArtifacts": true,
+    "resources": {
+      "../mcp/tri-code.mjs": "mcp/tri-code.mjs"
+    },
     "macOS": {
       "signingIdentity": "-"
     }

@@ -9,11 +9,13 @@ import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./RemoteSettings";
 import { BrowserPage } from "./profiles";
+import { AgentsPage } from "./AgentSettings";
 
-export type SettingsPage = "windows" | "files" | "git" | "browser" | "remote" | "hotkeys";
+export type SettingsPage = "windows" | "agents" | "files" | "git" | "browser" | "remote" | "hotkeys";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "windows", name: "Windows", icon: "layout-panel-left" },
+  { page: "agents", name: "Agents", icon: "bot" },
   { page: "files", name: "Files", icon: "folder-search" },
   { page: "git", name: "Git", icon: "git-branch" },
   { page: "browser", name: "Browser", icon: "globe" },
@@ -259,6 +261,7 @@ export function SettingsDialog() {
             </nav>
             <section class="settings-page">
               <Show when={p() === "windows"}><WindowsPage /></Show>
+              <Show when={p() === "agents"}><AgentsPage /></Show>
               <Show when={p() === "files"}><FilesPage /></Show>
               <Show when={p() === "git"}><GitPage /></Show>
               <Show when={p() === "browser"}><BrowserPage /></Show>

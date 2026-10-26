@@ -13,6 +13,9 @@ import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import { CtxMenu, ctxMenuOpen } from "./ctxmenu";
 import ClaudeUsage, { CommandCodeUsage } from "./Usage";
 import { SettingsDialog, hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./Settings";
+import { startAgentWindows } from "./agentwin";
+import { startAgentSetup } from "./agentsetup";
+import { SetupBanner } from "./SetupBanner";
 import { phoneStatus, startPhoneSync } from "./phone";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
@@ -75,6 +78,8 @@ export default function App() {
   });
   persistChanges(ready);
   createEffect(on(ready, (r) => r && startPhoneSync(), { defer: true }));
+  createEffect(on(ready, (r) => r && startAgentWindows(), { defer: true }));
+  createEffect(on(ready, (r) => r && startAgentSetup(), { defer: true }));
 
   // Start a session for every terminal tab once, including tabs added later.
   const started = new Set<string>();
@@ -134,6 +139,7 @@ export default function App() {
         <Show when={activeProject()} keyed fallback={<div class="empty">{withKey("Open a project", "open-project")} to get started.</div>}>
           {(p) => <Show when={!envLocked(p.host)} fallback={<PinPad host={p.host} />}><Canvas project={p} /></Show>}
         </Show>
+        <SetupBanner />
         <Show when={toast()}>
           {(t) => (
             <div class="toast">

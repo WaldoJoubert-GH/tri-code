@@ -1,0 +1,24 @@
+/* The setup banner: one strip over the top of the active project, dismissible, not blocking. */
+.setup-banner {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6;
+  width: min(580px, calc(100% - 32px)); display: grid; gap: 10px;
+  padding: 12px 14px; border-radius: 10px;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--accent); box-shadow: var(--shadow);
+}
+.setup-banner p { margin: 0; font-size: 13.5px; line-height: 1.5; }
+.setup-banner .sb-warn { color: var(--warn); }
+.setup-banner .sb-err { color: var(--bad); font-family: var(--mono); font-size: 12px; }
+.sb-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.sb-btn { font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+.sb-btn:hover { background: var(--hover); }
+.sb-btn:disabled { opacity: .55; cursor: default; }
+.sb-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 500; }
+.sb-btn.quiet { border-color: transparent; background: none; color: var(--muted); }
+.sb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Settings › Agents: one row per agent, with its state and the action that fits it. */
+.ag-state { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.ag-state.ok { color: var(--ok); }
+.ag-state.warn { color: var(--warn); }
+.ag-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }

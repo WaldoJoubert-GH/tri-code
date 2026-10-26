@@ -145,7 +145,7 @@ export function TabStrip(props: { project: Project }) {
         {(t) => (
           <button
             class="tab"
-            classList={{ min: !!t.min }}
+            classList={{ min: !!t.min, "by-agent": t.by === "agent" }}
             aria-pressed={!t.min && space(props.project).focus === t.id}
             title={`${tabName(t)}${hint(t) ? " · " + hint(t) : ""}${sigOf(t) ? " · " + SIG_TEXT[sigOf(t)!] : ""}${t.min ? " · minimised, click to bring back" : ""}`}
             onClick={() => focusTab(props.project.id, t.id)}

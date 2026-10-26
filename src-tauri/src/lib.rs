@@ -1,3 +1,5 @@
+mod agent_setup;
+mod agent_windows;
 mod bg;
 mod browser;
 mod devfs;
@@ -74,6 +76,9 @@ pub fn run() {
         .manage(Arc::new(pty::Ptys::default()))
         .setup(|app| {
             let ptys = Arc::clone(app.state::<Arc<pty::Ptys>>().inner());
+            let hub = agent_windows::AgentWindows::new(app.handle().clone(), Arc::clone(&ptys));
+            agent_windows::serve(Arc::clone(&hub));
+            app.manage(hub);
             app.manage(phone::Phone::new(app.handle().clone(), ptys));
             // The main window is built here rather than in tauri.conf.json: browser
             // panes are child webviews, and a plain Window with an auto-resizing
@@ -100,6 +105,11 @@ pub fn run() {
             pty::pty_kill,
             pty::pty_kill_all,
             pty::remote_kill_session,
+            agent_windows::agent_allowed,
+            agent_windows::agent_open_failed,
+            agent_setup::agent_setup_status,
+            agent_setup::agent_setup_install,
+            agent_setup::agent_setup_remove,
             dirs::list_dirs,
             folders::folder_repos,
             folders::folder_copy,

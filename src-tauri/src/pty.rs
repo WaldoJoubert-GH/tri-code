@@ -14,6 +14,7 @@ use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_s
 use tauri::ipc::{Channel, InvokeResponseBody};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
+use crate::agent_windows::{self, AgentWindows, Owner};
 use crate::envssh;
 use crate::spawn::{self, SpawnSpec};
 
@@ -32,11 +33,14 @@ const SCROLLBACK: usize = 256 * 1024;
 #[derive(Default)]
 struct Tap {
     recent: VecDeque<u8>,
+    /// Bytes written since the session began, so a wait can tell new output from old.
+    total: u64,
     watchers: Vec<UnboundedSender<Vec<u8>>>,
 }
 
 impl Tap {
     fn push(&mut self, bytes: &[u8]) {
+        self.total += bytes.len() as u64;
         self.recent.extend(bytes);
         let over = self.recent.len().saturating_sub(SCROLLBACK);
         self.recent.drain(..over);
@@ -77,6 +81,13 @@ impl Ptys {
         Ok((tap.recent.iter().copied().collect(), rx))
     }
 
+    /// The recent output and the total bytes so far (agent windows read and wait on these).
+    pub fn snapshot(&self, id: u32) -> Result<(Vec<u8>, u64), String> {
+        let session = self.get(id)?;
+        let tap = session.tap.lock().unwrap();
+        Ok((tap.recent.iter().copied().collect(), tap.total))
+    }
+
     pub fn write(&self, id: u32, data: &[u8]) -> Result<(), String> {
         let session = self.get(id)?;
         let mut w = session.writer.lock().unwrap();
@@ -97,11 +108,36 @@ fn size(cols: u16, rows: u16) -> PtySize {
 #[tauri::command]
 pub async fn pty_spawn(
     state: tauri::State<'_, Arc<Ptys>>,
+    hub: tauri::State<'_, Arc<AgentWindows>>,
     spec: SpawnSpec,
     cols: u16,
     rows: u16,
     on_data: Channel<InvokeResponseBody>,
     on_exit: Channel<i32>,
+    owner: Option<Owner>,
+) -> Result<u32, String> {
+    // The token goes in the terminal's environment; the window is registered once the process
+    // has started, and an open that waits on this spawn is answered either way.
+    let token = owner.as_ref().map(|_| agent_windows::new_token());
+    let result = spawn_session(state.inner(), hub.inner(), spec, cols, rows, on_data, on_exit, owner.as_ref(), token.as_deref());
+    if let Some(o) = &owner
+        && let Some(req) = &o.req
+    {
+        hub.resolve(req, result.clone().map(|_| o.tab.clone()));
+    }
+    result
+}
+
+fn spawn_session(
+    state: &Arc<Ptys>,
+    hub: &Arc<AgentWindows>,
+    spec: SpawnSpec,
+    cols: u16,
+    rows: u16,
+    on_data: Channel<InvokeResponseBody>,
+    on_exit: Channel<i32>,
+    owner: Option<&Owner>,
+    token: Option<&str>,
 ) -> Result<u32, String> {
     if let Some(host) = spec.host.as_deref().filter(|h| !matches!(*h, "" | "local")) {
         envssh::check(host)?;
@@ -124,6 +160,10 @@ pub async fn pty_spawn(
     }
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
+    if let Some(t) = token {
+        cmd.env("TRICODE_TOKEN", t);
+        cmd.env("TRICODE_URL", agent_windows::URL);
+    }
 
     let mut child = pair
         .slave
@@ -144,6 +184,9 @@ pub async fn pty_spawn(
     });
     let tap = Arc::clone(&session.tap);
     state.sessions.lock().unwrap().insert(id, session);
+    if let (Some(o), Some(t)) = (owner, token) {
+        hub.issue(o, id, t.to_string());
+    }
 
     let reader_thread = std::thread::spawn(move || {
         let mut buf = vec![0u8; 64 * 1024];
@@ -162,7 +205,9 @@ pub async fn pty_spawn(
         tap.lock().unwrap().watchers.clear();
     });
 
-    let ptys = Arc::clone(state.inner());
+    let ptys = Arc::clone(state);
+    let hub = Arc::clone(hub);
+    let tab = owner.map(|o| o.tab.clone());
     std::thread::spawn(move || {
         let code = child.wait().map(|s| s.exit_code() as i32).unwrap_or(-1);
         // Dropping the master closes the PTY; on Windows (ConPTY) that is what
@@ -170,6 +215,9 @@ pub async fn pty_spawn(
         // Bind first so the guard is released before the PTY is closed.
         let removed = ptys.sessions.lock().unwrap().remove(&id);
         drop(removed);
+        if let Some(tab) = &tab {
+            hub.forget(tab, id);
+        }
         let _ = reader_thread.join();
         let _ = on_exit.send(code);
     });

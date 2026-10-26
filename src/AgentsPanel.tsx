@@ -392,7 +392,7 @@ export default function AgentsPanel(props: { project: Project }) {
           </Show>
         </div>
         <div class="ag-row ag-th">
-          <span /><span>Icon</span><span>Name</span><span>Command or URL</span><span>Scope</span><span class="ag-th-icon" title="Signal sounds"><Icon name="bell" size={12} /></span><span>Hotkey</span><span />
+          <span /><span>Icon</span><span>Name</span><span>Command or URL</span><span>Scope</span><span class="ag-th-icon" title="Signal sounds"><Icon name="bell" size={12} /></span><span>Hotkey</span><span title="Whether agents may open it as a window">Agent</span><span />
         </div>
         <For each={shown()}>
           {(a) => (
@@ -470,6 +470,17 @@ export default function AgentsPanel(props: { project: Project }) {
                   <SoundButton agent={a} project={props.project} onOpen={(el) => toggle("sound", a.id, el)} />
                 </Show>
                 <HotkeyField agent={a} />
+                <Show when={!isWebApp(a)} fallback={<span />}>
+                  <button
+                    class="ag-agent"
+                    classList={{ on: !!a.agentRun }}
+                    title={a.agentRun ? `Agents may open this in a window of their project · click to stop` : "Agents may not open this · click to allow"}
+                    onClick={() => updateAgent(a.id, { agentRun: !a.agentRun })}
+                  >
+                    <Icon name="bot" size={12} />
+                    <span>{a.agentRun ? "agent" : "off"}</span>
+                  </button>
+                </Show>
                 <span class="ag-ops">
                   <button title={`Open ${a.name || "one"} in ${props.project.name}`} onClick={() => launchAgent(props.project, a)}>
                     <Icon name="play" size={13} />

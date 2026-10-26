@@ -4,6 +4,7 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { takeAgentReq } from "./agentwin";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -303,6 +304,14 @@ class TermSession {
         rows,
         onData,
         onExit,
+        // Whose window this is: the agent endpoint scopes what a terminal's agent can see by it.
+        owner: {
+          project: this.project.id,
+          tab: this.tab.id,
+          name: this.tab.name ?? "shell",
+          by: this.tab.by ?? null,
+          req: takeAgentReq(this.tab.id) ?? null,
+        },
       });
       if (this.disposed) return void call("pty_kill", { id: this.ptyId });
       this.update({ pty: this.ptyId });
