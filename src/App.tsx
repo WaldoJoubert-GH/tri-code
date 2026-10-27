@@ -4,7 +4,7 @@ import {
   SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
   persistChanges, repoOf, setLayout, space, tabName,
 } from "./state";
-import { SIG_TEXT, nextSignal, sigOf, topSig } from "./signals";
+import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
 import Canvas from "./Canvas";
@@ -100,6 +100,9 @@ export default function App() {
     document.documentElement.style.setProperty("--accent-raw", activeProject()?.accent ?? "#7aa2f7");
   });
 
+  // Signal colours changed in Settings → Signals override the theme's --state-* tokens.
+  createEffect(() => applySignalColors());
+
   // Git colours changed in Settings → Git override the theme's --git-* tokens.
   createEffect(() => {
     const st = document.documentElement.style, c = app.settings.gitColors ?? {};
@@ -186,7 +189,7 @@ function Toolbar() {
               <For each={Array.from({ length: SPACES }, (_, i) => i)}>
                 {(i) => {
                   const inWs = () => p.tabs.filter((t) => t.space === i);
-                  const sig = () => (i === p.ws ? null : topSig(inWs()));
+                  const sig = () => (i === p.ws ? null : topSig(inWs(), true));
                   return (
                     <button
                       data-ws={i}

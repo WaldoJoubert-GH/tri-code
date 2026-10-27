@@ -39,9 +39,20 @@ export function topSig(tabs: Tab[], withWorking = false): Sig | null {
   return best;
 }
 
-/** One line per window that needs you, for a project's tooltip. */
+/** One line per window with a signal, for a project's tooltip. */
 export const sigSummary = (p: Project) =>
-  p.tabs.filter((t) => sigOf(t) && sigOf(t) !== "working").map((t) => `${tabName(t)}: ${SIG_TEXT[sigOf(t)!]}`).join("\n");
+  p.tabs.filter((t) => sigOf(t)).map((t) => `${tabName(t)}: ${SIG_TEXT[sigOf(t)!]}`).join("\n");
+
+const STATES: AgentState[] = ["working", "blocked", "done", "error"];
+
+/** Signal colours changed in Settings › Signals override the theme's --state-* tokens on <html>. */
+export function applySignalColors() {
+  const st = document.documentElement.style, c = app.settings.signalColors ?? {};
+  for (const s of STATES) {
+    if (c[s]) st.setProperty(`--state-${s}`, c[s]!);
+    else st.removeProperty(`--state-${s}`);
+  }
+}
 
 /** Built-in sounds, synthesized so the app ships no audio files: [frequency Hz, start s, length s]. */
 export const SOUNDS: Record<string, { name: string; notes: [number, number, number][]; type?: OscillatorType }> = {

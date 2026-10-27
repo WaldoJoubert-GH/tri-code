@@ -2,8 +2,9 @@
 // sidebar opens it on the page used last; the toolbar's ? button and the "help" hotkey open the
 // Hotkeys page. Chosen from design/settings-hotkeys.html.
 
-import { For, Show, createSignal } from "solid-js";
-import { DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setDraftCommand, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSkipFolders, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { For, Show, batch, createSignal } from "solid-js";
+import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setDraftCommand, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSignalColor, setSkipFolders, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
 import { HotkeysPage } from "./HotkeySettings";
@@ -11,13 +12,14 @@ import { RemotePage } from "./RemoteSettings";
 import { BrowserPage } from "./profiles";
 import { AgentsPage } from "./AgentSettings";
 
-export type SettingsPage = "windows" | "agents" | "files" | "git" | "browser" | "remote" | "hotkeys";
+export type SettingsPage = "windows" | "agents" | "files" | "git" | "signals" | "browser" | "remote" | "hotkeys";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "windows", name: "Windows", icon: "layout-panel-left" },
   { page: "agents", name: "Agents", icon: "bot" },
   { page: "files", name: "Files", icon: "folder-search" },
   { page: "git", name: "Git", icon: "git-branch" },
+  { page: "signals", name: "Signals", icon: "bell" },
   { page: "browser", name: "Browser", icon: "globe" },
   { page: "remote", name: "Remote", icon: "smartphone" },
   { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
@@ -98,6 +100,49 @@ const GIT_COLORS: { key: GitColor; name: string; letter: string; cls: string }[]
 function themeColor(key: GitColor) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(`--git-${key}`).trim();
   return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888";
+}
+
+const SIGNAL_COLORS: { key: AgentState; name: string }[] = [
+  { key: "working", name: "Working" },
+  { key: "blocked", name: "Needs you" },
+  { key: "done", name: "Done" },
+  { key: "error", name: "Error" },
+];
+
+/** The theme's colour for a --state-* token, as #rrggbb for the colour input. */
+function signalThemeColor(key: AgentState) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(`--state-${key}`).trim();
+  return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888";
+}
+
+function SignalsPage() {
+  // Applied at once, so the picker reads the theme's colour again straight after a reset.
+  const pick = (key: AgentState, color: string | undefined) =>
+    batch(() => {
+      setSignalColor(key, color);
+      applySignalColors();
+    });
+  return (
+    <>
+      <h4>Colours</h4>
+      <For each={SIGNAL_COLORS}>
+        {(s) => (
+          <label class={`row signal-color s-${s.key}`}>
+            <span class={`sg s-${s.key}`} />
+            {s.name}
+            <input
+              type="color"
+              aria-label={`${s.name} colour`}
+              value={app.settings.signalColors?.[s.key] ?? signalThemeColor(s.key)}
+              onInput={(e) => pick(s.key, e.currentTarget.value)}
+            />
+            <button type="button" class="reset" title="Back to the theme's colour" disabled={!app.settings.signalColors?.[s.key]} onClick={() => pick(s.key, undefined)}>↺</button>
+          </label>
+        )}
+      </For>
+      <p class="note">Used by the project and workspace badges, the tabs, the status line, window borders and the agent chip. Working is blue; the others follow the theme. A colour you pick is kept in light and dark; ↺ goes back to the theme's.</p>
+    </>
+  );
 }
 
 /** The three Draft Commands. Each example is a Claude Code command and the same model through pi. */
@@ -264,6 +309,7 @@ export function SettingsDialog() {
               <Show when={p() === "agents"}><AgentsPage /></Show>
               <Show when={p() === "files"}><FilesPage /></Show>
               <Show when={p() === "git"}><GitPage /></Show>
+              <Show when={p() === "signals"}><SignalsPage /></Show>
               <Show when={p() === "browser"}><BrowserPage /></Show>
               <Show when={p() === "remote"}><RemotePage /></Show>
               <Show when={p() === "hotkeys"}><HotkeysPage /></Show>

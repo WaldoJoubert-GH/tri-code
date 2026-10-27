@@ -290,6 +290,8 @@ export type Settings = {
   gitColors?: Partial<Record<GitColor, string>>;
   /** How strongly diff lines are tinted, %. Unset is GIT_TINT. */
   gitTint?: number;
+  /** Agent signal colours that were changed (Settings › Signals); the rest follow the theme (--state-* in styles.css). */
+  signalColors?: Partial<Record<AgentState, string>>;
   /** The agent New worktree opens in the new checkout, by id; "" opens nothing. Unset is worktreeAgent's default. */
   worktreeAgent?: string;
   /** The shell command each ✦ Draft runs, by kind (Settings › Git): it reads the prompt on stdin and
@@ -653,6 +655,16 @@ export function setGitColor(key: GitColor, color: string | undefined) {
     if (color) c[key] = color;
     else delete c[key];
     if (!Object.keys(c).length) delete s.settings.gitColors;
+  }));
+}
+
+/** One signal colour, or undefined to follow the theme again. */
+export function setSignalColor(key: AgentState, color: string | undefined) {
+  setApp(produce((s) => {
+    const c = (s.settings.signalColors ??= {});
+    if (color) c[key] = color;
+    else delete c[key];
+    if (!Object.keys(c).length) delete s.settings.signalColors;
   }));
 }
 

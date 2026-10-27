@@ -144,14 +144,15 @@ export default function Sidebar() {
   onCleanup(() => clearTimeout(timer));
 
   /** The loudest signal among another project's windows, and how many windows share it. A repo
-   *  with Worktrees counts the windows of every checkout but the one you are in. */
+   *  with Worktrees counts the windows of every checkout but the one you are in. `working` counts
+   *  too, so a project whose agents are only working shows a spinner. */
   const badge = (p: Project) => {
     const tabs = [p, ...worktreesOf(p.id)].filter((x) => x.id !== app.activeProject).flatMap((x) => x.tabs);
-    const s = topSig(tabs);
+    const s = topSig(tabs, true);
     return s ? { s, n: tabs.filter((t) => sigOf(t) === s).length } : null;
   };
   const ownBadge = (p: Project) => {
-    const s = app.activeProject === p.id ? null : topSig(p.tabs);
+    const s = app.activeProject === p.id ? null : topSig(p.tabs, true);
     return s ? { s, n: p.tabs.filter((t) => sigOf(t) === s).length } : null;
   };
   /** The repo project or one of its Worktrees is the active project. */

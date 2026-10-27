@@ -13,6 +13,11 @@
   --warn: #9a6400;
   --ok: #3d7a1c;
   --bad: #c4314b;
+  /* agent signals (signals.ts, Settings › Signals): working is blue; the rest follow the theme */
+  --state-working: #2f6fdf;
+  --state-blocked: var(--warn);
+  --state-done: var(--ok);
+  --state-error: var(--bad);
   --violet: #7c4dbd;
   --scrim: rgba(30, 34, 44, .35);
   --shadow: rgba(30, 34, 44, .22);
@@ -45,6 +50,7 @@
     --scrim: rgba(8, 9, 11, .6); --shadow: rgba(0, 0, 0, .8);
     --dusk-a: #1b1533; --dusk-b: #2c1a3c; --dusk-c: #43202f; --dusk-d: #16100f;
     --accent: var(--accent-raw);
+    --state-working: #7aa2f7;
     --page-bg: #f7f8fa;
     --p-ocean: #5aa9e0; --p-marigold: #e8b043; --p-terracotta: #e47e5f; --p-moss: #8fbf5a; --p-plum: #b884dc; --p-slate: #9aa3b5;
     color-scheme: dark;
@@ -56,6 +62,7 @@
   --scrim: rgba(8, 9, 11, .6); --shadow: rgba(0, 0, 0, .8);
   --dusk-a: #1b1533; --dusk-b: #2c1a3c; --dusk-c: #43202f; --dusk-d: #16100f;
   --accent: var(--accent-raw);
+  --state-working: #7aa2f7;
   --page-bg: #f7f8fa;
   --p-ocean: #5aa9e0; --p-marigold: #e8b043; --p-terracotta: #e47e5f; --p-moss: #8fbf5a; --p-plum: #b884dc; --p-slate: #9aa3b5;
   color-scheme: dark;
@@ -159,7 +166,7 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 .project:hover .x, .project .x:focus-visible { opacity: 1; }
 .project .x:hover { color: var(--text); }
 /* Agent signals (signals.ts): one colour per state, a dot, and a spinner while working */
-.s-working { --sc: var(--accent); } .s-blocked { --sc: var(--warn); } .s-done { --sc: var(--ok); } .s-error { --sc: var(--bad); }
+.s-working { --sc: var(--state-working); } .s-blocked { --sc: var(--state-blocked); } .s-done { --sc: var(--state-done); } .s-error { --sc: var(--state-error); }
 .sg { width: 7px; height: 7px; border-radius: 50%; background: var(--sc); flex: none; }
 .sg.s-working { width: 9px; height: 9px; background: none; border: 1.5px solid var(--sc); border-right-color: transparent; animation: spin .9s linear infinite; }
 /* The project icon's badge: the loudest signal among its windows, a count when several share it.
@@ -172,6 +179,9 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 .project > .sb:empty { min-width: 0; width: 10px; height: 10px; padding: 0; left: 26px; top: 1px; }
 .project > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
 @keyframes sbp { 50% { box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px color-mix(in srgb, var(--sc) 28%, transparent); } }
+/* Only working: a ring, spinning when it has no count (the count stays still when there is one) */
+.project > .sb.s-working, .wt > .sb.s-working { background: var(--panel); color: var(--sc); border: 1.5px solid var(--sc); box-sizing: border-box; }
+.project > .sb.s-working:empty { border-right-color: transparent; animation: spin .9s linear infinite; }
 /* Worktrees: a row per checkout of the repo under its row, the repo's own folder first. The small
    tile sits at the same x open or collapsed (centred under the project tile, on a stem), so
    nothing moves when the rail peeks; collapsed, only the tiles show. */
@@ -205,6 +215,7 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 }
 .wt > .sb:empty { min-width: 0; width: 8px; height: 8px; padding: 0; left: 25px; top: 0; }
 .wt > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
+.wt > .sb.s-working:empty { border-right-color: transparent; animation: spin .9s linear infinite; }
 .rail:not(.peek) .wt { justify-content: center; padding: 0; }
 .rail:not(.peek) .wt .bn, .rail:not(.peek) .wt .count, .rail:not(.peek) .wt .x { display: none; }
 .rail:not(.peek) .wt.active { background: none; }
@@ -278,6 +289,8 @@ svg.lucide { flex: none; display: block; }
   content: ""; position: absolute; top: -2px; right: -2px; width: 7px; height: 7px; border-radius: 50%;
   background: var(--sc, var(--warn)); box-shadow: 0 0 0 2px var(--panel);
 }
+/* Only working: the same spinning ring as the project badges */
+.spaces button.att.s-working::before { background: var(--panel); border: 1.5px solid var(--sc); border-right-color: transparent; box-sizing: border-box; animation: spin .9s linear infinite; }
 .spaces button.target { background: color-mix(in srgb, var(--accent) 35%, var(--raised)); color: var(--text); outline: 2px dashed var(--accent); }
 .theme-btn { display: flex; align-items: center; gap: 6px; }
 .theme-btn i { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
@@ -874,10 +887,12 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
   .hk-mods, .hk-list { grid-template-columns: 1fr; }
   .hk-list dt { border-bottom: 0; padding-bottom: 0; }
 }
-.settings-dlg .git-color input[type="color"] { margin-left: auto; width: 34px; height: 22px; padding: 0 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); cursor: pointer; }
-.settings-dlg .git-color .reset, .settings-dlg .git-tint .reset, .settings-dlg .wt-agent .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
-.settings-dlg .git-color .reset:hover, .settings-dlg .git-tint .reset:hover, .settings-dlg .wt-agent .reset:hover { background: var(--hover); color: var(--text); }
-.settings-dlg .git-color .reset:disabled, .settings-dlg .git-tint .reset:disabled, .settings-dlg .wt-agent .reset:disabled { visibility: hidden; }
+.settings-dlg .git-color input[type="color"], .settings-dlg .signal-color input[type="color"] { margin-left: auto; width: 34px; height: 22px; padding: 0 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); cursor: pointer; }
+.settings-dlg .git-color .reset, .settings-dlg .git-tint .reset, .settings-dlg .wt-agent .reset, .settings-dlg .signal-color .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+.settings-dlg .git-color .reset:hover, .settings-dlg .git-tint .reset:hover, .settings-dlg .wt-agent .reset:hover, .settings-dlg .signal-color .reset:hover { background: var(--hover); color: var(--text); }
+.settings-dlg .git-color .reset:disabled, .settings-dlg .git-tint .reset:disabled, .settings-dlg .wt-agent .reset:disabled, .settings-dlg .signal-color .reset:disabled { visibility: hidden; }
+.settings-dlg .signal-color .sg { width: 10px; height: 10px; }
+.settings-dlg .signal-color .sg.s-working { width: 12px; height: 12px; }
 .settings-dlg .git-color .g-st { width: 14px; }
 .settings-dlg .git-tint input[type="range"] { margin-left: auto; accent-color: var(--accent); }
 .settings-dlg .git-tint .val { width: 34px; text-align: right; font: 11px var(--mono); }

@@ -167,7 +167,7 @@ Pointing an agent at part of a Page: an overlay that `src-tauri/src/pick.js` dra
 _Avoid_: Inspector, element picker (in UI text).
 
 **Agent Signal**:
-What an agent says it is doing: `working`, `blocked` (needs you), `done` or `error`, reported over OSC 7501 (the Program Status Protocol) and kept on the tab's live state. tri-code answers the probe claude and pi send at startup; they report nothing until it does. A `done` or `error` stays until its window has been on screen in a focused app; `blocked` stays until the agent reports something else. The loudest signal (blocked, then error, then done) marks the project's icon and the workspace number; the tab and title bar also show `working`. A terminal bell from any other app counts as `blocked`.
+What an agent says it is doing: `working`, `blocked` (needs you), `done` or `error`, reported over OSC 7501 (the Program Status Protocol) and kept on the tab's live state. tri-code answers the probe claude and pi send at startup; they report nothing until it does. A `done` or `error` stays until its window has been on screen in a focused app; `blocked` stays until the agent reports something else. The loudest signal (blocked, then error, then done, then working) marks the project's icon and the workspace number; a project or workspace whose agents are only working shows a spinning ring there. The tab and title bar also show `working`. Their colours are set in Settings › Signals: working is blue, the rest follow the theme. A terminal bell from any other app counts as `blocked`.
 _Avoid_: Notification (that is the desktop popup), attention, status (a tab's status is its connection).
 
 **Alert**:
