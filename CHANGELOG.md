@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.40 — 2026-10-27
+
+- The Database window browses and edits a project's Postgres, SQLite and MongoDB databases. Open it from the Command Palette (New › Database, or a saved connection by name). Connections are saved per project in `.dev/databases.json`; passwords stay out of `.dev/` and live on the project's host. Over ssh it tunnels through `ssh -L` after the Environment's PIN check. A read-only connection opens read-only in the driver, and pending edits apply in one transaction, each checking the row it expects, so a row changed underneath fails instead of being overwritten. ([#31](https://github.com/WaldoJoubert-GH/tri-code/pull/31))
+- Settings › Signals sets the colour of each Agent Signal; Reset goes back to the theme's. Working is blue by default.
+- Project and workspace badges count working windows too: a badge with only working windows shows a spinning ring, with a count when there are several. The project tooltip lists every window with a signal, not only those that need you.
+
 ## 0.1.39 — 2026-10-26
 
 - Agents can open and drive their project's windows. A small MCP server bundled with tri-code gives them `open_window`, `list_windows`, `status`, `read`, `send`, `wait_for` and `close_window`, so an agent can start a command, read its terminal, type into it and wait for it to finish. Settings › Agents shows whether it's installed and installs or removes it in Claude's and pi's own configs; a banner offers setup once per local project. An agent opens only Commands with the new Agent toggle on in the Commands window, sees only its own project's windows, and closes only the ones it opened. ([#28](https://github.com/WaldoJoubert-GH/tri-code/pull/28))
