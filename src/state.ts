@@ -3,7 +3,7 @@ import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 import type { DiffMode } from "./diff";
 
-export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents";
+export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db";
 
 /** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
@@ -81,8 +81,8 @@ export type Page = {
 
 /** A window on the canvas. Terminals run a PTY; browsers are native child webviews;
  *  issues panels render the project's `.dev/`; an editor is the project's file tree
- *  with a tab per open file; git takes the branch from changes to a merged PR and
- *  agents edits the agent list. */
+ *  with a tab per open file; git takes the branch from changes to a merged PR,
+ *  agents edits the agent list and db is one database Connection (see db.ts). */
 export type Tab = {
   id: string;
   kind: TabKind;
@@ -114,6 +114,8 @@ export type Tab = {
   cmd?: string;
   /** `term` tabs with a multi-line `cmd`: its lines were typed into the shell, so a restart or reattach doesn't type them again. */
   typed?: true;
+  /** `db` tabs only: the Connection it shows (an id in `.dev/databases.json`); unset shows the start page. */
+  db?: string;
   /** Minimised: when (ms), so Alt+Shift+N brings back the latest. Off the canvas but still in the Tab Strip. */
   min?: number;
   /** `term` tabs of the tour's sample project only: a scripted session played in place of a PTY (see demo.ts). */
@@ -131,7 +133,7 @@ export const isTerminal = (t: Tab) => t.kind === "term";
 
 export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
 
-const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2" };
+const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database" };
 
 /** A window's lucide icon: its agent's for a terminal or web app, else its kind's. */
 export const tabIcon = (t: Tab) =>
@@ -146,6 +148,7 @@ export const tabName = (t: Tab) =>
   t.kind === "term" ? agentOf(t)?.name || t.name || "terminal"
   : t.agent ? agentOf(t)?.name || t.name || t.kind
   : t.kind === "agents" ? "commands"
+  : t.kind === "db" ? "database"
   : t.kind;
 
 export type Layout = "master" | "grid" | "mono";
@@ -505,7 +508,7 @@ export function removeProject(id: string) {
 }
 
 /** Add a window on the active workspace and focus it. `after` inserts it right after that tab. */
-export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string; agent?: Agent; by?: "agent" } = {}) {
+export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string; agent?: Agent; by?: "agent"; db?: string } = {}) {
   const id = newId();
   edit(projectId, (p) => {
     const a = opts.agent;
@@ -513,6 +516,7 @@ export function addTab(projectId: string, kind: TabKind, opts: { url?: string; p
       id, kind, space: p.ws,
       ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}), ...(a?.profile ? { profile: a.profile } : {}) } : {}),
       ...(kind === "editor" && opts.path ? { path: opts.path, files: [opts.path] } : {}),
+      ...(kind === "db" && opts.db ? { db: opts.db } : {}),
       ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "", ...(opts.by ? { by: opts.by } : {}) } : {}),
     };
     const i = opts.after ? p.tabs.findIndex((t) => t.id === opts.after) : -1;
@@ -761,6 +765,11 @@ function editTab(projectId: string, tabId: string, fn: (t: Tab) => void) {
 /** A terminal whose agent quit carries on as a plain login shell. */
 export function becomeShell(projectId: string, tabId: string) {
   editTab(projectId, tabId, (t) => Object.assign(t, { agent: undefined, name: "shell", cmd: "" }));
+}
+
+/** The Connection a database window shows; unset goes back to its start page. */
+export function setTabDb(projectId: string, tabId: string, db: string | undefined) {
+  editTab(projectId, tabId, (t) => { t.db = db; });
 }
 
 /** A multi-line command's lines have been typed into its shell. */

@@ -24,7 +24,7 @@ import { keysOf, sameChord, setEditorKeys, textPress } from "./keymap";
 import type { Chord } from "./state";
 
 /** The look: plain CSS with tri-code's variables, so every editor follows the theme and accent. */
-const theme = EditorView.theme({
+export const theme = EditorView.theme({
   "&": { height: "100%", color: "var(--text)", backgroundColor: "var(--bg)", fontSize: "12px" },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "var(--mono)", lineHeight: "17px" },
@@ -105,7 +105,7 @@ const changeGutter = [marksField, gutter({ class: "cm-changes", markers: (v) => 
 export const showChanges = (view: EditorView, m: ChangeMarks | null) => view.dispatch({ effects: setMarks.of(m) });
 
 /** Token colours: the same few as the old highlighter (code.ts) and the Markdown preview. */
-const highlight = HighlightStyle.define([
+export const highlight = HighlightStyle.define([
   { tag: [t.keyword, t.modifier, t.controlKeyword, t.operatorKeyword, t.definitionKeyword, t.moduleKeyword], color: "var(--violet)" },
   { tag: [t.string, t.special(t.string), t.regexp, t.character], color: "var(--ok)" },
   { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: "var(--muted)", fontStyle: "italic" },

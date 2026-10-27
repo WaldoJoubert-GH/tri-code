@@ -200,3 +200,15 @@ _Avoid_: Clone, snapshot, sandbox.
 **Favourite**:
 A page a project keeps for its browser windows: a URL and a name, in `state.json` under the project (`favs`). The star in a browser's address field (or `Ctrl+D`) adds one; they show on the bar under the address and as tiles on a blank browser window. Per project, not global, since each project has its own dev server and tracker.
 _Avoid_: Bookmark.
+
+**Database Window**:
+A canvas Window, one per Connection, for browsing, querying and editing a project's database: a schema tree and Data, Query and Structure views. New `TabKind` `"db"`. Plain HTML; `Alt+Shift+D` addresses the most recent. Postgres, SQLite (local projects only) and MongoDB. See ADR 0004.
+_Avoid_: DB client, db viewer, studio.
+
+**Connection**:
+A saved database target of a project, in `.dev/databases.json` (written only by tri-code): a name, a kind (`postgres`, `sqlite`, `mongo`), a target (a `.env` variable, or a URL whose password lives in `~/.tri-code/secrets/databases.json` on the host), `via` (`direct`, or `host` for an ssh tunnel), `readOnly` and an optional `prod` tag. Opening one makes a Session.
+_Avoid_: Datasource, database (the Connection points at one).
+
+**Pending Edit**:
+A cell change, new row or deleted row in a Database Window that is staged and highlighted but not written. Apply shows the statements and runs them all in one transaction; a row is found by its primary key, `rowid` or `_id`, and an edit fails if the cell changed underneath.
+_Avoid_: Draft, unsaved change.

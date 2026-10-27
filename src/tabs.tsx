@@ -11,6 +11,7 @@ import { nativeBrowsers } from "./browsers";
 import { openEditor } from "./files";
 import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
+import { openDbWindow } from "./db";
 import { hotkeyProblem, hotkeyText, launchAgent, offeredIn, openAgentsPanel } from "./agents";
 import { Icon } from "./lucide";
 import { SIG_TEXT, sigOf } from "./signals";
@@ -19,7 +20,7 @@ import { keyOf } from "./keymap";
 
 /** Glyphs of the windows that aren't terminals (those show their agent's icon). */
 const GLYPH: Record<Exclude<TabKind, "term">, string> = {
-  browser: "◎", issues: "☑", editor: "▤", git: "±", agents: "⚙",
+  browser: "◎", issues: "☑", editor: "▤", git: "±", agents: "⚙", db: "⛁",
 };
 
 /** The panels the New window menu offers under the agents, with the key that also opens one. */
@@ -28,6 +29,7 @@ const PANELS: { kind: Exclude<TabKind, "term">; /** The Keymap action that also 
   { kind: "issues", key: "issues" },
   { kind: "editor", key: "files" },
   { kind: "git", key: "git" },
+  { kind: "db", key: "db" },
   { kind: "agents", key: "agents" },
 ];
 
@@ -57,6 +59,7 @@ function newPanel(p: Project, kind: (typeof PANELS)[number]["kind"]) {
   if (kind === "editor") return void openEditor(p);
   if (kind === "git") return void openGitPanel(p);
   if (kind === "agents") return void openAgentsPanel(p);
+  if (kind === "db") return void openDbWindow(p);
   addTab(p.id, kind);
   flash(`new ${kind}`);
 }
@@ -124,7 +127,7 @@ export function TabMenu() {
                     }}
                   >
                     <span class="glyph" aria-hidden="true">{GLYPH[k.kind]}</span>
-                    {k.kind === "agents" ? "commands" : k.kind}
+                    {k.kind === "agents" ? "commands" : k.kind === "db" ? "database" : k.kind}
                     <Show when={keyOf(k.key)}>{(t) => <kbd>{t()}</kbd>}</Show>
                   </button>
                 )}
