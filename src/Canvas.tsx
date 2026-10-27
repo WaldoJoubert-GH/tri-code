@@ -22,6 +22,8 @@ import { dirtyCount, dropEditor } from "./files";
 const Editor = lazy(() => import("./Editor"));
 import GitPanel from "./GitPanel";
 import AgentsPanel from "./AgentsPanel";
+import DbPanel from "./DbPanel";
+import { closeSession as closeDbSession, dbTitle, isProd } from "./db";
 import { gitOf } from "./git";
 import { clock, dev, panelTitle } from "./issues";
 import { SIG_TEXT, sigOf } from "./signals";
@@ -171,7 +173,8 @@ export default function Canvas(props: { project: Project }) {
     const isEditor = tab.kind === "editor";
     const isGit = tab.kind === "git";
     const isAgents = tab.kind === "agents";
-    const isPanel = isIssues || isEditor || isGit || isAgents;
+    const isDb = tab.kind === "db";
+    const isPanel = isIssues || isEditor || isGit || isAgents || isDb;
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -224,6 +227,7 @@ export default function Canvas(props: { project: Project }) {
       : isEditor ? (tab.path ? `${tab.path.split("/").pop()}${dirtyCount(id) ? ` · ${dirtyCount(id)} modified` : ""}` : props.project.name)
       : isGit ? `${props.project.name} · ${gitOf(props.project.id).status?.branch ?? ""}`
       : isAgents ? "the + menu, for every project"
+      : isDb ? dbTitle(props.project, tab)
       : (live[id]?.title ?? "");
 
     /** Browser windows: the shown page. Back, reload, the address and the star act on it. */
@@ -393,6 +397,7 @@ export default function Canvas(props: { project: Project }) {
           hidden: hidden(),
           peek: peek(),
           profiled: isBrowser && nativeBrowsers && profilesInUse(),
+          prod: isDb && isProd(props.project, tab),
         }}
         style={{
           ...(isBrowser ? { "--pc": profileColor(profile()) } : {}),
@@ -427,6 +432,7 @@ export default function Canvas(props: { project: Project }) {
               : isEditor ? "editor"
               : isGit ? "git"
               : isAgents ? "agents"
+              : isDb ? "db"
               : (live[id]?.status ?? "connecting")
             }`}
           />
@@ -553,6 +559,8 @@ export default function Canvas(props: { project: Project }) {
           <GitPanel project={props.project} tab={tab} focused={focused()} />
         ) : isAgents ? (
           <AgentsPanel project={props.project} />
+        ) : isDb ? (
+          <DbPanel project={props.project} tab={tab} focused={focused()} />
         ) : (
           <div class="body" ref={termEl} />
         )}
@@ -642,6 +650,6 @@ export function requestClose(projectId: string, tabId: string): void {
       msg: `Closed ${tabName(tab)}${title ? " · " + title : ""}.`,
       undo: () => restoreTab(projectId, tab, index),
     },
-    () => (tab.kind === "browser" ? closeBrowser(tab) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : undefined),
+    () => (tab.kind === "browser" ? closeBrowser(tab) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : tab.kind === "db" ? closeDbSession(tabId) : undefined),
   );
 }

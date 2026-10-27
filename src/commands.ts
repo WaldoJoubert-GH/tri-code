@@ -19,6 +19,7 @@ import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { openGitPanel } from "./git";
+import { connsOf, openDbWindow } from "./db";
 import { labelOf, openNewWorktree, removeWorktree } from "./worktrees";
 import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgentsPanel } from "./agents";
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
@@ -126,6 +127,10 @@ export function commands(): Command[] {
     add({ id: "issues", group: "New", title: "Issues", icon: "list-todo", keys: capsOf("issues"), run: () => openIssuePanel(p) });
     add({ id: "files", group: "New", title: "Editor", icon: "file-code", keys: capsOf("files"), run: () => void openEditor(p) });
     add({ id: "git", group: "New", title: "Git", icon: "git-branch", keys: capsOf("git"), run: () => void openGitPanel(p) });
+    add({ id: "db", group: "New", title: "Database", hint: "the latest database window, or a new one", icon: "database", keys: capsOf("db"), run: () => void openDbWindow(p) });
+    for (const c of connsOf(p) ?? []) {
+      add({ id: `db:${c.id}`, group: "New", title: `Database ${c.name}`, hint: c.kind + (c.tag === "prod" ? " · prod" : ""), icon: "database", run: () => void openDbWindow(p, c.id) });
+    }
     add({ id: "agents", group: "New", title: "Commands", hint: "edit the + menu", icon: "settings-2", keys: capsOf("agents"), run: () => void openAgentsPanel(p) });
 
     if (f) {

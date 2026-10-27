@@ -18,6 +18,7 @@ import { closeProfileMenu, profileMenuOpen } from "./profiles";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { openGitPanel } from "./git";
+import { openDbWindow } from "./db";
 import { diffKeys } from "./DiffView";
 import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";
 import { closeIconPicker, iconPickerOpen } from "./lucide";
@@ -91,6 +92,9 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
       return true;
     case "git":
       openGitPanel(p);
+      return true;
+    case "db":
+      openDbWindow(p);
       return true;
     case "agents":
       openAgentsPanel(p);

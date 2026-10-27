@@ -1,0 +1,167 @@
+/* Database window. See src/DbPanel.tsx; the look comes from design/database-window.html. */
+
+.mark.db { color: var(--accent); }
+.win.prod > .bar { background: color-mix(in srgb, var(--bad) 16%, var(--panel)); border-bottom-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+
+.dbwin { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: 12.5px; position: relative; user-select: text; }
+.dbwin .db-grow { flex: 1; min-width: 0; }
+.dbwin .muted { color: var(--muted); }
+.dbwin .mono { font-family: var(--mono); }
+.dbwin .small { font-size: 11.5px; }
+.dbwin code { font: 11.5px var(--mono); }
+.dbwin kbd { font-size: 9.5px; padding: 0 3px; opacity: .8; }
+.db-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dbwin .spin { animation: db-spin .9s linear infinite; vertical-align: -2px; }
+@keyframes db-spin { to { transform: rotate(360deg); } }
+
+/* Pills, kind badges, buttons. */
+.db-kind { font: 600 10px var(--mono); padding: 1px 5px; border-radius: 3px; color: #fff; flex: none; }
+.db-kind.postgres { background: #336791; }
+.db-kind.sqlite { background: #3f7f9f; }
+.db-kind.mongo { background: #3f8f4f; }
+.db-pill { font: 600 10.5px var(--mono); padding: 1px 6px; border-radius: 4px; display: inline-flex; gap: 4px; align-items: center; flex: none; white-space: nowrap; }
+.db-pill.prod { background: var(--bad); color: #fff; }
+.db-pill.ro { border: 1px solid var(--line); color: var(--muted); font-weight: 400; }
+.db-btn {
+  height: 24px; padding: 0 10px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg);
+  font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; flex: none;
+}
+.db-btn:hover:not(:disabled) { background: var(--hover); }
+.db-btn:disabled { opacity: .45; cursor: default; }
+.db-btn.db-pri { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.db-btn.db-danger { background: var(--bad); border-color: var(--bad); color: #fff; font-weight: 600; }
+.db-btn.db-pri kbd, .db-btn.db-danger kbd { background: none; color: inherit; border-color: rgba(255, 255, 255, .5); }
+.db-btn.db-ghost { border-color: transparent; background: none; color: var(--muted); }
+.db-btn.db-ghost:hover { color: var(--text); }
+.db-ib { width: 22px; height: 22px; border-radius: 4px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.db-ib:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.db-ib:disabled { opacity: .35; cursor: default; }
+.db-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.db-seg button { padding: 3px 10px; color: var(--muted); border-right: 1px solid var(--line); }
+.db-seg button:last-child { border-right: 0; }
+.db-seg button.on { background: var(--raised); color: var(--text); font-weight: 600; }
+.db-err { color: var(--bad); font: 12px/1.5 var(--mono); white-space: pre-wrap; margin: 8px 10px; }
+.db-dim { color: var(--muted); padding: 10px 12px; }
+.db-dim.center { text-align: center; padding: 24px; }
+
+/* Start page and connection form. */
+.db-start { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 28px 16px; }
+.db-start-in { width: min(560px, 100%); display: flex; flex-direction: column; gap: 8px; }
+.db-start h3 { margin: 0 0 6px; font-size: 14px; }
+.db-start .db-btn { align-self: flex-start; margin-top: 6px; }
+.db-conn-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; background: var(--bg); }
+.db-conn-row:hover { border-color: var(--accent); }
+.db-conn-row .muted { font-size: 11.5px; }
+.db-form { width: min(560px, 100%); display: flex; flex-direction: column; gap: 11px; border: 1px solid var(--line); border-radius: 10px; padding: 0 16px; background: var(--bg); align-self: flex-start; }
+.db-form-h { display: flex; align-items: center; gap: 8px; padding: 12px 0 10px; border-bottom: 1px solid var(--line); }
+.db-form-f { display: flex; align-items: center; gap: 8px; padding: 10px 0 12px; border-top: 1px solid var(--line); }
+.db-field { display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center; }
+.db-field > span:first-child { color: var(--muted); }
+.db-field input:not([type=checkbox]) { height: 28px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); padding: 0 8px; outline: 0; width: 100%; font-size: 12.5px; color: var(--text); }
+.db-field input:focus { border-color: var(--accent); }
+.db-hint { font-size: 11.5px; color: var(--muted); margin: -6px 0 0 100px; }
+.db-hint.warn { color: var(--warn); margin-left: 0; }
+.db-check { display: inline-flex; gap: 5px; align-items: center; }
+.db-test { font-size: 11.5px; color: var(--ok); overflow-wrap: anywhere; }
+.db-test.bad { color: var(--bad); }
+
+/* Tree | pane. */
+.db-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(170px, 230px) minmax(0, 1fr); }
+.db-tree { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.db-tree-h { padding: 6px; border-bottom: 1px solid var(--line); display: flex; gap: 4px; align-items: center; }
+.db-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); background: var(--panel); }
+.db-search input { border: 0; outline: 0; background: none; width: 100%; font-size: 12px; color: var(--text); }
+.db-tree-b { flex: 1; overflow: auto; padding: 4px 0 10px; }
+.db-grp { display: flex; align-items: center; gap: 5px; padding: 4px 10px; color: var(--muted); font-size: 11.5px; cursor: pointer; user-select: none; }
+.db-grp .chev { transition: transform .12s; }
+.db-grp.shut .chev { transform: rotate(-90deg); }
+.db-obj { display: flex; align-items: center; gap: 7px; padding: 3px 10px 3px 24px; cursor: pointer; white-space: nowrap; user-select: none; color: var(--accent); }
+.db-obj .n { flex: 1; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.db-obj.view { color: var(--violet); }
+.db-obj.sys, .db-obj.sys .n { color: var(--muted); }
+.db-obj:hover { background: var(--hover); }
+.db-obj.on { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 2px 0 var(--accent); }
+.db-c { font: 10.5px var(--mono); color: var(--muted); }
+.db-dirty { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); flex: none; }
+.db-tree-f { border-top: 1px solid var(--line); padding: 4px 4px 4px 10px; font-size: 11px; color: var(--muted); display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; }
+.db-tree-f .db-grow { overflow: hidden; text-overflow: ellipsis; }
+.db-tree-f .live { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.db-tree-f .live.on { background: var(--ok); }
+
+.db-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.db-ph { height: 32px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 8px; border-bottom: 1px solid var(--line); background: var(--panel); white-space: nowrap; overflow: hidden; }
+.db-obname { font: 600 12px var(--mono); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.db-views { display: inline-flex; gap: 2px; flex: none; }
+.db-views button { height: 22px; padding: 0 8px; border-radius: 5px; font-size: 12px; color: var(--muted); display: inline-flex; gap: 5px; align-items: center; }
+.db-views button:hover { background: var(--hover); color: var(--text); }
+.db-views button.on { background: var(--raised); color: var(--text); font-weight: 600; }
+
+/* Data. */
+.db-filter { flex: none; display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+.db-filter .kw { font: 600 11px var(--mono); color: var(--violet); flex: none; }
+.db-filter input { flex: 1; min-width: 0; height: 24px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); padding: 0 8px; font-size: 12px; outline: 0; color: var(--text); }
+.db-filter input:focus { border-color: var(--accent); }
+.db-split { flex: 1; min-height: 0; display: flex; }
+.db-grid { flex: 1; min-height: 0; min-width: 0; overflow: auto; outline: 0; }
+.db-grid table { border-collapse: separate; border-spacing: 0; font: 12px var(--mono); min-width: 100%; }
+.db-grid th { position: sticky; top: 0; z-index: 2; background: var(--panel); text-align: left; font: 600 11.5px var(--ui); padding: 0; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); white-space: nowrap; cursor: pointer; user-select: none; }
+.db-grid th .h { display: flex; align-items: center; gap: 5px; padding: 5px 8px; }
+.db-grid th .t { font: 400 10px var(--mono); color: var(--muted); }
+.db-grid th .sort { color: var(--accent); }
+.db-grid .pk { color: var(--warn); }
+.db-grid th.rn, .db-grid td.rn { position: sticky; left: 0; z-index: 1; background: var(--panel); color: var(--muted); text-align: right; width: 1%; min-width: 44px; padding: 0 8px; font-size: 10.5px; border-right: 1px solid var(--line); cursor: default; }
+.db-grid th.rn { z-index: 3; }
+.db-grid td { padding: 0 8px; height: 23px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.db-grid tr:hover td:not(.rn) { background: color-mix(in srgb, var(--hover) 70%, transparent); }
+.db-grid td.num { text-align: right; color: var(--warn); }
+.db-grid td.nul { color: var(--muted); font-style: italic; }
+.db-grid td.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+.db-grid td.mod { background: color-mix(in srgb, var(--warn) 22%, transparent) !important; }
+.db-grid tr.r-add td:not(.rn) { background: color-mix(in srgb, var(--ok) 15%, transparent) !important; }
+.db-grid tr.r-add td.rn { color: var(--ok); font-weight: 700; }
+.db-grid tr.r-del td:not(.rn) { background: color-mix(in srgb, var(--bad) 12%, transparent) !important; text-decoration: line-through; color: var(--muted); }
+.db-grid tr.r-del td.rn { color: var(--bad); font-weight: 700; }
+.db-grid td.editing { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--bg) !important; padding: 0 4px; }
+.db-grid td input { width: 100%; min-width: 120px; height: 21px; border: 0; outline: 0; background: none; font: 12px var(--mono); color: var(--text); }
+.db-grid .chip { font-size: 10.5px; padding: 0 5px; border-radius: 3px; background: var(--raised); color: var(--violet); cursor: pointer; }
+.db-doc { width: 320px; flex: none; border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.db-doc-h { padding: 4px 6px 4px 10px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 6px; }
+.db-doc pre { margin: 0; flex: 1; overflow: auto; padding: 10px; font: 12px/1.5 var(--mono); }
+
+.db-pending { flex: none; display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-top: 1px solid color-mix(in srgb, var(--warn) 50%, var(--line)); background: color-mix(in srgb, var(--warn) 10%, var(--panel)); }
+.db-pending.bad { border-top-color: color-mix(in srgb, var(--bad) 50%, var(--line)); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); color: var(--bad); }
+.db-pending .cnt { display: inline-flex; gap: 10px; }
+.db-pending .cnt span { display: inline-flex; gap: 4px; align-items: center; }
+.db-pending .sq { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.db-pending .sq.mod { background: var(--warn); }
+.db-pending .sq.add { background: var(--ok); }
+.db-pending .sq.del { background: var(--bad); }
+.db-status { height: 26px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 8px; border-top: 1px solid var(--line); background: var(--panel); font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+
+/* Query. */
+.db-qv { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(110px, 40%) auto minmax(0, 1fr); }
+.db-ed { min-height: 0; overflow: hidden; border-bottom: 1px solid var(--line); }
+.db-ed .cm-editor { height: 100%; }
+.db-qbar { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--line); background: var(--panel); white-space: nowrap; overflow: hidden; }
+.db-res { min-height: 0; display: flex; flex-direction: column; }
+.db-msg { padding: 10px 12px; }
+.db-msg.ok { color: var(--ok); }
+
+/* Structure. */
+.db-sv { flex: 1; overflow: auto; padding: 12px 14px 20px; }
+.db-sv h4 { margin: 14px 0 6px; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.db-sv h4:first-child { margin-top: 0; }
+.db-sv table { border-collapse: collapse; width: 100%; }
+.db-sv td, .db-sv th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.db-sv th { font-size: 11px; color: var(--muted); font-weight: 600; }
+.db-sv .pk { color: var(--warn); font: 600 11px var(--mono); }
+.db-ddl { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font: 12px/1.6 var(--mono); white-space: pre; overflow: auto; margin: 0; }
+
+/* Review. */
+.db-scrim { position: absolute; inset: 0; background: var(--scrim); display: flex; align-items: flex-start; justify-content: center; padding: 6% 16px 16px; z-index: 10; }
+.db-dlg { width: min(620px, 100%); max-height: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 20px 60px var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
+.db-dlg-h { padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+.db-dlg-b { padding: 14px 16px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.db-dlg-f { padding: 10px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; background: var(--panel); }
+.db-stmts { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; max-height: 320px; }
+.db-prodwarn { display: flex; gap: 8px; align-items: flex-start; padding: 9px 11px; border-radius: 6px; background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }

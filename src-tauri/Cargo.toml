@@ -35,6 +35,14 @@ rand_core = { version = "0.6", features = ["getrandom"] }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 tauri-plugin-dialog = "2"
 trash = "5"
+# Database Window (db/): one driver per cargo feature, so a dev build can leave one out.
+# TLS stays on ring through tokio-rustls, like ureq; nothing pulls in aws-lc or OpenSSL.
+rusqlite = { version = "0.41.0", features = ["bundled", "column_decltype"], optional = true }
+tokio-postgres = { version = "0.7.18", optional = true }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12", "logging"], optional = true }
+webpki-roots = { version = "1.0.11", optional = true }
+mongodb = { version = "3.9.1", default-features = false, features = ["rustls-tls", "dns-resolver", "compat-3-0-0"], optional = true }
+futures-util = { version = "0.3.34", default-features = false, optional = true }
 
 # Dev builds: keep link time and memory low (4 GB build machines).
 [profile.dev]
@@ -70,3 +78,9 @@ tauri-plugin-process = "2"
 # No `zip`: every zip 2–4 release is yanked, and it only handles v1-style zipped
 # Windows bundles and compressed AppImages, which we don't ship.
 tauri-plugin-updater = { version = "2.14", default-features = false, features = ["rustls-tls", "system-proxy"] }
+
+[features]
+default = ["db-pg", "db-sqlite", "db-mongo"]
+db-pg = ["dep:tokio-postgres", "dep:tokio-rustls", "dep:webpki-roots", "dep:futures-util"]
+db-sqlite = ["dep:rusqlite"]
+db-mongo = ["dep:mongodb", "dep:futures-util"]

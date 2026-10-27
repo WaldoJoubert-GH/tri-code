@@ -2,6 +2,7 @@ mod agent_setup;
 mod agent_windows;
 mod bg;
 mod browser;
+mod db;
 mod devfs;
 mod dirs;
 mod envs;
@@ -155,6 +156,16 @@ pub fn run() {
             git::git_push_delete,
             git::git_draft,
             git::project_files,
+            db::db_open,
+            db::db_close,
+            db::db_schema,
+            db::db_structure,
+            db::db_rows,
+            db::db_run,
+            db::db_cancel,
+            db::db_apply,
+            db::db_env_vars,
+            db::db_secret_set,
             devfs::dev_read,
             devfs::dev_write,
             devfs::save_pasted_image,
@@ -219,6 +230,7 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 app.state::<Arc<phone::Phone>>().shutdown();
                 app.state::<Arc<pty::Ptys>>().kill_all();
+                db::close_all();
             }
         });
 }
