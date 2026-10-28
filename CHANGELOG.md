@@ -2,6 +2,13 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.41 — 2026-10-28
+
+- New worktree starts its branch with the repo's branch prefix (e.g. `waldo/`), saved on the repo and left out of the folder and sidebar label. The dialog also takes a setup script, saved per repo, that runs once in its own window and closes when it succeeds, and "and open" picks the Commands to start beside it. ([#34](https://github.com/WaldoJoubert-GH/tri-code/pull/34))
+- Worktrees and projects can be pinned to a Pinned list above the Environments, from a row's pin button, its right-click menu or the Command Palette. Project right-click menus gain Pin, New worktree, Appearance and Reveal in Finder / Open folder location. A Worktree's own name now shows as ◆.
+- On Windows, closing a terminal ends its whole process tree, removing a worktree retries deleting its leftover folder while programs release their files, and setup lines run in PowerShell so `cp`, `mv` and `rm` work as on macOS.
+- Repos without `origin/HEAD` (only `git clone` sets it) now use the remote's `main` or `master`, whichever exists, as the base branch instead of assuming `main`.
+
 ## 0.1.40 — 2026-10-27
 
 - The Database window browses and edits a project's Postgres, SQLite and MongoDB databases. Open it from the Command Palette (New › Database, or a saved connection by name). Connections are saved per project in `.dev/databases.json`; passwords stay out of `.dev/` and live on the project's host. Over ssh it tunnels through `ssh -L` after the Environment's PIN check. A read-only connection opens read-only in the driver, and pending edits apply in one transaction, each checking the row it expects, so a row changed underneath fails instead of being overwritten. ([#31](https://github.com/WaldoJoubert-GH/tri-code/pull/31))
