@@ -12,22 +12,12 @@ import {
 import { flash } from "./ui";
 import { keyOf } from "./keymap";
 import { pushSignal } from "./phone";
-
-/** What a window signals now. `working` only badges the tab strip, title bar and status line. */
-export type Sig = AgentState;
+import { type Sig, sigOf } from "./sigs";
+export { busySignals, sigOf, type Sig } from "./sigs";
 
 export const SIG_RANK: Record<Sig, number> = { blocked: 3, error: 2, done: 1, working: 0 };
 export const SIG_TEXT: Record<Sig, string> = { working: "working", blocked: "needs you", done: "done", error: "error" };
 export const EVENTS: [SoundEvent, string][] = [["blocked", "Needs input"], ["done", "Done"], ["error", "Error"]];
-
-/** Blocked until answered, done and error until seen, working while it runs. A bell in a plain shell counts as blocked. */
-export function sigOf(t: Tab): Sig | null {
-  const l = live[t.id];
-  const a = l?.agent;
-  if (a?.state === "blocked" || a?.state === "working") return a.state;
-  if (a && !a.seen) return a.state;
-  return l?.attention ? "blocked" : null;
-}
 
 /** The loudest signal among some windows. `working` counts only when asked for. */
 export function topSig(tabs: Tab[], withWorking = false): Sig | null {

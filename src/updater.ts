@@ -5,6 +5,7 @@
 import { createSignal } from "solid-js";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { busySignals } from "./sigs";
 import { flash } from "./ui";
 
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
@@ -24,6 +25,11 @@ const [status, setStatus] = createSignal<UpdateStatus>({ kind: "idle" });
 export { status as updateStatus };
 
 export const appVersion = __APP_VERSION__;
+
+/** Open while the restart would end agents that are working or waiting for you (see RestartDialog.tsx). */
+const [askRestart, setAskRestart] = createSignal(false);
+export { askRestart };
+export const cancelRestart = () => setAskRestart(false);
 
 let busy = false;
 
@@ -66,9 +72,17 @@ export async function checkForUpdates() {
   else if (ready()) flash(`${ready()!.version} downloaded: restart to update`);
 }
 
-/** Install the downloaded update and restart into it. */
+/** Install the downloaded update and restart into it. Asks first if an agent is busy. */
 export async function installUpdate() {
+  if (!ready()) return;
+  if (busySignals().length) return setAskRestart(true);
+  await installNow();
+}
+
+/** Install and restart without asking. */
+export async function installNow() {
   const update = ready();
+  cancelRestart();
   if (!update) return;
   try {
     await update.install(); // Windows: the installer quits the app itself

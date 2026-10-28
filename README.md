@@ -109,7 +109,7 @@ bun pm version patch          # or minor, major, or 1.2.3; commits and tags v<ve
 git push --follow-tags
 ```
 
-Installed copies check the latest release's `latest.json` at startup and every 6 hours, download a newer version in the background, and show "↻ Restart to update" in the status bar. Restarting ends local terminal sessions; remote tabs reattach. Dev builds never update. The window title and the status bar show the running version; click the version (or run "About tri-code" / "Check for updates" from `Alt+X`) to check now and read the changelog.
+Installed copies check the latest release's `latest.json` at startup and every 6 hours, download a newer version in the background, and show "↻ Restart to update" in the status bar. Restarting ends local terminal sessions; remote tabs reattach. If an agent is still working, needs you, or has failed, a "Restart to update?" prompt asks first. Dev builds never update. The window title and the status bar show the running version; click the version (or run "About tri-code" / "Check for updates" from `Alt+X`) to check now and read the changelog.
 
 The updater checks downloads against the public key in `tauri.conf.json`. The matching private key is the `TAURI_SIGNING_PRIVATE_KEY` repository secret (kept outside the repo at `~/.tauri/tri-code.key` on the machine that made it). If the key is lost, installed copies cannot verify new releases and must be reinstalled by hand. The macOS builds are ad-hoc signed but not notarized, so Gatekeeper blocks the first launch. Open System Settings → Privacy & Security and click Open Anyway, or run `xattr -cr /Applications/tri-code.app`. Builds from before 0.1.28 were unsigned, and macOS reports them as "damaged". The `xattr` command fixes those too.
 

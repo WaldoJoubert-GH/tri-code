@@ -36,7 +36,8 @@ import { ensureSession, setLinkHandler } from "./terms";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { keyOf, withKey } from "./keymap";
-import { appVersion, installUpdate, startUpdateChecks, updateReady } from "./updater";
+import { appVersion, askRestart, installUpdate, startUpdateChecks, updateReady } from "./updater";
+import { RestartDialog } from "./RestartDialog";
 import { type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
 import {
   clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
@@ -124,7 +125,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || openProjectOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || signalsOpen() || feedbackOpen()));
+  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || openProjectOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   const backdrop = () => {
@@ -166,6 +167,7 @@ export default function App() {
       <NewWorktreeDialog />
       <WorktreeDialog />
       <AboutDialog />
+      <RestartDialog />
       <SignalsPopover />
       <FeedbackPopover />
       <IconPicker />
