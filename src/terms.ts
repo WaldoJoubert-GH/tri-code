@@ -342,6 +342,11 @@ class TermSession {
       this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS);
       return;
     }
+    if (this.cmd && this.tab.once && code === 0) {
+      // A Worktree's setup that finished: nothing left to see.
+      removeTab(this.project.id, this.tab.id);
+      return closeSession(this.tab.id);
+    }
     if (this.cmd) {
       // An agent quit: restarting it rarely helps, so carry on in a plain shell.
       this.term.write(`\r\n\x1b[90m[${this.tab.name ?? "agent"} exited with code ${code}, starting a shell]\x1b[0m\r\n`);

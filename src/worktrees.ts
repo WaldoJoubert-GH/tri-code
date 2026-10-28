@@ -10,9 +10,11 @@
 // design/folder-worktrees.html; see ADR 0003.
 
 import { invoke } from "@tauri-apps/api/core";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Agent, type Project, addWorktree, app, projectById, repoOf, setApp, worktreesOf } from "./state";
+import { type Agent, type Project, addTab, addWorktree, app, focusTab, isLocalHost, projectById, repoOf, setApp, worktreesOf } from "./state";
+import { setupCommand, setupLines } from "./setup";
 import { launchAgent } from "./agents";
 import { dropProject } from "./Sidebar";
 import { folderStatus, gitOf, peekStatus } from "./git";
@@ -109,18 +111,20 @@ export function nestedBranches(p: Project): { repo: string; branch: string }[] {
   return (folderStatus[p.id] ?? []).map((r) => ({ repo: r.repo, branch: r.status?.branch ?? "detached" }));
 }
 
-/** What the sidebar row, its tooltip, the rail tile and Finish call a Worktree. `mark` is `pin` for a
+/** What the sidebar row, its tooltip, the rail tile and Finish call a Worktree. `mark` is `named` for a
  *  name the user chose and `split` when a copy's repos are on different branches. */
-export type Label = { text: string; mark?: "pin" | "split"; tip: string[] };
+export type Label = { text: string; mark?: "named" | "split"; tip: string[] };
 
 /** The label rule (CONTEXT.md, Worktree): the title if one is set; a copy's repos' branch (the most
  *  of them, a tie going to a branch that isn't the copy's first); a plain worktree's branch; a copy
- *  with no repos in it, its folder. `branchOf` stays the git truth it is built on. */
+ *  with no repos in it, its folder. A branch shows without the repo's prefix; the tooltip has it
+ *  whole. `branchOf` stays the git truth it is built on. */
 export function labelOf(p: Project): Label {
   const folder = p.path.split(/[\\/]/).pop() || p.path;
   if (!p.parent) return { text: branchOf(p), tip: [branchOf(p)] };
-  if (p.title) return { text: p.title, mark: "pin", tip: [`${p.title}  (pinned name)`, `folder: ${folder}`, `branch: ${branchOf(p)}`] };
-  if (!p.copy) return { text: branchOf(p), tip: [branchOf(p), `folder: ${folder}`] };
+  if (p.title) return { text: p.title, mark: "named", tip: [`${p.title}  (named)`, `folder: ${folder}`, `branch: ${branchOf(p)}`] };
+  const short = (b: string) => unprefixed(repoOf(p), b);
+  if (!p.copy) return { text: short(branchOf(p)), tip: [branchOf(p), `folder: ${folder}`] };
   const repos = nestedBranches(p);
   if (!repos.length) return { text: folder, tip: [folder, `folder: ${folder}`, "  no nested repos: nothing to follow"] };
   const n = new Map<string, number>();
@@ -128,14 +132,14 @@ export function labelOf(p: Project): Label {
   const text = [...n].sort(([a, x], [b, y]) => y - x || Number(a === p.branch) - Number(b === p.branch))[0][0];
   const split = n.size > 1;
   return {
-    text,
+    text: short(text),
     mark: split ? "split" : undefined,
     tip: [text, `folder: ${folder}`, ...repos.map((r) => `  ${r.repo}: ${r.branch}`)],
   };
 }
 
 /** The short label of a Worktree's tile: its issue's number while the label still carries it, else the
- *  start of the label. A pinned name is never the issue's, so it gets its letters. */
+ *  start of the label. A name you gave is never the issue's, so it gets its letters. */
 export function tileLabel(p: Project): string {
   const text = labelOf(p).text;
   const n = p.issue?.match(/-(\d+)$/)?.[1];
@@ -150,7 +154,7 @@ export function renameWorktree(p: Project, title: string): void {
 
 /** Start next feature: create `branch` from each nested repo's default branch on origin, in every
  *  repo that is clean. A repo with uncommitted changes is skipped and named, never stashed. The
- *  pinned name is cleared, since the work it named is over. */
+ *  name you gave is cleared, since the work it named is over. */
 export async function startNextFeature(p: Project, branch: string): Promise<void> {
   const status = folderStatus[p.id] ?? [];
   if (!status.length) return flash("no nested repos to switch");
@@ -179,11 +183,25 @@ export function issueBranch(slug: string, title: string): string {
   return b.length <= 40 ? b : b.slice(0, 41).replace(/-[^-]*$/, "");
 }
 
-/** Where a new Worktree's folder goes: next to the repo, in `<repo>.worktrees/`. */
-export function worktreeDir(repo: Project, branch: string): string {
+/** A branch prefix as git gets it (`Waldo` → `waldo/`): ending in one `/`, or "" for none. */
+export const cleanPrefix = (prefix?: string) => {
+  const t = toBranch(prefix ?? "").replace(/\/+$/, "");
+  return t ? `${t}/` : "";
+};
+
+/** `branch` less the repo's branch prefix (or `prefix`): what its folder and sidebar label show. */
+export function unprefixed(repo: Project, branch: string, prefix = repo.branchPrefix): string {
+  const pre = cleanPrefix(prefix);
+  return pre && branch.startsWith(pre) && branch.length > pre.length ? branch.slice(pre.length) : branch;
+}
+
+/** Where a new Worktree's folder goes: next to the repo, in `<repo>.worktrees/`, named after the
+ *  branch without the repo's prefix (`waldo/fix-sync` → `fix-sync`). `prefix` is the dialog's, before
+ *  it is saved. */
+export function worktreeDir(repo: Project, branch: string, prefix = repo.branchPrefix): string {
   const path = repo.path.replace(/[\\/]+$/, "");
   const sep = path.includes("\\") && !path.includes("/") ? "\\" : "/";
-  return `${path}.worktrees${sep}${branch.replace(/[\\/]/g, "-")}`;
+  return `${path}.worktrees${sep}${unprefixed(repo, branch, prefix).replace(/[\\/]/g, "-")}`;
 }
 
 // ── the New Worktree dialog's state ─────────────────────────────────
@@ -228,8 +246,14 @@ export const closeNewWorktree = () => setNewWorktreeFor(null);
 
 // ── create and remove ───────────────────────────────────────────────
 
-/** Add a Worktree on `branch` (made from `base` if new), switch to it and open `agent` in it. */
-export async function createWorktree(repo: Project, branch: string, opts: { base: string; issue?: string; agent?: Agent }): Promise<void> {
+/** A setup script's lines as they will run in the new checkout of `repo` on `branch`. */
+export const setupFor = (repo: Project, branch: string, script: string, prefix = repo.branchPrefix) =>
+  setupLines(script, { repo: repo.path, worktree: worktreeDir(repo, branch, prefix), branch });
+
+/** Make a Worktree of `repo` on `branch` (from `base` if new) and switch to it. In the new checkout,
+ *  `setup` gets a window of its own and the focus, which closes once it succeeds (setup.ts); each of
+ *  `open` opens beside it. They start together: nothing waits for the setup to finish. */
+export async function createWorktree(repo: Project, branch: string, opts: { base: string; issue?: string; setup?: string; open: Agent[] }): Promise<void> {
   const taken = worktreesOf(repo.id).find((w) => w.branch === branch);
   if (taken) {
     setApp("activeProject", taken.id);
@@ -246,7 +270,16 @@ export async function createWorktree(repo: Project, branch: string, opts: { base
   }
   const id = addWorktree(repo.id, { path: dir, branch, issue: opts.issue, ...(copy ? { copy } : {}) });
   const p = projectById(id);
-  if (p && opts.agent) launchAgent(p, opts.agent);
+  if (p) {
+    const lines = setupFor(repo, branch, opts.setup ?? "");
+    // PowerShell only for a project on this Windows machine; an ssh host runs its own login shell.
+    const windows = isLocalHost(repo.host) && /Windows/i.test(navigator.userAgent);
+    const setup = lines.length
+      ? addTab(p.id, "term", { agent: { id: "setup", name: "setup", command: setupCommand(lines, windows), icon: "wrench" }, once: true })
+      : undefined;
+    for (const a of opts.open) launchAgent(p, a);
+    if (setup) focusTab(p.id, setup);
+  }
   flash(`${copy ? "copy" : "worktree"} ${branch} · ${dir}`);
   void loadWorktrees(repo);
 }
@@ -355,8 +388,16 @@ export async function removeWorktree(p: Project): Promise<void> {
   await new Promise((r) => setTimeout(r, 300));
   try {
     await invoke("git_worktree_remove", { host: repo.host, path: repo.path, dir: p.path, force: dirty > 0 || gone });
+  } catch {
+    // On Windows git stops at the first file still open and leaves the rest; deleted below.
+  }
+  try {
+    await invoke("worktree_dir_delete", { host: repo.host, dir: p.path });
   } catch (e) {
-    if (!gone) flash(`git worktree remove: ${e}`);
+    if (!isLocalHost(repo.host)) flash(`couldn't delete ${p.path}: ${e}`);
+    else if (await ask(`Couldn't delete ${p.path}: something still has files open there (a dev server, an editor). ${e}\n\nShow the folder?`)) {
+      void revealItemInDir(p.path).catch(() => {});
+    }
   }
 
   if (branch !== "detached") {

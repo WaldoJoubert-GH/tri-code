@@ -3,10 +3,12 @@
 // hotkeys.ts run the same code and flash the same message.
 
 import {
-  GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, app, focusTab, focusedTab, goSpace, isRemote, live,
-  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, space, tabIcon, tabName, toggleMono,
+  GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, app, focusTab, focusedTab, goSpace, isPinned, isRemote, live,
+  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, space, tabIcon, tabName, toggleMono, togglePin,
 } from "./state";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { requestClose } from "./Canvas";
+import { isMac } from "./modkey";
 import { openAppearance, toggleAppearance } from "./Appearance";
 import { nextSignal, toggleDnd } from "./signals";
 import { toggleSignals } from "./SignalSettings";
@@ -169,6 +171,15 @@ export function commands(): Command[] {
     add({ id: "workspace-next", group: "Layout", title: "Next workspace", icon: "chevron-right", keys: capsOf("workspace-next"), run: () => stepWorkspace(p, 1) });
 
     add({ id: "new-worktree", group: "Project", title: "New worktree", hint: "another checkout of the repo, on its own branch", icon: "git-branch-plus", keys: capsOf("new-worktree"), run: () => openNewWorktree(p) });
+    if (!p.sample) add({
+      id: "pin-project", group: "Project", title: isPinned(p.id) ? `Unpin ${p.parent ? labelOf(p).text : p.name}` : `Pin ${p.parent ? labelOf(p).text : p.name} to top`,
+      hint: "the Pinned list above the Environments", icon: isPinned(p.id) ? "pin-off" : "pin",
+      run: () => (togglePin(p.id), flash(isPinned(p.id) ? "pinned to top" : "unpinned")),
+    });
+    if (!isRemote(p)) add({
+      id: "reveal-folder", group: "Project", title: isMac ? "Reveal in Finder" : "Open folder location", hint: p.path, icon: "folder-open",
+      run: () => void revealItemInDir(p.path).catch((err) => flash(`can't open ${p.path}: ${err}`)),
+    });
     if (p.parent) add({
       id: "remove-worktree", group: "Project", title: `${p.copy ? "Finish" : "Remove worktree"} ${labelOf(p).text}`,
       hint: p.copy ? "copy the changes back, delete the copy" : p.path, icon: "trash-2", run: () => void removeWorktree(p),

@@ -1,8 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
-  Project, app, envIcon, envName, isLocalHost, isTerminal, moveProject, projectById, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
-  setSidebarCollapsed, worktreesOf,
+  Project, app, envIcon, envName, isLocalHost, isPinned, isTerminal, moveProject, projectById, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
+  setSidebarCollapsed, togglePin, worktreesOf,
 } from "./state";
 import { closeBrowser, setBrowsersCovered } from "./browsers";
 import { closeSession } from "./terms";
@@ -18,6 +19,7 @@ import { type CtxItem, openCtxMenu } from "./ctxmenu";
 import { folderStatus, peekStatus } from "./git";
 import { ask, flash } from "./ui";
 import { keyOf, withKey } from "./keymap";
+import { isMac } from "./modkey";
 import { envLocked, lockEnv } from "./envlock";
 import { settingsOpen, toggleSettings } from "./Settings";
 
@@ -93,13 +95,49 @@ export function dropProject(p: Project) {
   removeProject(p.id);
 }
 
-/** The right-click menu of a Worktree's row: rename, go back to following its branch, start the next
- *  feature (a copy's repos), and finish or remove it. */
+/** Show the project's folder in Explorer or Finder. Only a folder on this machine can be shown. */
+function folderItem(p: Project): CtxItem {
+  return {
+    label: isMac ? "Reveal in Finder" : "Open folder location",
+    disabled: !isLocalHost(p.host),
+    run: () => void revealItemInDir(p.path).catch((err) => flash(`can't open ${p.path}: ${err}`)),
+  };
+}
+
+const pinItem = (p: Project): CtxItem => ({ label: isPinned(p.id) ? "Unpin" : "Pin to top", run: () => togglePin(p.id) });
+
+/** The right-click menu of a project's row (and its own folder's row under it): what the row's hover
+ *  buttons do, which the collapsed rail has no room for, plus pinning and its folder. */
+function projectMenu(e: MouseEvent, p: Project) {
+  const anchor = e.currentTarget as HTMLElement;
+  const items: CtxItem[] = [
+    pinItem(p),
+    "sep",
+    ...(p.sample ? [] : [{ label: "New worktree…", run: () => openNewWorktree(p) }]),
+    {
+      label: "Appearance…",
+      run: () => {
+        setApp("activeProject", p.id);
+        openAppearance(anchor, p.id);
+      },
+    },
+    "sep",
+    folderItem(p),
+  ];
+  openCtxMenu(e, items);
+}
+
+/** The right-click menu of a Worktree's row: pin it to the top, rename, go back to following its
+ *  branch, start the next feature (a copy's repos), show its folder, and finish or remove it. */
 function worktreeMenu(e: MouseEvent, w: Project) {
   const items: CtxItem[] = [
+    pinItem(w),
+    "sep",
     { label: "Rename…", run: () => openWorktreeDialog(w.id, "rename") },
     { label: "Reset to auto", disabled: !w.title, run: () => renameWorktree(w, "") },
     ...(w.copy ? [{ label: "Start next feature…", disabled: !folderStatus[w.id]?.length, run: () => openWorktreeDialog(w.id, "next") }] : []),
+    "sep",
+    folderItem(w),
     "sep",
     { label: w.copy ? "Finish…" : "Remove worktree…", run: () => openWorktreeDialog(w.id, "finish") },
   ];
@@ -157,6 +195,73 @@ export default function Sidebar() {
   };
   /** The repo project or one of its Worktrees is the active project. */
   const inFamily = (p: Project) => app.activeProject === p.id || worktreesOf(p.id).some((w) => w.id === app.activeProject);
+
+  /** Pinned projects and Worktrees, in pin order, for the shelf above the Environments. */
+  const pins = () => app.pinned.map(projectById).filter((w): w is Project => !!w);
+
+  /** One checkout's row. In its repo's list (the repo's own folder too) it can be removed; on the
+   *  Pinned shelf (`shelf`) it carries its repo's name instead, and dims while its Environment is locked.
+   *  A pinned repo shows there with its icon and name, its branch after. */
+  const wtRow = (w: Project, shelf = false) => {
+    const repo = () => (w.parent && projectById(w.parent)) || w;
+    const locked = () => shelf && envLocked(repo().host);
+    const shelvedRepo = shelf && !w.parent;
+    return (
+      <div
+        class="wt"
+        classList={{ active: app.activeProject === w.id, shelved: shelf, locked: locked() }}
+        style={{ "--wa": w.accent }}
+        title={[
+          ...labelOf(w).tip, shelf ? `${repo().name} · ${envName(repo().host)}` : "", w.path,
+          `${w.tabs.length ? `${w.tabs.length} window${w.tabs.length === 1 ? "" : "s"}` : ""}`, sigSummary(w),
+        ].filter(Boolean).join("\n")}
+        onClick={() => {
+          setApp("activeProject", w.id);
+          // A copy's repos are not polled like one repo's: read them as the copy is picked.
+          if (w.copy) void peekStatus(w);
+        }}
+        onDblClick={() => w.parent && openWorktreeDialog(w.id, "rename")}
+        onContextMenu={(e) => (w.parent ? worktreeMenu(e, w) : projectMenu(e, w))}
+      >
+        <span class="wtile" classList={{ face: shelvedRepo }}>
+          {w.parent ? tileLabel(w) : shelvedRepo ? <IconFace project={w} /> : <Icon name="git-branch" size={12} />}
+          <Show when={labelOf(w).mark}>
+            {(m) => <span class={`mark ${m()}`} title={m() === "named" ? "Named" : "Repos are on different branches"}>{m() === "named" ? "◆" : "≠"}</span>}
+          </Show>
+        </span>
+        <Show when={ownBadge(w)}>
+          {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
+        </Show>
+        <span class="bn" classList={{ name: shelvedRepo }}>{shelvedRepo ? w.name : labelOf(w).text}</span>
+        <Show when={shelf}>
+          <span class="sub">{shelvedRepo ? labelOf(w).text : repo().name}{isLocalHost(repo().host) ? "" : ` · ${envName(repo().host)}`}</span>
+        </Show>
+        <Show when={locked()} fallback={<span class="count">{w.tabs.length || ""}</span>}>
+          <span class="lk" title={`${envName(repo().host)} is locked`}><Icon name="lock" size={11} /></span>
+        </Show>
+        <Show when={w.parent || shelf}>
+          <button
+            class="pin"
+            classList={{ on: !shelf && isPinned(w.id) }}
+            title={isPinned(w.id) ? "Unpin" : "Pin to top"}
+            aria-label={`${isPinned(w.id) ? "Unpin" : "Pin"} ${labelOf(w).text}`}
+            aria-pressed={isPinned(w.id)}
+            onClick={(e) => (e.stopPropagation(), togglePin(w.id))}
+          >
+            <Icon name={shelf ? "pin-off" : "pin"} size={11} />
+          </button>
+        </Show>
+        <Show when={w.parent && !shelf}>
+          <button
+            class="x"
+            title={w.copy ? "Finish: copy the changes back and delete the copy" : "Remove worktree"}
+            aria-label={`${w.copy ? "Finish" : "Remove worktree"} ${labelOf(w).text}`}
+            onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}
+          >×</button>
+        </Show>
+      </div>
+    );
+  };
 
   // Branch names come from `git worktree list`; ask again whenever a repo's set of Worktrees changes.
   createEffect(() => {
@@ -224,6 +329,15 @@ export default function Sidebar() {
           {peek() ? "⇥" : app.sidebarCollapsed ? "»" : "«"}
         </button>
       </div>
+      <Show when={pins().length}>
+        <section class="pinned">
+          <h2>
+            <span class="env-icon"><Icon name="pin" size={14} /></span>
+            <span class="host">Pinned</span>
+          </h2>
+          <For each={pins()}>{(w) => wtRow(w, true)}</For>
+        </section>
+      </Show>
       <For each={app.environments}>
         {(host) => (
           <section>
@@ -284,6 +398,7 @@ export default function Sidebar() {
                   title={[app.sidebarCollapsed && !peek() ? `${p.name} · ${envName(p.host)} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : "", sigSummary(p)].filter(Boolean).join("\n") || undefined}
                   onPointerDown={(e) => renaming() !== p.id && dragProject(e, p)}
                   onClick={() => !dragged && !inFamily(p) && setApp("activeProject", p.id)}
+                  onContextMenu={(e) => projectMenu(e, p)}
                 >
                   <span class="swatch"><IconFace project={p} /></span>
                   <Show when={badge(p)}>
@@ -333,43 +448,7 @@ export default function Sidebar() {
                   {/* Every checkout of the repo, the repo's own folder first: one row each, open or
                       collapsed, with the tile in the same place so nothing moves when the rail peeks. */}
                   <div class="wts" classList={{ "drop-after": dropAt()?.id === p.id && dropAt()!.after }} data-drop={p.id}>
-                    <For each={[p, ...worktreesOf(p.id)]}>
-                      {(w) => (
-                        <div
-                          class="wt"
-                          classList={{ active: app.activeProject === w.id }}
-                          style={{ "--wa": w.accent }}
-                          title={[...labelOf(w).tip, w.path, `${w.tabs.length ? `${w.tabs.length} window${w.tabs.length === 1 ? "" : "s"}` : ""}`, sigSummary(w)].filter(Boolean).join("\n")}
-                          onClick={() => {
-                            setApp("activeProject", w.id);
-                            // A copy's repos are not polled like one repo's: read them as the copy is picked.
-                            if (w.copy) void peekStatus(w);
-                          }}
-                          onDblClick={() => w.parent && openWorktreeDialog(w.id, "rename")}
-                          onContextMenu={(e) => w.parent && worktreeMenu(e, w)}
-                        >
-                          <span class="wtile">
-                            {w.parent ? tileLabel(w) : <Icon name="git-branch" size={12} />}
-                            <Show when={labelOf(w).mark}>
-                              {(m) => <span class={`mark ${m()}`} title={m() === "pin" ? "Pinned name" : "Repos are on different branches"}>{m() === "pin" ? <Icon name="pin" size={8} /> : "≠"}</span>}
-                            </Show>
-                          </span>
-                          <Show when={ownBadge(w)}>
-                            {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
-                          </Show>
-                          <span class="bn">{labelOf(w).text}</span>
-                          <span class="count">{w.tabs.length || ""}</span>
-                          <Show when={w.parent}>
-                            <button
-                              class="x"
-                              title={w.copy ? "Finish: copy the changes back and delete the copy" : "Remove worktree"}
-                              aria-label={`${w.copy ? "Finish" : "Remove worktree"} ${labelOf(w).text}`}
-                              onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}
-                            >×</button>
-                          </Show>
-                        </div>
-                      )}
-                    </For>
+                    <For each={[p, ...worktreesOf(p.id)]}>{(w) => wtRow(w)}</For>
                     <button class="wt new" title={withKey("New worktree", "new-worktree")} onClick={() => openNewWorktree(p)}>
                       <span class="wtile"><Icon name="git-branch-plus" size={12} /></span><span class="bn">New worktree</span>
                     </button>

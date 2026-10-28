@@ -116,6 +116,7 @@ pub fn run() {
             folders::folder_copy,
             folders::folder_changes,
             folders::folder_finish,
+            folders::worktree_dir_delete,
             envs::ssh_hosts,
             envs::scan_logos,
             envssh::env_ssh_set,
