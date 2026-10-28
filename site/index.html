@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tri-code — a minimal agent development environment</title>
-  <meta name="description" content="Run Claude Code, pi and your shells side by side, locally or over ssh, with git, an editor, a browser and issues in one window.">
+  <meta name="description" content="Run Claude Code, pi and your shells side by side, locally or over ssh, with worktrees, git, an editor, a database browser, a browser and issues in one window.">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,13 +27,13 @@
 <header class="hero">
   <div class="wrap">
     <h1>Your agents, <em>side by side</em>.</h1>
-    <p class="lede">tri-code is a minimal agent development environment. Run Claude Code, pi and your shells in tiled windows, on your machine or over ssh, with git, an editor, a browser and your issues one keystroke away.</p>
+    <p class="lede">tri-code is a minimal agent development environment. Run Claude Code, pi and your shells in tiled windows, on your machine or over ssh, with worktrees, git, an editor, your database and your issues one keystroke away.</p>
     <div class="cta">
       <a class="btn primary" href="download.html">Download for free</a>
       <a class="btn ghost" href="https://github.com/WaldoJoubert-GH/tri-code">View on GitHub</a>
     </div>
     <div class="meta">Windows &amp; macOS · updates itself</div>
-    <img class="shot" src="screenshots/hero.png" width="2880" height="1760" alt="A claude tab, the git window and a shell tiled in one project">
+    <video class="shot" src="screenshots/demo.mp4" poster="screenshots/demo-poster.jpg" width="1920" height="1080" autoplay muted loop playsinline aria-label="A 40-second tour: tri-code opens from a terminal, claude works in a worktree, agent signals show who needs you, worktrees, ✦ drafts a commit, the Command Palette opens the database window, and a recap of the editor, Commands and ssh"></video>
   </div>
 </header>
 
@@ -62,7 +62,7 @@
       <div class="card">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v6M18 9a9 9 0 0 1-9 9"/></svg></div>
         <h3>Worktrees built in</h3>
-        <p>One branch per agent. New worktree makes the checkout, opens an agent in it, and cleans up when the PR merges.</p>
+        <p>One branch per agent. New worktree adds your branch prefix, runs a setup script once, opens the agents you pick and cleans up when the PR merges. Pin the ones you're working on.</p>
       </div>
       <div class="card">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg></div>
@@ -85,9 +85,24 @@
         <p>Plane, GitHub Issues and local issues in one keyboard-driven panel, linked to the branch you're on.</p>
       </div>
       <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg></div>
+        <h3>Your database, beside the code</h3>
+        <p>Browse and edit Postgres, SQLite and MongoDB. Edits apply in one checked transaction, read-only connections stay read-only, and ssh projects tunnel through the host.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg></div>
+        <h3>Agents drive windows</h3>
+        <p>A bundled MCP server lets claude and pi start a command you allowed, read its terminal, type into it and wait for it to finish.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div>
+        <h3>Remote Control</h3>
+        <p>Your agents on your phone over Tailscale: watch a terminal live, type into it, and get a push when one needs you.</p>
+      </div>
+      <div class="card">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></div>
         <h3>Keyboard first</h3>
-        <p>A Command Palette for everything (<kbd>Alt</kbd> <kbd>X</kbd>), fuzzy Go to File, and every hotkey rebindable.</p>
+        <p>One box finds commands and files together (<kbd>Alt</kbd> <kbd>X</kbd>), and every hotkey is rebindable.</p>
       </div>
     </div>
   </div>
@@ -99,35 +114,69 @@
       <div class="text">
         <div class="eyebrow">Layouts</div>
         <h3>Run the whole team at once</h3>
-        <p>claude, pi, the issues panel and a shell in one grid. Projects are grouped by where they run: your machine or any ssh host.</p>
+        <p>claude, pi, the issues panel and a shell in one grid. Projects are grouped by where they run, your machine or any ssh host, with their worktrees beneath them.</p>
         <ul>
           <li>Minimise a window without stopping it</li>
           <li>Four workspaces per project</li>
-          <li>Accent colours and icons per project</li>
+          <li>Badges show which agents are working, waiting or done</li>
         </ul>
       </div>
-      <img class="shot" src="screenshots/grid.png" width="2880" height="1760" alt="Grid layout with claude, pi, issues and a shell" loading="lazy">
+      <img class="shot" src="screenshots/grid.png" width="2880" height="1760" alt="Grid layout with claude, pi waiting for an answer, issues and a shell" loading="lazy">
     </div>
     <div class="row">
       <div class="text">
         <div class="eyebrow">Git</div>
         <h3>Review what the agent did</h3>
-        <p>Read the diff, stage what you want, and let ✦ write the commit message from the diff, the issue in progress and your commit style.</p>
+        <p>Read the diff unified or split, stage what you want, and let ✦ write the commit message from the diff, the issue in progress and your commit style.</p>
         <ul>
           <li>Push, open a PR and merge from one window</li>
           <li>PR checks refresh while they run</li>
           <li>Branch status always in the status line</li>
         </ul>
       </div>
-      <img class="shot" src="screenshots/git.png" width="2880" height="1760" alt="Git window with staged and unstaged changes and a diff" loading="lazy">
+      <img class="shot" src="screenshots/git.png" width="2880" height="1760" alt="Git window with staged and unstaged changes and a split diff" loading="lazy">
     </div>
     <div class="row">
       <div class="text">
         <div class="eyebrow">Editor</div>
         <h3>Make the small fix yourself</h3>
-        <p>Open any file in a tab, see Markdown, HTML and SVG rendered, and switch to a diff of your unsaved edits with <kbd>Alt</kbd> <kbd>D</kbd>.</p>
+        <p>A file tree that shows git status, a tab per file and CodeMirror with search, multi-cursor and folding. Switch to a diff against HEAD with <kbd>Alt</kbd> <kbd>D</kbd>.</p>
       </div>
-      <img class="shot" src="screenshots/files.png" width="2880" height="1760" alt="Files window with the README previewed" loading="lazy">
+      <img class="shot" src="screenshots/files.png" width="2880" height="1760" alt="Editor with the file tree, git marks and a TypeScript file open" loading="lazy">
+    </div>
+    <div class="row">
+      <div class="text">
+        <div class="eyebrow">Database</div>
+        <h3>Check the data the agent touched</h3>
+        <p>Open a project's Postgres, SQLite or MongoDB from the Command Palette. Filter with a WHERE, sort, page, and edit rows in place.</p>
+        <ul>
+          <li>Connections saved per project, passwords kept on its host</li>
+          <li>Pending edits apply in one transaction, each checking its row</li>
+          <li>Query and Structure tabs beside the data</li>
+        </ul>
+      </div>
+      <img class="shot" src="screenshots/database.png" width="2880" height="1760" alt="Database window browsing an invoices table in Postgres" loading="lazy">
+    </div>
+    <div class="row">
+      <div class="text">
+        <div class="eyebrow">Commands</div>
+        <h3>Every tool you start, in one list</h3>
+        <p>claude, pi, a dev server, lazygit or a web app. Give each an icon, a hotkey and its own sounds, and offer it everywhere, on one environment or in one repo.</p>
+        <ul>
+          <li>Several lines run one after another in a login shell</li>
+          <li>The Agent toggle lets your agents open it themselves</li>
+          <li>Web apps open a browser window at their address</li>
+        </ul>
+      </div>
+      <img class="shot" src="screenshots/commands.png" width="2880" height="1760" alt="The Commands window listing agents, scripts and a web app" loading="lazy">
+    </div>
+    <div class="row">
+      <div class="text">
+        <div class="eyebrow">Command Palette</div>
+        <h3>One box for everything</h3>
+        <p><kbd>Alt</kbd> <kbd>X</kbd> finds commands and files together, commands first, with their hotkeys beside them. <kbd>/</kbd> browses the project's folders.</p>
+      </div>
+      <img class="shot" src="screenshots/palette.png" width="2880" height="1760" alt="Command Palette matching commands and a file for “data”" loading="lazy">
     </div>
   </div>
 </section>
