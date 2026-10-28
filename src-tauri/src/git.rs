@@ -259,6 +259,8 @@ const STATUS_CMDS: &[&[&str]] = &[
     &["rev-list", "HEAD", "--not", "--remotes", "-n", "200"],
     &["diff", "--numstat", "-z", "--cached"],
     &["diff", "--numstat", "-z"],
+    // origin/HEAD is only set by `git clone`: without it, guess from the usual names.
+    &["for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin/main", "refs/remotes/origin/master"],
 ];
 
 /// Parse one repo's status outputs (the commands in STATUS_CMDS).
@@ -270,8 +272,9 @@ fn status_from(r: &[Result<String, i32>]) -> Result<Status, String> {
     let mut s = Status::default();
     parse_status(status, &mut s);
     let base = r.get(1).and_then(|x| x.as_ref().ok()).map(|b| b.trim().to_string()).unwrap_or_default();
-    s.base = base.split_once('/').map(|(_, b)| b.to_string()).filter(|b| !b.is_empty()).unwrap_or_else(|| "main".into());
     let ok = |i: usize| r.get(i).and_then(|x| x.as_ref().ok()).map(String::as_str).unwrap_or("");
+    let guess = ok(6).lines().map(str::trim).find(|b| !b.is_empty()).map(String::from);
+    s.base = base.split_once('/').map(|(_, b)| b.to_string()).filter(|b| !b.is_empty()).or(guess).unwrap_or_else(|| "main".into());
     s.commits = parse_log(ok(2), ok(3));
     let (index, work) = (parse_numstat(ok(4)), parse_numstat(ok(5)));
     for c in &mut s.files {
