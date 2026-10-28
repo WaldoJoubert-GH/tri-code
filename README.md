@@ -4,23 +4,37 @@
 
 tri-code is a minimal agent development environment. The left sidebar lists projects grouped by host (`local` or an ssh destination). Each project has terminal tabs that run an agent: `claude` (Claude Code), `pi`, a plain shell, or any terminal app you add. Local tabs run in a local PTY. Remote tabs run the system `ssh` client and attach to a persistent session on the remote host, so agents survive network drops and app restarts. The app is built with Tauri v2 (Rust), SolidJS, and xterm.js. Projects and tabs are saved to `state.json` in the Tauri app config directory.
 
-![A claude tab, the git window and a shell tiled in one project](docs/screenshots/hero.png)
+![claude at work in a pinned worktree, beside the git window with a split diff and a shell](docs/screenshots/hero.png)
+
+▶ [Watch the 40-second demo](docs/screenshots/demo.mp4)
 
 ## Screenshots
 
-**Agents side by side.** claude, pi, the issues panel and a shell tiled in the grid layout. The sidebar groups projects by environment, local or ssh.
+**Agents side by side.** claude, pi, the issues panel and a shell tiled in the grid layout. The sidebar groups projects by environment, local or ssh, with each repo's worktrees beneath it and pinned ones on top; badges show which agents are working, waiting for you or done.
 
-![Grid layout with claude, pi, issues and a shell](docs/screenshots/grid.png)
+![Grid layout with claude, pi waiting for an answer, issues and a shell](docs/screenshots/grid.png)
 
-**Git window.** Stage files, read the diff, browse recent commits, and draft the commit message with ✦ from the diff, the In Progress issue and the commit style.
+**Git window.** Stage files, read the diff unified or split, browse recent commits, and draft the commit message with ✦ from the diff, the In Progress issue and the commit style.
 
-![Git window with staged and unstaged changes and a diff](docs/screenshots/git.png)
+![Git window with staged and unstaged changes and a split diff](docs/screenshots/git.png)
 
 **Editor.** The project's file tree, a tab per file and a CodeMirror editor: syntax colours for the common languages, search, multi-cursor, folding. Markdown, HTML and SVG also show rendered. One click opens a preview tab that the next click replaces; double-click or edit to keep it, `Ctrl`+click for a second editor beside. Saving won't overwrite a file an agent changed since you opened it without asking. A changed file gets a **Diff** view beside Source (`Alt+D` switches): `HEAD → buffer` (unsaved edits included, a staged rename against its old name), unified or side by side, and a double-click there goes back to source at that line. In Source, thin bars beside the line numbers mark added, changed and deleted lines.
 
-![Files window with the README previewed](docs/screenshots/files.png)
+![Editor with the file tree, git marks and a TypeScript file open](docs/screenshots/files.png)
 
-**Open project.** Pick an environment, then type to filter folders. Git repositories are marked.
+**Database window.** Browse and edit a project's Postgres, SQLite and MongoDB databases: filter with a WHERE, sort, page, edit rows in place, run queries and read the structure. Pending edits apply in one transaction, each checking the row it expects.
+
+![Database window browsing an invoices table in Postgres](docs/screenshots/database.png)
+
+**Commands window.** Everything the `+` menu offers: agents, scripts, terminal apps and web apps, each with an icon, a hotkey, its own sounds and a scope. The Agent toggle lets claude and pi open it as a window themselves.
+
+![The Commands window listing agents, scripts and a web app](docs/screenshots/commands.png)
+
+**Command Palette.** `Alt+X` finds commands and files together, commands first.
+
+![Command Palette matching commands and a file for "data"](docs/screenshots/palette.png)
+
+**Open project.** Pick an environment, then type to filter folders. Git repositories and `.code-workspace` files are marked.
 
 ![The Open project dialog](docs/screenshots/open.png)
 
