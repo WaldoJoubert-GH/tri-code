@@ -1,10 +1,13 @@
 // The New Worktree dialog (Alt+W): a branch name, an existing branch (local, or only on a remote),
-// or an In Progress issue to name it after, and the agent to open in the new checkout. Creating it runs `git worktree add` on the
-// project's host (or, for a folder that isn't a repo, copies it) and switches to the Worktree.
+// or an In Progress issue to name it after, a setup script to run once in the new checkout (kept per
+// repo) and the Commands to open there. Creating it runs `git worktree add` on the project's host (or,
+// for a folder that isn't a repo, copies it) and switches to the Worktree.
+// Chosen from design/worktree-commands.html (variant D).
 
 import { For, Show, createSignal } from "solid-js";
-import { app, projectById, worktreeAgent, worktreesOf } from "./state";
-import { branches, closeNewWorktree, createWorktree, fetching, issueBranch, kinds, listed, newWorktreeFor, toBranch, worktreeDir } from "./worktrees";
+import { app, projectById, setBranchPrefix, setWorktreeSetup, worktreeAgent, worktreesOf } from "./state";
+import { branches, cleanPrefix, closeNewWorktree, createWorktree, fetching, issueBranch, kinds, listed, newWorktreeFor, setupFor, toBranch, worktreeDir } from "./worktrees";
+import { SETUP_VARS } from "./setup";
 import { dev, inProgress, slugOf } from "./issues";
 import { gitOf } from "./git";
 import { Icon } from "./lucide";
@@ -15,13 +18,35 @@ export function NewWorktreeDialog() {
       {(repo) => {
         const [name, setName] = createSignal("");
         const [issue, setIssue] = createSignal<string | undefined>();
-        // Settings › Git picks the default; "" opens nothing.
-        const [agent, setAgent] = createSignal(worktreeAgent());
+        const [setup, setSetup] = createSignal(repo.setup ?? "");
+        let setupEl!: HTMLTextAreaElement;
+        /** Put `{name}` where the cursor is in the setup box (at the end if it hasn't been focused). */
+        const insertVar = (name: string) => {
+          const v = setup(), at = setupEl.selectionStart ?? v.length, to = setupEl.selectionEnd ?? at;
+          const text = `{${name}}`;
+          setSetup(v.slice(0, at) + text + v.slice(to));
+          setupEl.focus();
+          setupEl.setSelectionRange(at + text.length, at + text.length);
+        };
+        // Settings › Git picks the one that starts on; "" starts with none.
+        const [open, setOpen] = createSignal<string[]>(worktreeAgent() ? [worktreeAgent()] : []);
+        const toggleOpen = (id: string) => setOpen((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+        /** The picked Commands, in the + menu's order. */
+        const opening = () => app.agents.filter((a) => open().includes(a.id));
         const [busy, setBusy] = createSignal(false);
         const [error, setError] = createSignal("");
         /** An existing branch picked below: its name is used as it is, not through toBranch. */
         const [picked, setPicked] = createSignal<string | undefined>();
-        const branch = () => picked() ?? toBranch(name());
+        const [prefix, setPrefix] = createSignal(repo.branchPrefix ?? "");
+        /** A new branch starts with the prefix; an existing one is used as it is. */
+        const branch = () => picked() ?? (toBranch(name()) ? cleanPrefix(prefix()) + toBranch(name()) : "");
+        /** The prefix the folder leaves out: the typed one, or the saved one for an existing branch. */
+        const dirPrefix = () => (picked() ? repo.branchPrefix : prefix());
+        const keys = (e: KeyboardEvent) => {
+          if (e.key === "Enter") void create();
+          else if (e.key === "Escape") closeNewWorktree();
+          e.stopPropagation();
+        };
         /** The branches that could be checked out: not the ones a checkout already has, matching what is typed. */
         const existing = () => {
           const out = new Set((listed[repo.id] ?? []).map((w) => w.branch));
@@ -44,7 +69,10 @@ export function NewWorktreeDialog() {
           setBusy(true);
           setError("");
           try {
-            await createWorktree(repo, branch(), { base: base(), issue: issue(), agent: app.agents.find((a) => a.id === agent()) });
+            setWorktreeSetup(repo.id, setup());
+            // Saved first: the new folder is named without it.
+            if (!picked()) setBranchPrefix(repo.id, cleanPrefix(prefix()));
+            await createWorktree(repo, branch(), { base: base(), issue: issue(), setup: setup(), open: opening() });
             closeNewWorktree();
           } catch (e) {
             setError(String(e));
@@ -61,19 +89,32 @@ export function NewWorktreeDialog() {
                 <button type="button" title="Close (Esc)" aria-label="Close" onClick={closeNewWorktree}>×</button>
               </header>
               <div class="body">
-                <input
-                  value={name()}
-                  placeholder="branch name"
-                  spellcheck={false}
-                  autocomplete="off"
-                  ref={(el) => requestAnimationFrame(() => el.focus())}
-                  onInput={(e) => { setName(e.currentTarget.value); setIssue(undefined); setPicked(undefined); }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void create();
-                    else if (e.key === "Escape") closeNewWorktree();
-                    e.stopPropagation();
-                  }}
-                />
+                <div class="joined">
+                  <input
+                    class="pre"
+                    value={prefix()}
+                    placeholder="prefix/"
+                    spellcheck={false}
+                    autocomplete="off"
+                    disabled={!!picked()}
+                    style={{ width: `${Math.min(18, Math.max(7, prefix().length + 2))}ch` }}
+                    title={picked() ? "An existing branch is used as it is" : `Every new branch in ${repo.name} starts with this; saved when you press Create`}
+                    aria-label="Branch prefix"
+                    onInput={(e) => setPrefix(e.currentTarget.value)}
+                    onKeyDown={keys}
+                  />
+                  <input
+                    class="nm"
+                    value={name()}
+                    placeholder="branch name"
+                    spellcheck={false}
+                    autocomplete="off"
+                    aria-label="Branch name"
+                    ref={(el) => requestAnimationFrame(() => el.focus())}
+                    onInput={(e) => { setName(e.currentTarget.value); setIssue(undefined); setPicked(undefined); }}
+                    onKeyDown={keys}
+                  />
+                </div>
                 <Show when={!nested() && (existing().length || fetching() === repo.id)}>
                   <div class="mt">or check out an existing branch<Show when={fetching() === repo.id}> · fetching…</Show></div>
                   <div class="issues">
@@ -113,14 +154,47 @@ export function NewWorktreeDialog() {
                     </For>
                   </div>
                 </Show>
-                <label class="row">
-                  Open
-                  <select value={agent()} onChange={(e) => setAgent(e.currentTarget.value)}>
-                    <For each={app.agents}>{(a) => <option value={a.id}>{a.name || "untitled"}</option>}</For>
-                    <option value="">nothing</option>
-                  </select>
-                  in it
-                </label>
+                <div class="mt">Setup <span class="r">runs once, in its own window; closes when done</span></div>
+                <textarea
+                  class="setup"
+                  ref={setupEl}
+                  value={setup()}
+                  placeholder={"bun install\ncp {repo}/.env .env"}
+                  spellcheck={false}
+                  rows={3}
+                  onInput={(e) => setSetup(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void create();
+                    else if (e.key === "Escape") closeNewWorktree();
+                    e.stopPropagation();
+                  }}
+                />
+                <div class="vars">
+                  <For each={SETUP_VARS}>
+                    {(v) => (
+                      <button type="button" class="chip" title={`${v.hint}: insert at the cursor`} onClick={() => insertVar(v.name)}>
+                        <b>{`{${v.name}}`}</b> {v.hint}
+                      </button>
+                    )}
+                  </For>
+                </div>
+                <div class="mt">and open</div>
+                <div class="issues">
+                  <For each={app.agents}>
+                    {(a) => (
+                      <button
+                        type="button"
+                        class="chip"
+                        classList={{ on: open().includes(a.id) }}
+                        aria-pressed={open().includes(a.id)}
+                        title={a.url ?? (a.command || "login shell")}
+                        onClick={() => toggleOpen(a.id)}
+                      >
+                        <b>{a.name || "untitled"}</b>
+                      </button>
+                    )}
+                  </For>
+                </div>
                 <div class="where">
                   <Show when={kinds[repo.id]} fallback={<span>checking {repo.path}…</span>}>
                     <Show
@@ -129,7 +203,7 @@ export function NewWorktreeDialog() {
                         <span>
                           {(() => {
                             const b = branch() || "<branch>";
-                            const dir = worktreeDir(repo, b);
+                            const dir = worktreeDir(repo, b, dirPrefix());
                             const f = found();
                             if (!f) return `git worktree add -b ${b} ${dir} ${base()}`;
                             return f.remote ? `git worktree add --track -b ${b} ${dir} ${f.remote}/${b}` : `git worktree add ${dir} ${b}`;
@@ -139,7 +213,7 @@ export function NewWorktreeDialog() {
                     >
                       {(repos) => (
                         <>
-                          <span>not a git repo: copy {repo.path} → {worktreeDir(repo, branch() || "<branch>")}</span>
+                          <span>not a git repo: copy {repo.path} → {worktreeDir(repo, branch() || "<branch>", dirPrefix())}</span>
                           <Show when={repos().length}>
                             <span>{repos().join(", ")}: git worktree add -b {branch() || "<branch>"}</span>
                           </Show>
@@ -148,6 +222,10 @@ export function NewWorktreeDialog() {
                       )}
                     </Show>
                   </Show>
+                  <Show when={setup().trim()}>
+                    <span class="then">then runs setup: {setupFor(repo, branch() || "<branch>", setup(), dirPrefix()).join(" && ")}</span>
+                  </Show>
+                  <span class="then">{opening().length ? `then opens: ${opening().map((a) => a.name || "untitled").join(", ")}` : "then opens nothing"}</span>
                 </div>
                 <Show when={taken()}><div class="note">{branch()} already has a worktree; Create switches to it.</div></Show>
                 <Show when={error()}><div class="note bad">{error()}</div></Show>

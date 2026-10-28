@@ -122,6 +122,54 @@ pub async fn folder_finish(host: String, src: String, dest: String, files: Vec<S
     .await
 }
 
+/// Delete what `git worktree remove` left of a Worktree's folder. On Windows git gives up at the
+/// first file something still has open and leaves the rest (often `node_modules` and the folder
+/// itself), so try again for a few seconds while closed terminals' programs exit, clearing
+/// read-only flags on the way. Only a folder inside a `.worktrees` folder; one already gone is fine.
+#[tauri::command]
+pub async fn worktree_dir_delete(host: String, dir: String) -> Result<(), String> {
+    blocking(move || {
+        if !dir.replace('\\', "/").contains(".worktrees/") {
+            return Err(format!("{dir} is not in a .worktrees folder; not deleting it"));
+        }
+        if !is_local(&host) {
+            return remote::run(&host, &format!("rm -rf -- {}", remote_path(&dir))).map(|_| ());
+        }
+        let path = PathBuf::from(expand_home(&dir));
+        let mut last = String::new();
+        for attempt in 0..8 {
+            if !path.exists() {
+                return Ok(());
+            }
+            match std::fs::remove_dir_all(&path) {
+                Ok(()) => return Ok(()),
+                Err(e) => last = e.to_string(),
+            }
+            clear_readonly(&path);
+            std::thread::sleep(std::time::Duration::from_millis(250 * (attempt + 1)));
+        }
+        Err(format!("{}: {last}", path.display()))
+    })
+    .await
+}
+
+/// Make every file under `dir` writable, so `remove_dir_all` can delete it on Windows.
+fn clear_readonly(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        let p = e.path();
+        let Ok(meta) = std::fs::symlink_metadata(&p) else { continue };
+        if meta.is_dir() {
+            clear_readonly(&p);
+        } else if meta.permissions().readonly() {
+            let mut perms = meta.permissions();
+            #[allow(clippy::permissions_set_readonly_false)]
+            perms.set_readonly(false);
+            let _ = std::fs::set_permissions(&p, perms);
+        }
+    }
+}
+
 /// Which files to carry back: changed in the copy and not already the same in the folder; a
 /// conflict when the folder changed too.
 fn compare(then: &Manifest, copy: &Manifest, base: &Manifest) -> Changes {

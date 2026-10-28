@@ -3,10 +3,10 @@
 // collapsed. Finish only explains what is about to happen; removeWorktree then asks for the exact list.
 
 import { For, Show, createSignal } from "solid-js";
-import { type Project, projectById } from "./state";
+import { type Project, projectById, repoOf } from "./state";
 import { folderStatus } from "./git";
 import { Icon } from "./lucide";
-import { labelOf, removeWorktree, renameWorktree, startNextFeature, toBranch } from "./worktrees";
+import { cleanPrefix, labelOf, removeWorktree, renameWorktree, startNextFeature, toBranch } from "./worktrees";
 
 export type WorktreeAction = "rename" | "next" | "finish";
 
@@ -34,7 +34,9 @@ function Dialog(props: { w: Project; action: WorktreeAction }) {
   const repos = () => folderStatus[props.w.id] ?? [];
   const dirty = () => repos().filter((r) => (r.status?.files.length ?? 0) > 0).map((r) => r.repo);
   const clean = () => repos().filter((r) => !dirty().includes(r.repo));
-  const branch = () => toBranch(name());
+  /** The repo's branch prefix, which a next feature's branch starts with as a new worktree's does. */
+  const prefix = () => cleanPrefix(repoOf(props.w).branchPrefix);
+  const branch = () => (toBranch(name()) ? prefix() + toBranch(name()) : "");
   const canNext = () => !!branch() && clean().length > 0;
 
   const run = () => {
@@ -77,7 +79,7 @@ function Dialog(props: { w: Project; action: WorktreeAction }) {
               onInput={(e) => setName(e.currentTarget.value)}
             />
             <div class="note">
-              A label only: the folder and branches keep their names. Empty goes back to following the branch. Pinned names show a badge on the tile.
+              A label only: the folder and branches keep their names. Empty goes back to following the branch. A name shows ◆ on the tile.
             </div>
           </Show>
 
@@ -85,7 +87,7 @@ function Dialog(props: { w: Project; action: WorktreeAction }) {
             <input
               ref={(el) => requestAnimationFrame(() => el.focus())}
               value={name()}
-              placeholder="branch for the next feature"
+              placeholder={prefix() ? `branch for the next feature (after ${prefix()})` : "branch for the next feature"}
               spellcheck={false}
               onInput={(e) => setName(e.currentTarget.value)}
             />

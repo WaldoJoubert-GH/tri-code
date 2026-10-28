@@ -114,6 +114,8 @@ export type Tab = {
   cmd?: string;
   /** `term` tabs with a multi-line `cmd`: its lines were typed into the shell, so a restart or reattach doesn't type them again. */
   typed?: true;
+  /** `term` tabs only: a Worktree's setup (setup.ts). Its window closes when the command succeeds. */
+  once?: true;
   /** `db` tabs only: the Connection it shows (an id in `.dev/databases.json`); unset shows the start page. */
   db?: string;
   /** Minimised: when (ms), so Alt+Shift+N brings back the latest. Off the canvas but still in the Tab Strip. */
@@ -221,6 +223,12 @@ export type Project = {
   /** A Worktree of a folder that is not a git repo: a copy of the folder. `repos` are the repos
    *  nested in it, each added back as a git worktree on `branch` (see worktrees.ts). */
   copy?: { repos: string[] };
+  /** A repo project only: the script New worktree runs once in each new checkout (install, copy
+   *  `.env`), kept from the last time so the next one starts with it. */
+  setup?: string;
+  /** A repo project only: what New worktree starts each new branch with (`waldo/`), kept from the
+   *  last time. Its Worktrees' folders and sidebar labels leave it out. */
+  branchPrefix?: string;
   /** The tour's sample project: its terminals are scripted, and it can be closed with nothing lost. */
   sample?: boolean;
 };
@@ -256,6 +264,8 @@ type Persisted = {
   /** Per environment, by host: its PIN lock, if it has one. */
   envLocks: Record<string, EnvLock>;
   projects: Project[];
+  /** Projects and Worktrees pinned to the top of the sidebar, in the order they were pinned. */
+  pinned: string[];
   /** Most recent first, at most RECENT_MAX. */
   recent: RecentFolder[];
   activeProject?: string;
@@ -340,7 +350,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], recent: [], agents: defaultAgents(), profiles: defaultProfiles(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, settings: defaultSettings() });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], pinned: [], recent: [], agents: defaultAgents(), profiles: defaultProfiles(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, settings: defaultSettings() });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -439,6 +449,22 @@ export function renameProject(projectId: string, name: string) {
   edit(projectId, (p) => { p.name = name; });
 }
 
+/** The repo's branch prefix, already cleaned (worktrees.ts `cleanPrefix`); empty clears it. */
+export function setBranchPrefix(projectId: string, prefix: string) {
+  edit(projectId, (p) => {
+    if (prefix) p.branchPrefix = prefix;
+    else delete p.branchPrefix;
+  });
+}
+
+/** The repo's New worktree setup script; empty clears it. */
+export function setWorktreeSetup(projectId: string, script: string) {
+  edit(projectId, (p) => {
+    if (script.trim()) p.setup = script;
+    else delete p.setup;
+  });
+}
+
 export function setIcon(projectId: string, icon: ProjectIcon) {
   edit(projectId, (p) => { p.icon = icon; });
 }
@@ -500,15 +526,23 @@ export function moveProject(id: string, target: string, after: boolean) {
   }));
 }
 
+export const isPinned = (id: string) => app.pinned.includes(id);
+
+/** Pin a project or Worktree to the top of the sidebar, or unpin it. */
+export function togglePin(id: string) {
+  setApp("pinned", (ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+}
+
 export function removeProject(id: string) {
   setApp(produce((s) => {
     s.projects = s.projects.filter((p) => p.id !== id);
+    s.pinned = s.pinned.filter((x) => x !== id);
     if (s.activeProject === id) s.activeProject = s.projects[0]?.id;
   }));
 }
 
 /** Add a window on the active workspace and focus it. `after` inserts it right after that tab. */
-export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string; agent?: Agent; by?: "agent"; db?: string } = {}) {
+export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string; agent?: Agent; by?: "agent"; db?: string; once?: true } = {}) {
   const id = newId();
   edit(projectId, (p) => {
     const a = opts.agent;
@@ -517,7 +551,7 @@ export function addTab(projectId: string, kind: TabKind, opts: { url?: string; p
       ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}), ...(a?.profile ? { profile: a.profile } : {}) } : {}),
       ...(kind === "editor" && opts.path ? { path: opts.path, files: [opts.path] } : {}),
       ...(kind === "db" && opts.db ? { db: opts.db } : {}),
-      ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "", ...(opts.by ? { by: opts.by } : {}) } : {}),
+      ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "", ...(opts.by ? { by: opts.by } : {}), ...(opts.once ? { once: true as const } : {}) } : {}),
     };
     const i = opts.after ? p.tabs.findIndex((t) => t.id === opts.after) : -1;
     if (i >= 0) p.tabs.splice(i + 1, 0, tab);
@@ -1037,6 +1071,8 @@ function migrate(raw: any): Persisted {
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
       favs: p.favs ?? [], diffMode: p.diffMode, icon: p.icon, notify: p.notify, profile: p.profile,
       ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.title ? { title: p.title } : {}), ...(p.copy ? { copy: p.copy } : {}) } : {}),
+      ...(p.setup ? { setup: p.setup } : {}),
+      ...(p.branchPrefix ? { branchPrefix: p.branchPrefix } : {}),
       ...(p.sample ? { sample: true } : {}),
     };
   });
@@ -1047,6 +1083,7 @@ function migrate(raw: any): Persisted {
   for (const p of projects) if (!environments.includes(p.host)) environments.push(p.host);
   return {
     environments, envStyles: raw.envStyles ?? {}, envSsh: raw.envSsh ?? {}, envLocks: raw.envLocks ?? {}, projects, recent: raw.recent ?? [],
+    pinned: (raw.pinned ?? []).filter((id: string) => projects.some((p) => p.id === id)),
     activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(),
     // Browser data from before profiles stays in the default profile.
     profiles: raw.profiles?.some((p: Profile) => p.id === DEFAULT_PROFILE) ? raw.profiles : [...defaultProfiles(), ...(raw.profiles ?? [])],

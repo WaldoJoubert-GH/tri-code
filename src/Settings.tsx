@@ -195,7 +195,7 @@ function GitPage() {
         </select>
         <button type="button" class="reset" title="Back to the first agent with a command" disabled={app.settings.worktreeAgent === undefined} onClick={() => setWorktreeAgent(undefined)}>↺</button>
       </label>
-      <p class="note">The agent the New worktree dialog starts on; you can still pick another there.</p>
+      <p class="note">The command the New worktree dialog starts with under “and open”; you can pick more there.</p>
       <h4>Drafts</h4>
       <For each={DRAFT_ROWS}>
         {(d) => (

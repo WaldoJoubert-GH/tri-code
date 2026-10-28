@@ -22,6 +22,8 @@ struct Session {
     master: Mutex<Box<dyn MasterPty + Send>>,
     writer: Mutex<Box<dyn Write + Send>>,
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
+    /// The program's process id, to end what it started too (see `Session::kill`).
+    pid: Option<u32>,
     /// Its own Arc: the reader thread holds it, and must not hold the master (see below).
     tap: Arc<Mutex<Tap>>,
 }
@@ -48,6 +50,27 @@ impl Tap {
     }
 }
 
+impl Session {
+    /// End the program. On Windows that alone leaves what it started running (a dev server under
+    /// the shell) with no window, holding files and the folder open; `taskkill /T` ends the tree
+    /// first. Elsewhere the pty's hangup reaches the whole process group.
+    fn kill(&self) -> Result<(), String> {
+        #[cfg(windows)]
+        if let Some(pid) = self.pid {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            let _ = std::process::Command::new("taskkill")
+                .args(["/T", "/F", "/PID", &pid.to_string()])
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+            // taskkill has usually ended it already, so the killer's "not found" is no failure.
+            let _ = self.killer.lock().unwrap().kill();
+            return Ok(());
+        }
+        self.killer.lock().unwrap().kill().map_err(|e| e.to_string())
+    }
+}
+
 #[derive(Default)]
 pub struct Ptys {
     next_id: AtomicU32,
@@ -58,7 +81,7 @@ impl Ptys {
     pub fn kill_all(&self) {
         let sessions: Vec<_> = self.sessions.lock().unwrap().values().cloned().collect();
         for s in sessions {
-            let _ = s.killer.lock().unwrap().kill();
+            let _ = s.kill();
         }
     }
 
@@ -180,6 +203,7 @@ fn spawn_session(
         master: Mutex::new(pair.master),
         writer: Mutex::new(writer),
         killer: Mutex::new(child.clone_killer()),
+        pid: child.process_id(),
         tap: Arc::default(),
     });
     let tap = Arc::clone(&session.tap);
@@ -272,7 +296,7 @@ pub async fn pty_kill_all(state: tauri::State<'_, Arc<Ptys>>) -> Result<(), Stri
 #[tauri::command]
 pub async fn pty_kill(state: tauri::State<'_, Arc<Ptys>>, id: u32) -> Result<(), String> {
     match state.get(id) {
-        Ok(session) => session.killer.lock().unwrap().kill().map_err(|e| e.to_string()),
+        Ok(session) => session.kill(),
         Err(_) => Ok(()), // already gone
     }
 }

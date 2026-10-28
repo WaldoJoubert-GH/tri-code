@@ -203,6 +203,21 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 /* a badge on the tile's corner, out of the row's flow, so the collapsed rail stays aligned */
 .wt .wtile .mark { position: absolute; top: -5px; right: -5px; width: 13px; height: 13px; border-radius: 50%; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--accent); font: 600 9px var(--mono); line-height: 1; }
 .wt .wtile .mark.split { color: var(--warn); }
+.wt .sub { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--muted); }
+/* Pin to top: shown on hover, and kept on a pinned row in its repo's list so the copy there says why */
+.wt .pin { display: none; place-items: center; width: 16px; height: 16px; padding: 0; flex: none; border-radius: 4px; color: var(--muted); }
+.wt:hover .pin, .wt .pin.on { display: grid; }
+.wt .pin.on { color: var(--accent); }
+.wt .pin:hover { background: var(--raised); color: var(--text); }
+.wt.locked > :not(.pin) { opacity: .5; }
+.wt .lk { display: grid; color: var(--warn); }
+.wt.shelved { padding-right: 6px; }
+/* a pinned repo: its own icon in the small tile, its name in the row's font */
+.wt .wtile.face { overflow: hidden; font: 600 10px var(--ui); }
+.wt .wtile.face img { width: 100%; height: 100%; object-fit: contain; }
+.wt .wtile.face svg { width: 13px; height: 13px; }
+.wt .wtile.face b, .wt .wtile.face i { font-style: normal; }
+.wt .bn.name { font: 12px var(--ui); }
 .wt .x { position: absolute; right: 4px; opacity: 0; color: var(--muted); padding: 0 2px; }
 .wt:hover .x, .wt .x:focus-visible { opacity: 1; }
 .wt .x:hover { color: var(--text); }
@@ -217,7 +232,7 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 .wt > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
 .wt > .sb.s-working:empty { border-right-color: transparent; animation: spin .9s linear infinite; }
 .rail:not(.peek) .wt { justify-content: center; padding: 0; }
-.rail:not(.peek) .wt .bn, .rail:not(.peek) .wt .count, .rail:not(.peek) .wt .x { display: none; }
+.rail:not(.peek) .wt .bn, .rail:not(.peek) .wt .count, .rail:not(.peek) .wt .x, .rail:not(.peek) .wt .sub, .rail:not(.peek) .wt .pin, .rail:not(.peek) .wt .lk { display: none; }
 .rail:not(.peek) .wt.active { background: none; }
 .rail:not(.peek) .wt.active .wtile { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--wa); }
 .side-actions { margin-top: 10px; }
@@ -575,7 +590,26 @@ svg.lucide { flex: none; display: block; }
 }
 .wt-dlg input { font-family: var(--mono); }
 .wt-dlg input:focus, .wt-dlg select:focus { border-color: var(--accent); }
-.wt-dlg .mt { margin-top: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.wt-dlg .mt { margin-top: 4px; display: flex; align-items: baseline; gap: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.wt-dlg .mt .r { margin-left: auto; font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+/* the branch prefix as the start of the name field, in the accent so it reads as part of the branch */
+.wt-dlg .joined { display: flex; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
+.wt-dlg .joined:focus-within { border-color: var(--accent); }
+.wt-dlg .joined input { border: 0; border-radius: 0; background: transparent; }
+.wt-dlg .joined .pre {
+  flex: none; padding-right: 3px; text-align: right; color: var(--accent); font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 9%, transparent); border-right: 1px solid var(--line); border-radius: 3px 0 0 3px;
+}
+.wt-dlg .joined .pre:disabled { color: var(--muted); text-decoration: line-through; background: transparent; }
+.wt-dlg .joined .nm { flex: 1; padding-left: 5px; }
+.wt-dlg textarea.setup {
+  font: 12px/1.5 var(--mono); color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px;
+  outline: none; resize: vertical; min-height: 58px;
+}
+.wt-dlg textarea.setup:focus { border-color: var(--accent); }
+.wt-dlg .vars { display: flex; flex-wrap: wrap; gap: 5px; margin-top: -2px; }
+.wt-dlg .vars .chip { font-size: 11px; padding: 0 8px; }
+.wt-dlg .where .then { color: var(--text); }
 .wt-dlg .issues { display: flex; flex-wrap: wrap; gap: 5px; }
 .wt-dlg .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
 .wt-dlg .chip b { font: 600 11px var(--mono); color: var(--text); }
