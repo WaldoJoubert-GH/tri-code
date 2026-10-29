@@ -93,11 +93,14 @@ kbd {
 aside {
   grid-area: side; background: var(--panel); border-right: 1px solid var(--line);
   padding: 4px 6px 8px; overflow-y: auto; overflow-x: hidden; min-width: 0;
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: column; scrollbar-width: none;
 }
+aside::-webkit-scrollbar { display: none; }
 aside > * { flex: none; }
 /* Settings sits at the foot of the sidebar, under the list however long it is */
-.side-foot { margin-top: auto; padding-top: 10px; }
+.side-foot { margin-top: auto; padding-top: 10px; position: sticky; bottom: 0; z-index: 2; background: var(--panel); }
+/* Pinned shelf stays at the top of the list while the Environments scroll under it */
+.pinned { position: sticky; top: 0; z-index: 2; background: var(--panel); }
 .side-head { display: flex; align-items: center; justify-content: space-between; height: 26px; padding-left: 8px; }
 .side-head span { font-size: 12px; font-weight: 600; color: var(--muted); }
 .collapse { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; font-size: 14px; line-height: 1; }
