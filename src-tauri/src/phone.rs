@@ -388,6 +388,10 @@ fn router(phone: Shared) -> Router {
         .route("/app.css", get(|| async { asset("text/css", include_bytes!("../phone/app.css")) }))
         .route("/sw.js", get(|| async { asset("text/javascript", include_bytes!("../phone/sw.js")) }))
         .route("/icon.png", get(|| async { asset("image/png", include_bytes!("../icons/icon.png")) }))
+        .route("/icon-192.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-192.png")) }))
+        .route("/icon-maskable.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-maskable.png")) }))
+        .route("/apple-touch-icon.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-apple-touch.png")) }))
+        .route("/badge.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-badge.png")) }))
         .route("/xterm.js", get(|| async { asset("text/javascript", include_bytes!("../../node_modules/@xterm/xterm/lib/xterm.js")) }))
         .route("/xterm.css", get(|| async { asset("text/css", include_bytes!("../../node_modules/@xterm/xterm/css/xterm.css")) }))
         .route("/addon-fit.js", get(|| async { asset("text/javascript", include_bytes!("../../node_modules/@xterm/addon-fit/lib/addon-fit.js")) }))
@@ -404,11 +408,15 @@ struct PairQuery {
 }
 
 /// The pair code rides along in `start_url`: on iOS a Home Screen app has its own storage, so
-/// it pairs on its first launch rather than in the Safari tab it was added from.
+/// it pairs on its first launch rather than in the Safari tab it was added from. A fixed `id`
+/// keeps that varying `start_url` from making each pairing a different app. Android Chrome only
+/// installs it as a real app (its notifications under tri-code, not Chrome) with 192 and 512
+/// icons, and the maskable one stops Android framing the rounded icon in a white circle.
 async fn manifest(Query(q): Query<PairQuery>) -> Response {
     let code: String = q.pair.unwrap_or_default().chars().filter(|c| c.is_ascii_alphanumeric()).take(12).collect();
     let start = if code.is_empty() { "/".to_string() } else { format!("/?pair={code}") };
     let body = serde_json::json!({
+        "id": "/",
         "name": "tri-code",
         "short_name": "tri-code",
         "start_url": start,
@@ -416,7 +424,11 @@ async fn manifest(Query(q): Query<PairQuery>) -> Response {
         "display": "standalone",
         "background_color": "#0e0f12",
         "theme_color": "#0e0f12",
-        "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png" }],
+        "icons": [
+            { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+            { "src": "/icon.png", "sizes": "512x512", "type": "image/png" },
+            { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        ],
     });
     ([(header::CONTENT_TYPE, "application/manifest+json")], body.to_string()).into_response()
 }
