@@ -238,9 +238,25 @@
 .itools .seg button { padding: 1px 8px; }
 .isearch {
   flex: 1; min-width: 40px; margin: 0 4px 0 0; font: 12px var(--mono); color: var(--text); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; outline: none; user-select: text;
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px 3px 26px; outline: none; user-select: text; width: 100%;
 }
 .isearch:focus { border-color: var(--accent); }
+/* the search box is the one filter: a dropdown over the issues hangs off it */
+.sbox { position: relative; flex: 1; min-width: 60px; display: flex; margin-right: 4px; }
+.sbox > .lucide { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.sbox .isearch { margin: 0; }
+/* Source and Status: filter buttons that open a menu, the way the State Pill does */
+.fbtn {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; flex: none; margin-left: 2px; padding: 0 6px 0 7px;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--bg); font-size: 12px; color: var(--text);
+}
+.fbtn:hover, .fbtn[aria-expanded="true"] { background: var(--hover); }
+.fbtn > .lucide { color: var(--muted); }
+/* New: the one filled button in the toolbar */
+.nbtn {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; flex: none; margin: 0 2px 0 6px; padding: 0 9px 0 7px;
+  border-radius: 4px; background: var(--accent); color: var(--bg); font-size: 12px; font-weight: 600;
+}
 .ib { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
 .ib:hover { background: var(--hover); color: var(--text); }
 .ib[aria-pressed="true"] { background: var(--raised); color: var(--text); }
@@ -266,8 +282,13 @@
   position: sticky; top: 0; z-index: 1; height: 32px; display: flex; align-items: center; gap: 2px; padding: 0 6px;
   background: var(--panel); border-bottom: 1px solid var(--line); user-select: none;
 }
-.dhead .crumb { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; }
-.dhead .crumb b { color: var(--text); font: 600 11.5px var(--mono); }
+/* the crumb is the issue switcher: a button that opens the jump dropdown */
+.crumbbtn {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; height: 24px; margin-right: auto; padding: 0 6px 0 7px;
+  border-radius: 4px; color: var(--muted); font-size: 12px; white-space: nowrap;
+}
+.crumbbtn:hover, .crumbbtn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+.crumbbtn b { color: var(--text); font: 600 11.5px var(--mono); }
 .dhead .pos { font: 11px var(--mono); color: var(--muted); padding: 0 4px; }
 .dbody { padding: 14px 16px 18px; display: grid; gap: 4px 28px; max-width: 980px; }
 .dside { min-width: 0; }
@@ -367,12 +388,6 @@
 .pri.none { align-items: center; } .pri.none b { height: 2px !important; }
 .pri.urgent { align-items: center; justify-content: center; border-radius: 3px; background: var(--pc); color: #fff; font: 800 9px/1 var(--ui); }
 .lvl { width: 8px; height: 8px; border-radius: 50%; background: var(--pc); margin-left: 2px; }
-.inew { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; padding: 2px 10px 6px 12px; }
-.inew .pri { flex: none; }
-.inew input {
-  flex: 1; font: 12.5px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--accent);
-  border-radius: 4px; padding: 4px 8px; outline: none; user-select: text;
-}
 .iempty { grid-column: 1 / -1; padding: 28px 16px; color: var(--muted); text-align: center; }
 .idetail h3 { margin: 4px 0 8px; font-size: 14px; line-height: 1.35; text-wrap: balance; }
 .ichips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
@@ -441,9 +456,80 @@
 .isrc .srow .go { margin-top: 0; }
 .isrc .cancel { padding: 5px 12px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); }
 .isrc .cancel:hover { color: var(--text); background: var(--hover); }
-/* New Issue row: where it goes, when the project has more than one Source */
-.inew .idest { flex: none; font-size: 11.5px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); white-space: nowrap; }
-.inew .idest:hover { color: var(--text); background: var(--hover); }
+/* List row: assignees as avatars, or a dim icon when nobody is on it */
+.rmeta { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.avs { display: inline-flex; align-items: center; flex: none; }
+.avs .av.sm + .av.sm { margin-left: -5px; }
+.av.sm { width: 18px; height: 18px; font-size: 8.5px; box-shadow: 0 0 0 1.5px var(--panel); flex: none; }
+.irow:hover .av.sm { box-shadow: 0 0 0 1.5px var(--hover); }
+.unasg { display: inline-flex; color: var(--muted); opacity: .55; }
+.iss .idrop .lucide, .iss .fbtn .lucide, .iss .ib .lucide, .iss .nbtn .lucide { flex: none; }
+.idrop .cur { display: inline-flex; align-items: center; gap: 6px; }
+.idrop .cur .lucide { color: var(--accent); }
+/* Jump to issue: the search dropdown (list search box, or the detail crumb) */
+.idrop.jump { width: min(340px, calc(100% - 8px)); padding: 4px; }
+.jfield { position: relative; padding: 2px 2px 4px; }
+.jfield > .lucide { position: absolute; left: 9px; top: 8px; color: var(--muted); pointer-events: none; }
+.jfield input {
+  width: 100%; font: 12px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 4px; padding: 4px 8px 4px 26px; outline: none; user-select: text;
+}
+.jfield input:focus { border-color: var(--accent); }
+.jlist { max-height: 300px; overflow: auto; }
+.jitem {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%;
+  padding: 4px 6px; border-radius: 4px; text-align: left;
+}
+.jitem:hover { background: var(--hover); }
+.jitem.hi { background: var(--hover); box-shadow: inset 0 0 0 1px var(--accent); }
+.jitem .jt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jitem .pill { font-size: 10px; line-height: 15px; }
+.jempty { padding: 8px 6px; font-size: 12px; color: var(--muted); }
+.jfoot { display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 5px 6px 1px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
+.jfoot kbd { font-size: 10px; padding: 0 3px; }
+/* New Issue modal: over the panel, title / description / tags / assignees */
+.mback {
+  position: absolute; inset: 0; z-index: 20; display: grid; place-items: start center; padding-top: 48px;
+  background: color-mix(in srgb, #000 30%, transparent);
+}
+.modal {
+  width: min(460px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 24px 60px -12px var(--shadow);
+}
+.mhead { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px 0 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.mhead .grow { flex: 1; }
+.mbody { display: grid; gap: 12px; padding: 12px 14px 14px; }
+.mfoot { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--bg); border-radius: 0 0 8px 8px; }
+.mfoot .grow { flex: 1; font-size: 11px; color: var(--muted); }
+.mfoot kbd { font-size: 10px; padding: 0 3px; }
+.fld { display: grid; gap: 4px; min-width: 0; }
+.fld > span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.finput {
+  width: 100%; padding: 5px 8px; font: 13px/1.4 var(--ui); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; outline: none; user-select: text;
+}
+.finput:focus { border-color: var(--accent); }
+textarea.finput { resize: vertical; min-height: 74px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tchip { display: inline-flex; border-radius: 10px; opacity: .45; }
+.tchip[aria-pressed="true"] { opacity: 1; box-shadow: 0 0 0 1px var(--accent); }
+.pchip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 2px; border: 1px solid var(--line); border-radius: 14px; font-size: 12px;
+}
+.pchip:hover { background: var(--hover); }
+.pchip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+.fnote { font-size: 11px; color: var(--muted); }
+.btn { height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 5px; font-size: 12px; background: var(--bg); }
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--accent); color: var(--bg); border-color: transparent; font-weight: 600; }
+.btn:disabled { opacity: .45; cursor: default; background: var(--bg); }
+.btn.primary:disabled { background: var(--accent); }
+/* Detail: who the issue is assigned to, and the Created row */
+.dside dd.who { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font: 12px var(--ui); }
+.dside dd .asg { display: inline-flex; align-items: center; gap: 5px; }
+.lblbtn { display: inline-flex; align-items: center; gap: 4px; }
+.iback { display: inline-flex; align-items: center; gap: 2px; }
+.dhead .ib .lucide { width: 14px; height: 14px; }
 /* Sidebar: active Plane issues per State, in Plane's colours (the pi-todos widget) */
 .minibar { display: flex; gap: 1px; width: 26px; height: 4px; border-radius: 2px; overflow: hidden; flex: none; }
 .minibar i { height: 100%; }

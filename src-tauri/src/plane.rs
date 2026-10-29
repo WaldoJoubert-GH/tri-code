@@ -41,6 +41,12 @@ pub struct PlaneIssue {
     pub labels: Vec<String>,
     pub link: String,
     pub updated_at: String,
+    /// When the work item was created (ISO 8601). Empty when Plane didn't say.
+    #[serde(default)]
+    pub created_at: String,
+    /// The assignees' user ids; names are in `PlaneSync.members`.
+    #[serde(default)]
+    pub assignees: Vec<String>,
 }
 
 /// A workspace State, as `plane-states.json` stores it.
@@ -60,6 +66,13 @@ pub struct PlaneLabel {
     pub color: String,
 }
 
+/// A project member, as `plane-members.json` stores it. `id` is the user id that assignees carry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaneMember {
+    pub id: String,
+    pub name: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct PlaneSync {
     pub last_synced: String,
@@ -67,6 +80,7 @@ pub struct PlaneSync {
     pub issues: Vec<PlaneIssue>,
     pub states: Vec<PlaneState>,
     pub labels: Vec<PlaneLabel>,
+    pub members: Vec<PlaneMember>,
 }
 
 #[derive(Debug, Serialize)]
@@ -76,6 +90,7 @@ pub struct CreatedIssue {
     pub title: String,
     pub priority: String,
     pub link: String,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -113,6 +128,9 @@ struct RawIssue {
     // break the whole sync.
     #[serde(default)]
     labels: Vec<serde_json::Value>,
+    created_at: Option<String>,
+    #[serde(default)]
+    assignees: Vec<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -304,6 +322,7 @@ fn sync(host: &str, workspace_slug: &str, project_id: &str) -> Result<PlaneSync,
     let raw_states: Vec<RawState> = page(&api, &format!("{base}/states/?per_page=1000"))?;
     let raw_labels: Vec<RawLabel> = page(&api, &format!("{base}/labels/?per_page=1000"))?;
     let raw_issues: Vec<RawIssue> = page(&api, &format!("{base}/issues/?per_page=1000"))?;
+    let members = project_members(&api, &base);
 
     let states: Vec<PlaneState> = raw_states
         .iter()
@@ -364,6 +383,8 @@ fn sync(host: &str, workspace_slug: &str, project_id: &str) -> Result<PlaneSync,
                 target_date: raw.target_date,
                 labels: label_ids(&raw.labels),
                 updated_at: now.clone(),
+                created_at: raw.created_at.unwrap_or_default(),
+                assignees: label_ids(&raw.assignees),
             }
         })
         .collect();
@@ -387,7 +408,28 @@ fn sync(host: &str, workspace_slug: &str, project_id: &str) -> Result<PlaneSync,
         issues,
         states,
         labels,
+        members,
     })
+}
+
+/// The project's members, for assignee names. A failed read leaves the names unknown rather than failing the sync.
+fn project_members(api: &Api, base: &str) -> Vec<PlaneMember> {
+    let Ok(v) = api.json("GET", &format!("{base}/members/?per_page=1000"), None) else {
+        return Vec::new();
+    };
+    let rows = v.get("results").cloned().unwrap_or_else(|| v.clone());
+    rows.as_array().map(|a| a.iter().filter_map(member_of).collect()).unwrap_or_default()
+}
+
+/// One member row. The user id is `member` (a string, or the nested user's `id`); the name is the
+/// user's display name, else first and last name, else e-mail.
+fn member_of(v: &serde_json::Value) -> Option<PlaneMember> {
+    let user = v.get("member").filter(|m| m.is_object()).unwrap_or(v);
+    let id = v.get("member").and_then(|m| m.as_str()).or_else(|| user.get("id").and_then(|x| x.as_str()))?.to_string();
+    let text = |key: &str| user.get(key).and_then(|x| x.as_str()).unwrap_or_default().trim().to_string();
+    let full = format!("{} {}", text("first_name"), text("last_name")).trim().to_string();
+    let name = [text("display_name"), full, text("email")].into_iter().find(|n| !n.is_empty()).unwrap_or_else(|| id.clone());
+    Some(PlaneMember { id, name })
 }
 
 fn priority_rank(p: &str) -> u8 {
@@ -474,6 +516,40 @@ pub async fn plane_set_labels(
     .map_err(|e| e.to_string())?
 }
 
+/// PATCH the fields the Edit form changed; `None` leaves a field as it is.
+#[tauri::command]
+pub async fn plane_update_issue(
+    host: String,
+    workspace_slug: String,
+    project_id: String,
+    issue_id: String,
+    title: Option<String>,
+    description_html: Option<String>,
+    labels: Option<Vec<String>>,
+    assignees: Option<Vec<String>>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let api = Api::new(read_token(&host)?);
+        let url = format!("{API_V1}/workspaces/{workspace_slug}/projects/{project_id}/issues/{issue_id}/");
+        let mut body = serde_json::json!({});
+        if let Some(t) = title {
+            body["name"] = serde_json::Value::String(t);
+        }
+        if let Some(d) = description_html {
+            body["description_html"] = serde_json::Value::String(d);
+        }
+        if let Some(l) = labels {
+            body["labels"] = serde_json::json!(l);
+        }
+        if let Some(a) = assignees {
+            body["assignees"] = serde_json::json!(a);
+        }
+        api.json("PATCH", &url, Some(&body)).map(|_| ())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn plane_create_issue(
     host: String,
@@ -481,6 +557,9 @@ pub async fn plane_create_issue(
     project_id: String,
     title: String,
     state_id: Option<String>,
+    description_html: Option<String>,
+    labels: Vec<String>,
+    assignees: Vec<String>,
 ) -> Result<CreatedIssue, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let api = Api::new(read_token(&host)?);
@@ -488,6 +567,15 @@ pub async fn plane_create_issue(
         let mut body = serde_json::json!({ "name": title, "project": project_id });
         if let Some(s) = &state_id {
             body["state"] = serde_json::Value::String(s.clone());
+        }
+        if let Some(d) = description_html.filter(|d| !d.is_empty()) {
+            body["description_html"] = serde_json::Value::String(d);
+        }
+        if !labels.is_empty() {
+            body["labels"] = serde_json::json!(labels);
+        }
+        if !assignees.is_empty() {
+            body["assignees"] = serde_json::json!(assignees);
         }
         let v = api.json("POST", &url, Some(&body))?;
         let id = v.get("id").and_then(|x| x.as_str()).unwrap_or_default().to_string();
@@ -497,6 +585,7 @@ pub async fn plane_create_issue(
             sequence_id: v.get("sequence_id").and_then(|x| x.as_u64()),
             title: v.get("name").and_then(|x| x.as_str()).unwrap_or(&title).to_string(),
             priority: v.get("priority").and_then(|x| x.as_str()).unwrap_or("none").to_string(),
+            created_at: v.get("created_at").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
         })
     })
     .await
@@ -706,6 +795,18 @@ mod tests {
         assert_eq!(mime, "image/png");
         assert_eq!(bytes, b"hi");
         assert!(decode_data_url("https://x/y").is_err());
+    }
+
+    #[test]
+    fn member_rows_read_flat_and_nested_users() {
+        let flat: serde_json::Value = serde_json::from_str(r#"{"member":"u1","display_name":"wj"}"#).unwrap();
+        let m = member_of(&flat).unwrap();
+        assert_eq!((m.id.as_str(), m.name.as_str()), ("u1", "wj"));
+        let nested: serde_json::Value = serde_json::from_str(r#"{"member":{"id":"u2","first_name":"Anna","last_name":"K"}}"#).unwrap();
+        let m = member_of(&nested).unwrap();
+        assert_eq!((m.id.as_str(), m.name.as_str()), ("u2", "Anna K"));
+        let bare: serde_json::Value = serde_json::from_str(r#"{"id":"u3","email":"a@b.c"}"#).unwrap();
+        assert_eq!(member_of(&bare).unwrap().name, "a@b.c");
     }
 
     #[test]
