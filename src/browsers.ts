@@ -96,6 +96,19 @@ function ownerOf(pageId: string): { project: Project; tab: Tab; page: Page } | u
   }
 }
 
+/** The page a browser webview's event came from, its window, and whether it is on screen now. */
+export function pageOfLabel(lbl: string): { pageId: string; tab: Tab; shown: boolean } | undefined {
+  if (!lbl.startsWith("browser-")) return;
+  const pageId = pageIdOf(lbl);
+  const o = ownerOf(pageId);
+  return o && { pageId, tab: o.tab, shown: shown.has(pageId) };
+}
+
+/** Download a URL again from inside a page, which stays where it is. */
+export function redownload(pageId: string, url: string): void {
+  invoke("browser_download", { label: label(pageId), url }).catch((e) => flash(`can't download again: ${e}`));
+}
+
 function patchInfo(pageId: string, patch: Partial<BrowserInfo>) {
   setBrowserInfo(pageId, (prev) => ({ ...{ url: "", title: "New tab", loading: false }, ...prev, ...patch }));
 }
@@ -393,7 +406,7 @@ export function setBrowsersCovered(right: number): void {
 }
 
 /** The roots of the HTML overlays setBrowsersOverlaid measures. */
-const OVERLAYS = ".tabmenu, .pop, .iconpick, .gtf, .dialog-scrim, .profmenu";
+const OVERLAYS = ".tabmenu, .pop, .iconpick, .gtf, .dialog-scrim, .profmenu, .dlmenu";
 let overlayRo: ResizeObserver | undefined;
 let overlayRaf = 0;
 

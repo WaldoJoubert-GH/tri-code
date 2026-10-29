@@ -266,6 +266,8 @@ pub async fn browser_open(
         .on_document_title_changed(move |_webview, title| {
             let _ = title_app.emit("browser-title", TitlePayload { label: title_label.clone(), title });
         });
+    #[cfg(not(windows))]
+    let builder = crate::downloads::watch(builder, &app, &label);
     let profile = profile.unwrap_or_default();
     let (autofill, passwords) = (autofill.unwrap_or(true), passwords.unwrap_or(true));
     let builder = builder.general_autofill_enabled(autofill);
@@ -281,6 +283,8 @@ pub async fn browser_open(
         .add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
     set_autofill(&webview, autofill, passwords)?;
+    #[cfg(windows)]
+    crate::downloads::watch(&app, &webview, &label)?;
     #[cfg(target_os = "macos")]
     crate::passwords::install(&app, &webview, &label, &profile, passwords)?;
     if hidden == Some(true) {
@@ -410,6 +414,22 @@ pub async fn browser_pick(
         .eval(format!("window.__tricodePick && window.__tricodePick({opts})"))
         .map_err(|e| e.to_string())?;
     webview.set_focus().map_err(|e| e.to_string())
+}
+
+/// Downloads a URL again from inside the page (its cookies apply), through a download link so the
+/// page stays where it is.
+#[tauri::command]
+pub async fn browser_download(app: AppHandle, label: String, url: String) -> Result<(), String> {
+    let url = parse_url(&url)?;
+    if !is_web(&url) {
+        return Err("only web addresses can be downloaded again".into());
+    }
+    let url = serde_json::to_string(url.as_str()).map_err(|e| e.to_string())?;
+    find(&app, &label)?
+        .eval(format!(
+            "(() => {{ const a = document.createElement('a'); a.href = {url}; a.download = ''; a.style.display = 'none'; document.documentElement.append(a); a.click(); a.remove(); }})()"
+        ))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -166,6 +166,10 @@ _Avoid_: Account, session, container, identity.
 Pointing an agent at part of a Page: an overlay that `src-tauri/src/pick.js` draws inside the page (tri-code's own HTML cannot paint over a native webview). The picked elements and areas, with the user's comment, become text pasted into the project's agent window (the one "send to agent" uses); Ctrl+Enter also submits it. Text only for now: no screenshot.
 _Avoid_: Inspector, element picker (in UI text).
 
+**Download**:
+A file a Page saves, always to the user's Downloads folder under a free name (`report (1).pdf`). `src-tauri/src/downloads.rs` reports each one as a `browser-download` event; the browser window lists this run's downloads under a button in its nav row, and the newest shows in a strip under the nav that pushes the page down (HTML can't paint over the webview). On Windows it hooks WebView2 for progress and Cancel, which also hides WebView2's own flyout; on macOS only the start and the end are known.
+_Avoid_: Transfer.
+
 **Agent Signal**:
 What an agent says it is doing: `working`, `blocked` (needs you), `done` or `error`, reported over OSC 7501 (the Program Status Protocol) and kept on the tab's live state. tri-code answers the probe claude and pi send at startup; they report nothing until it does. A `done` or `error` stays until its window has been on screen in a focused app; `blocked` stays until the agent reports something else. The loudest signal (blocked, then error, then done, then working) marks the project's icon and the workspace number; a project or workspace whose agents are only working shows a spinning ring there. The tab and title bar also show `working`. Their colours are set in Settings › Signals: working is blue, the rest follow the theme. A terminal bell from any other app counts as `blocked`.
 _Avoid_: Notification (that is the desktop popup), attention, status (a tab's status is its connection).

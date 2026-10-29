@@ -30,6 +30,7 @@ import { installClipboardFallback } from "./clipboard";
 import { openExternal, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended } from "./browsers";
 import { FavPopover, favEditOpen } from "./favs";
 import { ProfileMenu, profileMenuOpen } from "./profiles";
+import { DownloadMenu, downloadMenuOpen } from "./downloads";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./Tour";
 import { ensureSession, setLinkHandler } from "./terms";
@@ -125,7 +126,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || openProjectOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen()));
+  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   const backdrop = () => {
@@ -162,6 +163,7 @@ export default function App() {
       <SettingsDialog />
       <FavPopover />
       <ProfileMenu />
+      <DownloadMenu />
       <Palette />
       <OpenProjectDialog />
       <NewWorktreeDialog />
