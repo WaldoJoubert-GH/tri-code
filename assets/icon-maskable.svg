@@ -1,0 +1,19 @@
+<!-- Full bleed, glyph shrunk into the centre 80% circle that Android's masks keep. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1f2b"/><stop offset="1" stop-color="#0c0d12"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g transform="translate(512 512) scale(.78) translate(-526 -468)">
+  <g fill="none" stroke="#7aa2f7" stroke-width="60" stroke-linecap="round">
+  <path d="M270 314 V515 Q270 590 420 590 Q570 590 570 515 V314"/>
+  <path d="M420 230 V800"/>
+  </g>
+  <g fill="#7aa2f7" stroke="#7aa2f7" stroke-width="21" stroke-linejoin="round">
+  <path d="M270 200 L327 314 L213 314 Z"/>
+  <path d="M420 116 L477 230 L363 230 Z"/>
+  <path d="M570 200 L627 314 L513 314 Z"/>
+  </g>
+  <rect x="640" y="744" width="200" height="60" rx="10" fill="#c0caf5"/>
+  </g>
+</svg>

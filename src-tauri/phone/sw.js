@@ -16,8 +16,10 @@ self.addEventListener("push", (e) => {
       tag: d.tab || undefined,
       renotify: !!d.tab,
       data: { tab: d.tab },
-      icon: "/icon.png",
-      badge: "/icon.png",
+      timestamp: Date.now(),
+      icon: "/icon-192.png",
+      // The status bar draws only the badge's alpha: a full-colour icon there is a blank square.
+      badge: "/badge.png",
     }),
   );
 });
