@@ -4,6 +4,7 @@ mod bg;
 mod browser;
 mod db;
 mod devfs;
+mod downloads;
 mod dirs;
 mod envs;
 mod envssh;
@@ -206,6 +207,11 @@ pub fn run() {
             browser::browser_back,
             browser::browser_forward,
             browser::browser_reload,
+            browser::browser_download,
+            downloads::download_open,
+            downloads::download_reveal,
+            downloads::download_cancel,
+            downloads::downloads_folder,
             bg::bg_save,
             bg::bg_load,
             bg::bg_delete,

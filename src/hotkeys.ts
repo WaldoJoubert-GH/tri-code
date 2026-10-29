@@ -15,6 +15,7 @@ import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeCtxMenu, ctxMenuOpen } from "./ctxmenu";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { closeProfileMenu, profileMenuOpen } from "./profiles";
+import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { openGitPanel } from "./git";
@@ -183,6 +184,7 @@ function onKey(e: KeyboardEvent) {
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
     else if (profileMenuOpen()) closeProfileMenu();
+    else if (downloadMenuOpen()) closeDownloadMenu();
     else return;
     e.preventDefault();
     e.stopPropagation();

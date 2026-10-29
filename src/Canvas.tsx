@@ -28,6 +28,7 @@ import { gitOf } from "./git";
 import { clock, dev, panelTitle } from "./issues";
 import { SIG_TEXT, sigOf } from "./signals";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
+import { DownloadBar, DownloadButton, forgetDownloads } from "./downloads";
 
 /** "just now", "4m ago", "2h ago": how long an agent has been in its state. */
 const ago = (ms: number) => {
@@ -522,6 +523,9 @@ export default function Canvas(props: { project: Project }) {
                   <ProfileAvatar profile={profile()} />
                 </button>
               </Show>
+              <Show when={nativeBrowsers}>
+                <DownloadButton tabId={id} />
+              </Show>
               <button title="Open in system browser" onClick={() => openExternal(url())}>↗</button>
               <Show when={!bare()}>{loadBar()}</Show>
             </div>
@@ -538,6 +542,7 @@ export default function Canvas(props: { project: Project }) {
                 </div>
               )}
             </Show>
+            <DownloadBar tabId={id} />
             <Show when={!bare()}>
               <FavBar projectId={props.project.id} favs={props.project.favs} url={url()} onOpen={open} />
             </Show>
@@ -650,6 +655,6 @@ export function requestClose(projectId: string, tabId: string): void {
       msg: `Closed ${tabName(tab)}${title ? " · " + title : ""}.`,
       undo: () => restoreTab(projectId, tab, index),
     },
-    () => (tab.kind === "browser" ? closeBrowser(tab) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : tab.kind === "db" ? closeDbSession(tabId) : undefined),
+    () => (tab.kind === "browser" ? (closeBrowser(tab), forgetDownloads(tabId)) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : tab.kind === "db" ? closeDbSession(tabId) : undefined),
   );
 }
