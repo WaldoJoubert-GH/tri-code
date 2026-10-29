@@ -7,7 +7,7 @@ A minimal agent development environment. The left sidebar lists projects grouped
 tri-code is the third client of a project's **Dev Directory** (`.dev/`). The other two are pi-todos (a pi extension) and dev-hub (a Claude Code mod). pi-todos' `CONTEXT.md` is the source of the domain language; these terms are the ones tri-code uses for the same files.
 
 **Dev Directory** (`.dev/`):
-The per-project, gitignored folder shared by the three clients: `config.json`, `issues.json`, `plane-states.json`, `plane-labels.json`, `time-entries.json`, `sentry/<id>.json`, and `plane/comments/<issue>.json`; tri-code adds `local-issues.json`, `github-labels.json` and `github/comments/<n>.json`. Read and written on the project's host.
+The per-project, gitignored folder shared by the three clients: `config.json`, `issues.json`, `plane-states.json`, `plane-labels.json`, `time-entries.json`, `sentry/<id>.json`, and `plane/comments/<issue>.json`; tri-code adds `local-issues.json`, `github-labels.json`, `github-members.json`, `plane-members.json` and `github/comments/<n>.json`. Read and written on the project's host.
 _Avoid_: Data dir, cache dir.
 
 **Dev Client**:
@@ -38,6 +38,9 @@ A State rendered with its State Hex as the fill (a GitHub or Local Issue's State
 **State Dropdown**:
 The popup anchored under a State Pill that lists every State of the issue's Source grouped by State Group. `d` opens it; arrows move, Enter confirms and PATCHes Plane, runs `gh`, or rewrites `local-issues.json`.
 _Avoid_: State picker, status menu.
+
+**Assignee**:
+A person an issue is assigned to: a Plane member (the user id on the issue, named from `plane-members.json`) or a GitHub login, which is its own name (the repo's assignable logins, from `github-members.json`). A Local Issue has none. Shown as avatars on the row; the New Issue modal picks them from the Source's members.
 
 **Label**:
 A workspace-scoped Plane label: an id, a name and a colour. Cached in `plane-labels.json`, carried on an Issue as label ids. `l` opens a multi-select dropdown; each toggle PATCHes Plane and keeps the dropdown open.

@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::git::{blocking, exec};
 
-const ISSUE_FIELDS: &str = "number,title,body,state,stateReason,labels,url,updatedAt,author";
+const ISSUE_FIELDS: &str = "number,title,body,state,stateReason,labels,url,createdAt,updatedAt,author,assignees";
 
 #[derive(Debug, Serialize)]
 pub struct GhIssue {
@@ -21,7 +21,10 @@ pub struct GhIssue {
     pub state_reason: Option<String>,
     pub labels: Vec<String>,
     pub author: String,
+    /// Assignees' logins.
+    pub assignees: Vec<String>,
     pub link: String,
+    pub created_at: String,
     pub updated_at: String,
 }
 
@@ -75,9 +78,16 @@ fn issue(v: &Value) -> GhIssue {
             .map(|ls| ls.iter().map(|l| str_of(l, "name")).collect())
             .unwrap_or_default(),
         author: v.get("author").map(|a| str_of(a, "login")).unwrap_or_default(),
+        assignees: logins(v.get("assignees")),
         link: str_of(v, "url"),
+        created_at: str_of(v, "createdAt"),
         updated_at: str_of(v, "updatedAt"),
     }
+}
+
+/// The `login` of each user in a gh JSON array (assignees).
+fn logins(v: Option<&Value>) -> Vec<String> {
+    v.and_then(Value::as_array).map(|a| a.iter().map(|u| str_of(u, "login")).filter(|s| !s.is_empty()).collect()).unwrap_or_default()
 }
 
 /// `owner/name` of the repo gh sees in `path`, to prefill the setup form.
@@ -110,11 +120,38 @@ pub async fn gh_issues_sync(host: String, path: String, repo: String) -> Result<
     .await
 }
 
-/// Create an issue and return it as `gh issue view` sees it.
+/// The logins gh offers as assignees in the repo (who can be assigned an issue).
 #[tauri::command]
-pub async fn gh_issue_create(host: String, path: String, repo: String, title: String) -> Result<GhIssue, String> {
+pub async fn gh_assignees(host: String, path: String, repo: String) -> Result<Vec<String>, String> {
     blocking(move || {
-        let url = gh(&host, &path, &["issue", "create", "-R", &repo, "--title", &title, "--body", ""], None)?;
+        let endpoint = format!("repos/{repo}/assignees");
+        let out = gh(&host, &path, &["api", &endpoint, "--paginate", "--jq", ".[].login"], None)?;
+        Ok(out.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect())
+    })
+    .await
+}
+
+/// Create an issue and return it as `gh issue view` sees it. The body goes on stdin, so its
+/// length and quoting don't matter; labels and assignees must already exist in the repo.
+#[tauri::command]
+pub async fn gh_issue_create(
+    host: String,
+    path: String,
+    repo: String,
+    title: String,
+    body: String,
+    labels: Vec<String>,
+    assignees: Vec<String>,
+) -> Result<GhIssue, String> {
+    blocking(move || {
+        let mut args: Vec<&str> = vec!["issue", "create", "-R", &repo, "--title", &title, "--body-file", "-"];
+        for l in &labels {
+            args.extend(["--label", l]);
+        }
+        for a in &assignees {
+            args.extend(["--assignee", a]);
+        }
+        let url = gh(&host, &path, &args, Some(body))?;
         let url = url.trim().to_string();
         let out = gh(&host, &path, &["issue", "view", &url, "-R", &repo, "--json", ISSUE_FIELDS], None)?;
         Ok(issue(&json(&out)?))
@@ -174,6 +211,44 @@ pub async fn gh_issue_labels(host: String, path: String, repo: String, number: u
             args.extend(["--remove-label", l]);
         }
         gh(&host, &path, &args, None).map(|_| ())
+    })
+    .await
+}
+
+/// Apply the Edit form: a new title and body (`None` keeps them; the body goes on stdin),
+/// and labels and assignees added or removed.
+#[tauri::command]
+pub async fn gh_issue_edit(
+    host: String,
+    path: String,
+    repo: String,
+    number: u64,
+    title: Option<String>,
+    body: Option<String>,
+    add_labels: Vec<String>,
+    remove_labels: Vec<String>,
+    add_assignees: Vec<String>,
+    remove_assignees: Vec<String>,
+) -> Result<(), String> {
+    blocking(move || {
+        let n = number.to_string();
+        let mut args: Vec<&str> = vec!["issue", "edit", &n, "-R", &repo];
+        let base = args.len();
+        if let Some(t) = &title {
+            args.extend(["--title", t]);
+        }
+        if body.is_some() {
+            args.extend(["--body-file", "-"]);
+        }
+        for (flag, list) in [("--add-label", &add_labels), ("--remove-label", &remove_labels), ("--add-assignee", &add_assignees), ("--remove-assignee", &remove_assignees)] {
+            for x in list {
+                args.extend([flag, x.as_str()]);
+            }
+        }
+        if args.len() == base {
+            return Ok(());
+        }
+        gh(&host, &path, &args, body).map(|_| ())
     })
     .await
 }
@@ -247,6 +322,18 @@ mod tests {
         assert_eq!((i.number, i.state.as_str(), i.state_reason.as_deref()), (231, "closed", Some("not_planned")));
         assert_eq!(i.labels, vec!["bug"]);
         assert_eq!(i.author, "wj");
+    }
+
+    #[test]
+    fn issue_reads_assignees_and_created_date() {
+        let v: Value = serde_json::from_str(
+            r#"{"number":7,"state":"OPEN","createdAt":"2026-04-20T09:00:00Z","assignees":[{"login":"wj"},{"login":"ak"}]}"#,
+        )
+        .unwrap();
+        let i = issue(&v);
+        assert_eq!(i.assignees, vec!["wj", "ak"]);
+        assert_eq!(i.created_at, "2026-04-20T09:00:00Z");
+        assert!(issue(&serde_json::from_str(r#"{"number":8}"#).unwrap()).assignees.is_empty());
     }
 
     #[test]

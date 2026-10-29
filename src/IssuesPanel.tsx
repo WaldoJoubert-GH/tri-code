@@ -8,15 +8,17 @@ import { type Project, type Tab, focusTab, space, tabName } from "./state";
 import { agentTarget } from "./agents";
 import {
   ACTIVE_GROUPS, DEFAULT_PROGRESS_LABEL, LEVEL_COLORS, PRIORITY_COLORS, SOURCES, SOURCE_NAMES, type DevState,
-  type GithubIssue, type LocalIssue, type PlaneIssue, type PlaneLabel, type PlaneState, type Source, type SourceFilter, type TrackedIssue, type UnifiedIssue,
-  accumulatedMs, addDraftImage, ago, avatarColor, changingTo, clearDraft, clock, commentsOf, createIssue, dev,
-  ensureComments, fgFor, filtersOf, formatDay, formatHm, formatHms, getDraft, guessRepo, initials, isActive,
-  issueKey, issueLabels, labelOf, labelsFor, loadDev, pendingIssue, postComment, priorityRank, removeDraftImage,
-  runningEntry, saveSources, setDraftText, setIssueState, setPendingIssue, shownIssues, slugOf, sourcesOf,
-  stateOf, statesFor, syncDev, syncNow, toggleLabel, toggleTimer,
+  type GithubIssue, type NewIssue, type PlaneIssue, type PlaneLabel, type PlaneState, type SortOrder, type Source, type SourceFilter,
+  type StatusFilter, type TrackedIssue, type UnifiedIssue,
+  accumulatedMs, addDraftImage, ago, assigneesOf, avatarColor, changingTo, clearDraft, clock, commentsOf, createIssue, dev,
+  draftOf, ensureComments, fgFor, filtersOf, formatDay, formatHm, formatHms, getDraft, guessRepo, initials, isActive,
+  issueKey, issueLabels, labelOf, labelsFor, loadDev, membersFor, pendingIssue, postComment, priorityRank, removeDraftImage,
+  runningEntry, saveSources, searchIssues, setDraftText, setIssueState, setPendingIssue, shownIssues, slugOf, sourcesOf,
+  statesFor, statusStopsOf, stateOf, syncDev, syncNow, toggleLabel, toggleTimer, updateIssue,
 } from "./issues";
 import { openUrlInProject } from "./browsers";
 import { sendText } from "./terms";
+import { Icon } from "./lucide";
 import { flash } from "./ui";
 
 // ── small presentational pieces ─────────────────────────────────────
@@ -103,11 +105,20 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
   const [view, setView] = createSignal<"list" | "detail">("list");
   const [sel, setSel] = createSignal<string | null>(null);
   const [src, setSrc] = createSignal<SourceFilter>("all");
-  const [done, setDone] = createSignal(false);
+  const [status, setStatus] = createSignal<StatusFilter>("open");
+  const [sort, setSort] = createSignal<SortOrder>("newest");
   const [q, setQ] = createSignal("");
+  /** The open filter menu, if any: Source or Status. */
+  const [fmenu, setFmenu] = createSignal<"source" | "status" | null>(null);
+  /** The search dropdown: under the list's search box, or under the detail's crumb with its own field. */
+  const [jump, setJump] = createSignal<"list" | "detail" | null>(null);
+  /** The detail's jump field; the list's query is `q`. */
+  const [jq, setJq] = createSignal("");
+  /** The highlighted match in the search dropdown. */
+  const [hit, setHit] = createSignal(0);
   const [creating, setCreating] = createSignal(false);
-  /** Where a New Issue goes when the project has more than one Source. */
-  const [dest, setDest] = createSignal<Source | null>(null);
+  /** The issue the Edit modal is open on. */
+  const [editingIssue, setEditingIssue] = createSignal<TrackedIssue | null>(null);
   /** The Sources form is open over a connected panel (the ⚙ button). */
   const [editing, setEditing] = createSignal(false);
   const [drop, setDrop] = createSignal<number | null>(null);
@@ -124,7 +135,9 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
   /** The project this window is in: a Worktree's panel shows its repo's issues (`project`) but types into its own agents. */
   const home = () => props.home ?? props.project;
   const state = (): DevState | undefined => dev[props.project.id];
-  const rows = createMemo(() => shownIssues(state(), { src: src(), done: done(), q: q() }));
+  const rows = createMemo(() => shownIssues(state(), { src: src(), status: status(), sort: sort(), q: q() }));
+  /** The search dropdown's matches, for whichever field it hangs off. */
+  const matches = createMemo(() => searchIssues(state(), view() === "detail" ? jq() : q()));
   const selected = createMemo(() => (state()?.issues ?? []).find((i) => issueKey(i) === sel()));
   const selectedTracked = (): TrackedIssue | undefined => {
     const i = selected();
@@ -134,7 +147,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
   const dropStates = () => { const i = selectedTracked(); return i ? statesFor(state(), i.source) : []; };
   const dropLabels = () => { const i = selectedTracked(); return i ? labelsFor(state(), i.source) : []; };
   const sources = () => sourcesOf(state()?.config);
-  const target = (): Source | undefined => { const d = dest(); const all = sources(); return d && all.includes(d) ? d : all[0]; };
+  const statusLabel = () => statusStopsOf(state()).find((s) => s.value === status())?.label ?? "Open";
   const anchor = () => (drop() !== null ? rootEl.querySelector(view() === "detail" ? ".pillbtn" : ".irow.sel .pill") : null);
   const labelAnchor = () => (ldrop() !== null ? rootEl.querySelector(".lblbtn") : null);
 
@@ -146,7 +159,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
 
   // A sync in pi-todos or dev-hub should show up: re-read `.dev/` when focused.
   createEffect(on(() => props.focused, (f) => {
-    if (!f) { setDrop(null); setLdrop(null); }
+    if (!f) { setDrop(null); setLdrop(null); setFmenu(null); setJump(null); }
     if (!f || untrack(() => state()?.loading)) return;
     loadDev(props.project).then(() => {
       if (!syncedOnce && state()?.connected && !editing()) {
@@ -180,8 +193,35 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
     setDrop(null);
     setLdrop(null);
     setLight(null);
+    setJump(null);
+    setFmenu(null);
     const issue = (state()?.issues ?? []).find((i) => issueKey(i) === issueId);
     if (issue) ensureComments(props.project, issue).catch(() => {});
+  }
+
+  function openJumpDetail() {
+    setJq("");
+    setHit(0);
+    setJump("detail");
+  }
+
+  /** Arrows move the highlight, Enter opens it, Escape closes the dropdown, then clears the search. */
+  function jumpKey(e: KeyboardEvent) {
+    const list = matches();
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!jump()) setJump(view() === "detail" ? "detail" : "list");
+      setHit(Math.max(0, Math.min(list.length - 1, hit() + (e.key === "ArrowDown" ? 1 : -1))));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const pick = list[hit()] ?? list[0];
+      if (pick) { setJump(null); openDetailById(issueKey(pick)); }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      if (jump()) setJump(null);
+      else if (view() === "list" && q()) { setQ(""); if (searchEl) searchEl.value = ""; }
+      else if (view() === "list") searchEl?.blur();
+    }
   }
 
   function step(n: number) {
@@ -196,9 +236,10 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
     if (view() === "detail") ensureComments(props.project, issue).catch(() => {});
   }
 
-  function toggleDone() {
-    setDone(!done());
-    flash(done() ? "showing done and cancelled" : "showing active only");
+  function toggleSort() {
+    const next: SortOrder = sort() === "newest" ? "oldest" : "newest";
+    setSort(next);
+    flash(`sorted by created date, ${next} first`);
   }
 
   async function changeState(stateId: string) {
@@ -257,9 +298,14 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
 
   function handleKey(e: KeyboardEvent): boolean {
     const d = state();
-    if (!d?.connected || editing()) return false;
+    // the New Issue modal and the search dropdown take their own keys
+    if (!d?.connected || editing() || creating() || editingIssue() || jump()) return false;
     const k = e.key;
 
+    if (fmenu()) {
+      if (k === "Escape" || k === "f" || k === "s") setFmenu(null);
+      return true;
+    }
     if (drop() !== null) {
       const states = dropStates();
       if (k === "ArrowDown" || k === "j") setDrop(((drop() ?? 0) + 1) % states.length);
@@ -287,6 +333,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
     const detail = view() === "detail";
     if (detail && k === "c") rootEl.querySelector<HTMLTextAreaElement>(".ccompose textarea")?.focus();
     else if (detail && k === "l") openLabels();
+    else if (detail && k === "e") openEdit();
     else if (k === "ArrowDown" || k === "j") step(1);
     else if (k === "ArrowUp" || k === "k") step(-1);
     else if (k === "Enter" || (!detail && k === "ArrowRight")) {
@@ -301,19 +348,19 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
       if (!q()) return false;
       setQ("");
       if (searchEl) searchEl.value = "";
-    } else if (k === "/") { setView("list"); searchEl?.focus(); }
-    else if (!detail && k === "f") {
-      const stops = filtersOf(d);
-      setSrc((s) => stops[(stops.indexOf(s) + 1) % stops.length]);
-      const now = src();
-      flash(`source: ${now === "all" ? "all" : SOURCE_NAMES[now]}`);
-    } else if (!detail && k === "c") toggleDone();
+    } else if (k === "/") {
+      if (detail) openJumpDetail();
+      else { setView("list"); searchEl?.focus(); }
+    }
+    else if (!detail && k === "f") setFmenu("source");
+    else if (!detail && k === "s") setFmenu("status");
+    else if (!detail && k === "o") toggleSort();
     else if (k === "r") syncNow(props.project);
     else if (k === "n") { setView("list"); setCreating(true); }
-    else if (k === "o" && selected()) openExternal(selected()!);
+    else if (detail && k === "o" && selected()) openExternal(selected()!);
     else if (k === "d") openStates();
     else if (k === "a" && selected()) sendToAgent(selected()!);
-    else if (k === "s" && selectedTracked()) void toggleTimer(props.project, selectedTracked()!);
+    else if (k === "s" && detail && selectedTracked()) void toggleTimer(props.project, selectedTracked()!);
     else if (k === "y" && selected()) copySlug(selected()!);
     else return false;
     return true;
@@ -324,6 +371,14 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
     if (!issue) return void flash("Sentry issues have no state to change");
     if (changingTo(props.project.id, issue)) return void flash(`${slugOf(state(), issue)} is still changing state`);
     setDrop(Math.max(0, dropStates().findIndex((s) => s.id === stateOf(state(), issue)?.id)));
+  }
+
+  function openEdit() {
+    const issue = selectedTracked();
+    if (!issue) return void flash("Sentry issues are edited in Sentry");
+    setDrop(null);
+    setLdrop(null);
+    setEditingIssue(issue);
   }
 
   function openLabels() {
@@ -363,6 +418,8 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
     clearDraft(props.project.id, key);
   }
 
+  const sourceCount = (key: SourceFilter) => (state()?.issues ?? []).filter((i) => key === "all" || i.source === key).length;
+
   return (
     <div class="iss" classList={{ detail: view() === "detail" }} ref={rootEl}>
       <Show
@@ -373,65 +430,44 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
           </Show>
         }
       >
-        {/* toolbar */}
+        {/* toolbar: one search (a dropdown over the issues), two filters, sort, sync, New */}
         <div class="itools">
-          <div class="seg" role="group" aria-label="Source">
-            <For each={filtersOf(state())}>
-              {(key) => {
-                const label = key === "all" ? "All" : SOURCE_NAMES[key];
-                return <button data-src={key} aria-pressed={src() === key} title={`${label} (f)`} onClick={() => setSrc(key)}>{label}</button>;
-              }}
-            </For>
+          <div class="sbox">
+            <Icon name="search" size={13} />
+            <input
+              class="isearch" ref={searchEl} placeholder="Search issues…" spellcheck={false} autocomplete="off" aria-label="Search issues"
+              value={q()}
+              onFocus={() => { setHit(0); setJump("list"); }}
+              onInput={(e) => { setQ(e.currentTarget.value); setHit(0); setJump("list"); }}
+              onKeyDown={jumpKey}
+            />
           </div>
-          <input
-            class="isearch" ref={searchEl} placeholder="/ filter" spellcheck={false} aria-label="Filter issues"
-            value={q()}
-            onInput={(e) => setQ(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") { if (searchEl?.value) { setQ(""); searchEl.value = ""; } else searchEl?.blur(); }
-              else if (e.key === "Enter" || e.key === "ArrowDown") searchEl?.blur();
-            }}
-          />
-          <button class="ib" aria-pressed={done()} title="Show done and cancelled (c)" onClick={toggleDone}>✓</button>
-          <button class="ib" classList={{ spin: state()?.syncing }} title="Sync now (r)" onClick={() => syncNow(props.project)}>⟳</button>
-          <button class="ib" title="New Issue (n)" onClick={() => { setView("list"); setCreating(true); }}>+</button>
-          <button class="ib" title="Issue sources: Plane, GitHub, Local" onClick={() => { setDrop(null); setLdrop(null); setEditing(true); }}>⚙</button>
+          <button class="fbtn" data-menu="source" aria-haspopup="listbox" title="Filter by source (f)" onClick={() => setFmenu(fmenu() === "source" ? null : "source")}>
+            <Icon name="database" size={13} />
+            <span>{src() === "all" ? "All" : SOURCE_NAMES[src() as UnifiedIssue["source"]]}</span>
+            <Icon name="chevron-down" size={12} />
+          </button>
+          <button class="fbtn" data-menu="status" aria-haspopup="listbox" title="Filter by status (s)" onClick={() => setFmenu(fmenu() === "status" ? null : "status")}>
+            <Icon name="list-filter" size={13} />
+            <span>{statusLabel()}</span>
+            <Icon name="chevron-down" size={12} />
+          </button>
+          <button class="ib" title={`Created date: ${sort() === "newest" ? "newest" : "oldest"} first (o)`} onClick={toggleSort}>
+            <Icon name={sort() === "newest" ? "arrow-down-wide-narrow" : "arrow-up-wide-narrow"} />
+          </button>
+          <button class="ib" classList={{ spin: state()?.syncing }} title="Sync now (r)" onClick={() => syncNow(props.project)}>
+            <Icon name="refresh-cw" />
+          </button>
+          <button class="nbtn" title="New Issue (n)" onClick={() => { setView("list"); setCreating(true); }}>
+            <Icon name="plus" size={13} />New
+          </button>
+          <button class="ib" title="Issue sources: Plane, GitHub, Local" onClick={() => { setDrop(null); setLdrop(null); setEditing(true); }}>
+            <Icon name="settings" />
+          </button>
         </div>
 
         <div class="imain">
           <div class="ilist">
-            <Show when={creating() ? target() : undefined}>
-              {(to) => {
-                const where = () => to() === "plane" ? state()?.config.plane?.project_identifier ?? "Plane" : to() === "github" ? state()?.config.github?.repo ?? "GitHub" : "Local";
-                const cycle = () => { const all = sources(); setDest(all[(all.indexOf(to()) + 1) % all.length]); };
-                return (
-                  <div class="inew">
-                    <Priority p="none" />
-                    <input
-                      placeholder={`New Issue title · Enter to create in ${where()}${sources().length > 1 ? ", Tab changes where" : ""}, Esc to cancel`}
-                      spellcheck={false}
-                      autofocus
-                      onKeyDown={async (e) => {
-                        const input = e.currentTarget;
-                        if (e.key === "Tab" && sources().length > 1) {
-                          e.preventDefault();
-                          cycle();
-                        } else if (e.key === "Enter" && input.value.trim()) {
-                          const issue = await createIssue(props.project, input.value.trim(), to());
-                          setCreating(false);
-                          if (issue) openDetailById(issueKey(issue));
-                        } else if (e.key === "Escape" || e.key === "Enter") {
-                          setCreating(false);
-                        }
-                      }}
-                    />
-                    <Show when={sources().length > 1}>
-                      <button class="idest" title="Where the New Issue goes (Tab)" onMouseDown={(e) => e.preventDefault()} onClick={cycle}>→ {SOURCE_NAMES[to()]}</button>
-                    </Show>
-                  </div>
-                );
-              }}
-            </Show>
             <For each={rows()}>{(issue) => <Row
               issue={issue}
               state={state()}
@@ -447,7 +483,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
             />}</For>
             <Show when={rows().length === 0}>
               <div class="iempty">
-                {q() ? `Nothing matches “${q()}”` : `No ${done() ? "" : "open "}issues${src() === "all" ? "" : ` from ${SOURCE_NAMES[src() as UnifiedIssue["source"]]}`}.`}
+                {q() ? `Nothing matches “${q()}”` : "Nothing matches these filters."}
                 <br /><kbd>n</kbd> creates one
               </div>
             </Show>
@@ -461,10 +497,12 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
                   project={props.project}
                   position={(() => { const k = rows().findIndex((x) => issueKey(x) === issueKey(issue())); return k >= 0 ? `${k + 1} / ${rows().length}` : "not in this filter"; })()}
                   onBack={() => { setView("list"); setLight(null); }}
+                  onJump={openJumpDetail}
                   onPrev={() => step(-1)}
                   onNext={() => step(1)}
                   onState={openStates}
                   onLabels={openLabels}
+                  onEdit={openEdit}
                   onOpen={() => openExternal(issue())}
                   onCopy={() => copySlug(issue())}
                   onSend={() => sendToAgent(issue())}
@@ -487,14 +525,18 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
           <Show when={view() === "detail"} fallback={<>
             <span><kbd>j</kbd><kbd>k</kbd> move</span>
             <span><kbd>Enter</kbd> open</span>
-            <span><kbd>/</kbd> filter</span>
-            <span><kbd>n</kbd> new</span>
+            <span><kbd>/</kbd> search</span>
+            <span><kbd>s</kbd> status</span>
             <span><kbd>f</kbd> source</span>
+            <span><kbd>o</kbd> sort</span>
+            <span><kbd>n</kbd> new</span>
             <span><kbd>r</kbd> sync</span>
           </>}>
             <span><kbd>Esc</kbd> back</span>
             <span><kbd>j</kbd><kbd>k</kbd> next / prev</span>
+            <span><kbd>/</kbd> jump to issue</span>
             <span><kbd>o</kbd> open in {SOURCE_NAMES[selected()?.source ?? "plane"]}</span>
+            <span><kbd>e</kbd> edit</span>
             <span><kbd>d</kbd> state</span>
             <span><kbd>l</kbd> labels</span>
             <span><kbd>c</kbd> comment</span>
@@ -507,6 +549,77 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
         </div>
 
         <div class="islot">
+          {/* Source and Status: filters, under their buttons */}
+          <Show when={fmenu() === "source"}>
+            <Dropdown anchor={() => rootEl.querySelector("[data-menu='source']")} onClose={() => setFmenu(null)}>
+              <div class="ttl">Source</div>
+              <For each={filtersOf(state())}>
+                {(key) => (
+                  <button class={src() === key ? "hi" : ""} role="option" aria-selected={src() === key} onClick={() => { setSrc(key); setFmenu(null); }}>
+                    <span>{key === "all" ? "All" : SOURCE_NAMES[key]}</span>
+                    <span class="cur">{sourceCount(key)}{src() === key ? <Icon name="check" size={13} /> : ""}</span>
+                  </button>
+                )}
+              </For>
+            </Dropdown>
+          </Show>
+          <Show when={fmenu() === "status"}>
+            <Dropdown anchor={() => rootEl.querySelector("[data-menu='status']")} onClose={() => setFmenu(null)}>
+              <div class="ttl">Status</div>
+              <For each={statusStopsOf(state())}>
+                {(stop) => (
+                  <button class={status() === stop.value ? "hi" : ""} role="option" aria-selected={status() === stop.value} onClick={() => { setStatus(stop.value); setFmenu(null); }}>
+                    <span>{stop.label}</span>
+                    <span class="cur">
+                      {shownIssues(state(), { src: "all", status: stop.value, sort: "newest", q: "" }).length}
+                      {status() === stop.value ? <Icon name="check" size={13} /> : ""}
+                    </span>
+                  </button>
+                )}
+              </For>
+            </Dropdown>
+          </Show>
+
+          {/* the search dropdown: under the list's search box, or under the detail's crumb */}
+          <Show when={jump()}>
+            {(mode) => (
+              <Dropdown anchor={() => rootEl.querySelector(mode() === "detail" ? ".crumbbtn" : ".sbox")} onClose={() => setJump(null)}>
+                <Show when={mode() === "detail"}>
+                  <div class="jfield">
+                    <Icon name="search" size={13} />
+                    <input
+                      ref={(el) => requestAnimationFrame(() => el.focus())}
+                      placeholder="Jump to issue…"
+                      spellcheck={false}
+                      autocomplete="off"
+                      value={jq()}
+                      onInput={(e) => { setJq(e.currentTarget.value); setHit(0); }}
+                      onKeyDown={jumpKey}
+                    />
+                  </div>
+                </Show>
+                <div class="jlist" role="listbox">
+                  <For each={matches()} fallback={<div class="jempty">No issue matches “{mode() === "detail" ? jq() : q()}”</div>}>
+                    {(i, k) => (
+                      <button
+                        class={`jitem${k() === hit() ? " hi" : ""}`}
+                        role="option"
+                        aria-selected={k() === hit()}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => { setJump(null); openDetailById(issueKey(i)); }}
+                      >
+                        <span class="sid">{slugOf(state(), i)}</span>
+                        <span class="jt">{i.title}</span>
+                        <Show when={i.source !== "sentry"}><Pill state={stateOf(state(), i as TrackedIssue)} /></Show>
+                      </button>
+                    )}
+                  </For>
+                </div>
+                <div class="jfoot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Esc</kbd> close</span></div>
+              </Dropdown>
+            )}
+          </Show>
+
           <Show when={drop() !== null ? selectedTracked() : undefined}>
             {(issue) => (
               <Dropdown anchor={anchor} onClose={() => setDrop(null)}>
@@ -550,7 +663,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
                         onClick={() => void toggleLabel(props.project, issue(), l.id)}
                       >
                         <LabelChip label={l} />
-                        <span class="cur">{on() ? "✓" : ""}</span>
+                        <span class="cur">{on() ? <Icon name="check" size={13} /> : ""}</span>
                       </button>
                     );
                   }}
@@ -568,12 +681,12 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
                     <div class="ilight" role="dialog" aria-label={img().img.name} onClick={(e) => { if (e.target === e.currentTarget) setLight(null); }}>
                       <div class="lwrap"><img src={img().img.src} alt={img().img.name} /></div>
                       <div class="cap">
-                        <Show when={lightImages().length > 1}><button title="Previous image (←)" onClick={() => lightStep(-1)}>‹</button></Show>
+                        <Show when={lightImages().length > 1}><button title="Previous image (←)" onClick={() => lightStep(-1)}><Icon name="chevron-left" size={14} /></button></Show>
                         <span>
                           {img().img.name} · {img().author} {ago(img().at)}
                           {lightImages().length > 1 ? ` · ${lightImages().findIndex((x) => x.c === img().c && x.i === img().i) + 1} / ${lightImages().length}` : ""}
                         </span>
-                        <Show when={lightImages().length > 1}><button title="Next image (→)" onClick={() => lightStep(1)}>›</button></Show>
+                        <Show when={lightImages().length > 1}><button title="Next image (→)" onClick={() => lightStep(1)}><Icon name="chevron-right" size={14} /></button></Show>
                         <span><kbd>Esc</kbd> close</span>
                       </div>
                     </div>
@@ -583,7 +696,162 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
             })()}
           </Show>
         </div>
+
+        {/* New Issue: a modal over the panel */}
+        <Show when={creating()}>
+          <IssueModal
+            project={props.project}
+            state={state()}
+            sources={sources()}
+            onClose={() => setCreating(false)}
+            onDone={(issue) => { setCreating(false); openDetailById(issueKey(issue)); }}
+          />
+        </Show>
+        <Show when={editingIssue()}>
+          {(issue) => (
+            <IssueModal
+              project={props.project}
+              state={state()}
+              sources={[issue().source]}
+              editing={issue()}
+              onClose={() => setEditingIssue(null)}
+              onDone={() => setEditingIssue(null)}
+            />
+          )}
+        </Show>
       </Show>
+    </div>
+  );
+}
+
+// ── New Issue / Edit modal ──────────────────────────────────────────
+
+/** Title, description, tags and assignees for a new issue, or for `editing` (whose Source is fixed).
+ *  Tags are Plane or GitHub labels; local issues have neither tags nor assignees, so those fields
+ *  say so instead of offering nothing. */
+function IssueModal(props: {
+  project: Project;
+  state: DevState | undefined;
+  sources: Source[];
+  editing?: TrackedIssue;
+  onClose: () => void;
+  onDone: (issue: TrackedIssue) => void;
+}): JSX.Element {
+  const start = untrack(() => (props.editing ? draftOf(props.state, props.editing) : undefined));
+  const [dest, setDest] = createSignal<Source>(untrack(() => props.editing?.source ?? props.sources[0] ?? "local"));
+  const [title, setTitle] = createSignal(start?.title ?? "");
+  const [desc, setDesc] = createSignal(start?.description ?? "");
+  const [tags, setTags] = createSignal<string[]>(start?.labels ?? []);
+  const [people, setPeople] = createSignal<string[]>(start?.assignees ?? []);
+  const [busy, setBusy] = createSignal(false);
+  let titleEl: HTMLInputElement | undefined;
+
+  onMount(() => requestAnimationFrame(() => titleEl?.focus()));
+
+  const labelPool = () => labelsFor(props.state, dest());
+  const memberPool = () => membersFor(props.state, dest());
+  const toggleIn = (list: () => string[], set: (v: string[]) => void, id: string) =>
+    set(list().includes(id) ? list().filter((x) => x !== id) : [...list(), id]);
+
+  /** A different Source has different labels and people, so the picks start over. */
+  function choose(s: Source) {
+    if (s === dest()) return;
+    setDest(s);
+    setTags([]);
+    setPeople([]);
+  }
+
+  async function submit() {
+    if (!title().trim() || busy()) return;
+    setBusy(true);
+    const draft: NewIssue = { title: title(), description: desc(), labels: tags(), assignees: people() };
+    if (props.editing) {
+      const ok = await updateIssue(props.project, props.editing, draft);
+      setBusy(false);
+      if (ok) props.onDone(props.editing);
+      return;
+    }
+    const issue = await createIssue(props.project, draft, dest());
+    setBusy(false);
+    if (issue) props.onDone(issue);
+  }
+
+  return (
+    <div class="mback" onMouseDown={(e) => { if (e.target === e.currentTarget) props.onClose(); }}>
+      <form
+        class="modal"
+        role="dialog"
+        aria-label={props.editing ? `Edit ${slugOf(props.state, props.editing)}` : "New issue"}
+        onSubmit={(e) => { e.preventDefault(); void submit(); }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); props.onClose(); }
+          else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void submit(); }
+        }}
+      >
+        <div class="mhead">
+          <span>{props.editing ? `Edit ${slugOf(props.state, props.editing)}` : "New issue"}</span>
+          <span class="grow" />
+          <button type="button" class="ib" title="Close (Esc)" onClick={props.onClose}><Icon name="x" /></button>
+        </div>
+        <div class="mbody">
+          <Show when={!props.editing && props.sources.length > 1}>
+            <div class="fld">
+              <span>Source</span>
+              <div class="seg" role="group" aria-label="Source">
+                <For each={props.sources}>
+                  {(s) => <button type="button" aria-pressed={dest() === s} onClick={() => choose(s)}>{SOURCE_NAMES[s]}</button>}
+                </For>
+              </div>
+            </div>
+          </Show>
+          <label class="fld">
+            <span>Title</span>
+            <input class="finput" ref={titleEl} placeholder="What needs doing?" spellcheck={false} value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
+          </label>
+          <label class="fld">
+            <span>Description</span>
+            <textarea class="finput" rows={4} placeholder="Context, steps to reproduce, what done looks like…" value={desc()} onInput={(e) => setDesc(e.currentTarget.value)} />
+          </label>
+          <div class="fld">
+            <span>Tags</span>
+            <Show when={dest() !== "local"} fallback={<div class="fnote">Local issues have no tags.</div>}>
+              <Show when={labelPool().length} fallback={<div class="fnote">No labels in {SOURCE_NAMES[dest()]} yet.</div>}>
+                <div class="chips">
+                  <For each={labelPool()}>
+                    {(l) => (
+                      <button type="button" class="tchip" aria-pressed={tags().includes(l.id)} onClick={() => toggleIn(tags, setTags, l.id)}>
+                        <LabelChip label={l} />
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </Show>
+          </div>
+          <div class="fld">
+            <span>Assignees</span>
+            <Show when={dest() !== "local"} fallback={<div class="fnote">Local issues have no assignees.</div>}>
+              <Show when={memberPool().length} fallback={<div class="fnote">No members to assign yet. It stays unassigned.</div>}>
+                <div class="chips">
+                  <For each={memberPool()}>
+                    {(m) => (
+                      <button type="button" class="pchip" aria-pressed={people().includes(m.id)} onClick={() => toggleIn(people, setPeople, m.id)}>
+                        <span class="av sm" style={{ "--avc": avatarColor(m.name) }}>{initials(m.name)}</span>{m.name}
+                      </button>
+                    )}
+                  </For>
+                </div>
+                <div class="fnote">None selected means unassigned.</div>
+              </Show>
+            </Show>
+          </div>
+        </div>
+        <div class="mfoot">
+          <span class="grow"><kbd>Ctrl</kbd><kbd>Enter</kbd> {props.editing ? "save" : "create"} · <kbd>Esc</kbd> cancel</span>
+          <button type="button" class="btn" onClick={props.onClose}>Cancel</button>
+          <button type="submit" class="btn primary" disabled={!title().trim() || busy()}>{props.editing ? "Save" : "Create issue"}</button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -616,6 +884,7 @@ function Row(props: {
   const target = i.source === "plane" ? i.target_date : undefined;
   const late = () => !!target && !closed() && target < new Date().toISOString().slice(0, 10);
   const labels = () => issueLabels(props.state, i).map((id) => labelOf(props.state, i.source, id)).filter((l): l is PlaneLabel => !!l);
+  const people = () => assigneesOf(props.state, i);
   return (
     <div class={`irow plane${props.selected ? " sel" : ""}${closed() ? " closed" : ""}`} onClick={props.onOpen}>
       <Priority p={i.source === "plane" ? i.priority : undefined} />
@@ -631,9 +900,20 @@ function Row(props: {
         </Show>
       </span>
       <Pill state={stateOf(props.state, i)} busy={changingTo(props.projectId, i)} onClick={(e) => { e.stopPropagation(); props.onPill(); }} />
-      {props.runningStart !== undefined
-        ? <span class="irun" title="Running Entry"><i class="rec" />{formatHms(clock() - props.runningStart)}</span>
-        : <span class={`idate${late() ? " late" : ""}`} title={late() ? "past its Target Date" : "Target Date"}>{target ? formatDay(target) : ""}</span>}
+      <span class="rmeta">
+        {/* assignees: avatars, or a dim icon when nobody is on it; local issues have no one to assign */}
+        <Show when={i.source !== "local"}>
+          <Show when={people().length} fallback={<span class="unasg" title="Unassigned"><Icon name="user-round" size={13} /></span>}>
+            <span class="avs" title={people().map((m) => m.name).join(", ")}>
+              <For each={people().slice(0, 3)}>{(m) => <span class="av sm" style={{ "--avc": avatarColor(m.name) }}>{initials(m.name)}</span>}</For>
+            </span>
+          </Show>
+        </Show>
+        <Show when={props.runningStart !== undefined}
+          fallback={<span class={`idate${late() ? " late" : ""}`} title={late() ? "past its Target Date" : "Target Date"}>{target ? formatDay(target) : ""}</span>}>
+          <span class="irun" title="Running Entry"><i class="rec" />{formatHms(clock() - (props.runningStart ?? 0))}</span>
+        </Show>
+      </span>
     </div>
   );
 }
@@ -646,10 +926,12 @@ function Detail(props: {
   project: Project;
   position: string;
   onBack: () => void;
+  onJump: () => void;
   onPrev: () => void;
   onNext: () => void;
   onState: () => void;
   onLabels: () => void;
+  onEdit: () => void;
   onOpen: () => void;
   onCopy: () => void;
   onSend: () => void;
@@ -675,11 +957,13 @@ function Detail(props: {
   return (
     <>
       <div class="dhead">
-        <button class="iback" title="Back to the list (Esc)" onClick={props.onBack}>‹ Issues</button>
-        <span class="crumb">/ <b>{slugOf(props.state, i())}</b>{SOURCE_NAMES[i().source]}</span>
+        <button class="iback" title="Back to the list (Esc)" onClick={props.onBack}><Icon name="chevron-left" size={14} />Issues</button>
+        <button class="crumbbtn" title="Jump to another issue (/)" aria-haspopup="listbox" onClick={props.onJump}>
+          <b>{slugOf(props.state, i())}</b><span>{SOURCE_NAMES[i().source]}</span><Icon name="chevron-down" size={12} />
+        </button>
         <span class="pos">{props.position}</span>
-        <button class="ib" title="Previous issue (k)" onClick={props.onPrev}>↑</button>
-        <button class="ib" title="Next issue (j)" onClick={props.onNext}>↓</button>
+        <button class="ib" title="Previous issue (k)" onClick={props.onPrev}><Icon name="chevron-up" size={14} /></button>
+        <button class="ib" title="Next issue (j)" onClick={props.onNext}><Icon name="chevron-down" size={14} /></button>
       </div>
       <div class="dbody">
         <div class="dmain">
@@ -695,7 +979,7 @@ function Detail(props: {
                 <div class="ichips">
                   <button class="pillbtn" title="Change state (d)" aria-haspopup="listbox" onClick={props.onState}>
                     <Pill state={stateOf(props.state, p())} busy={changingTo(props.project.id, p())} />
-                    <span class="caret">▾</span>
+                    <Icon name="chevron-down" size={11} />
                   </button>
                   <Show when={p().source === "plane"}>
                     <span><Priority p={(p() as PlaneIssue).priority} />{(p() as PlaneIssue).priority}</span>
@@ -707,7 +991,7 @@ function Detail(props: {
                       {(l) => <Show when={l}>{(x) => <LabelChip label={x()} />}</Show>}
                     </For>
                     <button class="lblbtn" title="Edit labels (l)" aria-haspopup="listbox" onClick={props.onLabels}>
-                      {issueLabels(props.state, p()).length ? "+ Label" : "+ Add label"}
+                      <Icon name="tag" size={11} />{issueLabels(props.state, p()).length ? "Label" : "Add label"}
                     </button>
                   </div>
                 </Show>
@@ -730,6 +1014,9 @@ function Detail(props: {
           }>
             {(p) => (
               <dl>
+                <Show when={p().created_at}>
+                  <dt>Created</dt><dd>{formatDay(p().created_at!.slice(0, 10))}</dd>
+                </Show>
                 <Show when={p().source === "plane"}>
                   <dt>Start</dt><dd>{formatDay((p() as PlaneIssue).start_date)}</dd>
                   <dt>Target</dt><dd>{formatDay((p() as PlaneIssue).target_date)}</dd>
@@ -738,8 +1025,15 @@ function Detail(props: {
                   <dt>Author</dt><dd>{(p() as GithubIssue).author || "—"}</dd>
                   <dt>Updated</dt><dd>{ago(p().updated_at)}</dd>
                 </Show>
-                <Show when={p().source === "local"}>
-                  <dt>Created</dt><dd>{ago((p() as LocalIssue).created_at)}</dd>
+                <Show when={p().source !== "local"}>
+                  <dt>Assignees</dt>
+                  <dd class="who">
+                    <Show when={assigneesOf(props.state, p()).length} fallback={<span class="c-m">Unassigned</span>}>
+                      <For each={assigneesOf(props.state, p())}>
+                        {(m) => <span class="asg"><span class="av sm" style={{ "--avc": avatarColor(m.name) }}>{initials(m.name)}</span>{m.name}</span>}
+                      </For>
+                    </Show>
+                  </dd>
                 </Show>
                 <dt>Time</dt><dd>{accumulatedMs(props.project.id, issueId()) ? formatHm(accumulatedMs(props.project.id, issueId())) : "—"}{running() ? " · running" : ""}</dd>
               </dl>
@@ -751,6 +1045,7 @@ function Detail(props: {
             </Show>
             <button onClick={props.onSend}><kbd>a</kbd>Send to agent</button>
             <Show when={tracked()}>
+              <button onClick={props.onEdit}><kbd>e</kbd>Edit issue</button>
               <button class={running() ? "on" : ""} onClick={props.onTimer}><kbd>s</kbd>{running() ? "Stop timer" : "Start timer"}</button>
             </Show>
             <button onClick={props.onCopy}><kbd>y</kbd>Copy {slugOf(props.state, i())}</button>
@@ -807,7 +1102,7 @@ function Detail(props: {
                     {(img, k) => (
                       <span>
                         <img src={img.src} alt={img.name} title={img.name} />
-                        <button title={`Remove ${img.name}`} aria-label={`Remove ${img.name}`} onClick={() => removeDraftImage(props.project.id, issueId(), k())}>×</button>
+                        <button title={`Remove ${img.name}`} aria-label={`Remove ${img.name}`} onClick={() => removeDraftImage(props.project.id, issueId(), k())}><Icon name="x" size={10} /></button>
                       </span>
                     )}
                   </For>
@@ -815,7 +1110,7 @@ function Detail(props: {
               </Show>
               <div class="cbar">
                 <Show when={i().source === "plane"} fallback={<span class="grow">posts to GitHub through gh · <kbd>Ctrl</kbd><kbd>Enter</kbd> posts</span>}>
-                  <button class="ib" title="Attach images" onClick={props.onAttach}>⊕</button>
+                  <button class="ib" title="Attach images" onClick={props.onAttach}><Icon name="image-plus" size={15} /></button>
                   <input class="cfile" type="file" accept="image/*" multiple hidden ref={props.fileRef} onChange={props.onFile} />
                   <span class="grow">images upload to Plane · <kbd>Ctrl</kbd><kbd>Enter</kbd> posts</span>
                 </Show>

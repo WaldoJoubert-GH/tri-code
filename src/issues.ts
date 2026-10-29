@@ -31,7 +31,10 @@ export type PlaneIssue = {
   start_date?: string | null;
   target_date?: string | null;
   labels?: string[];
+  /** Member ids (Plane user UUIDs); names come from `members`. */
+  assignees?: string[];
   link: string;
+  created_at?: string;
   updated_at: string;
 };
 
@@ -45,7 +48,10 @@ export type GithubIssue = {
   /** Label names; GitHub labels have no other id. */
   labels?: string[];
   author?: string;
+  /** Assignees' logins, which are also their names. */
+  assignees?: string[];
   link: string;
+  created_at?: string;
   updated_at: string;
 };
 
@@ -82,6 +88,8 @@ export const SOURCE_NAMES: Record<UnifiedIssue["source"], string> = { plane: "Pl
 
 export type PlaneState = { id: string; name: string; color: string; group: string };
 export type PlaneLabel = { id: string; name: string; color: string };
+/** Someone an issue can be assigned to. `id` is what the issue carries: a Plane user id, or a GitHub login. */
+export type Member = { id: string; name: string };
 export type PlaneConfig = { workspace_slug: string; project_id: string; project_identifier?: string };
 export type GithubConfig = { repo: string; progress_label?: string };
 export type LocalConfig = { prefix?: string };
@@ -102,10 +110,14 @@ export type PlaneSync = {
   issues: PlaneIssue[];
   states: PlaneState[];
   labels: PlaneLabel[];
+  members: Member[];
 };
 export type GithubSync = { issues: GithubIssue[]; labels: PlaneLabel[] };
 
-export type CreatedIssue = { id: string; sequence_id?: number; title: string; priority: string; link: string };
+export type CreatedIssue = { id: string; sequence_id?: number; title: string; priority: string; link: string; created_at: string };
+
+/** What the New Issue modal collects. `labels` are Label ids (Plane) or names (GitHub); `assignees` are member ids (Plane) or logins (GitHub). */
+export type NewIssue = { title: string; description: string; labels: string[]; assignees: string[] };
 
 export type DevState = {
   loaded: boolean;
@@ -119,6 +131,10 @@ export type DevState = {
   states: PlaneState[];
   labels: PlaneLabel[];
   githubLabels: PlaneLabel[];
+  /** Plane project members, for assignee names and the New Issue picker. */
+  members: Member[];
+  /** The repo's assignable logins. */
+  githubMembers: Member[];
   /** The next Local issue number. */
   localNext: number;
   timeEntries: TimeEntry[];
@@ -252,26 +268,85 @@ export function sortIssues(state: DevState | undefined, issues: UnifiedIssue[]):
 }
 
 export type SourceFilter = "all" | UnifiedIssue["source"];
-export type View = { src: SourceFilter; done: boolean; q: string };
+/** The Status filter: Open (not Done or Cancelled), All, or one State name (`state:<name>`). */
+export type StatusFilter = "open" | "all" | `state:${string}`;
+export type SortOrder = "newest" | "oldest";
+export type View = { src: SourceFilter; status: StatusFilter; sort: SortOrder; q: string };
 
 /** The source filter's stops: All, each of the project's Sources, Sentry. */
 export function filtersOf(state: DevState | undefined): SourceFilter[] {
   return ["all", ...sourcesOf(state?.config), "sentry"];
 }
 
-/** The rows the list shows: source filter, done toggle, and a search that
- *  matches the Slug-ID, the title and label names. */
+/** The Status filter's stops: Open, All, then each State name of the project's Sources, in State Group order. */
+export function statusStopsOf(state: DevState | undefined): { value: StatusFilter; label: string }[] {
+  const names = new Map<string, PlaneState>();
+  for (const source of sourcesOf(state?.config)) {
+    for (const s of statesFor(state, source)) if (!names.has(s.name)) names.set(s.name, s);
+  }
+  const byGroup = [...names.values()].sort((a, b) => (GROUP_ORDER[a.group] ?? 9) - (GROUP_ORDER[b.group] ?? 9));
+  return [
+    { value: "open", label: "Open" },
+    { value: "all", label: "All" },
+    ...byGroup.map((s) => ({ value: `state:${s.name}` as StatusFilter, label: s.name })),
+  ];
+}
+
+function matchesStatus(state: DevState | undefined, issue: UnifiedIssue, status: StatusFilter): boolean {
+  if (status === "all") return true;
+  if (status === "open") return isActive(state, issue);
+  return issue.source !== "sentry" && stateOf(state, issue)?.name === status.slice("state:".length);
+}
+
+/** Slug-ID, title, label names and assignee names: what the search box matches. */
+function matchesQuery(state: DevState | undefined, issue: UnifiedIssue, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (issue.source === "sentry") return `${slugOf(state, issue)} ${issue.title}`.toLowerCase().includes(q);
+  const labels = issueLabels(state, issue).map((id) => labelOf(state, issue.source, id)?.name ?? "");
+  const people = assigneesOf(state, issue).map((m) => m.name);
+  return `${slugOf(state, issue)} ${issue.title} ${labels.join(" ")} ${people.join(" ")}`.toLowerCase().includes(q);
+}
+
+/** Tracked issues by created date (newest or oldest first), then Sentry by level. */
+export function sortForList(state: DevState | undefined, issues: UnifiedIssue[], order: SortOrder): UnifiedIssue[] {
+  const dir = order === "newest" ? -1 : 1;
+  const tracked = issues
+    .filter((i): i is TrackedIssue => i.source !== "sentry")
+    .sort((a, b) => dir * (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.title.localeCompare(b.title));
+  return [...tracked, ...sortIssues(state, issues.filter((i) => i.source === "sentry"))];
+}
+
+/** The rows the list shows: the Source filter, the Status filter, and the search, sorted by created date. */
 export function shownIssues(state: DevState | undefined, view: View): UnifiedIssue[] {
-  const q = view.q.trim().toLowerCase();
   const on = sourcesOf(state?.config);
   const issues = (state?.issues ?? []).filter(
     (i) =>
       (i.source === "sentry" || on.includes(i.source)) &&
       (view.src === "all" || i.source === view.src) &&
-      (view.done || isActive(state, i)) &&
-      (!q || `${slugOf(state, i)} ${i.title} ${(i.source === "sentry" ? [] : issueLabels(state, i)).map((id) => labelOf(state, i.source as Source, id)?.name ?? "").join(" ")}`.toLowerCase().includes(q)),
+      matchesStatus(state, i, view.status) &&
+      matchesQuery(state, i, view.q),
   );
-  return sortIssues(state, issues);
+  return sortForList(state, issues, view.sort);
+}
+
+/** The search dropdown's matches: any issue from the project's Sources, newest first. */
+export function searchIssues(state: DevState | undefined, query: string, limit = 8): UnifiedIssue[] {
+  const on = sourcesOf(state?.config);
+  const issues = (state?.issues ?? []).filter((i) => (i.source === "sentry" || on.includes(i.source)) && matchesQuery(state, i, query));
+  return sortForList(state, issues, "newest").slice(0, limit);
+}
+
+/** The people an issue from `source` can be assigned to. Local issues have no account to assign. */
+export function membersFor(state: DevState | undefined, source: Source): Member[] {
+  return source === "plane" ? state?.members ?? [] : source === "github" ? state?.githubMembers ?? [] : [];
+}
+
+/** The assignees on an issue, by name: a Plane member id resolves through the members; a GitHub login is its own name. */
+export function assigneesOf(state: DevState | undefined, issue: UnifiedIssue): Member[] {
+  if (issue.source === "sentry" || issue.source === "local") return [];
+  const pool = membersFor(state, issue.source);
+  return (issue.assignees ?? []).map((id) => pool.find((m) => m.id === id) ?? { id, name: issue.source === "plane" ? "Unknown member" : id });
 }
 
 export function priorityRank(p?: string): number {
@@ -321,7 +396,7 @@ export function escapeHtml(s: string): string {
 
 const empty = (): DevState => ({
   loaded: false, loading: false, connected: false, hostToken: false,
-  config: {}, issues: [], states: [], labels: [], githubLabels: [], localNext: 1, timeEntries: [], syncing: false,
+  config: {}, issues: [], states: [], labels: [], githubLabels: [], members: [], githubMembers: [], localNext: 1, timeEntries: [], syncing: false,
 });
 
 export const [dev, setDev] = createStore<Record<string, DevState>>({});
@@ -444,7 +519,7 @@ export async function loadDev(project: Project): Promise<void> {
   if (current?.loading) return;
   setDev(project.id, { ...(current ?? empty()), loading: true, error: undefined });
   try {
-    const [configRaw, issuesRaw, statesRaw, labelsRaw, timeRaw, localRaw, ghLabelsRaw] = await Promise.all([
+    const [configRaw, issuesRaw, statesRaw, labelsRaw, timeRaw, localRaw, ghLabelsRaw, membersRaw, ghMembersRaw] = await Promise.all([
       devRead(project, "config.json"),
       devRead(project, "issues.json"),
       devRead(project, "plane-states.json"),
@@ -452,6 +527,8 @@ export async function loadDev(project: Project): Promise<void> {
       devRead(project, "time-entries.json"),
       devRead(project, "local-issues.json"),
       devRead(project, "github-labels.json"),
+      devRead(project, "plane-members.json"),
+      devRead(project, "github-members.json"),
     ]);
     const config = parse<DevConfig>(configRaw, {});
     const plane = config.plane;
@@ -461,6 +538,8 @@ export async function loadDev(project: Project): Promise<void> {
     const timeFile = parse<{ entries?: TimeEntry[] }>(timeRaw, {});
     const localFile = parse<{ next?: number; issues?: LocalIssue[] }>(localRaw, {});
     const ghLabelsFile = parse<{ labels?: PlaneLabel[] }>(ghLabelsRaw, {});
+    const membersFile = parse<{ members?: Member[] }>(membersRaw, {});
+    const ghMembersFile = parse<{ members?: Member[] }>(ghMembersRaw, {});
     const local = localFile.issues ?? [];
     setDev(project.id, {
       loaded: true, loading: false,
@@ -471,6 +550,8 @@ export async function loadDev(project: Project): Promise<void> {
       states: statesFile.states ?? [],
       labels: labelsFile.labels ?? [],
       githubLabels: ghLabelsFile.labels ?? [],
+      members: membersFile.members ?? [],
+      githubMembers: ghMembersFile.members ?? [],
       localNext: localFile.next ?? Math.max(0, ...local.map((i) => i.number)) + 1,
       timeEntries: timeFile.entries ?? [],
     });
@@ -515,8 +596,9 @@ async function syncPlane(project: Project, plane: PlaneConfig): Promise<number> 
     devWrite(project, "issues.json", JSON.stringify({ last_synced: res.last_synced, issues: issues.filter((i) => i.source !== "local") }, null, 2)),
     devWrite(project, "plane-states.json", JSON.stringify({ last_fetched: res.last_synced, states: res.states }, null, 2)),
     devWrite(project, "plane-labels.json", JSON.stringify({ last_fetched: res.last_synced, labels: res.labels }, null, 2)),
+    devWrite(project, "plane-members.json", JSON.stringify({ last_fetched: res.last_synced, members: res.members }, null, 2)),
   ]);
-  setDev(project.id, { issues, states: res.states, labels: res.labels, lastSynced: res.last_synced });
+  setDev(project.id, { issues, states: res.states, labels: res.labels, members: res.members, lastSynced: res.last_synced });
   // Fill in the project identifier the first time we see it.
   if (res.project_identifier && !plane.project_identifier) {
     const config: DevConfig = { ...(current?.config ?? {}), plane: { ...plane, project_identifier: res.project_identifier } };
@@ -528,13 +610,17 @@ async function syncPlane(project: Project, plane: PlaneConfig): Promise<number> 
 
 async function syncGithub(project: Project, github: GithubConfig): Promise<number> {
   const res = await invoke<GithubSync>("gh_issues_sync", { host: project.host, path: project.path, repo: github.repo });
+  // Who can be assigned: a failed read keeps the last list rather than failing the sync.
+  const logins = await invoke<string[]>("gh_assignees", { host: project.host, path: project.path, repo: github.repo }).catch(() => null);
   const now = new Date().toISOString();
+  const members: Member[] = logins ? logins.map((login) => ({ id: login, name: login })) : dev[project.id]?.githubMembers ?? [];
   const issues = replaceSource(dev[project.id]?.issues ?? [], "github", res.issues);
   await Promise.all([
     devWrite(project, "issues.json", JSON.stringify({ last_synced: now, issues: issues.filter((i) => i.source !== "local") }, null, 2)),
     devWrite(project, "github-labels.json", JSON.stringify({ last_fetched: now, labels: res.labels }, null, 2)),
+    devWrite(project, "github-members.json", JSON.stringify({ last_fetched: now, members }, null, 2)),
   ]);
-  setDev(project.id, { issues, githubLabels: res.labels, lastSynced: now });
+  setDev(project.id, { issues, githubLabels: res.labels, githubMembers: members, lastSynced: now });
   return res.issues.length;
 }
 
@@ -655,38 +741,49 @@ export function defaultStateId(projectId: string): string | undefined {
   );
 }
 
-export async function createIssue(project: Project, title: string, source: Source): Promise<TrackedIssue | undefined> {
+/** Create an issue in `source` from the New Issue modal. Local issues take no tags or assignees. */
+export async function createIssue(project: Project, draft: NewIssue, source: Source): Promise<TrackedIssue | undefined> {
   const d = dev[project.id];
+  const title = draft.title.trim();
+  const description = draft.description.trim();
+  const labels = source === "local" ? [] : draft.labels;
+  const assignees = source === "local" ? [] : draft.assignees;
   let issue: TrackedIssue;
   try {
     if (source === "plane") {
+      const stateId = defaultStateId(project.id);
       const created = await invoke<CreatedIssue>("plane_create_issue", {
         ...planeArgs(project),
         title,
-        stateId: defaultStateId(project.id) ?? null,
+        stateId: stateId ?? null,
+        descriptionHtml: description ? `<p>${escapeHtml(description).replace(/\n/g, "<br>")}</p>` : null,
+        labels,
+        assignees,
       });
-      const state = d?.states.find((s) => s.id === defaultStateId(project.id));
+      const state = d?.states.find((s) => s.id === stateId);
       issue = {
         source: "plane",
         id: created.id,
         sequence_id: created.sequence_id,
         title: created.title,
-        description: "",
+        description,
         state_id: state?.id,
         state_name: state?.name,
         state_group: state?.group,
         state_hex: state?.color,
         priority: created.priority,
         link: created.link,
-        labels: [],
+        labels,
+        assignees,
+        created_at: created.created_at,
         updated_at: new Date().toISOString(),
       };
     } else if (source === "github") {
-      issue = await invoke<GithubIssue>("gh_issue_create", { ...ghArgs(project), title });
+      issue = await invoke<GithubIssue>("gh_issue_create", { ...ghArgs(project), title, body: description, labels, assignees });
     } else {
       const now = new Date().toISOString();
       const number = d?.localNext ?? 1;
-      issue = { source: "local", number, title, state_id: "todo", link: "", created_at: now, updated_at: now };
+      issue = { source: "local", number, title, description, state_id: "todo", link: "", created_at: now, updated_at: now };
       setDev(project.id, "localNext", number + 1);
     }
   } catch (e) {
@@ -696,6 +793,95 @@ export async function createIssue(project: Project, title: string, source: Sourc
   await persistIssues(project, [...(dev[project.id]?.issues ?? []), issue], touchedBy(issue));
   flash(`created ${slugOf(dev[project.id], issue)}${source === "local" ? " in .dev/local-issues.json" : ` in ${SOURCE_NAMES[source]}`}`);
   return issue;
+}
+
+/** What the Edit form starts from: the issue's title, description, shown Labels and assignees. */
+export function draftOf(state: DevState | undefined, issue: TrackedIssue): NewIssue {
+  return {
+    title: issue.title,
+    description: issue.description ?? "",
+    labels: issueLabels(state, issue),
+    assignees: issue.source === "local" ? [] : issue.assignees ?? [],
+  };
+}
+
+export type IssueEdit = {
+  title?: string;
+  description?: string;
+  addLabels: string[];
+  removeLabels: string[];
+  addAssignees: string[];
+  removeAssignees: string[];
+};
+
+/** What the Edit form changed. Only changed fields are sent, so an untouched Plane description keeps its formatting. */
+export function editOf(state: DevState | undefined, issue: TrackedIssue, draft: NewIssue): IssueEdit {
+  const was = draftOf(state, issue);
+  const title = draft.title.trim();
+  const description = draft.description.trim();
+  const minus = (a: string[], b: string[]) => a.filter((x) => !b.includes(x));
+  return {
+    title: title && title !== was.title ? title : undefined,
+    description: description !== was.description.trim() ? description : undefined,
+    addLabels: minus(draft.labels, was.labels),
+    removeLabels: minus(was.labels, draft.labels),
+    addAssignees: minus(draft.assignees, was.assignees),
+    removeAssignees: minus(was.assignees, draft.assignees),
+  };
+}
+
+const isEmptyEdit = (e: IssueEdit) =>
+  e.title === undefined && e.description === undefined &&
+  !e.addLabels.length && !e.removeLabels.length && !e.addAssignees.length && !e.removeAssignees.length;
+
+/** Save the Edit form to the issue's Source, then to `.dev/`. Returns false if it failed. */
+export async function updateIssue(project: Project, issue: TrackedIssue, draft: NewIssue): Promise<boolean> {
+  const d = dev[project.id];
+  const edit = editOf(d, issue, draft);
+  if (isEmptyEdit(edit)) return true;
+  const now = new Date().toISOString();
+  let next: TrackedIssue = {
+    ...issue,
+    title: edit.title ?? issue.title,
+    description: edit.description ?? issue.description,
+    updated_at: now,
+  };
+  try {
+    if (issue.source === "plane") {
+      const labels = edit.addLabels.length || edit.removeLabels.length ? draft.labels : undefined;
+      const assignees = edit.addAssignees.length || edit.removeAssignees.length ? draft.assignees : undefined;
+      await invoke("plane_update_issue", {
+        ...planeArgs(project),
+        issueId: issue.id,
+        title: edit.title ?? null,
+        descriptionHtml: edit.description === undefined ? null : edit.description ? `<p>${escapeHtml(edit.description).replace(/\n/g, "<br>")}</p>` : "",
+        labels: labels ?? null,
+        assignees: assignees ?? null,
+      });
+      next = { ...(next as PlaneIssue), labels: labels ?? issue.labels, assignees: assignees ?? issue.assignees };
+    } else if (issue.source === "github") {
+      await invoke("gh_issue_edit", {
+        ...ghArgs(project),
+        number: issue.number,
+        title: edit.title ?? null,
+        body: edit.description ?? null,
+        addLabels: edit.addLabels,
+        removeLabels: edit.removeLabels,
+        addAssignees: edit.addAssignees,
+        removeAssignees: edit.removeAssignees,
+      });
+      // The progress label is the State, not a shown Label, so it stays whatever it was.
+      const progress = (issue.labels ?? []).filter((l) => l === progressLabel(d));
+      next = { ...(next as GithubIssue), labels: [...draft.labels, ...progress], assignees: draft.assignees };
+    }
+  } catch (e) {
+    flash(`edit failed: ${e}`);
+    return false;
+  }
+  await persistIssues(project, swap(project.id, next), touchedBy(issue));
+  const sent = issue.source === "plane" ? " · PATCH sent to Plane" : issue.source === "github" ? " · gh issue edit" : " in .dev/local-issues.json";
+  flash(`updated ${slugOf(d, issue)}${sent}`);
+  return true;
 }
 
 // ── time entries ────────────────────────────────────────────────────
