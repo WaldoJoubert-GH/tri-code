@@ -2,6 +2,14 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.42 — 2026-10-29
+
+- Browser windows save downloads to the Downloads folder, under a free name. A button in the nav row lists them with a progress ring, and the newest shows in a strip under the nav. On Windows a download shows its progress and can be cancelled; "Download again" re-fetches through the page so its cookies apply. ([#37](https://github.com/WaldoJoubert-GH/tri-code/pull/37))
+- The Issues Panel shows each issue's assignees as avatars and its created date, and `o` sorts by created date. A search box drops down matching issues, with Source and Status menus (`f`, `s`). New Issue and Edit (`e`) are one form with title, description, labels and assignees, and Plane and GitHub writes send only what changed. ([#38](https://github.com/WaldoJoubert-GH/tri-code/pull/38))
+- Restarting to update while an agent is working, needs you, or has failed now asks first, counting them, with Cancel focused.
+- The sidebar keeps Settings at the bottom and the pinned shelf at the top while a long list of Environments scrolls, without a scrollbar.
+- The phone app has its own icons, so Android installs it as a real app with notifications under tri-code, iOS gets a Home Screen icon, and the notification badge shows as a white trident instead of a blank square. ([#39](https://github.com/WaldoJoubert-GH/tri-code/pull/39))
+
 ## 0.1.41 — 2026-10-28
 
 - New worktree starts its branch with the repo's branch prefix (e.g. `waldo/`), saved on the repo and left out of the folder and sidebar label. The dialog also takes a setup script, saved per repo, that runs once in its own window and closes when it succeeds, and "and open" picks the Commands to start beside it. ([#34](https://github.com/WaldoJoubert-GH/tri-code/pull/34))
