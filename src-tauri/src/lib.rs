@@ -176,6 +176,7 @@ pub fn run() {
             plane::plane_set_labels,
             plane::plane_create_issue,
             plane::plane_update_issue,
+            plane::plane_set_dates,
             plane::plane_comments,
             plane::plane_add_comment,
             plane::plane_upload_asset,

@@ -516,6 +516,26 @@ pub async fn plane_set_labels(
     .map_err(|e| e.to_string())?
 }
 
+/// PATCH an issue's Start Date and Target Date (`YYYY-MM-DD`), as the Timeline drags them.
+#[tauri::command]
+pub async fn plane_set_dates(
+    host: String,
+    workspace_slug: String,
+    project_id: String,
+    issue_id: String,
+    start_date: String,
+    target_date: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let api = Api::new(read_token(&host)?);
+        let url = format!("{API_V1}/workspaces/{workspace_slug}/projects/{project_id}/issues/{issue_id}/");
+        let body = serde_json::json!({ "start_date": start_date, "target_date": target_date });
+        api.json("PATCH", &url, Some(&body)).map(|_| ())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// PATCH the fields the Edit form changed; `None` leaves a field as it is.
 #[tauri::command]
 pub async fn plane_update_issue(

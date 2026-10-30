@@ -29,6 +29,10 @@ An issue that exists only in `.dev/local-issues.json`: a number, a title and one
 **Issues Panel**:
 A canvas Window, one per project, that renders the project's Dev Directory as a list and a full-width drill-down. New `TabKind` `"issues"`. Plain HTML, not a terminal, so plain keys drive it while it is focused. Addressed with `Alt+I`.
 
+**Timeline**:
+The Issues Panel's list drawn as a Gantt chart (`v` toggles it; kept per window as `timeline` on the Tab): the same filtered rows on the left, a bar per issue on the right, a line at today, Day / Week / Month zoom. A Plane Issue's Start Date and Target Date place its bar; a missing one is derived (the created date; the closed date or today) and that end fades out. Dragging a Plane bar, or either end, PATCHes both dates. GitHub and Local Issues have no dates, so their bars run created → closed or today and do not move. Chosen from design/issues-gantt.html (variant A).
+_Avoid_: Gantt view, roadmap, schedule.
+
 **Slug-ID**:
 `<Project Identifier>-<sequence_id>` for a Plane Issue (e.g. `TRI-12`); `#<number>` for a GitHub Issue; `<prefix>-<number>` for a Local Issue, or the bare number when the project's Local prefix is empty; `S-<sentry_id>` for a Sentry Issue. What the user copies and sends to an agent; selection and Time Entries use the issue key (`gh231`, `lo3`, the Plane UUID).
 

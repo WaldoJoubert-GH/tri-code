@@ -116,6 +116,8 @@ export type Tab = {
   typed?: true;
   /** `term` tabs only: a Worktree's setup (setup.ts). Its window closes when the command succeeds. */
   once?: true;
+  /** `issues` tabs only: the list shows as the Timeline. */
+  timeline?: true;
   /** `db` tabs only: the Connection it shows (an id in `.dev/databases.json`); unset shows the start page. */
   db?: string;
   /** Minimised: when (ms), so Alt+Shift+N brings back the latest. Off the canvas but still in the Tab Strip. */
@@ -804,6 +806,11 @@ export function becomeShell(projectId: string, tabId: string) {
 /** The Connection a database window shows; unset goes back to its start page. */
 export function setTabDb(projectId: string, tabId: string, db: string | undefined) {
   editTab(projectId, tabId, (t) => { t.db = db; });
+}
+
+/** An Issues Panel shows its issues as the list or the Timeline. */
+export function setTabTimeline(projectId: string, tabId: string, on: boolean) {
+  editTab(projectId, tabId, (t) => { if (on) t.timeline = true; else delete t.timeline; });
 }
 
 /** A multi-line command's lines have been typed into its shell. */

@@ -884,6 +884,20 @@ export async function updateIssue(project: Project, issue: TrackedIssue, draft: 
   return true;
 }
 
+/** Set a Plane Issue's Start Date and Target Date (`YYYY-MM-DD`), as the Timeline drags them. Returns false if it failed. */
+export async function setIssueDates(project: Project, issue: PlaneIssue, start: string, target: string): Promise<boolean> {
+  if (issue.start_date === start && issue.target_date === target) return true;
+  try {
+    await invoke("plane_set_dates", { ...planeArgs(project), issueId: issue.id, startDate: start, targetDate: target });
+  } catch (e) {
+    flash(`date change failed: ${e}`);
+    return false;
+  }
+  await persistIssues(project, swap(project.id, { ...issue, start_date: start, target_date: target, updated_at: new Date().toISOString() }));
+  flash(`${slugOf(dev[project.id], issue)} · ${formatDay(start)} → ${formatDay(target)} · PATCH sent to Plane`);
+  return true;
+}
+
 // ── time entries ────────────────────────────────────────────────────
 
 export function runningEntry(projectId: string): TimeEntry | null {

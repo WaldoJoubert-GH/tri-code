@@ -388,6 +388,73 @@
 .pri.none { align-items: center; } .pri.none b { height: 2px !important; }
 .pri.urgent { align-items: center; justify-content: center; border-radius: 3px; background: var(--pc); color: #fff; font: 800 9px/1 var(--ui); }
 .lvl { width: 8px; height: 8px; border-radius: 50%; background: var(--pc); margin-left: 2px; }
+/* Timeline: the list as a Gantt chart (design/issues-gantt.html, variant A). One scroller; the
+   header sticks to the top, the issue column to the left, so rows and bars always line up. */
+.ilist.off, .iss.detail .itl { display: none; }
+.itl { --tlw: 330px; position: relative; overflow: auto; min-height: 0; }
+@container (max-width: 620px) { .itl { --tlw: 118px; } .tlleft .tt, .tlleft .pill, .tlcorner > span { display: none; } }
+.tlin { position: relative; min-height: 100%; }
+.tlhead { position: sticky; top: 0; z-index: 4; display: flex; height: 38px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.tlcorner {
+  position: sticky; left: 0; z-index: 5; flex: none; width: var(--tlw); display: flex; align-items: center; justify-content: space-between;
+  gap: 6px; padding: 0 8px 0 10px; background: var(--panel); border-right: 1px solid var(--line); font-size: 11px; color: var(--muted);
+}
+.tlcorner .seg { margin: 0; }
+.tlcorner .seg button { padding: 0 7px; font-size: 11px; }
+.tlscale { flex: none; display: flex; flex-direction: column; }
+.tlmonths, .tlunits { display: flex; height: 19px; }
+.tlmonths span { flex: none; padding: 2px 6px; border-left: 1px solid var(--line); font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; }
+.tlunits span { flex: none; padding: 2px 0 0 4px; border-left: 1px solid var(--line); font: 10.5px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; }
+.tlunits.days span { padding-left: 0; text-align: center; }
+.tlunits span.we { background: color-mix(in srgb, var(--line) 30%, transparent); }
+.tlunits span.now { color: var(--accent); font-weight: 700; }
+.tlrow { display: flex; height: 28px; cursor: default; }
+.tlleft {
+  position: sticky; left: 0; z-index: 3; flex: none; width: var(--tlw); display: flex; align-items: center; gap: 8px;
+  padding: 0 10px 0 8px; background: var(--bg); border-right: 1px solid var(--line); overflow: hidden;
+}
+.tlleft .sid { min-width: 44px; }
+.tlleft .tt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlleft .tt.closed { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.tlrow:hover > .tlleft, .tlrow:hover > .tltrack { background-color: var(--hover); }
+.tlrow.sel > .tlleft { background: color-mix(in srgb, var(--accent) 15%, var(--bg)); box-shadow: inset 2px 0 var(--accent); }
+.tlrow.sel > .tltrack { background-color: color-mix(in srgb, var(--accent) 8%, transparent); }
+.win:not(.focused) .tlrow.sel > .tlleft { background: var(--hover); box-shadow: inset 2px 0 var(--muted); }
+/* week lines, every 7 days from the range's Monday */
+.tltrack {
+  position: relative; flex: 1; overflow: hidden;
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--line) 70%, transparent) 1px, transparent 1px);
+  background-size: calc(var(--ppd) * 7px) 100%;
+}
+.tltoday { position: absolute; top: 0; bottom: 0; z-index: 2; border-left: 1.5px solid var(--accent); pointer-events: none; }
+.tlbar {
+  position: absolute; top: 5px; height: 18px; z-index: 1; display: flex; align-items: center; border-radius: 4px;
+  background: var(--sc); color: var(--fc); font-size: 11px; font-weight: 600; white-space: nowrap; cursor: grab; touch-action: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sc) 70%, #000);
+}
+/* the title sticks just right of the issue column, so a bar that started off-screen still reads from its first letter */
+.tlbar > span { position: sticky; left: var(--tlw); min-width: 0; padding: 0 7px; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.tlbar .grip { position: absolute; top: 0; bottom: 0; width: 7px; cursor: ew-resize; }
+.tlbar .grip:first-child { left: -2px; } .tlbar .grip:last-child { right: -2px; }
+.tlbar .grip::after { content: ""; position: absolute; top: 4px; bottom: 4px; left: 2px; width: 2px; border-radius: 1px; background: var(--fc); opacity: 0; }
+.tlbar:hover .grip::after { opacity: .5; }
+.tlbar.locked { cursor: default; }
+.tlbar.locked .grip { display: none; }
+.tlbar.closed { opacity: .55; }
+.tlbar.busy { opacity: .7; cursor: progress; }
+.tlrow.sel .tlbar { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* a derived end (no date set): the bar fades out instead of stopping */
+.tlbar.fs { border-top-left-radius: 0; border-bottom-left-radius: 0; mask-image: linear-gradient(to right, transparent, #000 16px); }
+.tlbar.fe { border-top-right-radius: 0; border-bottom-right-radius: 0; mask-image: linear-gradient(to left, transparent, #000 20px); }
+.tlbar.fs.fe { mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 20px), transparent); }
+.tlnote { position: absolute; top: 6px; font-size: 11px; white-space: nowrap; pointer-events: none; }
+.tlnote.late { color: var(--bad); font-weight: 600; }
+.tlover {
+  position: absolute; top: 10px; height: 8px; border-radius: 0 3px 3px 0; opacity: .6; pointer-events: none;
+  background: repeating-linear-gradient(-45deg, var(--bad) 0 3px, transparent 3px 6px);
+}
+body.tl-moving, body.tl-moving * { cursor: grabbing !important; }
+body.tl-sizing, body.tl-sizing * { cursor: ew-resize !important; }
 .iempty { grid-column: 1 / -1; padding: 28px 16px; color: var(--muted); text-align: center; }
 .idetail h3 { margin: 4px 0 8px; font-size: 14px; line-height: 1.35; text-wrap: balance; }
 .ichips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
