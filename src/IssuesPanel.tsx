@@ -4,7 +4,7 @@
 // terminal, so plain keys drive it while the window is focused.
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
-import { type Project, type Tab, focusTab, space, tabName } from "./state";
+import { type Project, type Tab, focusTab, setTabTimeline, space, tabName } from "./state";
 import { agentTarget } from "./agents";
 import {
   ACTIVE_GROUPS, DEFAULT_PROGRESS_LABEL, LEVEL_COLORS, PRIORITY_COLORS, SOURCES, SOURCE_NAMES, type DevState,
@@ -13,13 +13,14 @@ import {
   accumulatedMs, addDraftImage, ago, assigneesOf, avatarColor, changingTo, clearDraft, clock, commentsOf, createIssue, dev,
   draftOf, ensureComments, fgFor, filtersOf, formatDay, formatHm, formatHms, getDraft, guessRepo, initials, isActive,
   issueKey, issueLabels, labelOf, labelsFor, loadDev, membersFor, pendingIssue, postComment, priorityRank, removeDraftImage,
-  runningEntry, saveSources, searchIssues, setDraftText, setIssueState, setPendingIssue, shownIssues, slugOf, sourcesOf,
+  runningEntry, saveSources, searchIssues, setDraftText, setIssueDates, setIssueState, setPendingIssue, shownIssues, slugOf, sourcesOf,
   statesFor, statusStopsOf, stateOf, syncDev, syncNow, toggleLabel, toggleTimer, updateIssue,
 } from "./issues";
 import { openUrlInProject } from "./browsers";
 import { sendText } from "./terms";
 import { Icon } from "./lucide";
 import { flash } from "./ui";
+import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";
 
 // ── small presentational pieces ─────────────────────────────────────
 
@@ -125,6 +126,11 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
   const [ldrop, setLdrop] = createSignal<number | null>(null);
   const [light, setLight] = createSignal<{ c: number; i: number } | null>(null);
   const [over, setOver] = createSignal(false);
+  const [zoom, setZoom] = createSignal<Zoom>("week");
+  /** The list shows as the Timeline: kept on the window, so it reopens the way it was left. */
+  const timeline = () => !!props.tab.timeline;
+  const setTimeline = (on: boolean) => setTabTimeline(home().id, props.tab.id, on);
+  let tl: TimelineApi | undefined;
 
   let rootEl!: HTMLDivElement;
   let searchEl: HTMLInputElement | undefined;
@@ -148,7 +154,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
   const dropLabels = () => { const i = selectedTracked(); return i ? labelsFor(state(), i.source) : []; };
   const sources = () => sourcesOf(state()?.config);
   const statusLabel = () => statusStopsOf(state()).find((s) => s.value === status())?.label ?? "Open";
-  const anchor = () => (drop() !== null ? rootEl.querySelector(view() === "detail" ? ".pillbtn" : ".irow.sel .pill") : null);
+  const anchor = () => (drop() !== null ? rootEl.querySelector(view() === "detail" ? ".pillbtn" : ".irow.sel .pill, .tlrow.sel .pill") : null);
   const labelAnchor = () => (ldrop() !== null ? rootEl.querySelector(".lblbtn") : null);
 
   // Keep the list cursor on a visible row; a drilled-in issue stays open.
@@ -355,6 +361,9 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
     else if (!detail && k === "f") setFmenu("source");
     else if (!detail && k === "s") setFmenu("status");
     else if (!detail && k === "o") toggleSort();
+    else if (!detail && k === "v") setTimeline(!timeline());
+    else if (!detail && timeline() && k === "t") tl?.today();
+    else if (!detail && timeline() && (k === "-" || k === "=")) setZoom(zoomBy(zoom(), k === "-" ? 1 : -1));
     else if (k === "r") syncNow(props.project);
     else if (k === "n") { setView("list"); setCreating(true); }
     else if (detail && k === "o" && selected()) openExternal(selected()!);
@@ -432,6 +441,10 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
       >
         {/* toolbar: one search (a dropdown over the issues), two filters, sort, sync, New */}
         <div class="itools">
+          <div class="seg" role="group" aria-label="Layout">
+            <button aria-pressed={!timeline()} title="List (v)" onClick={() => setTimeline(false)}><Icon name="list" size={13} /></button>
+            <button aria-pressed={timeline()} title="Timeline (v)" onClick={() => setTimeline(true)}><Icon name="chart-gantt" size={13} /></button>
+          </div>
           <div class="sbox">
             <Icon name="search" size={13} />
             <input
@@ -467,7 +480,21 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
         </div>
 
         <div class="imain">
-          <div class="ilist">
+          <Show when={timeline()}>
+            <Timeline
+              rows={rows()}
+              state={state()}
+              project={props.project}
+              sel={sel()}
+              zoom={zoom()}
+              onZoom={setZoom}
+              onSelect={setSel}
+              onOpen={openDetailById}
+              onPill={(key) => { setSel(key); openStates(); }}
+              api={(a) => (tl = a)}
+            />
+          </Show>
+          <div class="ilist" classList={{ off: timeline() }}>
             <For each={rows()}>{(issue) => <Row
               issue={issue}
               state={state()}
@@ -522,7 +549,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
         </div>
 
         <div class="ihint">
-          <Show when={view() === "detail"} fallback={<>
+          <Show when={view() === "detail"} fallback={<Show when={timeline()} fallback={<>
             <span><kbd>j</kbd><kbd>k</kbd> move</span>
             <span><kbd>Enter</kbd> open</span>
             <span><kbd>/</kbd> search</span>
@@ -531,7 +558,15 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
             <span><kbd>o</kbd> sort</span>
             <span><kbd>n</kbd> new</span>
             <span><kbd>r</kbd> sync</span>
+            <span><kbd>v</kbd> timeline</span>
           </>}>
+            <span><kbd>j</kbd><kbd>k</kbd> move</span>
+            <span><kbd>Enter</kbd> open</span>
+            <span>drag a Plane bar to set its dates</span>
+            <span><kbd>t</kbd> today</span>
+            <span><kbd>-</kbd><kbd>=</kbd> zoom</span>
+            <span><kbd>v</kbd> list</span>
+          </Show>}>
             <span><kbd>Esc</kbd> back</span>
             <span><kbd>j</kbd><kbd>k</kbd> next / prev</span>
             <span><kbd>/</kbd> jump to issue</span>
@@ -914,6 +949,207 @@ function Row(props: {
           <span class="irun" title="Running Entry"><i class="rec" />{formatHms(clock() - (props.runningStart ?? 0))}</span>
         </Show>
       </span>
+    </div>
+  );
+}
+
+// ── timeline ────────────────────────────────────────────────────────
+
+type Zoom = "day" | "week" | "month";
+const ZOOMS: Zoom[] = ["day", "week", "month"];
+/** Pixels per day at each zoom. */
+const PPD: Record<Zoom, number> = { day: 28, week: 14, month: 5 };
+const zoomBy = (z: Zoom, n: number): Zoom => ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, ZOOMS.indexOf(z) + n))];
+type TimelineApi = { today: () => void };
+
+const DAY_MS = 86_400_000;
+const dateAt = (day: number) => new Date(day * DAY_MS);
+const shortDay = (day: number) => dateAt(day).toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" });
+
+/** The issue list as a Gantt chart: the rows on the left, a bar per issue on the right (design/issues-gantt.html, variant A). */
+function Timeline(props: {
+  rows: UnifiedIssue[];
+  state: DevState | undefined;
+  project: Project;
+  sel: string | null;
+  zoom: Zoom;
+  onZoom: (z: Zoom) => void;
+  onSelect: (key: string) => void;
+  onOpen: (key: string) => void;
+  onPill: (key: string) => void;
+  api: (a: TimelineApi) => void;
+}): JSX.Element {
+  let scrollEl!: HTMLDivElement;
+  const today = todayDay();
+  const ppd = () => PPD[props.zoom];
+  const spans = createMemo(() => new Map(props.rows.map((i) => [issueKey(i), spanOf(props.state, i, today)])));
+  const range = createMemo(() => rangeOf([...spans().values()], today));
+  const x = (day: number) => (day - range().from) * ppd();
+  /** A bar being dragged, and the bars whose new dates are on their way to Plane. */
+  const [drag, setDrag] = createSignal<{ key: string; grip: Grip; x0: number; span: Span; dd: number } | null>(null);
+  const [sending, setSending] = createSignal<Record<string, { start: number; end: number }>>({});
+  const shown = (key: string): { start: number; end: number; startSet: boolean; endSet: boolean } | null => {
+    const s = spans().get(key);
+    if (!s) return null;
+    const d = drag();
+    if (d?.key === key && d.dd) return { ...dragged(d.span, d.grip, d.dd), startSet: true, endSet: true };
+    const p = sending()[key];
+    return p ? { ...p, startSet: true, endSet: true } : s;
+  };
+
+  const months = createMemo(() => {
+    const { from, days } = range();
+    const out: { label: string; width: number }[] = [];
+    let start = 0;
+    for (let n = 1; n <= days; n++) {
+      if (n === days || dateAt(from + n).getUTCDate() === 1) {
+        out.push({ label: dateAt(from + start).toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" }), width: (n - start) * ppd() });
+        start = n;
+      }
+    }
+    return out;
+  });
+  /** The second header row: days at Day zoom, else weeks. */
+  const units = createMemo(() => {
+    const { from, days } = range();
+    const out: { label: string; width: number; now: boolean; weekend?: boolean }[] = [];
+    if (props.zoom === "day") {
+      for (let n = from; n < from + days; n++) {
+        const wd = dateAt(n).getUTCDay();
+        out.push({ label: String(dateAt(n).getUTCDate()), width: ppd(), now: n === today, weekend: wd === 0 || wd === 6 });
+      }
+    } else {
+      for (let n = from; n < from + days; n += 7) {
+        out.push({ label: props.zoom === "week" ? shortDay(n) : String(dateAt(n).getUTCDate()), width: 7 * ppd(), now: today >= n && today < n + 7 });
+      }
+    }
+    return out;
+  });
+
+  const leftWidth = () => scrollEl?.querySelector<HTMLElement>(".tlcorner")?.offsetWidth ?? 0;
+  const scrollToDay = (day: number, smooth: boolean) =>
+    scrollEl.scrollTo({ left: Math.max(0, x(day) - (scrollEl.clientWidth - leftWidth()) * 0.35), behavior: smooth ? "smooth" : "auto" });
+  props.api({ today: () => scrollToDay(today, true) });
+  onMount(() => scrollToDay(today, false));
+
+  // Zooming keeps the day in the middle where it was.
+  createEffect(on(() => props.zoom, (_, prev) => {
+    if (!prev) return;
+    const mid = (scrollEl.scrollLeft + (scrollEl.clientWidth - leftWidth()) / 2) / PPD[prev];
+    scrollEl.scrollLeft = mid * ppd() - (scrollEl.clientWidth - leftWidth()) / 2;
+  }, { defer: true }));
+
+  // Keep the selected row in view (vertically; the bar's day is left where it is).
+  createEffect(on(() => props.sel, (key) => {
+    const row = key ? scrollEl.querySelector<HTMLElement>(`.tlrow[data-key="${CSS.escape(key)}"]`) : null;
+    if (!row) return;
+    const head = scrollEl.querySelector<HTMLElement>(".tlhead")?.offsetHeight ?? 0;
+    if (row.offsetTop - head < scrollEl.scrollTop) scrollEl.scrollTop = row.offsetTop - head;
+    else if (row.offsetTop + row.offsetHeight > scrollEl.scrollTop + scrollEl.clientHeight) scrollEl.scrollTop = row.offsetTop + row.offsetHeight - scrollEl.clientHeight;
+  }, { defer: true }));
+
+  function grab(e: PointerEvent, issue: UnifiedIssue) {
+    if (e.button !== 0) return;
+    const key = issueKey(issue);
+    props.onSelect(key);
+    const span = spans().get(key);
+    if (!span) return;
+    if (issue.source !== "plane") return void flash(`${slugOf(props.state, issue)}: ${SOURCE_NAMES[issue.source]} issues have no dates to set`);
+    if (sending()[key]) return;
+    e.preventDefault();
+    const grip = ((e.target as HTMLElement).dataset.grip as Grip | undefined) ?? "move";
+    setDrag({ key, grip, x0: e.clientX, span, dd: 0 });
+    document.body.classList.add(grip === "move" ? "tl-moving" : "tl-sizing");
+    const move = (ev: PointerEvent) => setDrag((d) => (d ? { ...d, dd: Math.round((ev.clientX - d.x0) / ppd()) } : d));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      document.body.classList.remove("tl-moving", "tl-sizing");
+      const d = drag();
+      setDrag(null);
+      if (!d?.dd) return;
+      const next = dragged(d.span, d.grip, d.dd);
+      setSending((s) => ({ ...s, [key]: next }));
+      void setIssueDates(props.project, issue as PlaneIssue, isoOf(next.start), isoOf(next.end))
+        .finally(() => setSending((s) => { const { [key]: _, ...rest } = s; return rest; }));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  function barTitle(issue: UnifiedIssue, s: { start: number; end: number; startSet: boolean; endSet: boolean }): string {
+    const dates = `${slugOf(props.state, issue)} · ${shortDay(s.start)} → ${shortDay(s.end)} · ${s.end - s.start + 1}d`;
+    if (issue.source !== "plane") return `${dates}\nopened → ${isActive(props.state, issue) ? "today" : "closed"}; ${SOURCE_NAMES[issue.source]} issues have no dates to set`;
+    const missing = [!s.startSet && "Start Date", !s.endSet && "Target Date"].filter(Boolean).join(" or ");
+    return missing ? `${dates}\nno ${missing}: drag to set one` : dates;
+  }
+
+  return (
+    <div class="itl" ref={scrollEl} style={{ "--ppd": ppd() }}>
+      <div class="tlin" style={{ width: `calc(var(--tlw) + ${range().days * ppd()}px)` }}>
+        <div class="tlhead">
+          <div class="tlcorner">
+            <span>{props.rows.length} issues</span>
+            <div class="seg" role="group" aria-label="Zoom">
+              <For each={ZOOMS}>{(z) => <button aria-pressed={props.zoom === z} title={`${z[0].toUpperCase()}${z.slice(1)} (- / =)`} onClick={() => props.onZoom(z)}>{z[0].toUpperCase()}</button>}</For>
+            </div>
+          </div>
+          <div class="tlscale" style={{ width: `${range().days * ppd()}px` }}>
+            <div class="tlmonths"><For each={months()}>{(m) => <span style={{ width: `${m.width}px` }}><b>{m.label}</b></span>}</For></div>
+            <div class="tlunits" classList={{ days: props.zoom === "day" }}>
+              <For each={units()}>{(u) => <span classList={{ now: u.now, we: !!u.weekend }} style={{ width: `${u.width}px` }}>{u.label}</span>}</For>
+            </div>
+          </div>
+        </div>
+        <For each={props.rows}>{(issue) => {
+          const key = issueKey(issue);
+          const s = () => shown(key);
+          const closed = () => !isActive(props.state, issue);
+          const late = () => daysLate(props.state, issue, today);
+          const color = () => (issue.source === "sentry" ? undefined : stateOf(props.state, issue)?.color) ?? "#888888";
+          /** The title goes inside a bar wide enough for a few letters; the left column always has it. */
+          const inside = () => { const b = s(); return !!b && (b.end - b.start + 1) * ppd() >= 48; };
+          return (
+            <div class="tlrow" classList={{ sel: props.sel === key }} data-key={key} onClick={() => props.onSelect(key)} onDblClick={() => props.onOpen(key)}>
+              <div class="tlleft">
+                <Show when={issue.source === "sentry"} fallback={<Priority p={issue.source === "plane" ? issue.priority : undefined} />}>
+                  <span class="lvl" style={{ "--pc": LEVEL_COLORS[(issue as { level?: string }).level ?? "error"] ?? LEVEL_COLORS.error }} />
+                </Show>
+                <span class="sid">{slugOf(props.state, issue)}</span>
+                <span class="tt" classList={{ closed: closed() }}>{issue.title}</span>
+                <Show when={issue.source !== "sentry"}>
+                  <Pill state={stateOf(props.state, issue as TrackedIssue)} busy={changingTo(props.project.id, issue as TrackedIssue)}
+                    onClick={(e) => { e.stopPropagation(); props.onPill(key); }} />
+                </Show>
+              </div>
+              <div class="tltrack">
+                <Show when={s()}>
+                  {(b) => <>
+                    <div
+                      class="tlbar"
+                      classList={{ fs: !b().startSet, fe: !b().endSet, locked: issue.source !== "plane", closed: closed(), busy: !!sending()[key] }}
+                      style={{ left: `${x(b().start)}px`, width: `${(b().end - b().start + 1) * ppd()}px`, "--sc": color(), "--fc": fgFor(color()) }}
+                      title={barTitle(issue, b())}
+                      onPointerDown={(e) => grab(e, issue)}
+                    >
+                      <i class="grip" data-grip="start" />
+                      <span>{inside() ? issue.title : ""}</span>
+                      <i class="grip" data-grip="end" />
+                    </div>
+                    {/* overdue: a hatched tail from the Target Date to today, so a long-late bar still shows near today */}
+                    <Show when={late() && !drag()}>
+                      <span class="tlover" style={{ left: `${x(b().end + 1)}px`, width: `${(today - b().end) * ppd()}px` }} />
+                      <span class="tlnote late" style={{ left: `${x(Math.max(b().end, today) + 1) + 6}px` }}>{late()}d late</span>
+                    </Show>
+                  </>}
+                </Show>
+              </div>
+            </div>
+          );
+        }}</For>
+        <div class="tltoday" style={{ left: `calc(var(--tlw) + ${x(today) + ppd() / 2}px)` }} />
+        <Show when={props.rows.length === 0}><div class="iempty">Nothing matches these filters.</div></Show>
+      </div>
     </div>
   );
 }
