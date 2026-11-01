@@ -915,6 +915,13 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .rc-code { font: 600 22px var(--mono); letter-spacing: .12em; margin: 2px 0 8px; user-select: text; }
 .settings-dlg .rc-actions { display: flex; gap: 6px; align-items: center; }
 .settings-dlg .rc-actions .rc-btn { margin-top: 0; }
+.settings-dlg .bk-check { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--text); }
+.settings-dlg .bk-check input { margin: 0; accent-color: var(--accent); }
+.settings-dlg .bk-dim, .settings-dlg .bk-from { color: var(--muted); }
+.settings-dlg .bk-from { margin: 0 0 6px; font-size: 12px; }
+.settings-dlg .bk-actions { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.settings-dlg .bk-actions .rc-btn { margin-top: 0; }
+.settings-dlg .bk-preview { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
 .settings-dlg .rc-push { gap: 16px; color: var(--text); }
 .settings-dlg .rc-push label { display: flex; align-items: center; gap: 5px; }
 @media (max-width: 640px) {

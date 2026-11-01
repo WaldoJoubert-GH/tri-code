@@ -256,7 +256,7 @@ export type EnvSsh = { identityFile?: string; port?: string; options?: string[] 
 /** A PIN lock: salt and hash from `env_pin_hash`, and how long an unlock lasts. */
 export type EnvLock = { salt: string; hash: string; minutes: number };
 
-type Persisted = {
+export type Persisted = {
   /** Environments in sidebar order: "local" or an ssh destination. Each project's host is one of them. */
   environments: string[];
   /** Per environment, by host: a display name and a lucide icon. The host stays the key, so a rename never changes where projects run. */
@@ -1064,7 +1064,7 @@ function migrateTab(t: any): Tab {
 }
 
 /** Fill in fields added after the first release so older state.json files keep working. */
-function migrate(raw: any): Persisted {
+export function migrate(raw: any): Persisted {
   const projects: Project[] = (raw.projects ?? []).map((p: any, i: number) => {
     const spaces: Space[] = Array.from({ length: SPACES }, (_, k) => ({ ...newSpace(), ...(p.spaces?.[k] ?? {}) }));
     const tabs: Tab[] = (p.tabs ?? []).map(migrateTab);

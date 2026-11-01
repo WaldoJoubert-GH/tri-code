@@ -27,3 +27,18 @@ pub fn state_save(app: AppHandle, json: String) -> Result<(), String> {
     std::fs::write(&tmp, json).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
 }
+
+/// Settings › Backup: write an exported configuration where the save dialog pointed.
+#[tauri::command]
+pub fn config_write(path: String, json: String) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, json).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+}
+
+/// Settings › Backup: read a configuration file the open dialog picked.
+#[tauri::command]
+pub fn config_read(path: String) -> Result<String, String> {
+    std::fs::read_to_string(path).map_err(|e| e.to_string())
+}
