@@ -114,6 +114,10 @@ The path field that is also the folder list: typing filters, `Enter` goes in or 
 **Project Icon**:
 What the sidebar draws for a project: a logo file from the project, an uploaded image, a lucide icon or the first letter. **Auto** is tri-code's pick (the first logo found, else the letter); any other choice in the Appearance panel is an override until "reset to auto".
 
+**Configuration Export**:
+One JSON file (`format: "tri-code-config"`) holding the sections picked in Settings › Backup: Preferences (`settings`, `notify`, `gap`), Commands, Browser Profiles (names and colours only, never cookies or passwords), Environments (with `envSsh`) and Projects (place and appearance, with their uploaded backgrounds, icons and sounds inlined as data URLs). Made for moving to a new machine (`config.ts`). Worktrees, the Sample Project, window layouts, PIN Locks and Remote Control pairing are left out. **Import** previews each section, then merges: entries with a matching id are replaced, a project at the same host and path keeps its windows and takes the file's appearance, anything else is added, nothing is deleted. Read through the same `migrate()` as `state.json`, so older exports keep working.
+_Avoid_: Backup file, settings sync, profile (a Browser Profile is something else).
+
 **Tab Strip**:
 The leftmost toolbar group: the active workspace's Windows in tiling order, the focused one underlined, then `+`. A strip tab only focuses a Window that already exists (bringing back a Minimised one), so nothing is created or moved by clicking one; Windows on other workspaces are not listed.
 _Avoid_: Tab bar (there is no tab bar), window list, tab buttons.

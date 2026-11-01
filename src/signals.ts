@@ -134,6 +134,16 @@ export function uploadSound(p: Project, ev: SoundEvent, file: File) {
   r.readAsDataURL(file);
 }
 
+/** Forget the loaded copies of a project's uploaded sounds, so the next play reads the files again (an import replaced them). */
+export function reloadSounds(projectId: string) {
+  for (const [ev] of EVENTS) {
+    const key = soundKey(projectId, ev);
+    const url = customSounds.get(key);
+    if (url) URL.revokeObjectURL(url);
+    customSounds.delete(key);
+  }
+}
+
 /** Drop a project's uploaded sounds (project removed). */
 export function forgetSounds(projectId: string) {
   for (const [ev] of EVENTS) {

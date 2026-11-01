@@ -11,8 +11,9 @@ import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./RemoteSettings";
 import { BrowserPage } from "./profiles";
 import { AgentsPage } from "./AgentSettings";
+import { BackupPage } from "./Backup";
 
-export type SettingsPage = "windows" | "agents" | "files" | "git" | "signals" | "browser" | "remote" | "hotkeys";
+export type SettingsPage = "windows" | "agents" | "files" | "git" | "signals" | "browser" | "remote" | "hotkeys" | "backup";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "windows", name: "Windows", icon: "layout-panel-left" },
@@ -23,6 +24,7 @@ const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "browser", name: "Browser", icon: "globe" },
   { page: "remote", name: "Remote", icon: "smartphone" },
   { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
+  { page: "backup", name: "Backup", icon: "archive" },
 ];
 
 const [page, setPage] = createSignal<SettingsPage | null>(null);
@@ -313,6 +315,7 @@ export function SettingsDialog() {
               <Show when={p() === "browser"}><BrowserPage /></Show>
               <Show when={p() === "remote"}><RemotePage /></Show>
               <Show when={p() === "hotkeys"}><HotkeysPage /></Show>
+              <Show when={p() === "backup"}><BackupPage /></Show>
             </section>
           </div>
         </div>

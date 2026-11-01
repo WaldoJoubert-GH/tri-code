@@ -193,6 +193,8 @@ pub fn run() {
             github::gh_feedback,
             store::state_load,
             store::state_save,
+            store::config_write,
+            store::config_read,
             tour::tour_folder,
             browser::browser_open,
             browser::browser_bounds,
