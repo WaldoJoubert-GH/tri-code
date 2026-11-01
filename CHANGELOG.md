@@ -2,6 +2,11 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.43 — 2026-11-01
+
+- The Issues Panel has a Timeline (`v`): the filtered list as a Gantt chart with Day, Week and Month zoom, and `t` jumps to today. Plane issues place their bars by Start and Target Date, and dragging a bar or either end sets both dates in Plane. Open issues past their Target Date show a hatched tail with the days late. GitHub and Local issues run from created to closed or today. ([#40](https://github.com/WaldoJoubert-GH/tri-code/pull/40))
+- Settings › Backup exports the configuration to one JSON file for moving to a new machine: Preferences, Commands, Browser Profiles, Environments and Projects, with their backgrounds, icons and sounds. Import previews each section, then merges: matching entries are replaced, the rest are added, and nothing is deleted. Also in the Command Palette as Export and Import configuration. ([#41](https://github.com/WaldoJoubert-GH/tri-code/pull/41))
+
 ## 0.1.42 — 2026-10-29
 
 - Browser windows save downloads to the Downloads folder, under a free name. A button in the nav row lists them with a progress ring, and the newest shows in a strip under the nav. On Windows a download shows its progress and can be cancelled; "Download again" re-fetches through the page so its cookies apply. ([#37](https://github.com/WaldoJoubert-GH/tri-code/pull/37))
