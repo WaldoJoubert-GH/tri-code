@@ -103,6 +103,11 @@ export const capsOf = (id: string) => {
   const c = keysOf(id)[0];
   return c && chordKeys(c);
 };
+/** An action's first key without the Hotkey Modifier (it is being held), for the Hold Hints: ["N"], or ["Shift", "N"]. */
+export const hintKeys = (id: string): string[] => {
+  const c = keysOf(id)[0];
+  return c ? [...(c.ctrl ? ["Ctrl"] : []), ...(c.meta ? [metaName] : []), ...(c.shift ? ["Shift"] : []), keyLabel(c.code)] : [];
+};
 /** An action's first key as text ("Alt+W", or "Alt W" with sep " "), or "". */
 export const keyOf = (id: string, sep = "+") => {
   const c = keysOf(id)[0];
