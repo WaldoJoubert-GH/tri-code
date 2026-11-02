@@ -487,6 +487,25 @@ export function removeEnvironment(host: string) {
   }));
 }
 
+/** Point an Environment at another destination. The host is its key, so everything kept by host
+ *  follows: its place in the sidebar, projects, name, ssh options, PIN, recents and scoped Commands. */
+export function moveEnvironment(from: string, to: string) {
+  setApp(produce((s) => {
+    s.environments = s.environments.map((h) => (h === from ? to : h));
+    for (const byHost of [s.envStyles, s.envSsh, s.envLocks] as Record<string, unknown>[]) {
+      if (from in byHost) byHost[to] = byHost[from];
+      delete byHost[from];
+    }
+    for (const p of s.projects) if (p.host === from) p.host = to;
+    for (const a of s.agents) if (a.scope && "env" in a.scope && a.scope.env === from) a.scope = { env: to };
+    const seen = new Set<string>();
+    s.recent = s.recent.map((r) => (r.host === from ? { ...r, host: to } : r)).filter((r) => {
+      const key = `${r.host}\n${r.path}`;
+      return !seen.has(key) && !!seen.add(key);
+    });
+  }));
+}
+
 export function setEnvSsh(host: string, ssh: EnvSsh | undefined) {
   setApp(produce((s) => {
     if (ssh) s.envSsh[host] = ssh;

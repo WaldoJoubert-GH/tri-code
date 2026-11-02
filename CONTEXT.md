@@ -60,7 +60,8 @@ A toolbar chip for each issue, from any ticked Source, whose State is named exac
 
 **Environment**:
 Where projects run: `local`, or an ssh destination (an alias from `~/.ssh/config` or `user@host`). Kept as an ordered list in `state.json`, so one can exist with no projects; the sidebar shows one section per Environment. A project's `host` is its Environment. Each can have a display name (double-click its header) and a lucide icon (click the icon); both are labels only, kept in `envStyles` by host, so a rename never changes where projects run.
-An ssh Environment can also carry a key file, port and `-o` options (`envSsh`, applied to every ssh call to that host; New environment takes a pasted `ssh -i key user@host` command) and a **PIN Lock** (`envLocks`).
+An ssh Environment can also carry a key file, port and `-o` options (`envSsh`, applied to every ssh call to that host; the destination field takes a pasted `ssh -i key user@host` command) and a **PIN Lock** (`envLocks`).
+**The Environment dialog** is one form for New environment (the sidebar's Add environment, or Open project's "+ New environment") and Edit environment (right-click a header). A changed connection is tested first, and a failed test can still be saved. While an Environment is locked only its name and icon can change; changing or removing a PIN asks for the current one. Giving an Environment a new destination **moves** it: the host is its key, so its projects, Worktrees, name, ssh options, PIN, recents and scoped Commands follow, its sessions on the old host end, and its terminals restart on the new one. Folders keep their paths. Chosen from design/environment-dialog.html.
 
 **PIN Lock**:
 A 4–8 digit PIN on an Environment. Locked, its projects show the PIN pad instead of the canvas, its terminals don't start, and Rust refuses ssh to it. An unlock lasts the chosen minutes; a restart locks again. A gate in tri-code, not encryption of the key.
@@ -68,7 +69,7 @@ _Avoid_: Password, vault.
 _Avoid_: Host group, machine, server.
 
 **Open Project Dialog**:
-The `Alt+O` dialog: Environments on the left (with "New environment"), a Folder Picker on the right. Opening a folder that is already a project focuses it.
+The `Alt+O` dialog: Environments on the left (with "New environment", which opens the Environment dialog over it and comes back to what it added), a Folder Picker on the right. Opening a folder that is already a project focuses it.
 _Avoid_: Add project form, folder browser.
 
 **Tour**:

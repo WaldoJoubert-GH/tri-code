@@ -12,6 +12,7 @@ import { dev, forgetProject, isActive, sourcesOf, stateOf } from "./issues";
 import { IconFace, forgetIcon } from "./icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { openProjectDialog } from "./OpenProject";
+import { envDialogOpen, openEnvDialog } from "./EnvDialog";
 import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
 import { adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel } from "./worktrees";
 import { openWorktreeDialog } from "./WorktreeDialog";
@@ -33,7 +34,7 @@ const [peek, setPeek] = createSignal(false);
 export const sidebarPeek = peek;
 /** Something opened from the peeked list (appearance, icon picker, a rename) holds it open until it closes. */
 const [renaming, setRenaming] = createSignal<string | null>(null);
-const held = () => appearanceOpen() || iconPickerOpen() || settingsOpen() || renaming() !== null;
+const held = () => appearanceOpen() || iconPickerOpen() || settingsOpen() || envDialogOpen() || renaming() !== null;
 
 // Press and drag a project row to move it within its environment. Pointer events rather than HTML5
 // drag and drop, so a press that barely moves is still a click and the rail works the same way.
@@ -297,6 +298,22 @@ export default function Sidebar() {
     void invoke("env_forget_lock", { host });
   };
 
+  /** Right-click on an Environment's header. */
+  const envMenu = (e: MouseEvent, host: string) => {
+    const lock: CtxItem[] = !app.envLocks[host] ? []
+      : envLocked(host) ? ["sep", { label: "Unlock…", run: () => openEnvDialog(host) }]
+      : ["sep", { label: "Lock now", run: () => void lockEnv(host) }];
+    openCtxMenu(e, [
+      { label: "Open project here…", run: () => openProjectDialog(host) },
+      "sep",
+      { label: "Rename", run: () => setRenaming(`env:${host}`) },
+      { label: "Edit environment…", run: () => openEnvDialog(host) },
+      ...lock,
+      "sep",
+      { label: "Remove environment…", run: () => void removeEnv(host) },
+    ]);
+  };
+
   /** Active issues per State, in each Source's colours (the pi-todos widget). */
   const miniBar = (p: Project) => {
     const d = dev[p.id];
@@ -341,7 +358,10 @@ export default function Sidebar() {
       <For each={app.environments}>
         {(host) => (
           <section>
-            <h2 title={app.sidebarCollapsed && !peek() ? (envName(host) === host ? host : `${envName(host)} · ${host}`) : undefined}>
+            <h2
+              title={app.sidebarCollapsed && !peek() ? (envName(host) === host ? host : `${envName(host)} · ${host}`) : undefined}
+              onContextMenu={(e) => renaming() !== `env:${host}` && envMenu(e, host)}
+            >
               <button
                 class="env-icon"
                 title="Change icon"
@@ -464,7 +484,7 @@ export default function Sidebar() {
         <button class="add" title={withKey("Open project", "open-project")} onClick={() => openProjectDialog()}>
           <span class="glyph">+</span><span class="label">Open project</span><Show when={keyOf("open-project", " ")}>{(k) => <kbd class="label">{k()}</kbd>}</Show>
         </button>
-        <button class="add env" title="Add environment" onClick={() => openProjectDialog(undefined, true)}>
+        <button class="add env" title="Add environment" onClick={() => openEnvDialog()}>
           <span class="glyph">⇄</span><span class="label">Add environment</span>
         </button>
       </div>
