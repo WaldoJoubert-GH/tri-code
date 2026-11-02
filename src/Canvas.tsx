@@ -7,8 +7,9 @@ import {
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
-import { isKey, withKey } from "./keymap";
-import { Caps } from "./Keys";
+import { hintKeys, isKey, withKey } from "./keymap";
+import { Caps, HintCaps } from "./Keys";
+import { hintsShown } from "./hints";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
   addressToUrl, answerPassword, openExternal, passwordPrompts, pickElement, placeBrowser, profilesSupported, setBrowsersSuspended,
@@ -113,6 +114,20 @@ export default function Canvas(props: { project: Project }) {
   const anyDrag = createMemo(() => drag() !== null);
   const animOn = () => settled() && drag() === null && !splitOn();
   const splitRect = () => (tiling().mono >= 0 ? undefined : tiling().split);
+
+  /** The directions the focused window can actually move in, with the key that takes it there. */
+  const hintDirs = createMemo(() => {
+    if (!hintsShown()) return [];
+    const t = tiling();
+    const i = t.tabs.findIndex((tab) => tab.id === space(props.project).focus);
+    if (i < 0) return [];
+    return [
+      { id: "focus-left", glyph: "←", dx: -1, dy: 0 },
+      { id: "focus-up", glyph: "↑", dx: 0, dy: -1 },
+      { id: "focus-down", glyph: "↓", dx: 0, dy: 1 },
+      { id: "focus-right", glyph: "→", dx: 1, dy: 0 },
+    ].filter((d) => hintKeys(d.id).length > 0 && neighbour(t.rects, i, d.dx, d.dy) >= 0);
+  });
 
   const local = (x: number, y: number) => {
     const r = viewport.getBoundingClientRect();
@@ -307,6 +322,11 @@ export default function Canvas(props: { project: Project }) {
       showSizing(id);
     };
 
+    /** This window is focused and the modifier is being held: its bar draws the keys. */
+    const hinting = () => focused() && hintsShown();
+    /** A control only trades its glyph for a key when that action still has one. */
+    const hinted = (act: string) => hinting() && hintKeys(act).length > 0;
+
     let starEl!: HTMLButtonElement;
     const star = () => {
       const s = favEditFor();
@@ -476,9 +496,45 @@ export default function Canvas(props: { project: Project }) {
               <Icon name={showAddr() ? "chevron-up" : "ellipsis"} size={13} />
             </button>
           </Show>
-          <button class="mn" title={withKey("Minimise", "minimise")} onClick={() => minimiseTab(props.project.id, id)}>–</button>
-          <button title={withKey("Maximize", "maximize")} onClick={doMax}>▢</button>
-          <button title={withKey("Close", "close")} onClick={() => requestClose(props.project.id, id)}>×</button>
+          <Show when={hinting() && rect().w >= 360 && hintDirs().length > 0}>
+            <span class="dirhints" aria-hidden="true">
+              <For each={hintDirs()}>
+                {(d) => (
+                  <span class="dh">
+                    <HintCaps id={d.id} />
+                    <Show when={hintKeys(d.id)[0] !== d.glyph}><b>{d.glyph}</b></Show>
+                  </span>
+                )}
+              </For>
+            </span>
+          </Show>
+          <button
+            class="ctl mn"
+            classList={{ hk: hinted("minimise") }}
+            title={withKey("Minimise", "minimise")}
+            onClick={() => minimiseTab(props.project.id, id)}
+          >
+            <span class="g">–</span>
+            <Show when={hinting()}><HintCaps id="minimise" /></Show>
+          </button>
+          <button
+            class="ctl"
+            classList={{ hk: hinted("maximize") }}
+            title={withKey("Maximize", "maximize")}
+            onClick={doMax}
+          >
+            <span class="g">▢</span>
+            <Show when={hinting()}><HintCaps id="maximize" /></Show>
+          </button>
+          <button
+            class="ctl"
+            classList={{ hk: hinted("close") }}
+            title={withKey("Close", "close")}
+            onClick={() => requestClose(props.project.id, id)}
+          >
+            <span class="g">×</span>
+            <Show when={hinting()}><HintCaps id="close" /></Show>
+          </button>
           <Show when={bare()}>{loadBar()}</Show>
         </div>
         {isBrowser ? (

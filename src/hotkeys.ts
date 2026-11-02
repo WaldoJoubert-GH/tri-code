@@ -32,6 +32,8 @@ import { closeFeedback, feedbackOpen } from "./Feedback";
 import { flash } from "./ui";
 import { hasSelection } from "./terms";
 import { actionFor, editorKey } from "./keymap";
+import { hintChord, hintDown, hintsShown, hintUp, isHintModifier } from "./hints";
+import { modDown } from "./modkey";
 
 const DIRS: Record<string, [number, number]> = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
 
@@ -170,6 +172,15 @@ function runAnywhere(id: string): boolean {
 function onKey(e: KeyboardEvent) {
   // The agents window or Settings is recording a hotkey: the chord (and Escape) are its to take.
   if (recording()) return;
+  // The modifier on its own is not a chord: the focused window keeps the key (a terminal wants
+  // Alt), and the Hold Hints start their clock. Any other key means a chord, not a hint gesture.
+  if (isHintModifier(e)) {
+    hintDown();
+    return;
+  }
+  hintChord();
+  // A keyup the OS took from us (focus kept) would leave the hints up: the modifier is not down.
+  if (hintsShown() && !modDown(e)) hintUp();
   // Escape closes the overlays first; it is never bound on its own.
   if (e.code === "Escape" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     if (ctxMenuOpen()) closeCtxMenu();
@@ -215,9 +226,17 @@ function onKey(e: KeyboardEvent) {
 
 let installed = false;
 
+/** The modifier came up: whatever the hold drew goes away. */
+function onKeyUp(e: KeyboardEvent) {
+  if (isHintModifier(e)) hintUp();
+}
+
 /** Register the window keydown listener once (called from App's onMount). */
 export function installHotkeys() {
   if (installed) return;
   installed = true;
   window.addEventListener("keydown", onKey, { capture: true });
+  window.addEventListener("keyup", onKeyUp, { capture: true });
+  // Alt+Tab and the rest take the keyup to another window; leaving the app must not leave hints up.
+  window.addEventListener("blur", hintUp);
 }

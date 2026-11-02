@@ -73,7 +73,12 @@ export function ratioAt(x: number, width: number, gap: number) {
   return (x - gap - gap / 2) / (aw - gap);
 }
 
-/** Nearest rect in direction (dx, dy) from rect `from`, by centre distance, or -1. */
+/**
+ * Nearest rect in direction (dx, dy) from rect `from`, by centre distance, or -1. Only a rect
+ * that shares an edge counts: side by side for ← / →, stacked for ↑ / ↓. Distance from the centre
+ * alone calls the right-hand stack "above" and "below" a tall main window, which reads as a bug
+ * with an arrow key and would make the Hold Hints promise a direction the layout does not have.
+ */
 export function neighbour(rects: Rect[], from: number, dx: number, dy: number) {
   const f = rects[from];
   if (!f) return rects.length ? 0 : -1;
@@ -81,6 +86,10 @@ export function neighbour(rects: Rect[], from: number, dx: number, dy: number) {
   let best = -1, bs = Infinity;
   rects.forEach((o, i) => {
     if (i === from || o.w <= 0 || o.h <= 0) return;
+    const overlapX = Math.min(f.x + f.w, o.x + o.w) - Math.max(f.x, o.x);
+    const overlapY = Math.min(f.y + f.h, o.y + o.h) - Math.max(f.y, o.y);
+    if (dx && overlapY <= 0) return;
+    if (dy && overlapX <= 0) return;
     const vx = o.x + o.w / 2 - cx, vy = o.y + o.h / 2 - cy;
     const along = vx * dx + vy * dy, across = Math.abs(dx ? vy : vx);
     if (along <= 1) return;
