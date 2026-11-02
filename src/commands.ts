@@ -204,6 +204,7 @@ export function commands(): Command[] {
   add({ id: "help", group: "App", title: "Hotkeys", icon: "keyboard", keys: capsOf("help"), run: () => openSettings("hotkeys") });
   add({ id: "config-export", group: "App", title: "Export configuration…", hint: "preferences, commands, environments, projects", icon: "archive", run: () => void exportConfig(SECTIONS.map((s) => s.id)) });
   add({ id: "config-import", group: "App", title: "Import configuration…", hint: "from an exported file, with a preview", icon: "archive-restore", run: () => { openSettings("backup"); void chooseImport(); } });
+  add({ id: "theme-fonts", group: "App", title: "Theme and fonts", hint: "system, light or dark, interface and code fonts", icon: "palette", run: () => openSettings("appearance") });
   add({ id: "git-colors", group: "App", title: "Git colours", hint: "added, deleted, modified, diff highlight", icon: "palette", run: () => openSettings("git") });
   const u = updateReady();
   if (u) add({ id: "update", group: "App", title: `Restart to update to ${u.version}`, icon: "refresh-cw", run: installUpdate });

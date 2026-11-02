@@ -1,9 +1,12 @@
 // App-wide settings: a dialog with a page per topic. The Settings button at the foot of the
 // sidebar opens it on the page used last; the toolbar's ? button and the "help" hotkey open the
-// Hotkeys page. Chosen from design/settings-hotkeys.html.
+// Hotkeys page. Chosen from design/settings-hotkeys.html; the Appearance page from variant B of
+// design/settings-appearance.html.
 
-import { For, Show, batch, createSignal } from "solid-js";
-import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setDraftCommand, setDiffDefault, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSignalColor, setSkipFolders, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { invoke } from "@tauri-apps/api/core";
+import { For, Show, batch, createResource, createSignal } from "solid-js";
+import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
@@ -13,9 +16,10 @@ import { BrowserPage } from "./profiles";
 import { AgentsPage } from "./AgentSettings";
 import { BackupPage } from "./Backup";
 
-export type SettingsPage = "windows" | "agents" | "files" | "git" | "signals" | "browser" | "remote" | "hotkeys" | "backup";
+export type SettingsPage = "appearance" | "windows" | "agents" | "files" | "git" | "signals" | "browser" | "remote" | "hotkeys" | "backup";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
+  { page: "appearance", name: "Appearance", icon: "palette" },
   { page: "windows", name: "Windows", icon: "layout-panel-left" },
   { page: "agents", name: "Agents", icon: "bot" },
   { page: "files", name: "Files", icon: "folder-search" },
@@ -53,6 +57,75 @@ export function toggleSettings() {
 export function toggleHotkeys() {
   if (hotkeysOpen()) closeSettings();
   else openSettings("hotkeys");
+}
+
+const THEMES: { theme: Theme; name: string; icon: string; title: string }[] = [
+  { theme: "system", name: "System", icon: "monitor", title: "Follow your OS, and change when it does" },
+  { theme: "light", name: "Light", icon: "sun", title: "Light, whatever your OS is set to" },
+  { theme: "dark", name: "Dark", icon: "moon", title: "Dark, whatever your OS is set to" },
+];
+
+/** One font's row: a dropdown of what's installed, with a warning if the saved font isn't. */
+function FontRow(props: { kind: FontKind; name: string; fonts: string[] | null; installed: string[] | null }) {
+  const saved = () => (props.kind === "ui" ? app.settings.fontUi : app.settings.fontMono);
+  // A saved font stays in the list while it's missing, or the dropdown would say Default.
+  const options = () => {
+    const s = saved();
+    return s && !props.fonts?.includes(s) ? [s, ...(props.fonts ?? [])] : props.fonts ?? [];
+  };
+  return (
+    <>
+      <label class="row font-row">
+        <span class="lbl">{props.name}</span>
+        <select value={saved() ?? ""} onChange={(e) => setFont(props.kind, e.currentTarget.value)}>
+          <option value="">Default</option>
+          <For each={options()}>{(f) => <option value={f} selected={f === saved()}>{f}</option>}</For>
+        </select>
+        <button type="button" class="reset" title="Back to the default" aria-label={`Reset ${props.name} font`} disabled={!saved()} onClick={() => setFont(props.kind, undefined)}>↺</button>
+      </label>
+      <Show when={fontMissing(saved(), props.installed)}>
+        <p class="font-missing">{saved()} isn't installed here, so the default is showing. It comes back when the font does.</p>
+      </Show>
+    </>
+  );
+}
+
+function AppearancePage() {
+  const [fonts] = createResource(() => invoke<{ all: string[]; mono: string[] }>("font_list").catch((e) => {
+    console.warn("font_list failed:", e);
+    return null;
+  }));
+  const theme = () => themeOf(app.settings);
+  return (
+    <>
+      <h4>Theme</h4>
+      <div class="row">
+        <span class="set-seg theme-seg" role="radiogroup" aria-label="Theme">
+          <For each={THEMES}>
+            {(t) => (
+              <button type="button" role="radio" aria-checked={theme() === t.theme} title={t.title} onClick={() => setTheme(t.theme)}>
+                <Icon name={t.icon} size={12} />
+                {t.name}
+              </button>
+            )}
+          </For>
+        </span>
+      </div>
+      <p class="note">{theme() === "system" ? "Follows your OS, and changes when it does." : `Stays ${theme()} whatever your OS is set to.`} Terminals and the editor change too. Colours you picked under Git and Signals are kept.</p>
+      <h4>Fonts</h4>
+      <FontRow kind="ui" name="Interface" fonts={fonts()?.all ?? null} installed={fonts()?.all ?? null} />
+      <FontRow kind="mono" name="Code" fonts={fonts()?.mono ?? null} installed={fonts()?.all ?? null} />
+      <div class="font-sample" aria-hidden="true">
+        <div class="ui"><b>Open project</b><span>Worktrees and agents</span></div>
+        <pre>
+          <span class="fs-dir">~/tri-code</span> $ git status{"\n"}
+          <span class="fs-add">A</span> src/Settings.tsx  <span class="fs-mod">M</span> src/styles.css{"\n"}
+          0O 1lI {"{}[]"} =&gt; != &lt;= ===
+        </pre>
+      </div>
+      <p class="note">Interface is for menus, panels and labels. Code is for terminals, the editor and diffs, so it only lists monospaced fonts.</p>
+    </>
+  );
 }
 
 function FilesPage() {
@@ -307,6 +380,7 @@ export function SettingsDialog() {
               </For>
             </nav>
             <section class="settings-page">
+              <Show when={p() === "appearance"}><AppearancePage /></Show>
               <Show when={p() === "windows"}><WindowsPage /></Show>
               <Show when={p() === "agents"}><AgentsPage /></Show>
               <Show when={p() === "files"}><FilesPage /></Show>

@@ -1,5 +1,6 @@
 /* Layout: the sidebar stays; the toolbar sits over the canvas of windows (main + stack or grid, with a gap).
-   Follows the system light/dark setting; the dark palette is the one from design/canvas.html. */
+   Follows the system light/dark setting unless Settings › Appearance forces one with data-theme (look.ts);
+   the dark palette is the one from design/canvas.html. */
 :root {
   /* light palette (system default when the OS is in light mode) */
   --bg: #fbfbfc;
@@ -841,6 +842,22 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .set-seg button { padding: 3px 10px; font-size: 12px; color: var(--muted); }
 .settings-dlg .set-seg button + button { border-left: 1px solid var(--line); }
 .settings-dlg .set-seg button[aria-checked="true"] { background: var(--raised); color: var(--text); }
+/* Settings › Appearance */
+.settings-dlg .theme-seg button { display: inline-flex; align-items: center; gap: 6px; }
+.settings-dlg .font-row .lbl { width: 92px; flex: none; }
+.settings-dlg .font-row select { flex: 1; min-width: 0; height: 26px; padding: 0 4px; font: 12px var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; outline: none; }
+.settings-dlg .font-row .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
+.settings-dlg .font-row .reset:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.settings-dlg .font-row .reset:disabled { opacity: .35; }
+.settings-dlg .font-missing { margin: 0 0 4px 102px; color: var(--warn); font-size: 11.5px; }
+.settings-dlg .font-sample { margin-top: 10px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); }
+.font-sample .ui { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--line); background: var(--panel); font: 13px var(--ui); }
+.font-sample .ui b { font-weight: 600; }
+.font-sample .ui span { color: var(--muted); font-size: 12px; }
+.font-sample pre { margin: 0; padding: 7px 10px; color: var(--muted); font: 12px/18px var(--mono); overflow: hidden; }
+.font-sample .fs-dir { color: var(--state-working); }
+.font-sample .fs-add { color: var(--git-add); }
+.font-sample .fs-mod { color: var(--git-mod); }
 /* Settings › Browser: one row per Browser Profile */
 .settings-dlg .pf-list { display: grid; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .settings-dlg .pf-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px; }

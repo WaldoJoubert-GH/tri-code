@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { For, Show, createEffect, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import {
   SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
@@ -33,7 +34,8 @@ import { ProfileMenu, profileMenuOpen } from "./profiles";
 import { DownloadMenu, downloadMenuOpen } from "./downloads";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./Tour";
-import { ensureSession, setLinkHandler } from "./terms";
+import { applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
+import { applyLook, themeOf } from "./look";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { keyOf, withKey } from "./keymap";
@@ -114,6 +116,18 @@ export default function App() {
     }
     if (app.settings.gitTint === undefined) st.removeProperty("--git-tint");
     else st.setProperty("--git-tint", `${app.settings.gitTint}%`);
+  });
+
+  // The theme and fonts from Settings → Appearance. Waits for state.json, because until then the
+  // store holds the defaults and would undo the look restored from the last launch.
+  createEffect(() => {
+    if (!ready()) return;
+    const { theme, fontUi, fontMono } = app.settings;
+    applyLook({ theme, fontUi, fontMono });
+    // The title bar, and the system theme web pages see in browser windows.
+    const forced = themeOf({ theme });
+    getCurrentWindow().setTheme(forced === "system" ? null : forced).catch((e) => console.warn("setTheme failed:", e));
+    applyTerminalLook();
   });
 
   // Warm the active project's `.dev/` so the toolbar chips and sidebar bar have data.
