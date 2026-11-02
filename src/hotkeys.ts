@@ -9,6 +9,7 @@ import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance"
 import { closeSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
+import { closeEnvDialog, envDialogOpen } from "./EnvDialog";
 import { toggleSidebar } from "./Sidebar";
 import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees";
 import { closeTabMenu, tabMenuOpen } from "./tabs";
@@ -175,6 +176,7 @@ function onKey(e: KeyboardEvent) {
     else if (iconPickerOpen()) closeIconPicker();
     else if (paletteOpen()) closePalette();
     else if (aboutOpen()) setAboutOpen(false);
+    else if (envDialogOpen()) closeEnvDialog();
     else if (openProjectOpen()) closeOpenProject();
     else if (newWorktreeOpen()) closeNewWorktree();
     else if (appearanceOpen()) closeAppearance();

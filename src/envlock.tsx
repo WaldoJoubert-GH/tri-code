@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
-import { app, envName, type EnvSsh } from "./state";
+import { app, envName } from "./state";
 import { clock } from "./issues";
 import { Icon } from "./lucide";
 
@@ -46,40 +46,33 @@ export function markUnlocked(host: string, minutes: number) {
   setUnlocked(host, Date.now() + minutes * 60_000);
 }
 
-/** What `ssh ...` pasted into New environment means: a destination plus the options it can't carry. */
-export function parseSsh(raw: string): { dest: string } & EnvSsh {
-  const words: string[] = [];
-  let cur = "", quote = "", any = false;
-  for (const c of raw.trim()) {
-    if (quote) c === quote ? (quote = "") : (cur += c);
-    else if (c === "'" || c === '"') (quote = c), (any = true);
-    else if (/\s/.test(c)) {
-      if (cur || any) words.push(cur);
-      cur = "";
-      any = false;
-    } else cur += c;
-  }
-  if (cur || any) words.push(cur);
-  if (/^ssh(\.exe)?$/i.test(words[0] ?? "")) words.shift();
-
-  let dest = "", user = "", identityFile = "", port = "";
-  const options: string[] = [];
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i];
-    if (w === "-i") identityFile = words[++i] ?? "";
-    else if (w === "-p") port = words[++i] ?? "";
-    else if (w === "-l") user = words[++i] ?? "";
-    else if (w === "-o") options.push(words[++i] ?? "");
-    else if (!w.startsWith("-") && !dest) dest = w;
-  }
-  // A terminal usually starts in the home folder, so `.\key.pem` there means `~\key.pem`.
-  identityFile = identityFile.replace(/^\.(?=[\\/])/, "~");
-  if (user && dest && !dest.includes("@")) dest = `${user}@${dest}`;
-  return { dest, identityFile: identityFile || undefined, port: port || undefined, options: options.length ? options : undefined };
+/** A moved Environment's live unlock goes with it (state.moveEnvironment). */
+export function moveUnlock(from: string, to: string) {
+  if (unlocked[from] !== undefined) setUnlocked(to, unlocked[from]);
+  setUnlocked(from, undefined!);
 }
 
 const COOLDOWN_TRIES = 5;
 const COOLDOWN_MS = 30_000;
+/** Wrong PINs per host, shared by the PIN pad and the Environment dialog so neither is a way round the wait. */
+const tries = new Map<string, { n: number; coolUntil: number }>();
+
+/** Check a typed PIN, which unlocks `host` when right. Returns what to show when it isn't, else "". */
+export async function tryPin(host: string, pin: string): Promise<string> {
+  const t = tries.get(host) ?? { n: 0, coolUntil: 0 };
+  tries.set(host, t);
+  if (t.coolUntil > Date.now()) return `Too many tries. Wait ${Math.ceil((t.coolUntil - Date.now()) / 1000)} s`;
+  try {
+    await unlockEnv(host, pin);
+    t.n = 0;
+    return "";
+  } catch (e) {
+    if (++t.n < COOLDOWN_TRIES) return String(e);
+    t.n = 0;
+    t.coolUntil = Date.now() + COOLDOWN_MS;
+    return `Too many tries. Wait ${COOLDOWN_MS / 1000} s`;
+  }
+}
 
 /** Shown in place of the canvas while the active project's environment is locked. */
 export function PinPad(props: { host: string }) {
@@ -87,27 +80,17 @@ export function PinPad(props: { host: string }) {
   const [error, setError] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [shake, setShake] = createSignal(false);
-  let tries = 0, coolUntil = 0;
 
   const submit = async () => {
     if (busy() || !pin()) return;
-    if (coolUntil > Date.now()) return setError(`Too many tries. Wait ${Math.ceil((coolUntil - Date.now()) / 1000)} s`);
     setBusy(true);
-    try {
-      await unlockEnv(props.host, pin());
-    } catch (e) {
-      tries++;
-      setPin("");
-      if (tries >= COOLDOWN_TRIES) {
-        tries = 0;
-        coolUntil = Date.now() + COOLDOWN_MS;
-        setError(`Too many tries. Wait ${COOLDOWN_MS / 1000} s`);
-      } else setError(String(e));
-      setShake(true);
-      setTimeout(() => setShake(false), 300);
-    } finally {
-      setBusy(false);
-    }
+    const problem = await tryPin(props.host, pin());
+    setBusy(false);
+    if (!problem) return;
+    setPin("");
+    setError(problem);
+    setShake(true);
+    setTimeout(() => setShake(false), 300);
   };
   const digit = (d: string) => {
     if (pin().length < 8) setPin(pin() + d);

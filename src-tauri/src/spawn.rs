@@ -64,7 +64,7 @@ fn ssh(host: &str, spec: &SpawnSpec) -> Program {
     let shpool = match run {
         Some(cmd) => format!(
             "shpool attach -f -d . -c \"${{SHELL:-/bin/sh}} -lc {}\" {}",
-            dq_escape(&sq(cmd)),
+            dq_escape(&sq(&shpool_safe(cmd))),
             sq(&name)
         ),
         None => format!("shpool attach -f -d . {}", sq(&name)),
@@ -125,6 +125,17 @@ pub fn kill_remote(host: &str, session: &str) -> Program {
         .collect(),
         cwd: None,
     }
+}
+
+/// `cmd` with no braces in it, for shpool's `-c`. shpool reads that as a template with no escape:
+/// `{x}` becomes empty and any other `{...}` stops the session starting. So a command with braces
+/// goes as octal that the remote shell turns back and evals; any other command is left as it is.
+fn shpool_safe(cmd: &str) -> String {
+    if !cmd.contains(['{', '}']) {
+        return cmd.to_string();
+    }
+    let octal = cmd.replace('\\', r"\0134").replace('{', r"\0173").replace('}', r"\0175");
+    format!("eval \"$(printf %b {})\"", sq(&octal))
 }
 
 /// POSIX single-quote escaping.
@@ -206,6 +217,39 @@ mod tests {
         assert!(remote.starts_with("exec \"${SHELL:-/bin/sh}\" -lc '"));
         assert!(remote.contains("shpool attach -f -d . -c"));
         assert!(remote.contains("tmux new -A -s"));
+    }
+
+    /// shpool parses `-c` as a template: `{x}` is a variable (empty if unknown) and anything else
+    /// in braces refuses to start, with no way to escape them. A Worktree's Setup is all braces.
+    #[test]
+    fn shpool_never_sees_braces_from_the_command() {
+        let p = build(&spec("box", "/tmp", Some("{ touch a; } || { exec \"${SHELL:-/bin/sh}\" -l; }")));
+        let remote = &p.args[6];
+        let after = remote.split("shpool attach -f -d . -c ").nth(1).unwrap();
+        let shpool_cmd = after.split("tmux").next().unwrap();
+        assert!(!shpool_cmd.replace("${SHELL:-/bin/sh} -lc", "").contains(['{', '}']), "{shpool_cmd}");
+    }
+
+    #[test]
+    fn a_command_without_braces_goes_to_shpool_as_it_is() {
+        assert_eq!(shpool_safe("claude --resume"), "claude --resume");
+    }
+
+    /// The rewritten command does the same thing, whatever it holds. Each case prints what it
+    /// should through a real shell.
+    #[cfg(unix)]
+    #[test]
+    fn shpool_safe_commands_run_the_same() {
+        for (cmd, want) in [
+            ("{ printf 'it'\\''s'; } && { printf ' ok'; }", "it's ok"),
+            ("X=5; printf %s \"${X}\"", "5"),
+            ("printf '%s' 'a\\nb {c}'", "a\\nb {c}"),
+            ("false || { printf 'é%%'; }", "é%"),
+        ] {
+            let out = std::process::Command::new("/bin/sh").args(["-c", &shpool_safe(cmd)]).output().unwrap();
+            assert_eq!(String::from_utf8_lossy(&out.stdout), want, "{cmd}");
+            assert!(!shpool_safe(cmd).contains(['{', '}']), "{cmd}");
+        }
     }
 
     #[test]

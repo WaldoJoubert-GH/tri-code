@@ -91,6 +91,9 @@ class TermSession {
   private cmd: string;
   /** A multi-line command's lines, still to be typed into its login shell ("" once typed). */
   private script: string;
+  /** Which start() is current: a PTY from an earlier one is ignored. */
+  private run = 0;
+  private retry?: ReturnType<typeof setTimeout>;
 
   constructor(private project: Project, private tab: Tab) {
     // One line runs as the PTY's program; several are typed into a login shell, so a `cd` or
@@ -274,6 +277,27 @@ class TermSession {
     setLive(this.tab.id, (prev) => ({ ...{ status: this.status, attention: false, title: "" }, ...prev, ...patch }));
   }
 
+  /** Its Environment now points at another destination: end the session on the old host and start
+   *  this terminal's command over on the new one. Resolves once the old session is dealt with. */
+  async moveFrom(oldHost: string) {
+    if (this.disposed || this.tab.demo) return;
+    const pty = this.ptyId;
+    this.run++;
+    this.ptyId = undefined;
+    clearTimeout(this.retry);
+    if (pty !== undefined) call("pty_kill", { id: pty });
+    const ended = call("remote_kill_session", { host: oldHost, session: sessionName(this.project, this.tab) });
+    const cmd = this.tab.cmd?.trim() ?? "";
+    const multi = cmd.includes("\n");
+    this.cmd = multi ? "" : cmd;
+    this.script = multi ? cmd : "";
+    this.backoff = 1000;
+    this.status = "connecting";
+    this.term.write(`\r\n\x1b[90m[moved from ${oldHost} to ${this.project.host}, restarting]\x1b[0m\r\n`);
+    void this.start();
+    await ended;
+  }
+
   private async start() {
     if (this.disposed) return;
     if (this.tab.demo) {
@@ -283,9 +307,11 @@ class TermSession {
     }
     this.pending = [];
     this.update({ status: this.status === "reconnecting" ? "reconnecting" : "connecting" });
+    const run = ++this.run;
 
     const onData = new Channel<ArrayBuffer | number[]>();
     onData.onmessage = (chunk) => {
+      if (run !== this.run) return;
       if (this.status !== "running") {
         this.update({ status: "running" });
         this.backoff = 1000;
@@ -294,11 +320,11 @@ class TermSession {
       this.term.write(chunk instanceof ArrayBuffer ? new Uint8Array(chunk) : Uint8Array.from(chunk));
     };
     const onExit = new Channel<number>();
-    onExit.onmessage = (code) => this.exited(code);
+    onExit.onmessage = (code) => run === this.run && this.exited(code);
 
     const { cols, rows } = this.term;
     try {
-      this.ptyId = await invoke<number>("pty_spawn", {
+      const id = await invoke<number>("pty_spawn", {
         spec: {
           host: this.project.host,
           cwd: this.project.path,
@@ -318,7 +344,9 @@ class TermSession {
           req: takeAgentReq(this.tab.id) ?? null,
         },
       });
-      if (this.disposed) return void call("pty_kill", { id: this.ptyId });
+      // Closed, or moved to another host, while this was starting.
+      if (this.disposed || run !== this.run) return void call("pty_kill", { id });
+      this.ptyId = id;
       this.update({ pty: this.ptyId });
       // The tab is usually shown and fitted while the spawn is in flight, and
       // refit skips the resize until there is an id; send the real size now.
@@ -330,6 +358,7 @@ class TermSession {
       this.pending = [];
       if (queued) this.write(queued);
     } catch (e) {
+      if (run !== this.run) return;
       this.term.write(`\r\n\x1b[31m${e}\x1b[0m\r\n`);
       this.exited(-1);
     }
@@ -343,7 +372,7 @@ class TermSession {
       const secs = Math.round(this.backoff / 1000);
       this.term.write(`\r\n\x1b[33m[connection lost, reconnecting in ${secs}s]\x1b[0m\r\n`);
       this.update({ status: "reconnecting" });
-      setTimeout(() => this.start(), this.backoff);
+      this.retry = setTimeout(() => this.start(), this.backoff);
       this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS);
       return;
     }
@@ -562,6 +591,11 @@ export function pasteText(tabId: string, text: string): boolean {
 /** The tour: make a scripted pi stop and ask for permission. */
 export function askDemo(tabId: string) {
   sessions.get(tabId)?.askDemo();
+}
+
+/** Restart these terminals after their Environment moved off `oldHost` (state.moveEnvironment). */
+export async function moveSessions(tabIds: string[], oldHost: string): Promise<void> {
+  await Promise.all(tabIds.map((id) => sessions.get(id)?.moveFrom(oldHost)));
 }
 
 export function closeSession(tabId: string) {
