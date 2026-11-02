@@ -4,8 +4,10 @@
 use std::path::PathBuf;
 
 use serde::Serialize;
+use tauri::ipc::Invoke;
+use tauri::plugin::{Plugin, TauriPlugin};
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewBuilder, WebviewUrl};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewBuilder, WebviewUrl};
 
 #[derive(Clone, Serialize)]
 struct NavPayload {
@@ -58,6 +60,32 @@ const LINK_SCRIPT: &str = r#"(() => {
   addEventListener("click", open, true);
   addEventListener("auxclick", open, true);
 })();"#;
+
+/// tauri-plugin-dialog without its init script, which replaces `alert` and `confirm` in every
+/// webview. In a browser pane its IPC is denied, so nothing shows, and its async `confirm` returns
+/// a truthy Promise, so `if (confirm(...))` goes ahead unasked. No later script can undo it: plugin
+/// scripts run first and the originals are gone. The app itself asks through `ask` in ui.ts.
+pub struct DialogPlugin<R: Runtime>(TauriPlugin<R>);
+
+impl<R: Runtime> DialogPlugin<R> {
+    pub fn new() -> Self {
+        Self(tauri_plugin_dialog::init())
+    }
+}
+
+impl<R: Runtime> Plugin<R> for DialogPlugin<R> {
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+
+    fn initialize(&mut self, app: &AppHandle<R>, config: serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
+        self.0.initialize(app, config)
+    }
+
+    fn extend_api(&mut self, invoke: Invoke<R>) -> bool {
+        self.0.extend_api(invoke)
+    }
+}
 
 fn is_web(url: &Url) -> bool {
     matches!(url.scheme(), "http" | "https")
