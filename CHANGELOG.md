@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.44 — 2026-11-02
+
+- Settings › Appearance sets the theme (System, Light or Dark) and the Interface and Code fonts, chosen from the fonts installed on the machine. They apply across the whole app, including terminals and the window title bar, and the first paint matches the last launch. ([#42](https://github.com/WaldoJoubert-GH/tri-code/pull/42))
+- New environment and Edit environment are now one form. Right-click an environment's header to edit its name, icon, connection and PIN, or to lock or unlock it. A changed connection is tested first. A new destination moves the environment: its projects, Worktrees, ssh options, PIN, recents and scoped Commands follow it, and its terminals restart on the new host. ([#43](https://github.com/WaldoJoubert-GH/tri-code/pull/43))
+- shpool sessions now start when the command contains braces, as a worktree Setup does.
+
 ## 0.1.43 — 2026-11-01
 
 - The Issues Panel has a Timeline (`v`): the filtered list as a Gantt chart with Day, Week and Month zoom, and `t` jumps to today. Plane issues place their bars by Start and Target Date, and dragging a bar or either end sets both dates in Plane. Open issues past their Target Date show a hatched tail with the days late. GitHub and Local issues run from created to closed or today. ([#40](https://github.com/WaldoJoubert-GH/tri-code/pull/40))
