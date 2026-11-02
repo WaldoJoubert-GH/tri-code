@@ -321,6 +321,12 @@ export type Settings = {
   remote?: { push?: Partial<Record<SoundEvent, boolean>> };
   /** The Browser Profile of projects that haven't picked one. Unset is DEFAULT_PROFILE. */
   profile?: string;
+  /** Light or dark whatever the OS says (look.ts). Unset follows the OS. */
+  theme?: "light" | "dark";
+  /** The font of menus, panels and labels, by family (look.ts). Unset is the default. */
+  fontUi?: string;
+  /** The font of terminals, the editor and diffs, by family (look.ts). Unset is the default. */
+  fontMono?: string;
 };
 
 export type GitColor = "add" | "del" | "mod" | "ren";
@@ -706,6 +712,16 @@ export function setSignalColor(key: AgentState, color: string | undefined) {
     else delete c[key];
     if (!Object.keys(c).length) delete s.settings.signalColors;
   }));
+}
+
+/** The app's theme: "system" follows the OS. */
+export function setTheme(theme: "system" | "light" | "dark") {
+  setApp("settings", "theme", theme === "system" ? undefined : theme);
+}
+
+/** The interface or code font by family, or undefined for the default. */
+export function setFont(kind: "ui" | "mono", name: string | undefined) {
+  setApp("settings", kind === "ui" ? "fontUi" : "fontMono", name || undefined);
 }
 
 /** Diff line tint in %, or undefined for GIT_TINT. */

@@ -3,6 +3,9 @@ import { render } from "solid-js/web";
 import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
 import App from "./App";
+import { restoreLook } from "./look";
+
+restoreLook();
 
 // Opening the Vite URL in a normal browser has no Rust backend, so nothing
 // (terminals, saved state, folder listing) can work there.

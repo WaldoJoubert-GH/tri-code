@@ -9,7 +9,8 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { AgentState, Live, Project, Tab, TabStatus, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, sessionName, setLive } from "./state";
+import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, sessionName, setLive } from "./state";
+import { terminalFont } from "./look";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
 import { Demo, playDemo } from "./demo";
@@ -53,7 +54,11 @@ const LIGHT = {
 };
 
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-const themeNow = () => (darkQuery.matches ? DARK : LIGHT);
+/** The colours for the theme on <html> (look.ts), which only follows the OS when none is forced. */
+const themeNow = () => {
+  const forced = document.documentElement.dataset.theme;
+  return (forced ? forced === "dark" : darkQuery.matches) ? DARK : LIGHT;
+};
 
 /** Receives Ctrl+click links: the URL, the tab it was clicked in, and whether to use the system browser. */
 let linkHandler: ((url: string, tabId: string, external: boolean) => void) | undefined;
@@ -102,7 +107,7 @@ class TermSession {
     this.term = new Terminal({
       // Capped scrollback: each line costs memory per terminal.
       scrollback: 5000,
-      fontFamily: '"Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace',
+      fontFamily: terminalFont(app.settings.fontMono),
       fontSize: 13,
       cursorBlink: false,
       allowProposedApi: true,
@@ -415,6 +420,14 @@ class TermSession {
     this.term.options.theme = themeNow();
   }
 
+  /** A new font has a new cell size, so the columns and rows that fit change too. */
+  applyFont() {
+    const font = terminalFont(app.settings.fontMono);
+    if (this.term.options.fontFamily === font) return;
+    this.term.options.fontFamily = font;
+    this.refit();
+  }
+
   private dropWebgl() {
     this.webgl?.dispose();
     this.webgl = undefined;
@@ -490,6 +503,14 @@ window.addEventListener("focus", () => {
 darkQuery.addEventListener("change", () => {
   for (const s of sessions.values()) s.applyTheme();
 });
+
+/** Settings › Appearance changed: give every terminal the theme and font now in force. */
+export function applyTerminalLook() {
+  for (const s of sessions.values()) {
+    s.applyTheme();
+    s.applyFont();
+  }
+}
 
 /** Create the session for a terminal tab once; it starts parked until mounted. */
 export function ensureSession(project: Project, tab: Tab): void {

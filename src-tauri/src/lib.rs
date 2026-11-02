@@ -9,6 +9,7 @@ mod dirs;
 mod envs;
 mod envssh;
 mod folders;
+mod fonts;
 mod fs;
 mod git;
 mod github;
@@ -113,6 +114,7 @@ pub fn run() {
             agent_setup::agent_setup_install,
             agent_setup::agent_setup_remove,
             dirs::list_dirs,
+            fonts::font_list,
             folders::folder_repos,
             folders::folder_copy,
             folders::folder_changes,

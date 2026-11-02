@@ -114,6 +114,9 @@ The path field that is also the folder list: typing filters, `Enter` goes in or 
 **Project Icon**:
 What the sidebar draws for a project: a logo file from the project, an uploaded image, a lucide icon or the first letter. **Auto** is tri-code's pick (the first logo found, else the letter); any other choice in the Appearance panel is an override until "reset to auto".
 
+**Look**:
+The theme (System, Light or Dark) and the two fonts, Interface and Code, set in Settings › Appearance for the whole app (`look.ts`). A project's name, icon, accent and background are not part of it; they are in the project's Appearance panel. A saved font that isn't installed stays saved and the default shows until it is.
+
 **Configuration Export**:
 One JSON file (`format: "tri-code-config"`) holding the sections picked in Settings › Backup: Preferences (`settings`, `notify`, `gap`), Commands, Browser Profiles (names and colours only, never cookies or passwords), Environments (with `envSsh`) and Projects (place and appearance, with their uploaded backgrounds, icons and sounds inlined as data URLs). Made for moving to a new machine (`config.ts`). Worktrees, the Sample Project, window layouts, PIN Locks and Remote Control pairing are left out. **Import** previews each section, then merges: entries with a matching id are replaced, a project at the same host and path keeps its windows and takes the file's appearance, anything else is added, nothing is deleted. Read through the same `migrate()` as `state.json`, so older exports keep working.
 _Avoid_: Backup file, settings sync, profile (a Browser Profile is something else).
