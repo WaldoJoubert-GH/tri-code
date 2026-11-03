@@ -19,6 +19,9 @@ pub struct SpawnSpec {
     pub cmd: Option<String>,
     /// Stable name for the remote persistent session.
     pub session: String,
+    /// The conversation to reopen, for a local agent whose process is gone.
+    #[serde(default)]
+    pub resume: Option<crate::resume::Resume>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -193,6 +196,7 @@ mod tests {
             cwd: cwd.into(),
             cmd: cmd.map(Into::into),
             session: "tri-p1-t1".into(),
+            resume: None,
         }
     }
 

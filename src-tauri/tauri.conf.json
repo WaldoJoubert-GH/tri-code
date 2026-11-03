@@ -27,7 +27,8 @@
     ],
     "createUpdaterArtifacts": true,
     "resources": {
-      "../mcp/tri-code.mjs": "mcp/tri-code.mjs"
+      "../mcp/tri-code.mjs": "mcp/tri-code.mjs",
+      "../mcp/session-hook.mjs": "mcp/session-hook.mjs"
     },
     "macOS": {
       "signingIdentity": "-"
