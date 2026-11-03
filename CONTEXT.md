@@ -233,6 +233,17 @@ _Avoid_: DB client, db viewer, studio.
 A saved database target of a project, in `.dev/databases.json` (written only by tri-code): a name, a kind (`postgres`, `sqlite`, `mongo`), a target (a `.env` variable, or a URL whose password lives in `~/.tri-code/secrets/databases.json` on the host), `via` (`direct`, or `host` for an ssh tunnel), `readOnly` and an optional `prod` tag. Opening one makes a Session.
 _Avoid_: Datasource, database (the Connection points at one).
 
+**Docker Window**:
+A canvas Window, one per project, for what is running on the project's host: containers and their ports over one log pane. Picking a stack follows its compose logs (chips show or hide each service), picking a container follows its own. New `TabKind` `"docker"`, addressed with `Alt+Y`. Runs the `docker` CLI on the project's host, so an ssh Environment works the same way; `docker events` keeps the list live. Each container and stack can be started and stopped; stopping one that isn't the project's asks first. Running containers list first and stopped ones last, within a stack and across stacks, after the project's own. A search over the list matches name, stack, image, state or port, and only narrows the rows: the selection and its logs stay. Chosen from design/docker.html (variant A).
+_Avoid_: Docker dashboard, container view.
+
+**Stack**:
+The containers of one compose project (its `com.docker.compose.project` label). A stack is the project's when its `com.docker.compose.project.working_dir` is the project's folder or under it, so each Worktree has its own; "All on host" adds every other stack and the containers compose didn't start. Unticking Show stopped hides clean exits (0 or 143: a finished migration, `docker compose stop`); any other exit always shows.
+_Avoid_: Compose group, service group.
+
+**Port Chip**:
+A container's port in the Docker Window. A published port opens a Page, or copies its address when the container's port is known not to speak HTTP (Postgres, Redis and the like). On an ssh Environment the first click opens an `ssh -L` tunnel, which lasts until the window closes. A dashed chip is exposed only inside the Docker network and does nothing.
+
 **Pending Edit**:
 A cell change, new row or deleted row in a Database Window that is staged and highlighted but not written. Apply shows the statements and runs them all in one transaction; a row is found by its primary key, `rowid` or `_id`, and an edit fails if the cell changed underneath.
 _Avoid_: Draft, unsaved change.

@@ -24,6 +24,8 @@ const Editor = lazy(() => import("./Editor"));
 import GitPanel from "./GitPanel";
 import AgentsPanel from "./AgentsPanel";
 import DbPanel from "./DbPanel";
+import DockerPanel from "./DockerPanel";
+import { closeDockerWindow } from "./docker";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./db";
 import { gitOf } from "./git";
 import { clock, dev, panelTitle } from "./issues";
@@ -190,7 +192,8 @@ export default function Canvas(props: { project: Project }) {
     const isGit = tab.kind === "git";
     const isAgents = tab.kind === "agents";
     const isDb = tab.kind === "db";
-    const isPanel = isIssues || isEditor || isGit || isAgents || isDb;
+    const isDocker = tab.kind === "docker";
+    const isPanel = isIssues || isEditor || isGit || isAgents || isDb || isDocker;
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -454,6 +457,7 @@ export default function Canvas(props: { project: Project }) {
               : isGit ? "git"
               : isAgents ? "agents"
               : isDb ? "db"
+              : isDocker ? "docker"
               : (live[id]?.status ?? "connecting")
             }`}
           />
@@ -622,6 +626,8 @@ export default function Canvas(props: { project: Project }) {
           <AgentsPanel project={props.project} />
         ) : isDb ? (
           <DbPanel project={props.project} tab={tab} focused={focused()} />
+        ) : isDocker ? (
+          <DockerPanel project={props.project} tab={tab} focused={focused()} />
         ) : (
           <div class="body" ref={termEl} />
         )}
@@ -711,6 +717,6 @@ export function requestClose(projectId: string, tabId: string): void {
       msg: `Closed ${tabName(tab)}${title ? " · " + title : ""}.`,
       undo: () => restoreTab(projectId, tab, index),
     },
-    () => (tab.kind === "browser" ? (closeBrowser(tab), forgetDownloads(tabId)) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : tab.kind === "db" ? closeDbSession(tabId) : undefined),
+    () => (tab.kind === "browser" ? (closeBrowser(tab), forgetDownloads(tabId)) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : tab.kind === "db" ? closeDbSession(tabId) : tab.kind === "docker" ? closeDockerWindow(tabId) : undefined),
   );
 }
