@@ -21,6 +21,7 @@ import { sendText } from "./terms";
 import { Icon } from "./lucide";
 import { flash } from "./ui";
 import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";
+import { Key } from "./Keys";
 
 // ── small presentational pieces ─────────────────────────────────────
 
@@ -511,7 +512,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
             <Show when={rows().length === 0}>
               <div class="iempty">
                 {q() ? `Nothing matches “${q()}”` : "Nothing matches these filters."}
-                <br /><kbd>n</kbd> creates one
+                <br /><Key k="n" /> creates one
               </div>
             </Show>
           </div>
@@ -550,33 +551,33 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
 
         <div class="ihint">
           <Show when={view() === "detail"} fallback={<Show when={timeline()} fallback={<>
-            <span><kbd>j</kbd><kbd>k</kbd> move</span>
-            <span><kbd>Enter</kbd> open</span>
-            <span><kbd>/</kbd> search</span>
-            <span><kbd>s</kbd> status</span>
-            <span><kbd>f</kbd> source</span>
-            <span><kbd>o</kbd> sort</span>
-            <span><kbd>n</kbd> new</span>
-            <span><kbd>r</kbd> sync</span>
-            <span><kbd>v</kbd> timeline</span>
+            <span><Key k="j" /><Key k="k" /> move</span>
+            <span><Key k="Enter" /> open</span>
+            <span><Key k="/" /> search</span>
+            <span><Key k="s" /> status</span>
+            <span><Key k="f" /> source</span>
+            <span><Key k="o" /> sort</span>
+            <span><Key k="n" /> new</span>
+            <span><Key k="r" /> sync</span>
+            <span><Key k="v" /> timeline</span>
           </>}>
-            <span><kbd>j</kbd><kbd>k</kbd> move</span>
-            <span><kbd>Enter</kbd> open</span>
+            <span><Key k="j" /><Key k="k" /> move</span>
+            <span><Key k="Enter" /> open</span>
             <span>drag a Plane bar to set its dates</span>
-            <span><kbd>t</kbd> today</span>
-            <span><kbd>-</kbd><kbd>=</kbd> zoom</span>
-            <span><kbd>v</kbd> list</span>
+            <span><Key k="t" /> today</span>
+            <span><Key k="-" /><Key k="=" /> zoom</span>
+            <span><Key k="v" /> list</span>
           </Show>}>
-            <span><kbd>Esc</kbd> back</span>
-            <span><kbd>j</kbd><kbd>k</kbd> next / prev</span>
-            <span><kbd>/</kbd> jump to issue</span>
-            <span><kbd>o</kbd> open in {SOURCE_NAMES[selected()?.source ?? "plane"]}</span>
-            <span><kbd>e</kbd> edit</span>
-            <span><kbd>d</kbd> state</span>
-            <span><kbd>l</kbd> labels</span>
-            <span><kbd>c</kbd> comment</span>
-            <span><kbd>a</kbd> send to agent</span>
-            <span><kbd>s</kbd> timer</span>
+            <span><Key k="Esc" /> back</span>
+            <span><Key k="j" /><Key k="k" /> next / prev</span>
+            <span><Key k="/" /> jump to issue</span>
+            <span><Key k="o" /> open in {SOURCE_NAMES[selected()?.source ?? "plane"]}</span>
+            <span><Key k="e" /> edit</span>
+            <span><Key k="d" /> state</span>
+            <span><Key k="l" /> labels</span>
+            <span><Key k="c" /> comment</span>
+            <span><Key k="a" /> send to agent</span>
+            <span><Key k="s" /> timer</span>
           </Show>
           <span class="src" title="The panel only renders this file (and local-issues.json); pi-todos and dev-hub read the same one">
             {props.project.host !== "local" ? `${props.project.host}:` : ""}.dev/issues.json
@@ -650,7 +651,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
                     )}
                   </For>
                 </div>
-                <div class="jfoot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Esc</kbd> close</span></div>
+                <div class="jfoot"><span><Key k="↑" /><Key k="↓" /> move</span><span><Key k="Enter" /> open</span><span><Key k="Esc" /> close</span></div>
               </Dropdown>
             )}
           </Show>
@@ -703,7 +704,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
                     );
                   }}
                 </For>
-                <div class="lfoot">Enter toggles · Esc closes</div>
+                <div class="lfoot"><Key k="Enter" /> toggles · <Key k="Esc" /> closes</div>
               </Dropdown>
             )}
           </Show>
@@ -722,7 +723,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
                           {lightImages().length > 1 ? ` · ${lightImages().findIndex((x) => x.c === img().c && x.i === img().i) + 1} / ${lightImages().length}` : ""}
                         </span>
                         <Show when={lightImages().length > 1}><button title="Next image (→)" onClick={() => lightStep(1)}><Icon name="chevron-right" size={14} /></button></Show>
-                        <span><kbd>Esc</kbd> close</span>
+                        <span><Key k="Esc" /> close</span>
                       </div>
                     </div>
                   )}
@@ -882,7 +883,7 @@ function IssueModal(props: {
           </div>
         </div>
         <div class="mfoot">
-          <span class="grow"><kbd>Ctrl</kbd><kbd>Enter</kbd> {props.editing ? "save" : "create"} · <kbd>Esc</kbd> cancel</span>
+          <span class="grow"><Key k="Ctrl" /><Key k="Enter" /> {props.editing ? "save" : "create"} · <Key k="Esc" /> cancel</span>
           <button type="button" class="btn" onClick={props.onClose}>Cancel</button>
           <button type="submit" class="btn primary" disabled={!title().trim() || busy()}>{props.editing ? "Save" : "Create issue"}</button>
         </div>
@@ -1277,14 +1278,14 @@ function Detail(props: {
           </Show>
           <div class="iacts">
             <Show when={i().link}>
-              <button onClick={props.onOpen}><kbd>o</kbd>Open in {SOURCE_NAMES[i().source]}</button>
+              <button onClick={props.onOpen}><Key k="o" />Open in {SOURCE_NAMES[i().source]}</button>
             </Show>
-            <button onClick={props.onSend}><kbd>a</kbd>Send to agent</button>
+            <button onClick={props.onSend}><Key k="a" />Send to agent</button>
             <Show when={tracked()}>
-              <button onClick={props.onEdit}><kbd>e</kbd>Edit issue</button>
-              <button class={running() ? "on" : ""} onClick={props.onTimer}><kbd>s</kbd>{running() ? "Stop timer" : "Start timer"}</button>
+              <button onClick={props.onEdit}><Key k="e" />Edit issue</button>
+              <button class={running() ? "on" : ""} onClick={props.onTimer}><Key k="s" />{running() ? "Stop timer" : "Start timer"}</button>
             </Show>
-            <button onClick={props.onCopy}><kbd>y</kbd>Copy {slugOf(props.state, i())}</button>
+            <button onClick={props.onCopy}><Key k="y" />Copy {slugOf(props.state, i())}</button>
           </div>
         </div>
         <Show when={commented()}>
@@ -1345,10 +1346,10 @@ function Detail(props: {
                 </div>
               </Show>
               <div class="cbar">
-                <Show when={i().source === "plane"} fallback={<span class="grow">posts to GitHub through gh · <kbd>Ctrl</kbd><kbd>Enter</kbd> posts</span>}>
+                <Show when={i().source === "plane"} fallback={<span class="grow">posts to GitHub through gh · <Key k="Ctrl" /><Key k="Enter" /> posts</span>}>
                   <button class="ib" title="Attach images" onClick={props.onAttach}><Icon name="image-plus" size={15} /></button>
                   <input class="cfile" type="file" accept="image/*" multiple hidden ref={props.fileRef} onChange={props.onFile} />
-                  <span class="grow">images upload to Plane · <kbd>Ctrl</kbd><kbd>Enter</kbd> posts</span>
+                  <span class="grow">images upload to Plane · <Key k="Ctrl" /><Key k="Enter" /> posts</span>
                 </Show>
                 <button class="post" disabled={!draft().text.trim() && !draft().images.length} onClick={props.onPost}>Comment</button>
               </div>

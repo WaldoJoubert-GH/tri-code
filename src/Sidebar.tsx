@@ -11,6 +11,8 @@ import { appearanceOpen, closeAppearance, forgetBgImage, openAppearance } from "
 import { dev, forgetProject, isActive, sourcesOf, stateOf } from "./issues";
 import { IconFace, forgetIcon } from "./icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
+import { Caps, HoldFace } from "./Keys";
+import { projectStepKey } from "./hints";
 import { openProjectDialog } from "./OpenProject";
 import { envDialogOpen, openEnvDialog } from "./EnvDialog";
 import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
@@ -19,7 +21,7 @@ import { openWorktreeDialog } from "./WorktreeDialog";
 import { type CtxItem, openCtxMenu } from "./ctxmenu";
 import { folderStatus, peekStatus } from "./git";
 import { ask, flash } from "./ui";
-import { keyOf, withKey } from "./keymap";
+import { withKey } from "./keymap";
 import { isMac } from "./modkey";
 import { envLocked, lockEnv } from "./envlock";
 import { settingsOpen, toggleSettings } from "./Settings";
@@ -203,6 +205,15 @@ export default function Sidebar() {
   /** One checkout's row. In its repo's list (the repo's own folder too) it can be removed; on the
    *  Pinned shelf (`shelf`) it carries its repo's name instead, and dims while its Environment is locked.
    *  A pinned repo shows there with its icon and name, its branch after. */
+  /** The key that steps to this project from the active one, if any. */
+  const stepKey = (p: Project) => projectStepKey(app.projects.map((x) => x.id), app.activeProject, p.id);
+  /** What a repo's own row turns into during a hold. With Worktrees, the rows under it carry the keys. */
+  const projectFace = (p: Project) => {
+    if (worktreesOf(p.id).length) return undefined;
+    if (app.activeProject === p.id) return p.sample ? undefined : "new-worktree";
+    return stepKey(p);
+  };
+
   const wtRow = (w: Project, shelf = false) => {
     const repo = () => (w.parent && projectById(w.parent)) || w;
     const locked = () => shelf && envLocked(repo().host);
@@ -225,10 +236,12 @@ export default function Sidebar() {
         onContextMenu={(e) => (w.parent ? worktreeMenu(e, w) : projectMenu(e, w))}
       >
         <span class="wtile" classList={{ face: shelvedRepo }}>
-          {w.parent ? tileLabel(w) : shelvedRepo ? <IconFace project={w} /> : <Icon name="git-branch" size={12} />}
-          <Show when={labelOf(w).mark}>
-            {(m) => <span class={`mark ${m()}`} title={m() === "named" ? "Named" : "Repos are on different branches"}>{m() === "named" ? "◆" : "≠"}</span>}
-          </Show>
+          <HoldFace id={stepKey(w)} when={!shelf}>
+            {w.parent ? tileLabel(w) : shelvedRepo ? <IconFace project={w} /> : <Icon name="git-branch" size={12} />}
+            <Show when={labelOf(w).mark}>
+              {(m) => <span class={`mark ${m()}`} title={m() === "named" ? "Named" : "Repos are on different branches"}>{m() === "named" ? "◆" : "≠"}</span>}
+            </Show>
+          </HoldFace>
         </span>
         <Show when={ownBadge(w)}>
           {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
@@ -343,7 +356,7 @@ export default function Sidebar() {
           aria-label={peek() ? "Keep sidebar open" : app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!app.sidebarCollapsed || peek()}
         >
-          {peek() ? "⇥" : app.sidebarCollapsed ? "»" : "«"}
+          <HoldFace id="sidebar">{peek() ? "⇥" : app.sidebarCollapsed ? "»" : "«"}</HoldFace>
         </button>
       </div>
       <Show when={pins().length}>
@@ -420,7 +433,7 @@ export default function Sidebar() {
                   onClick={() => !dragged && !inFamily(p) && setApp("activeProject", p.id)}
                   onContextMenu={(e) => projectMenu(e, p)}
                 >
-                  <span class="swatch"><IconFace project={p} /></span>
+                  <span class="swatch"><HoldFace id={projectFace(p)}><IconFace project={p} /></HoldFace></span>
                   <Show when={badge(p)}>
                     {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
                   </Show>
@@ -470,7 +483,7 @@ export default function Sidebar() {
                   <div class="wts" classList={{ "drop-after": dropAt()?.id === p.id && dropAt()!.after }} data-drop={p.id}>
                     <For each={[p, ...worktreesOf(p.id)]}>{(w) => wtRow(w)}</For>
                     <button class="wt new" title={withKey("New worktree", "new-worktree")} onClick={() => openNewWorktree(p)}>
-                      <span class="wtile"><Icon name="git-branch-plus" size={12} /></span><span class="bn">New worktree</span>
+                      <span class="wtile"><HoldFace id="new-worktree" when={inFamily(p)}><Icon name="git-branch-plus" size={12} /></HoldFace></span><span class="bn">New worktree</span>
                     </button>
                   </div>
                 </Show>
@@ -482,7 +495,7 @@ export default function Sidebar() {
       </For>
       <div class="side-actions">
         <button class="add" title={withKey("Open project", "open-project")} onClick={() => openProjectDialog()}>
-          <span class="glyph">+</span><span class="label">Open project</span><Show when={keyOf("open-project", " ")}>{(k) => <kbd class="label">{k()}</kbd>}</Show>
+          <span class="glyph"><HoldFace id="open-project">+</HoldFace></span><span class="label">Open project</span><Caps id="open-project" class="label" />
         </button>
         <button class="add env" title="Add environment" onClick={() => openEnvDialog()}>
           <span class="glyph">⇄</span><span class="label">Add environment</span>

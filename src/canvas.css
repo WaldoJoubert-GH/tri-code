@@ -41,23 +41,29 @@
 .bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
 .bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); line-height: 1; flex: none; }
 .bar button:hover { background: var(--hover); color: var(--text); }
-/* Hold Hints (design/alt-hold.html, variant A; src/hints.ts): holding the Hotkey Modifier draws the
-   focused window's keys — the arrows it can move with, then N / F / W on its – ▢ ×. */
-.dirhints { display: flex; align-items: center; gap: 7px; flex: none; padding: 0 1px; }
-.dirhints .dh { display: flex; align-items: center; gap: 3px; color: var(--accent); }
-.dirhints .dh b { font: 600 11px var(--mono); }
-.bar .ctl.hk {
-  width: auto; min-width: 22px; padding: 0 3px; gap: 2px; display: inline-flex;
-  align-items: center; justify-content: center; color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
-}
+/* Hold Hints (src/hints.ts, Keys.tsx): while the Hotkey Modifier is held each icon turns into its key,
+   in the same box. The focused window's – ▢ × do the same. */
+.bar .ctl.hk { width: auto; min-width: 22px; padding: 0 1px; display: inline-flex; align-items: center; justify-content: center; }
 .bar .ctl.hk .g { display: none; }
-.bar .ctl.hk:hover { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); color: var(--text); }
-.bar .ctl.hk kbd, .dirhints kbd {
-  font: 600 10px var(--mono); padding: 0 3px; min-width: 14px; text-align: center;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
-  border-bottom-width: 1px; border-radius: 3px; background: var(--bg); color: var(--accent);
+.bar .dh { display: flex; align-items: center; gap: 4px; flex: none; padding: 0 3px; color: var(--muted); font-size: 11.5px; }
+/* The windows the focused one can jump to carry a large key. Never a browser window: see Canvas.tsx. */
+.holdtarget {
+  position: absolute; inset: 31px 0 0; z-index: 30; pointer-events: none; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 6px;
+  border-radius: 0 0 8px 8px; background: color-mix(in srgb, var(--bg) 72%, transparent); color: var(--text); font-size: 12px;
 }
+.holdtarget .big { display: flex; gap: 6px; }
+.holdtarget .to { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.holdtarget small { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11.5px; }
+/* While held, what has no key steps back. */
+.holding aside .project:not(:has(kbd)), .holding aside .wt:not(:has(kbd)), .holding aside .add:not(:has(kbd)), .holding .top .tool:not(:has(kbd)) { opacity: .55; }
+.holding .add > .keycaps, .holding .where .hover-caps { display: none; }
+.tabs .tab.min:has(kbd) { opacity: 1; }
+.holdkey { margin-right: 6px; }
+/* The keys with no control of their own, in the status line (tabs.tsx). */
+.holdbar { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; overflow: hidden; }
+.holdbar > span { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.holdbar .lbl { margin-left: 4px; }
 /* A browser window with two or more pages: its pages as tabs in place of the title. */
 .ptabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; }
 .ptab {
@@ -230,10 +236,6 @@
   text-align: center; color: var(--muted); pointer-events: none;
 }
 .empty div { display: flex; gap: 6px; justify-content: center; align-items: center; }
-.empty kbd {
-  font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line);
-  border-bottom-width: 2px; border-radius: 3px; color: var(--text); background: var(--panel);
-}
 
 @media (prefers-reduced-motion: reduce) {
   .world.anim .win { transition: none; }
@@ -357,7 +359,6 @@
 .ilight .cap { display: flex; gap: 10px; align-items: center; justify-content: center; padding-top: 10px; color: #c9ccd3; font-size: 12px; }
 .ilight .cap button { color: #c9ccd3; width: 26px; height: 24px; border-radius: 4px; }
 .ilight .cap button:hover { background: rgba(255, 255, 255, .1); color: #fff; }
-.ilight kbd { background: #1c1f26; border-color: #333844; color: #c9ccd3; }
 .irow {
   grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center;
   column-gap: 9px; height: 26px; cursor: default;
@@ -484,16 +485,15 @@ body.tl-sizing, body.tl-sizing * { cursor: ew-resize !important; }
 .iacts button { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; text-align: left; }
 .iacts button:hover { background: var(--hover); }
 .iacts button:disabled { opacity: .45; cursor: default; background: none; }
-.iacts kbd { min-width: 18px; text-align: center; }
 .iacts button.on { color: var(--accent); }
 .iback { height: 24px; padding: 0 8px 0 6px; border-radius: 4px; color: var(--muted); font-size: 12px; flex: none; }
 .iback:hover { background: var(--hover); color: var(--text); }
 .ihint {
+  flex: none;
   height: 22px; flex: none; display: flex; gap: 10px; align-items: center; padding: 0 10px;
   border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden;
 }
 .ihint span { display: flex; gap: 3px; align-items: center; }
-.ihint kbd { font-size: 10px; padding: 0 3px; }
 .ihint .src { margin-left: auto; font: 10.5px var(--mono); }
 /* The State Pill is the control: it opens the State Dropdown anchored under itself */
 .pillbtn {
@@ -569,8 +569,7 @@ body.tl-sizing, body.tl-sizing * { cursor: ew-resize !important; }
 .jitem .jt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jitem .pill { font-size: 10px; line-height: 15px; }
 .jempty { padding: 8px 6px; font-size: 12px; color: var(--muted); }
-.jfoot { display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 5px 6px 1px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
-.jfoot kbd { font-size: 10px; padding: 0 3px; }
+.jfoot { flex: none; display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 5px 6px 1px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
 /* New Issue modal: over the panel, title / description / tags / assignees */
 .mback {
   position: absolute; inset: 0; z-index: 20; display: grid; place-items: start center; padding-top: 48px;
@@ -583,9 +582,8 @@ body.tl-sizing, body.tl-sizing * { cursor: ew-resize !important; }
 .mhead { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px 0 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
 .mhead .grow { flex: 1; }
 .mbody { display: grid; gap: 12px; padding: 12px 14px 14px; }
-.mfoot { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--bg); border-radius: 0 0 8px 8px; }
+.mfoot { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--bg); border-radius: 0 0 8px 8px; }
 .mfoot .grow { flex: 1; font-size: 11px; color: var(--muted); }
-.mfoot kbd { font-size: 10px; padding: 0 3px; }
 .fld { display: grid; gap: 4px; min-width: 0; }
 .fld > span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
 .finput {

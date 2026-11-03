@@ -10,6 +10,7 @@ import { createStore } from "solid-js/store";
 import { openExternal } from "./browsers";
 import { appVersion } from "./updater";
 import { showToast } from "./ui";
+import { KeyText } from "./Keys";
 
 const REPO = "WaldoJoubert-GH/tri-code";
 const KINDS = { bug: { name: "Bug", label: "bug", ask: "What went wrong?" }, idea: { name: "Idea", label: "enhancement", ask: "What would you like?" } };
@@ -114,7 +115,7 @@ export function FeedbackPopover() {
           <div class="foot">
             <span>Files a GitHub issue as you, via gh</span>
             <button type="button" class="primary" disabled={!form.title.trim() || sending()} onClick={() => void send()}>
-              {sending() ? "Sending…" : "Send"} <kbd>Ctrl+⏎</kbd>
+              {sending() ? "Sending…" : "Send"} <KeyText text="Ctrl+⏎" />
             </button>
           </div>
         </div>

@@ -17,6 +17,7 @@ import { focusSession, sendText } from "./terms";
 import { flash } from "./ui";
 import { Icon } from "./lucide";
 import "./files.css";
+import { Key, KeyList } from "./Keys";
 
 type FileIndex = { files: string[]; git: boolean; truncated: boolean };
 type IndexState = { loading: boolean; index?: FileIndex; error?: string };
@@ -284,7 +285,7 @@ function Box(props: { project?: Project }) {
         </Show>
         <span class="gn"><Marked s={c.title} idx={new Set(rp.r.m?.idx ?? [])} off={0} /></span>
         <span class="ph">{rp.group ? <><b>{c.group}</b>{c.hint ? ` · ${c.hint}` : ""}</> : c.hint}</span>
-        <Show when={c.keys}>{(keys) => <span class="pk"><For each={keys()}>{(k) => <kbd>{k}</kbd>}</For></span>}</Show>
+        <Show when={c.keys}>{(keys) => <span class="pk"><KeyList keys={keys()} /></span>}</Show>
       </button>
     );
   };
@@ -364,13 +365,13 @@ function Box(props: { project?: Project }) {
         })()}
       </div>
       <div class="gfoot">
-        <span><kbd>Enter</kbd> {hiFile() ? "open" : "run"}</span>
+        <span><Key k="Enter" /> {hiFile() ? "open" : "run"}</span>
         <Show when={hiFile()}>
-          <span><kbd>Ctrl</kbd><kbd>Enter</kbd> new window</span>
-          <span><kbd>Tab</kbd> complete</span>
-          <Show when={agent()}>{(t) => <span><kbd>Shift</kbd><kbd>Enter</kbd> @ to {t().kind}</span>}</Show>
+          <span><Key k="Ctrl" /><Key k="Enter" /> new window</span>
+          <span><Key k="Tab" /> complete</span>
+          <Show when={agent()}>{(t) => <span><Key k="Shift" /><Key k="Enter" /> @ to {t().kind}</span>}</Show>
         </Show>
-        <span><kbd>Esc</kbd> close</span>
+        <span><Key k="Esc" /> close</span>
         <span class="src" title="Files: git ls-files (tracked, new and ignored), minus the folders skipped in Settings › Files">{status()}</span>
       </div>
     </div>

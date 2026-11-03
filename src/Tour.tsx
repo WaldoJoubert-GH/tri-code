@@ -10,7 +10,7 @@ import { openProjectDialog } from "./OpenProject";
 import { dropProject } from "./Sidebar";
 import { askDemo } from "./terms";
 import { flash } from "./ui";
-import { Caps } from "./Keys";
+import { Caps, Key, KeyList } from "./Keys";
 
 const [step, setStep] = createSignal(0);
 /** "tour" while walking the stops, "end" for the closing card. */
@@ -41,7 +41,7 @@ type Stop = {
   try?: { label: () => JSX.Element; done: (p: Project, base: Base) => boolean };
 };
 
-const K = (props: { k: string[] }) => <For each={props.k}>{(k) => <kbd>{k}</kbd>}</For>;
+const K = (props: { k: string[] }) => <KeyList keys={props.k} />;
 
 const STOPS: Stop[] = [
   {
@@ -74,7 +74,7 @@ const STOPS: Stop[] = [
       label: () => (
         <>
           <button class="g-btn" onClick={() => { const t = sample() && demoTab(sample()!, "pi"); if (t) askDemo(t.id); }}>Make pi ask</button>{" "}
-          then press <Caps id="next-signal" /> and answer <kbd>y</kbd>
+          then press <Caps id="next-signal" /> and answer <Key k="y" />
         </>
       ),
       done: (p, b) => {

@@ -332,6 +332,8 @@ export type Settings = {
   fontUi?: string;
   /** The font of terminals, the editor and diffs, by family (look.ts). Unset is the default. */
   fontMono?: string;
+  /** Keycaps in the project's accent colour (look.ts). Unset is the neutral keycap. */
+  accentKeys?: boolean;
 };
 
 export type GitColor = "add" | "del" | "mod" | "ren";

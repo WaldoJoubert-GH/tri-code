@@ -75,7 +75,7 @@
 .g-menu button { display: flex; width: 100%; padding: 6px 9px; border-radius: 5px; font-size: 12px; gap: 8px; text-align: left; }
 .g-menu button:hover:not(:disabled) { background: var(--hover); }
 .g-menu button:disabled { opacity: .45; }
-.g-menu .k { margin-left: auto; color: var(--muted); font: 10.5px var(--mono); }
+.g-menu .keycaps { margin-left: auto; padding-left: 12px; }
 
 /* Context chips: what ✦ reads. */
 .g-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }

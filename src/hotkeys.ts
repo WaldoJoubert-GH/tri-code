@@ -182,7 +182,7 @@ function onKey(e: KeyboardEvent) {
     hintDown();
     return;
   }
-  hintChord();
+  hintChord(e.key === "Shift" || e.key === "Control");
   // A keyup the OS took from us (focus kept) would leave the hints up: the modifier is not down.
   if (hintsShown() && !modDown(e)) hintUp();
   // Escape closes the overlays first; it is never bound on its own.

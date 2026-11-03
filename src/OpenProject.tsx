@@ -13,6 +13,7 @@ import { openEnvDialog } from "./EnvDialog";
 import { Icon } from "./lucide";
 import { autoIcon } from "./icons";
 import { flash } from "./ui";
+import { Key } from "./Keys";
 
 type DirList = { path: string; dirs: string[]; repos: string[]; drives: string[]; workspaces: string[] };
 /** A row of the folder list: a folder, or a `.code-workspace` file (`ws`). */
@@ -217,7 +218,7 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void; onO
       <div class="list" ref={listEl}>
         <Show when={!error()} fallback={<div class="note err">{error()}</div>}>
           <Show when={list()} fallback={<div class="note">{isLocalHost(props.host) ? "Loading…" : `Connecting to ${props.host}…`}</div>}>
-            <For each={shown()} fallback={<div class="note">{q() && !isPath() ? `No folder matches “${q()}”` : isPath() ? "Enter jumps to that path" : "No subfolders"}</div>}>
+            <For each={shown()} fallback={<div class="note">{q() && !isPath() ? `No folder matches “${q()}”` : isPath() ? <><Key k="Enter" /> jumps to that path</> : "No subfolders"}</div>}>
               {(d, i) => (
                 <div class="row" classList={{ sel: i() === sel(), ws: d.ws }} onClick={() => enter(d)} onMouseMove={() => setSel(i())}>
                   <span class="ic">{d.ws ? <Icon name="braces" size={11} /> : "▸"}</span>
@@ -236,9 +237,9 @@ function FolderPicker(props: { host: string; onOpen: (path: string) => void; onO
         <button type="button" class="primary" disabled={!list()} onClick={() => list() && props.onOpen(list()!.path)}>Open here</button>
       </div>
       <div class="keys">
-        <span><kbd>↵</kbd> in / open here</span>
-        <span><kbd>⌫</kbd> up</span>
-        <span><kbd>Ctrl</kbd><kbd>↵</kbd> open highlighted</span>
+        <span><Key k="↵" /> in / open here</span>
+        <span><Key k="⌫" /> up</span>
+        <span><Key k="Ctrl" /><Key k="↵" /> open highlighted</span>
       </div>
     </div>
   );

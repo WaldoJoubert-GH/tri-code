@@ -6,6 +6,7 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "./state";
 import { browserInfo } from "./browsers";
 import { flash } from "./ui";
+import { Key, KeyText } from "./Keys";
 
 const ICON_COLOURS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#2ac3de", "#ff9e64", "#e0af68", "#73daca"];
 
@@ -113,7 +114,7 @@ export function StartPage(props: { favs: Fav[]; onOpen: (url: string) => void })
         fallback={
           <>
             <b>New browser window</b>
-            <span>Type an address above, or Ctrl+click a link in a terminal. Star a page (☆ or Ctrl+D) to keep it here.</span>
+            <span>Type an address above, or <Key k="Ctrl" /> + click a link in a terminal. Star a page (☆ or <KeyText text="Ctrl+D" />) to keep it here.</span>
           </>
         }
       >
@@ -129,7 +130,7 @@ export function StartPage(props: { favs: Fav[]; onOpen: (url: string) => void })
             )}
           </For>
         </div>
-        <span>Type an address above, or Ctrl+click a link in a terminal.</span>
+        <span>Type an address above, or <Key k="Ctrl" /> + click a link in a terminal.</span>
       </Show>
     </div>
   );

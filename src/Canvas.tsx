@@ -117,19 +117,24 @@ export default function Canvas(props: { project: Project }) {
   const animOn = () => settled() && drag() === null && !splitOn();
   const splitRect = () => (tiling().mono >= 0 ? undefined : tiling().split);
 
-  /** The directions the focused window can actually move in, with the key that takes it there. */
-  const hintDirs = createMemo(() => {
-    if (!hintsShown()) return [];
+  /** During a hold, the windows the focused one can jump to, each with the keys that reach it. */
+  const holdTargets = createMemo(() => {
+    const out: Record<string, { focus: string[]; swap: string[] }> = {};
+    if (!hintsShown() || space(props.project).mono) return out;
     const t = tiling();
     const i = t.tabs.findIndex((tab) => tab.id === space(props.project).focus);
-    if (i < 0) return [];
-    return [
-      { id: "focus-left", glyph: "←", dx: -1, dy: 0 },
-      { id: "focus-up", glyph: "↑", dx: 0, dy: -1 },
-      { id: "focus-down", glyph: "↓", dx: 0, dy: 1 },
-      { id: "focus-right", glyph: "→", dx: 1, dy: 0 },
-    ].filter((d) => hintKeys(d.id).length > 0 && neighbour(t.rects, i, d.dx, d.dy) >= 0);
+    if (i < 0) return out;
+    for (const [d, dx, dy] of [["left", -1, 0], ["up", 0, -1], ["down", 0, 1], ["right", 1, 0]] as const) {
+      const to = t.tabs[neighbour(t.rects, i, dx, dy)];
+      if (!to || !hintKeys(`focus-${d}`).length) continue;
+      const target = (out[to.id] ??= { focus: [], swap: [] });
+      target.focus.push(`focus-${d}`);
+      if (hintKeys(`swap-${d}`).length) target.swap.push(`swap-${d}`);
+    }
+    return out;
   });
+  /** A stack window can become the main one; it has no button of its own to carry the key. */
+  const canMain = () => space(props.project).layout === "master" && tiling().tabs[0]?.id !== space(props.project).focus && hintKeys("main").length > 0;
 
   const local = (x: number, y: number) => {
     const r = viewport.getBoundingClientRect();
@@ -329,6 +334,9 @@ export default function Canvas(props: { project: Project }) {
     const hinting = () => focused() && hintsShown();
     /** A control only trades its glyph for a key when that action still has one. */
     const hinted = (act: string) => hinting() && hintKeys(act).length > 0;
+    const target = () => holdTargets()[id];
+    /** A native webview's page draws above HTML, so a browser window takes its key in its title bar. */
+    const targetInBar = isBrowser && nativeBrowsers;
 
     let starEl!: HTMLButtonElement;
     const star = () => {
@@ -500,17 +508,11 @@ export default function Canvas(props: { project: Project }) {
               <Icon name={showAddr() ? "chevron-up" : "ellipsis"} size={13} />
             </button>
           </Show>
-          <Show when={hinting() && rect().w >= 360 && hintDirs().length > 0}>
-            <span class="dirhints" aria-hidden="true">
-              <For each={hintDirs()}>
-                {(d) => (
-                  <span class="dh">
-                    <HintCaps id={d.id} />
-                    <Show when={hintKeys(d.id)[0] !== d.glyph}><b>{d.glyph}</b></Show>
-                  </span>
-                )}
-              </For>
-            </span>
+          <Show when={hinting() && canMain() && rect().w >= 360}>
+            <span class="dh" aria-hidden="true"><HintCaps id="main" />main</span>
+          </Show>
+          <Show when={targetInBar && target()}>
+            {(t) => <span class="dh" aria-hidden="true"><For each={t().focus}>{(k) => <HintCaps id={k} />}</For>focus</span>}
           </Show>
           <button
             class="ctl mn"
@@ -631,6 +633,17 @@ export default function Canvas(props: { project: Project }) {
         ) : (
           <div class="body" ref={termEl} />
         )}
+        <Show when={!targetInBar && target()}>
+          {(t) => (
+            <div class="holdtarget" aria-hidden="true">
+              <span class="big"><For each={t().focus}>{(k) => <HintCaps id={k} big />}</For></span>
+              <Show when={rect().h >= 170 && rect().w >= 150}>
+                <span class="to">Focus {tabName(tab)}</span>
+                <Show when={t().swap.length}><small><For each={t().swap}>{(k) => <HintCaps id={k} />}</For> to swap</small></Show>
+              </Show>
+            </div>
+          )}
+        </Show>
         <div class="tip">{tipText()}</div>
       </div>
     );

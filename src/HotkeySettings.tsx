@@ -8,10 +8,11 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "so
 import { type Chord, type Hotkey, app, setSettings, updateAgent } from "./state";
 import { metaName, modLabel } from "./modkey";
 import {
-  ACTIONS, THEN, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,
+  ACTIONS, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,
 } from "./keymap";
 import { offeredTogether, recording, scopeLabel, setRecording } from "./agents";
 import { flash } from "./ui";
+import { Key, KeyList } from "./Keys";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph", "OS"]);
 const GROUPS = ["Focus", "Arrange", "Project", "Windows and links", "Signals", "Commands", "Editor", "Text"];
@@ -94,9 +95,6 @@ function settle(swap: boolean) {
 
 const slotId = (row: Row, i: number) => `hk:${row.kind}:${row.id}:${i}`;
 
-/** A chord's labels as <kbd>s, with a gap word between the two keys of a two-key chord. */
-const Caps = (props: { keys: string[] }) => <For each={props.keys}>{(k) => (k === THEN ? <span class="hk-then">then</span> : <kbd>{k}</kbd>)}</For>;
-
 /** One key of a row, or the slot being recorded. Click, then press a key; the modifier is implied.
  *  An Editor action's slot then waits for a second key; Enter keeps the first alone. */
 function KeySlot(props: { row: Row; i: number; add?: boolean }) {
@@ -141,7 +139,7 @@ function KeySlot(props: { row: Row; i: number; add?: boolean }) {
               : <button type="button" class="hk none" title="Click to add a hotkey" onClick={start}><span>no hotkey</span></button>
           }
         >
-          {(c) => <button type="button" class="hk" title="Click to change" onClick={start}><Caps keys={chordKeys(c())} /></button>}
+          {(c) => <button type="button" class="hk" title="Click to change" onClick={start}><KeyList keys={chordKeys(c())} /></button>}
         </Show>
       }
     >
@@ -156,12 +154,12 @@ function KeySlot(props: { row: Row; i: number; add?: boolean }) {
         <Show
           when={first()}
           fallback={
-            <Show when={!props.row.text} fallback={<span>press Ctrl or Cmd + a key…</span>}>
-              <kbd>{modLabel()}</kbd><span>+ press a key…</span>
+            <Show when={!props.row.text} fallback={<span>press <Key k="Ctrl" /> or <Key k="Cmd" /> + a key…</span>}>
+              <Key k={modLabel()} /><span>+ press a key…</span>
             </Show>
           }
         >
-          {(c) => <><Caps keys={chordKeys(c())} /><span>then a second key, or Enter for just this one…</span></>}
+          {(c) => <><KeyList keys={chordKeys(c())} /><span>then a second key, or <Key k="Enter" /> for just this one…</span></>}
         </Show>
       </button>
     </Show>
@@ -246,7 +244,7 @@ export function HotkeysPage() {
               type="button" role="radio" class="hk-mod" aria-checked={app.settings.modKey === m.mod}
               onClick={() => { setSettings({ modKey: m.mod }); flash(`hotkeys now start with ${modLabel()}`); }}
             >
-              <span class="cap">{m.cap}</span><b>{m.name}</b><small>{m.help}</small>
+              <Key k={m.cap} big /><b>{m.name}</b><small>{m.help}</small>
             </button>
           )}
         </For>
@@ -261,7 +259,7 @@ export function HotkeysPage() {
         <Show when={q().trim()}><span>{count()} of {all().length}</span></Show>
         <button type="button" class="hk-resetall" disabled={!anyChanged()} onClick={resetAll}>Reset all</button>
       </div>
-      <p class="note">Click any key to change it, or + to add another. Shift and Ctrl are optional and {modLabel()} is implied. Backspace removes it, Esc cancels.</p>
+      <p class="note">Click any key to change it, or + to add another. <Key k="Shift" /> and <Key k="Ctrl" /> are optional and <Key k={modLabel()} /> is implied. <Key k="Backspace" /> removes it, <Key k="Esc" /> cancels.</p>
       <For each={shown()} fallback={<div class="hk-empty">No hotkey matches “{q().trim()}”.</div>}>
         {([g, rs]) => (
           <>
@@ -272,9 +270,9 @@ export function HotkeysPage() {
       </For>
       <h4>Mouse</h4>
       <dl class="hk-list">
-        <dt><kbd>Ctrl</kbd> + click link</dt><dd>Open it in this project's browser window</dd>
-        <dt><kbd>Ctrl</kbd><kbd>Shift</kbd> + click link</dt><dd>Open it in the system browser</dd>
-        <dt><kbd>Shift</kbd> + drag</dt><dd>Select text in claude, pi or any app that captures the mouse</dd>
+        <dt><Key k="Ctrl" /> + click link</dt><dd>Open it in this project's browser window</dd>
+        <dt><Key k="Ctrl" /><Key k="Shift" /> + click link</dt><dd>Open it in the system browser</dd>
+        <dt><Key k="Shift" /> + drag</dt><dd>Select text in claude, pi or any app that captures the mouse</dd>
       </dl>
     </div>
   );
