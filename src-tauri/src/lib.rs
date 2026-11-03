@@ -6,6 +6,7 @@ mod db;
 mod devfs;
 mod downloads;
 mod dirs;
+mod docker;
 mod envs;
 mod envssh;
 mod folders;
@@ -170,6 +171,13 @@ pub fn run() {
             db::db_apply,
             db::db_env_vars,
             db::db_secret_set,
+            docker::docker_ps,
+            docker::docker_action,
+            docker::docker_logs,
+            docker::docker_events,
+            docker::docker_stop,
+            docker::docker_forward,
+            docker::docker_unforward,
             devfs::dev_read,
             devfs::dev_write,
             devfs::save_pasted_image,
@@ -246,6 +254,7 @@ pub fn run() {
                 app.state::<Arc<phone::Phone>>().shutdown();
                 app.state::<Arc<pty::Ptys>>().kill_all();
                 db::close_all();
+                docker::close_all();
             }
         });
 }

@@ -26,6 +26,8 @@ tri-code is a minimal agent development environment. The left sidebar lists proj
 
 ![Database window browsing an invoices table in Postgres](docs/screenshots/database.png)
 
+**Docker window.** See what's running on the project's host, locally or over ssh: containers, their health and their ports, with compose logs for a stack and logs for each container. Start and stop a container or a whole stack; running ones list first. A port opens in a browser window, through an ssh tunnel on a remote host (`Alt+Y`).
+
 **Commands window.** Everything the `+` menu offers: agents, scripts, terminal apps and web apps, each with an icon, a hotkey, its own sounds and a scope. The Agent toggle lets claude and pi open it as a window themselves.
 
 ![The Commands window listing agents, scripts and a web app](docs/screenshots/commands.png)

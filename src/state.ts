@@ -3,7 +3,7 @@ import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 import type { DiffMode } from "./diff";
 
-export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db";
+export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker";
 
 /** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
@@ -137,7 +137,7 @@ export const isTerminal = (t: Tab) => t.kind === "term";
 
 export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
 
-const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database" };
+const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database", docker: "container" };
 
 /** A window's lucide icon: its agent's for a terminal or web app, else its kind's. */
 export const tabIcon = (t: Tab) =>

@@ -22,6 +22,7 @@ import { openProjectDialog } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
+import { openDockerPanel } from "./docker";
 import { openGitPanel } from "./git";
 import { connsOf, openDbWindow } from "./db";
 import { labelOf, openNewWorktree, removeWorktree } from "./worktrees";
@@ -135,6 +136,7 @@ export function commands(): Command[] {
     for (const c of connsOf(p) ?? []) {
       add({ id: `db:${c.id}`, group: "New", title: `Database ${c.name}`, hint: c.kind + (c.tag === "prod" ? " · prod" : ""), icon: "database", run: () => void openDbWindow(p, c.id) });
     }
+    add({ id: "docker", group: "New", title: "Docker", hint: "containers, ports and logs", icon: "container", keys: capsOf("docker"), run: () => void openDockerPanel(p) });
     add({ id: "agents", group: "New", title: "Commands", hint: "edit the + menu", icon: "settings-2", keys: capsOf("agents"), run: () => void openAgentsPanel(p) });
 
     if (f) {

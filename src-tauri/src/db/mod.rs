@@ -11,7 +11,7 @@
 #![cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo")), allow(unused, unreachable_code))]
 
 mod target;
-mod tunnel;
+pub(crate) mod tunnel;
 #[cfg(feature = "db-mongo")]
 mod mongo;
 #[cfg(feature = "db-pg")]
