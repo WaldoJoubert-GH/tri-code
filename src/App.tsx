@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { For, Show, createEffect, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import {
   SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
-  persistChanges, repoOf, setLayout, space, tabName,
+  persistChanges, repoOf, sessionName, setLayout, space, tabName,
 } from "./state";
 import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
@@ -62,10 +62,12 @@ export default function App() {
       const owner = app.projects.find((p) => p.tabs.some((t) => t.id === tabId))?.id ?? app.activeProject;
       if (owner) openUrlInProject(owner, url, tabId);
     });
-    // After a webview reload, PTYs and browser webviews from the previous page are unreachable.
-    await invoke("pty_kill_all");
+    // After a webview reload, browser webviews from the previous page are unreachable.
     await invoke("browser_close_all").catch((e) => console.warn("browser_close_all failed:", e));
     await loadState();
+    // Terminals run on in the terminal host and tabs attach to them; one with no tab left has to go.
+    const keep = app.projects.flatMap((p) => p.tabs.filter((t) => isTerminal(t) && !t.demo).map((t) => sessionName(p, t)));
+    await invoke("pty_reap", { keep }).catch((e) => console.warn("pty_reap failed:", e));
     await syncEnvs();
     for (const p of app.projects) {
       if (p.bg !== "image") continue;

@@ -9,7 +9,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, sessionName, setLive } from "./state";
+import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, sessionName, setLive, setTabResume } from "./state";
 import { terminalFont } from "./look";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
@@ -94,6 +94,11 @@ class TermSession {
   /** Which start() is current: a PTY from an earlier one is ignored. */
   private run = 0;
   private retry?: ReturnType<typeof setTimeout>;
+  /** Writing output from before this page. xterm answers the probes and reports in it as if they
+   *  were new, so its replies are dropped and those handlers stay quiet until it is done. */
+  private replaying = false;
+  /** Attached to a running program: it should redraw once this window has its real size. */
+  private redraw = false;
 
   constructor(private project: Project, private tab: Tab) {
     // One line runs as the PTY's program; several are typed into a login shell, so a `cd` or
@@ -129,11 +134,12 @@ class TermSession {
 
     this.term.onData((data) => {
       if (this.demo) return this.demo.input(data);
+      if (this.replaying) return;
       if (this.status === "exited" && data === "\r") return void this.start();
       this.write(data);
     });
     this.term.onBell(() => {
-      if (!this.visible || !document.hasFocus()) this.update({ attention: true });
+      if (!this.replaying && (!this.visible || !document.hasFocus())) this.update({ attention: true });
     });
     this.term.onTitleChange((title) => this.update({ title }));
 
@@ -192,6 +198,7 @@ class TermSession {
 
     // OSC 52: how a TUI asks the terminal to set the system clipboard.
     this.term.parser.registerOscHandler(52, (data) => {
+      if (this.replaying) return true; // an old copy must not take over the clipboard now
       const sep = data.indexOf(";");
       if (sep < 0) return false;
       const payload = data.slice(sep + 1).replace(/\?+$/, "");
@@ -234,21 +241,34 @@ class TermSession {
    */
   private installProgramStatus() {
     this.term.parser.registerOscHandler(7501, (data) => {
+      if (this.replaying) return true;
       if (data.startsWith("?")) {
         this.term.input("\x1b]7501;?\x1b\\", false);
         return true;
       }
-      const f = Object.fromEntries(data.split(":").map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)]));
-      if (f.id !== undefined) return true;
-      let msg = "";
-      try {
-        msg = f.msg ? decodeBase64(f.msg) : "";
-      } catch {
-        msg = "";
-      }
-      this.report(f.state, msg);
+      const r = parseReport(data);
+      if (r) this.report(r.state, r.msg);
       return true;
     });
+  }
+
+  /** What the program last reported while no app was open. It's old news, so it makes no sound. */
+  private restoreReport(data: string) {
+    const r = parseReport(data);
+    if (r && ["working", "blocked", "done", "error"].includes(r.state)) {
+      this.update({ agent: { state: r.state as AgentState, msg: r.msg, at: Date.now(), seen: false } });
+    }
+  }
+
+  /** Writes what the terminal printed before this page. Resolves once xterm has taken it all in. */
+  private replay(recent: string) {
+    const bytes = Uint8Array.from(atob(recent), (c) => c.charCodeAt(0));
+    if (!bytes.length) return Promise.resolve();
+    this.replaying = true;
+    return new Promise<void>((done) => this.term.write(bytes, () => {
+      this.replaying = false;
+      done();
+    }));
   }
 
   /** Store a report; a change of state may sound and notify. idle and clear drop it. */
@@ -293,6 +313,7 @@ class TermSession {
     this.script = multi ? cmd : "";
     this.backoff = 1000;
     this.status = "connecting";
+    setTabResume(this.project.id, this.tab.id, undefined);
     this.term.write(`\r\n\x1b[90m[moved from ${oldHost} to ${this.project.host}, restarting]\x1b[0m\r\n`);
     void this.start();
     await ended;
@@ -309,27 +330,50 @@ class TermSession {
     this.update({ status: this.status === "reconnecting" ? "reconnecting" : "connecting" });
     const run = ++this.run;
 
-    const onData = new Channel<ArrayBuffer | number[]>();
-    onData.onmessage = (chunk) => {
-      if (run !== this.run) return;
+    // Output waits for the spawn's answer: if that attached to a running terminal, what it printed
+    // earlier goes first. A chunk can arrive before the answer does.
+    let held: Uint8Array[] | undefined = [];
+    const show = (bytes: Uint8Array) => {
       if (this.status !== "running") {
         this.update({ status: "running" });
         this.backoff = 1000;
       }
       if (this.script) this.typeScript();
-      this.term.write(chunk instanceof ArrayBuffer ? new Uint8Array(chunk) : Uint8Array.from(chunk));
+      this.term.write(bytes);
     };
+    const onData = new Channel<ArrayBuffer | number[]>();
+    onData.onmessage = (chunk) => {
+      if (run !== this.run) return;
+      const bytes = chunk instanceof ArrayBuffer ? new Uint8Array(chunk) : Uint8Array.from(chunk);
+      if (held) held.push(bytes);
+      else show(bytes);
+    };
+    // The exit waits behind any held output too, as it did behind the output itself.
     const onExit = new Channel<number>();
-    onExit.onmessage = (code) => run === this.run && this.exited(code);
+    let exitCode: number | undefined;
+    onExit.onmessage = (code) => {
+      if (run !== this.run) return;
+      if (held) exitCode = code;
+      else this.exited(code);
+    };
 
     const { cols, rows } = this.term;
+    const remote = isRemote(this.project);
+    // pi takes its session id up front; Claude's arrives from its hook once it has started.
+    if (!remote && !this.tab.resume && !this.tab.once && /^pi(\.cmd|\.exe)?(\s|$)/.test(this.cmd)) {
+      setTabResume(this.project.id, this.tab.id, { kind: "pi", id: crypto.randomUUID() });
+    }
+    const resume = !remote && this.cmd && !this.tab.once ? this.tab.resume : undefined;
+    if (resume && this.run === 1) await resumeSlot();
+    if (run !== this.run || this.disposed) return;
     try {
-      const id = await invoke<number>("pty_spawn", {
+      const started = await invoke<Started>("pty_spawn", {
         spec: {
           host: this.project.host,
           cwd: this.project.path,
           cmd: this.cmd || null,
           session: sessionName(this.project, this.tab),
+          resume: resume ? { kind: resume.kind, id: resume.id } : null,
         },
         cols,
         rows,
@@ -345,12 +389,27 @@ class TermSession {
         },
       });
       // Closed, or moved to another host, while this was starting.
+      const { id } = started;
       if (this.disposed || run !== this.run) return void call("pty_kill", { id });
       this.ptyId = id;
       this.update({ pty: this.ptyId });
-      // The tab is usually shown and fitted while the spawn is in flight, and
-      // refit skips the resize until there is an id; send the real size now.
-      this.lastSize = `${cols}x${rows}`;
+      if (started.recent !== null) {
+        // Attached: nothing is left to start, and a running program may print nothing at all.
+        this.script = "";
+        this.update({ status: "running" });
+        await this.replay(started.recent);
+        if (started.report) this.restoreReport(started.report);
+        this.lastSize = "";
+        this.redraw = true;
+      } else {
+        // The tab is usually shown and fitted while the spawn is in flight, and
+        // refit skips the resize until there is an id; send the real size now.
+        this.lastSize = `${cols}x${rows}`;
+      }
+      const waiting = held;
+      held = undefined;
+      for (const bytes of waiting) show(bytes);
+      if (exitCode !== undefined) return this.exited(exitCode);
       this.refit();
       // Output can arrive before the id does; Windows ConPTY prints nothing
       // until xterm answers its cursor-position query, so flush that now.
@@ -385,7 +444,9 @@ class TermSession {
       // An agent quit: restarting it rarely helps, so carry on in a plain shell.
       this.term.write(`\r\n\x1b[90m[${this.tab.name ?? "agent"} exited with code ${code}, starting a shell]\x1b[0m\r\n`);
       this.update({ agent: undefined });
-      becomeShell(this.project.id, this.tab.id);
+      // Quitting on purpose ends the conversation. A failed resume, or being killed by a shutdown,
+      // doesn't: the tab stays an agent and tries again at the next launch.
+      if (code === 0 || !this.tab.resume) becomeShell(this.project.id, this.tab.id);
       this.cmd = "";
       return void this.start();
     }
@@ -465,7 +526,17 @@ class TermSession {
   private refit() {
     if (!this.visible || !this.fit.proposeDimensions()) return;
     this.fit.fit();
-    const size = `${this.term.cols}x${this.term.rows}`;
+    const { cols, rows } = this.term;
+    const size = `${cols}x${rows}`;
+    // Recent output can start mid-sequence, and a program only redraws when its size changes.
+    if (this.redraw && this.ptyId !== undefined && !phoneHeld.has(this.ptyId) && cols > 1) {
+      this.redraw = false;
+      const id = this.ptyId;
+      this.lastSize = size;
+      call("pty_resize", { id, cols: cols - 1, rows });
+      setTimeout(() => call("pty_resize", { id, cols: this.term.cols, rows: this.term.rows }), 60);
+      return;
+    }
     // A phone watching this PTY has given it the phone's size until it lets go.
     if (size === this.lastSize || this.ptyId === undefined || phoneHeld.has(this.ptyId)) return;
     this.lastSize = size;
@@ -495,6 +566,32 @@ class TermSession {
   }
 }
 
+/** What `pty_spawn` did. `recent` is set when it attached to a terminal that was already running. */
+type Started = { id: number; recent: string | null; report: string | null };
+
+/** Resumed agents start one at a time, a little apart, so a launch doesn't spawn them all at once. */
+const RESUME_GAP_MS = 150;
+let nextResume = 0;
+function resumeSlot() {
+  const at = Math.max(Date.now(), nextResume);
+  nextResume = at + RESUME_GAP_MS;
+  return new Promise((done) => setTimeout(done, at - Date.now()));
+}
+
+/** An OSC 7501 report: `state=working:app=pi:msg=<base64>`. Records with an `id` describe sub-tasks,
+ *  so only the root one counts. */
+function parseReport(data: string): { state: string; msg: string } | undefined {
+  const f = Object.fromEntries(data.split(":").map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)]));
+  if (f.id !== undefined) return undefined;
+  let msg = "";
+  try {
+    msg = f.msg ? decodeBase64(f.msg) : "";
+  } catch {
+    msg = "";
+  }
+  return { state: f.state, msg };
+}
+
 /** OSC 52 payloads are UTF-8 text encoded as base64. */
 function decodeBase64(b64: string): string {
   const binary = atob(b64);
@@ -510,6 +607,12 @@ listen<{ pty: number; held: boolean }>("phone-hold", ({ payload }) => {
   phoneHeld.delete(payload.pty);
   for (const s of sessions.values()) s.restoreSize(payload.pty);
 }).catch((e) => console.warn("phone-hold unavailable:", e));
+
+/** Claude's hook reported its session id (agent_windows.rs): the tab keeps it to reopen the conversation. */
+listen<{ tab: string; kind: string; id: string }>("agent-session", ({ payload }) => {
+  const p = app.projects.find((x) => x.tabs.some((t) => t.id === payload.tab));
+  if (p) setTabResume(p.id, payload.tab, { kind: payload.kind, id: payload.id });
+}).catch((e) => console.warn("agent-session unavailable:", e));
 
 /** Hidden container that holds the elements of sessions that are not mounted. */
 let park: HTMLElement | undefined;

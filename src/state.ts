@@ -112,6 +112,8 @@ export type Tab = {
   by?: "agent";
   /** `term` tabs only: the command it runs ("" = login shell). Kept from launch, so editing an agent only changes new windows. */
   cmd?: string;
+  /** Local `term` tabs: the agent's conversation, so a new process can reopen it when the old one is gone. */
+  resume?: AgentSession;
   /** `term` tabs with a multi-line `cmd`: its lines were typed into the shell, so a restart or reattach doesn't type them again. */
   typed?: true;
   /** `term` tabs only: a Worktree's setup (setup.ts). Its window closes when the command succeeds. */
@@ -125,6 +127,9 @@ export type Tab = {
   /** `term` tabs of the tour's sample project only: a scripted session played in place of a PTY (see demo.ts). */
   demo?: DemoKind;
 };
+
+/** An agent's own session id, which its CLI can reopen (resume.rs builds the command). */
+export type AgentSession = { kind: string; id: string };
 
 /** The tour's scripted terminals: claude at work, pi waiting to ask, a dev server. */
 export type DemoKind = "claude" | "pi" | "server";
@@ -835,7 +840,22 @@ function editTab(projectId: string, tabId: string, fn: (t: Tab) => void) {
 
 /** A terminal whose agent quit carries on as a plain login shell. */
 export function becomeShell(projectId: string, tabId: string) {
-  editTab(projectId, tabId, (t) => Object.assign(t, { agent: undefined, name: "shell", cmd: "" }));
+  editTab(projectId, tabId, (t) => Object.assign(t, { agent: undefined, name: "shell", cmd: "", resume: undefined }));
+}
+
+/** The conversation this tab reopens after a restart; unset starts a new one. */
+export function setTabResume(projectId: string, tabId: string, resume: AgentSession | undefined) {
+  editTab(projectId, tabId, (t) => { t.resume = resume; });
+}
+
+/** Two tabs can't reopen one conversation: the first keeps it, a later one starts new. Pure, for bun test. */
+export function dropDuplicateResumes(tabs: Tab[], seen = new Set<string>()) {
+  for (const t of tabs) {
+    if (!t.resume) continue;
+    const key = `${t.resume.kind}:${t.resume.id}`;
+    if (seen.has(key)) delete t.resume;
+    else seen.add(key);
+  }
 }
 
 /** The Connection a database window shows; unset goes back to its start page. */
@@ -1118,6 +1138,8 @@ export function migrate(raw: any): Persisted {
       ...(p.sample ? { sample: true } : {}),
     };
   });
+  const resumes = new Set<string>();
+  for (const p of projects) dropDuplicateResumes(p.tabs, resumes);
   // A Worktree whose repo project is gone stands on its own.
   for (const p of projects) if (p.parent && !projects.some((q) => q.id === p.parent)) delete p.parent;
   // Before environments existed, hosts only came from projects.

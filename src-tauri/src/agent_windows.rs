@@ -26,8 +26,17 @@ use tokio::sync::oneshot;
 use crate::pty::Ptys;
 
 /// The endpoint's port, and the address every terminal is told in `TRICODE_URL`.
-pub const PORT: u16 = 7521;
-pub const URL: &str = "http://127.0.0.1:7521";
+const PORT: u16 = 7521;
+
+/// A debug build can take another port with `TRICODE_AGENT_PORT`, to run beside the installed app.
+fn port() -> u16 {
+    let chosen = if cfg!(debug_assertions) { std::env::var("TRICODE_AGENT_PORT").ok().and_then(|p| p.parse().ok()) } else { None };
+    chosen.unwrap_or(PORT)
+}
+
+pub fn url() -> String {
+    format!("http://127.0.0.1:{}", port())
+}
 
 const OPEN_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_WAIT: Duration = Duration::from_secs(300);
@@ -393,8 +402,34 @@ async fn close(State(hub): State<Arc<AgentWindows>>, headers: HeaderMap, Path(id
     Ok(axum::Json(json!({ "closed": true })))
 }
 
+#[derive(Deserialize)]
+struct SessionBody {
+    kind: String,
+    id: String,
+}
+
+/// An agent's hook reporting its session id (mcp/session-hook.mjs), which the tab keeps so a new
+/// process can reopen the conversation. The token says which tab; the id goes on a command line
+/// later, so anything but a plain id is refused here as well as at launch.
+async fn session(State(hub): State<Arc<AgentWindows>>, headers: HeaderMap, axum::Json(body): axum::Json<SessionBody>) -> Reply {
+    let tab = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .and_then(|t| hub.reg.lock().unwrap().tokens.get(t).cloned())
+        .ok_or_else(|| fail(StatusCode::UNAUTHORIZED, "not a tri-code terminal: TRICODE_TOKEN is missing or unknown"))?;
+    if !crate::resume::valid_id(&body.id) || body.kind != "claude" {
+        return Err(fail(StatusCode::BAD_REQUEST, "not a session id"));
+    }
+    hub.app
+        .emit("agent-session", json!({ "tab": tab, "kind": body.kind, "id": body.id }))
+        .map_err(|e| fail(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(axum::Json(json!({ "saved": true })))
+}
+
 fn router(hub: Arc<AgentWindows>) -> Router {
     Router::new()
+        .route("/v1/session", axum::routing::post(session))
         .route("/v1/windows", get(list).post(open))
         .route("/v1/windows/{id}", get(status).delete(close))
         .route("/v1/windows/{id}/output", get(output))
@@ -406,10 +441,10 @@ fn router(hub: Arc<AgentWindows>) -> Router {
 /// Starts the endpoint on 127.0.0.1. If the port is taken, agent windows are off and the app runs on.
 pub fn serve(hub: Arc<AgentWindows>) {
     tauri::async_runtime::spawn(async move {
-        let listener = match tokio::net::TcpListener::bind(("127.0.0.1", PORT)).await {
+        let listener = match tokio::net::TcpListener::bind(("127.0.0.1", port())).await {
             Ok(l) => l,
             Err(e) => {
-                eprintln!("agent windows: couldn't listen on port {PORT}: {e}");
+                eprintln!("agent windows: couldn't listen on port {}: {e}", port());
                 return;
             }
         };
