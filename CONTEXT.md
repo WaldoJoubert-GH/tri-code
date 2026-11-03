@@ -106,6 +106,10 @@ _Avoid_: Leader key, prefix.
 Every action a hotkey runs (focus left, close window, go to workspace 2, copy, ...), with its default keys and the keys it has now (`keymap.ts`). An action can have several keys or none; Settings › Hotkeys changes them and only the changed ones are saved, as `settings.hotkeys`. Window actions are Hotkey Modifier chords; the text actions (copy, paste, favourite) are plain Ctrl / Cmd chords. Labels and tooltips print an action's current first key, so they follow a rebind. Agents keep their own one hotkey, which may not be a Keymap action's.
 _Avoid_: Keybindings, shortcuts (in code and docs; the UI says hotkeys).
 
+**Hold Hints**:
+While the Hotkey Modifier is held with no other key for 120 ms, the focused window's title bar draws its keys: a chip per direction it can move in, then N, F and W on its – ▢ ×. Letting go hides them; a chord pressed inside those 120 ms runs as always and draws nothing (`hints.ts`). Only the focused window draws, because Alt+W closes that window, and the arrows sit in its title bar because a native webview's page draws above the canvas HTML. The chips follow Settings › Hotkeys and the arrows follow the tiling, so a direction with no window that way has none. Chosen from design/alt-hold.html (variant A).
+_Avoid_: Cheat sheet, overlay, tooltip (it is not a tooltip and does not wait for hover).
+
 **File Index**:
 A project's files for Go to File, as relative paths: `git ls-files --cached --others --exclude-standard` on the project's host plus the ignored files, walking into wholly ignored folders but not the skipped ones (Settings › Files; by default dependency and build folders like `node_modules`, `.venv`, `target`), or a walk that skips the same folders when the folder is not a repo. Fetched each time the box opens; the last one shows meanwhile.
 

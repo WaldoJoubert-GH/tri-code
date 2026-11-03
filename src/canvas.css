@@ -41,6 +41,23 @@
 .bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
 .bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); line-height: 1; flex: none; }
 .bar button:hover { background: var(--hover); color: var(--text); }
+/* Hold Hints (design/alt-hold.html, variant A; src/hints.ts): holding the Hotkey Modifier draws the
+   focused window's keys — the arrows it can move with, then N / F / W on its – ▢ ×. */
+.dirhints { display: flex; align-items: center; gap: 7px; flex: none; padding: 0 1px; }
+.dirhints .dh { display: flex; align-items: center; gap: 3px; color: var(--accent); }
+.dirhints .dh b { font: 600 11px var(--mono); }
+.bar .ctl.hk {
+  width: auto; min-width: 22px; padding: 0 3px; gap: 2px; display: inline-flex;
+  align-items: center; justify-content: center; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+.bar .ctl.hk .g { display: none; }
+.bar .ctl.hk:hover { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); color: var(--text); }
+.bar .ctl.hk kbd, .dirhints kbd {
+  font: 600 10px var(--mono); padding: 0 3px; min-width: 14px; text-align: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-bottom-width: 1px; border-radius: 3px; background: var(--bg); color: var(--accent);
+}
 /* A browser window with two or more pages: its pages as tabs in place of the title. */
 .ptabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; }
 .ptab {
