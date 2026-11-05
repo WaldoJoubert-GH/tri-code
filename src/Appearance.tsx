@@ -1,9 +1,11 @@
-// Per-project appearance: name, icon, accent colour, background preset or uploaded image, and dim;
+// Per-project appearance: name, icon, accent colour, background preset or uploaded image, dim, the
+// Backdrop Effect and Transparency;
 // and on its Signals tab, the project's sounds and alerts for agent signals.
 // The popover is anchored under the toolbar button, or beside a sidebar gear.
 
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { CLEAR_MAX, type Clear, type Fx, type FxKind, fxOn, paintBackdrop } from "./backdrop";
 import { createStore, produce } from "solid-js/store";
 import { ACCENTS, GAP_MAX, Project, activeProject, app, projectById, renameProject, repoOf, setAppearance, setGap, setIcon } from "./state";
 import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
@@ -52,6 +54,73 @@ export function backgroundCss(p: Project): string {
     return url ? `center / cover no-repeat url("${url}"), var(--canvas)` : "var(--canvas)";
   }
   return (BACKGROUNDS[p.bg] ?? BACKGROUNDS.none).css(p.accent);
+}
+
+/** Bumped when the theme changes, so a canvas backdrop draws again in the new colours. */
+const [themeTick, setThemeTick] = createSignal(0);
+new MutationObserver(() => setThemeTick((n) => n + 1)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => setThemeTick((n) => n + 1));
+
+/**
+ * The project's backdrop (its repo's, for a Worktree), behind the canvas or the whole window (Transparency's
+ * "Sidebar and bars too"). Plain CSS, or a canvas when the project has a Backdrop Effect: the effect needs pixels.
+ */
+export function Backdrop(props: { project?: Project }) {
+  const withFx = () => (props.project && fxOn(props.project.fx) ? props.project : undefined);
+  const css = () => {
+    const p = props.project;
+    return p ? { background: backgroundCss(p), "--dim": String(p.dim / 100) } : { background: "var(--canvas)", "--dim": "0" };
+  };
+  return (
+    <Show when={withFx()} keyed fallback={<div class="bg" style={css()} />}>
+      {(p) => <FxBackdrop project={p} />}
+    </Show>
+  );
+}
+
+function FxBackdrop(props: { project: Project }) {
+  let el!: HTMLCanvasElement;
+  const [size, setSize] = createSignal({ width: 0, height: 0 });
+  const [image, setImage] = createSignal<HTMLImageElement>();
+
+  createEffect(() => {
+    const url = props.project.bg === "image" ? bgImages[props.project.id] : undefined;
+    setImage(undefined);
+    if (!url) return;
+    let live = true;
+    const im = new Image();
+    im.onload = () => live && setImage(im);
+    im.src = url;
+    onCleanup(() => (live = false));
+  });
+
+  onMount(() => {
+    const ro = new ResizeObserver(([e]) => setSize({ width: e.contentRect.width, height: e.contentRect.height }));
+    ro.observe(el);
+    onCleanup(() => ro.disconnect());
+  });
+
+  // One paint per frame however many settings change in it (a slider drag).
+  let frame = 0;
+  createEffect(() => {
+    const p = props.project;
+    themeTick();
+    const job = { bg: p.bg, accent: p.accent, dim: p.dim, fx: { ...p.fx! }, image: image(), ...size() };
+    cancelAnimationFrame(frame);
+    if (!job.width || !job.height) return;
+    frame = requestAnimationFrame(() => {
+      const style = getComputedStyle(document.documentElement), token = (n: string) => style.getPropertyValue(n).trim();
+      paintBackdrop(el, {
+        ...job,
+        scale: window.devicePixelRatio || 1,
+        light: style.colorScheme !== "dark",
+        tokens: { canvas: token("--canvas"), dusk: [token("--dusk-a"), token("--dusk-b"), token("--dusk-c"), token("--dusk-d")] },
+      });
+    });
+  });
+  onCleanup(() => cancelAnimationFrame(frame));
+
+  return <canvas class="bg fx" ref={el} aria-hidden="true" />;
 }
 
 export type AppearanceSection = "look" | "signals";
@@ -215,10 +284,11 @@ export function AppearancePopover() {
                     </label>
                   </div>
                   <div class="row">
-                    Dim
-                    <input type="range" min="0" max="85" step="5" value={String(p.dim)} onInput={(e) => setAppearance(p.id, { dim: +e.currentTarget.value })} />
+                    <span class="lb">Dim</span>
+                    <input type="range" min="0" max="85" step="5" value={String(p.dim)} aria-label="Dim" onInput={(e) => setAppearance(p.id, { dim: +e.currentTarget.value })} />
                     <span class="val">{p.dim}%</span>
                   </div>
+                  <BackdropSection project={p} />
                   <label class="row" title={`Between windows, in every project${keyOf("gap-less") || keyOf("gap-more") ? ` (${[keyOf("gap-less"), keyOf("gap-more")].filter(Boolean).join(" / ")})` : ""}`}>
                     Gap
                     <span class="px">
@@ -237,6 +307,64 @@ export function AppearancePopover() {
         </Show>
       )}
     </Show>
+  );
+}
+
+const FX_NAMES: Record<FxKind, string> = { dither: "Dither", halftone: "Halftone" };
+/** What a newly picked effect starts at: Zeron's "medium". */
+const FX_START = 75;
+
+/** Effect (Zeron's dither or halftone over the background) and Transparency (the backdrop through windows). */
+function BackdropSection(props: { project: Project }) {
+  const p = () => props.project;
+  const fx = (): Fx => p().fx ?? { kind: "dither", strength: 0 };
+  const on = () => fxOn(p().fx);
+  const setFx = (patch: Partial<Fx>) => setAppearance(p().id, { fx: { ...fx(), ...patch } });
+  const clear = (): Clear => p().clear ?? { panels: 0, terms: 0 };
+  const setClear = (patch: Partial<Clear>) => setAppearance(p().id, { clear: { ...clear(), ...patch } });
+  const slider = (label: string, value: number, max: number, set: (v: number) => void) => (
+    <div class="row">
+      <span class="lb">{label}</span>
+      <input type="range" min="0" max={String(max)} step="5" value={String(value)} aria-label={label} onInput={(e) => set(+e.currentTarget.value)} />
+      <span class="val">{value}%</span>
+    </div>
+  );
+
+  return (
+    <>
+      <h4>Effect</h4>
+      <div class="seg wide" role="group" aria-label="Effect">
+        <button type="button" aria-pressed={!on()} onClick={() => setFx({ strength: 0 })}>Off</button>
+        <For each={Object.entries(FX_NAMES) as [FxKind, string][]}>
+          {([kind, name]) => (
+            <button type="button" aria-pressed={on() && fx().kind === kind} onClick={() => setFx({ kind, strength: on() ? fx().strength : FX_START })}>
+              {name}
+            </button>
+          )}
+        </For>
+      </div>
+      <Show when={on()}>
+        {slider("Strength", fx().strength, 100, (v) => setFx({ strength: Math.max(5, v) }))}
+        <div class="seg wide" role="group" aria-label="Effect colours">
+          <button type="button" aria-pressed={fx().tone !== "accent"} onClick={() => setFx({ tone: undefined })}>Picture colours</button>
+          <button type="button" aria-pressed={fx().tone === "accent"} onClick={() => setFx({ tone: "accent" })}>Accent only</button>
+        </div>
+      </Show>
+      <h4>Transparency</h4>
+      {slider("Panels", clear().panels, CLEAR_MAX, (v) => setClear({ panels: v }))}
+      {slider("Terminals", clear().terms, CLEAR_MAX, (v) => setClear({ terms: v }))}
+      <Show when={clear().panels > 0 || clear().terms > 0}>
+        <label class="chk">
+          <input type="checkbox" checked={!!clear().blur} onChange={(e) => setClear({ blur: e.currentTarget.checked || undefined })} />
+          Blur what shows through
+        </label>
+        <label class="chk" title="At the panels' value">
+          <input type="checkbox" checked={!!clear().chrome} disabled={clear().panels === 0} onChange={(e) => setClear({ chrome: e.currentTarget.checked || undefined })} />
+          Sidebar and bars too
+        </label>
+        <div class="note">Browser windows stay solid.</div>
+      </Show>
+    </>
   );
 }
 

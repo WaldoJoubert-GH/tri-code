@@ -9,6 +9,26 @@
   background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
   overflow: hidden;
 }
+/* Transparency (backdrop.ts clearLook): the window paints the theme's background at the chosen value,
+   and inside it --bg is clear and --panel see-through, so the layers in a window don't stack up solid.
+   Browser windows are native webviews drawn over the page and stay as they are. */
+.app.see-panels .win:not([data-kind="term"], [data-kind="browser"]) { --see: var(--see-panels); }
+.app.see-terms .win[data-kind="term"] { --see: var(--see-terms); }
+.app.see-panels .win:not([data-kind="term"], [data-kind="browser"]),
+.app.see-terms .win[data-kind="term"] {
+  --bg: transparent;
+  --panel: color-mix(in srgb, var(--panel-solid) var(--see), transparent);
+  background: color-mix(in srgb, var(--bg-solid) var(--see), transparent);
+}
+/* Frost what shows through, on a layer under the content: backdrop-filter on the window itself would
+   become the containing block of its fixed menus. */
+.app.see-blur .win[data-kind]:not([data-kind="browser"])::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(12px);
+}
+/* Menus, tips and sticky headers inside a window cover what is under them, so they keep the solid colours. */
+.win :is(.tip, .dhead, .cattach button, .tlhead, .tlcorner, .tlleft, .idrop, .ag-more, .ag-pop, .iconpick, .db-grid th, .db-grid td.rn, .gtf, .g-menu, .g-drawer, .g-repomenu, .cm-tooltip, .cm-panels, .holdtarget, .dk-tb th) {
+  --bg: var(--bg-solid); --panel: var(--panel-solid);
+}
 .viewport.gap0 .win { border-radius: 0; }
 .win.focused { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 /* Mono (carousel): the focused window is centered, its neighbours dim in the side gutters,
@@ -130,7 +150,7 @@
 .dlbtn .ring .track { stroke: var(--line); }
 .dlbtn .ring .val { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 250ms linear; }
 .dlbtn.spin .ring { animation: dl-spin 1s linear infinite; }
-.dlbtn .dot { position: absolute; right: 2px; top: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel); }
+.dlbtn .dot { position: absolute; right: 2px; top: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel-solid); }
 .dlbtn .dot.bad { background: var(--bad); }
 @keyframes dl-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
 .dlbar {
@@ -208,7 +228,7 @@
 .favpop .acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
 .favpop .acts button { padding: 4px 12px; border-radius: 4px; border: 1px solid var(--line); color: var(--text); }
 .favpop .acts button:hover { background: var(--hover); }
-.favpop .acts .primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.favpop .acts .primary { background: var(--accent); border-color: var(--accent); color: var(--bg-solid); }
 .page { flex: 1; min-height: 0; overflow: auto; background: var(--bg); transition: opacity 120ms; }
 .win:not(.focused) .page { opacity: .72; }
 
@@ -274,7 +294,7 @@
 /* New: the one filled button in the toolbar */
 .nbtn {
   display: inline-flex; align-items: center; gap: 4px; height: 24px; flex: none; margin: 0 2px 0 6px; padding: 0 9px 0 7px;
-  border-radius: 4px; background: var(--accent); color: var(--bg); font-size: 12px; font-weight: 600;
+  border-radius: 4px; background: var(--accent); color: var(--bg-solid); font-size: 12px; font-weight: 600;
 }
 .ib { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
 .ib:hover { background: var(--hover); color: var(--text); }
@@ -346,7 +366,7 @@
 }
 .cbar { display: flex; align-items: center; gap: 6px; padding: 4px 6px 5px 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .cbar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cbar .post { padding: 3px 12px; border-radius: 5px; background: var(--accent); color: var(--bg); font-weight: 600; font-size: 12px; flex: none; }
+.cbar .post { padding: 3px 12px; border-radius: 5px; background: var(--accent); color: var(--bg-solid); font-weight: 600; font-size: 12px; flex: none; }
 .cbar .post:disabled { opacity: .4; cursor: default; }
 .cc { margin-left: 7px; color: var(--muted); font-size: 11px; }
 .cc::before {
@@ -527,7 +547,7 @@ body.tl-sizing, body.tl-sizing * { cursor: ew-resize !important; }
   border-radius: 4px; padding: 5px 8px; outline: none; user-select: text;
 }
 .isetup input:focus { border-color: var(--accent); }
-.isetup .go { justify-self: start; margin-top: 2px; padding: 5px 14px; border-radius: 5px; background: var(--accent); color: var(--bg); font-weight: 600; }
+.isetup .go { justify-self: start; margin-top: 2px; padding: 5px 14px; border-radius: 5px; background: var(--accent); color: var(--bg-solid); font-weight: 600; }
 .isetup .files { font: 10.5px/1.7 var(--mono); color: var(--muted); }
 /* The Sources form: one fieldset per Source, its fields shown while ticked */
 .isetup form.isrc { width: min(440px, 100%); }
@@ -544,7 +564,7 @@ body.tl-sizing, body.tl-sizing * { cursor: ew-resize !important; }
 .rmeta { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .avs { display: inline-flex; align-items: center; flex: none; }
 .avs .av.sm + .av.sm { margin-left: -5px; }
-.av.sm { width: 18px; height: 18px; font-size: 8.5px; box-shadow: 0 0 0 1.5px var(--panel); flex: none; }
+.av.sm { width: 18px; height: 18px; font-size: 8.5px; box-shadow: 0 0 0 1.5px var(--panel-solid); flex: none; }
 .irow:hover .av.sm { box-shadow: 0 0 0 1.5px var(--hover); }
 .unasg { display: inline-flex; color: var(--muted); opacity: .55; }
 .iss .idrop .lucide, .iss .fbtn .lucide, .iss .ib .lucide, .iss .nbtn .lucide { flex: none; }
@@ -603,7 +623,7 @@ textarea.finput { resize: vertical; min-height: 74px; }
 .fnote { font-size: 11px; color: var(--muted); }
 .btn { height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 5px; font-size: 12px; background: var(--bg); }
 .btn:hover { background: var(--hover); }
-.btn.primary { background: var(--accent); color: var(--bg); border-color: transparent; font-weight: 600; }
+.btn.primary { background: var(--accent); color: var(--bg-solid); border-color: transparent; font-weight: 600; }
 .btn:disabled { opacity: .45; cursor: default; background: var(--bg); }
 .btn.primary:disabled { background: var(--accent); }
 /* Detail: who the issue is assigned to, and the Created row */

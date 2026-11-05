@@ -32,6 +32,11 @@
   /* the project's chosen accent; darkened in light mode so borders and text keep contrast */
   --accent-raw: #7aa2f7;
   --accent: color-mix(in oklab, var(--accent-raw) 76%, #000);
+  /* --bg and --panel as the theme has them. Transparency makes --bg and --panel see-through inside windows,
+     so a menu, a sticky header or text drawn in the background colour takes these instead. Resolved here,
+     on :root, so they follow the dark blocks below. */
+  --bg-solid: var(--bg);
+  --panel-solid: var(--panel);
   /* web content inside browser windows */
   --page-bg: #ffffff;
   --page-fg: #1b1e24;
@@ -107,7 +112,7 @@ kbd.big svg { width: 20px; height: 20px; }
 .project:has(.swatch kbd + kbd) .name, .wt:has(.wtile kbd + kbd) .bn { margin-left: 4px; }
 
 .app {
-  display: grid; height: 100%;
+  display: grid; height: 100%; position: relative; isolation: isolate;
   grid-template-columns: 220px 1fr;
   grid-template-rows: 34px 1fr 26px;
   transition: grid-template-columns 160ms ease;
@@ -402,9 +407,18 @@ svg.lucide { flex: none; display: block; }
 .tab-pf { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 
 /* Stage: the canvas area the windows are drawn on */
-.stage { grid-area: canvas; position: relative; overflow: hidden; background: var(--canvas); min-width: 0; min-height: 0; isolation: isolate; }
-.bg { position: absolute; inset: 0; pointer-events: none; transition: background 200ms; }
+.stage { grid-area: canvas; position: relative; overflow: hidden; min-width: 0; min-height: 0; isolation: isolate; }
+/* The backdrop sits under the canvas's grid area, or under everything when the sidebar and bars show it too.
+   z-index -1 in .app's stacking context: under every child, over .app's own background. */
+.bg { position: absolute; inset: 0; grid-area: canvas; z-index: -1; pointer-events: none; transition: background 200ms; }
+.app.see-chrome .bg { grid-area: 1 / 1 / -1 / -1; }
 .bg::after { content: ""; position: absolute; inset: 0; background: var(--canvas); opacity: var(--dim, 0); }
+/* A Backdrop Effect draws on a canvas, with the Dim in its pixels. A canvas doesn't stretch to inset: 0. */
+canvas.bg { display: block; width: 100%; height: 100%; }
+
+/* Transparency (backdrop.ts clearLook): the sidebar, toolbar and status line show the backdrop at the panels' value.
+   Their sticky parts stay as see-through as the rest, so what scrolls under them shows a little. */
+.app.see-chrome > aside, .app.see-chrome > .top, .app.see-chrome > .status { --panel: color-mix(in srgb, var(--panel-solid) var(--see-panels), transparent); }
 .stage .empty { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center; color: var(--muted); }
 
 /* Project appearance panel */
@@ -470,6 +484,10 @@ svg.lucide { flex: none; display: block; }
 }
 .bgs .upload:hover, .bgs .upload:focus-visible { color: var(--text); outline: 1px solid var(--accent); outline-offset: 1px; }
 .pop .row { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.pop .row .lb { width: 58px; flex: none; }
+.pop .chk { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.pop .chk input { margin: 0; accent-color: var(--accent); }
+.pop .chk:has(input:disabled) { opacity: .5; cursor: default; }
 .pop input[type="range"] { flex: 1; accent-color: var(--accent); }
 .pop .val { font: 11px var(--mono); width: 34px; text-align: right; color: var(--text); }
 

@@ -9,7 +9,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, sessionName, setLive, setTabResume } from "./state";
+import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, repoOf, sessionName, setLive, setTabResume } from "./state";
 import { terminalFont } from "./look";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
@@ -101,6 +101,8 @@ class TermSession {
   /** Which start() is current: a PTY from an earlier one is ignored. */
   private run = 0;
   private retry?: ReturnType<typeof setTimeout>;
+  /** Whether the project's Transparency lets the backdrop through this terminal (see setClear). */
+  private clear = false;
   /** Writing output from before this page. xterm answers the probes and reports in it as if they
    *  were new, so its replies are dropped and those handlers stay quiet until it is done. */
   private replaying = false;
@@ -119,6 +121,7 @@ class TermSession {
     this.el.style.display = "none";
     parkElement().appendChild(this.el); // xterm measures fonts, so open it inside the document
 
+    this.clear = seesThrough(project);
     this.term = new Terminal({
       // Capped scrollback: each line costs memory per terminal.
       scrollback: 5000,
@@ -126,7 +129,9 @@ class TermSession {
       fontSize: 13,
       cursorBlink: false,
       allowProposedApi: true,
-      theme: themeNow(),
+      // Only when asked: a transparent canvas renders glyphs without the background behind them.
+      allowTransparency: this.clear,
+      theme: this.theme(),
     });
     this.term.loadAddon(this.fit);
     // Plain clicks do nothing; Ctrl+click opens in the canvas, Ctrl+Shift+click in the system browser.
@@ -517,15 +522,7 @@ class TermSession {
     if (visible) {
       // WebGL only for visible terminals: browsers cap live GL contexts (~16)
       // and each one holds GPU memory.
-      if (!this.webgl) {
-        try {
-          this.webgl = new WebglAddon();
-          this.webgl.onContextLoss(() => this.dropWebgl());
-          this.term.loadAddon(this.webgl);
-        } catch {
-          this.webgl = undefined; // falls back to the DOM renderer
-        }
-      }
+      if (!this.webgl) this.loadWebgl();
       this.refit();
       // output written while parked (display:none) is in the buffer but was never painted
       this.term.refresh(0, this.term.rows - 1);
@@ -559,7 +556,39 @@ class TermSession {
   }
 
   applyTheme() {
-    this.term.options.theme = themeNow();
+    this.term.options.theme = this.theme();
+  }
+
+  /** The theme's colours; with no background of its own when the backdrop shows through (the window paints it). */
+  private theme() {
+    const t = themeNow();
+    return this.clear ? { ...t, background: "rgba(0, 0, 0, 0)", cursorAccent: t.background } : t;
+  }
+
+  followClear() {
+    this.setClear(seesThrough(this.project));
+  }
+
+  /** Follow the project's Transparency. The WebGL renderer reads allowTransparency when it starts, so restart it. */
+  setClear(clear: boolean) {
+    if (clear === this.clear) return;
+    this.clear = clear;
+    this.term.options.allowTransparency = clear;
+    if (this.webgl) {
+      this.dropWebgl();
+      this.loadWebgl();
+    }
+    this.applyTheme();
+  }
+
+  private loadWebgl() {
+    try {
+      this.webgl = new WebglAddon();
+      this.webgl.onContextLoss(() => this.dropWebgl());
+      this.term.loadAddon(this.webgl);
+    } catch {
+      this.webgl = undefined; // falls back to the DOM renderer
+    }
   }
 
   /** A new font has a new cell size, so the columns and rows that fit change too. */
@@ -694,6 +723,14 @@ export function applyTerminalLook() {
     s.applyTheme();
     s.applyFont();
   }
+}
+
+/** Whether a terminal of `project` lets the backdrop through: its repo's Transparency, as the backdrop is the repo's. */
+const seesThrough = (project: Project) => (repoOf(project).clear?.terms ?? 0) > 0;
+
+/** A project's Transparency changed: let every terminal follow. Reads the store, so an effect calling it re-runs on a change. */
+export function applyTerminalClear() {
+  for (const s of sessions.values()) s.followClear();
 }
 
 /** Create the session for a terminal tab once; it starts parked until mounted. */
