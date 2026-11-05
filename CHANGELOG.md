@@ -2,6 +2,11 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.46 — 2026-11-05
+
+- A project's Appearance panel adds a Backdrop Effect, which redraws the background through a Dither or Halftone at a chosen Strength, in the picture's colours or the accent's alone. Transparency lets the Backdrop show through panel windows and terminals, each up to 85%, optionally frosted and taken into the sidebar, toolbar and status line. Browser windows stay solid. Both are saved with the project and travel in a Configuration Export. ([#52](https://github.com/WaldoJoubert-GH/tri-code/pull/52))
+- Agents can call `create_worktree` on the tri-code MCP server to make a Worktree with the repo's saved setup and move their window there with the program still running. A branch that already has a Worktree is reused. Claude switches its own folder; pi is restarted in the Worktree with `pi --fork` on its conversation when its turn ends. ([#51](https://github.com/WaldoJoubert-GH/tri-code/pull/51))
+
 ## 0.1.45 — 2026-11-03
 
 - Terminals now run in a small host process, so closing or updating tri-code no longer ends running agents; the next launch attaches to them and takes back their recent output. Closing the window with terminals running hides it to a tray icon, whose menu quits and either keeps them or stops them. A second launch shows the running window instead of starting another, and a tab can resume its Claude conversation after a restart. The update to this version still ends local terminals, because 0.1.44 runs them itself. ([#49](https://github.com/WaldoJoubert-GH/tri-code/pull/49))
