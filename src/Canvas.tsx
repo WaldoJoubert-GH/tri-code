@@ -7,8 +7,9 @@ import {
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
-import { isKey, withKey } from "./keymap";
-import { Caps } from "./Keys";
+import { hintKeys, isKey, withKey } from "./keymap";
+import { Caps, HintCaps } from "./Keys";
+import { hintsShown } from "./hints";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
   addressToUrl, answerPassword, openExternal, passwordPrompts, pickElement, placeBrowser, profilesSupported, setBrowsersSuspended,
@@ -23,6 +24,8 @@ const Editor = lazy(() => import("./Editor"));
 import GitPanel from "./GitPanel";
 import AgentsPanel from "./AgentsPanel";
 import DbPanel from "./DbPanel";
+import DockerPanel from "./DockerPanel";
+import { closeDockerWindow } from "./docker";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./db";
 import { gitOf } from "./git";
 import { clock, dev, panelTitle } from "./issues";
@@ -114,6 +117,25 @@ export default function Canvas(props: { project: Project }) {
   const animOn = () => settled() && drag() === null && !splitOn();
   const splitRect = () => (tiling().mono >= 0 ? undefined : tiling().split);
 
+  /** During a hold, the windows the focused one can jump to, each with the keys that reach it. */
+  const holdTargets = createMemo(() => {
+    const out: Record<string, { focus: string[]; swap: string[] }> = {};
+    if (!hintsShown() || space(props.project).mono) return out;
+    const t = tiling();
+    const i = t.tabs.findIndex((tab) => tab.id === space(props.project).focus);
+    if (i < 0) return out;
+    for (const [d, dx, dy] of [["left", -1, 0], ["up", 0, -1], ["down", 0, 1], ["right", 1, 0]] as const) {
+      const to = t.tabs[neighbour(t.rects, i, dx, dy)];
+      if (!to || !hintKeys(`focus-${d}`).length) continue;
+      const target = (out[to.id] ??= { focus: [], swap: [] });
+      target.focus.push(`focus-${d}`);
+      if (hintKeys(`swap-${d}`).length) target.swap.push(`swap-${d}`);
+    }
+    return out;
+  });
+  /** A stack window can become the main one; it has no button of its own to carry the key. */
+  const canMain = () => space(props.project).layout === "master" && tiling().tabs[0]?.id !== space(props.project).focus && hintKeys("main").length > 0;
+
   const local = (x: number, y: number) => {
     const r = viewport.getBoundingClientRect();
     return { x: x - r.left, y: y - r.top };
@@ -175,7 +197,8 @@ export default function Canvas(props: { project: Project }) {
     const isGit = tab.kind === "git";
     const isAgents = tab.kind === "agents";
     const isDb = tab.kind === "db";
-    const isPanel = isIssues || isEditor || isGit || isAgents || isDb;
+    const isDocker = tab.kind === "docker";
+    const isPanel = isIssues || isEditor || isGit || isAgents || isDb || isDocker;
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -307,6 +330,14 @@ export default function Canvas(props: { project: Project }) {
       showSizing(id);
     };
 
+    /** This window is focused and the modifier is being held: its bar draws the keys. */
+    const hinting = () => focused() && hintsShown();
+    /** A control only trades its glyph for a key when that action still has one. */
+    const hinted = (act: string) => hinting() && hintKeys(act).length > 0;
+    const target = () => holdTargets()[id];
+    /** A native webview's page draws above HTML, so a browser window takes its key in its title bar. */
+    const targetInBar = isBrowser && nativeBrowsers;
+
     let starEl!: HTMLButtonElement;
     const star = () => {
       const s = favEditFor();
@@ -435,6 +466,7 @@ export default function Canvas(props: { project: Project }) {
               : isGit ? "git"
               : isAgents ? "agents"
               : isDb ? "db"
+              : isDocker ? "docker"
               : (live[id]?.status ?? "connecting")
             }`}
           />
@@ -477,9 +509,39 @@ export default function Canvas(props: { project: Project }) {
               <Icon name={showAddr() ? "chevron-up" : "ellipsis"} size={13} />
             </button>
           </Show>
-          <button class="mn" title={withKey("Minimise", "minimise")} onClick={() => minimiseTab(props.project.id, id)}>–</button>
-          <button title={withKey("Maximize", "maximize")} onClick={doMax}>▢</button>
-          <button title={withKey("Close", "close")} onClick={() => requestClose(props.project.id, id)}>×</button>
+          <Show when={hinting() && canMain() && rect().w >= 360}>
+            <span class="dh" aria-hidden="true"><HintCaps id="main" />main</span>
+          </Show>
+          <Show when={targetInBar && target()}>
+            {(t) => <span class="dh" aria-hidden="true"><For each={t().focus}>{(k) => <HintCaps id={k} />}</For>focus</span>}
+          </Show>
+          <button
+            class="ctl mn"
+            classList={{ hk: hinted("minimise") }}
+            title={withKey("Minimise", "minimise")}
+            onClick={() => minimiseTab(props.project.id, id)}
+          >
+            <span class="g">–</span>
+            <Show when={hinting()}><HintCaps id="minimise" /></Show>
+          </button>
+          <button
+            class="ctl"
+            classList={{ hk: hinted("maximize") }}
+            title={withKey("Maximize", "maximize")}
+            onClick={doMax}
+          >
+            <span class="g">▢</span>
+            <Show when={hinting()}><HintCaps id="maximize" /></Show>
+          </button>
+          <button
+            class="ctl"
+            classList={{ hk: hinted("close") }}
+            title={withKey("Close", "close")}
+            onClick={() => requestClose(props.project.id, id)}
+          >
+            <span class="g">×</span>
+            <Show when={hinting()}><HintCaps id="close" /></Show>
+          </button>
           <Show when={bare()}>{loadBar()}</Show>
         </div>
         {isBrowser ? (
@@ -567,9 +629,22 @@ export default function Canvas(props: { project: Project }) {
           <AgentsPanel project={props.project} />
         ) : isDb ? (
           <DbPanel project={props.project} tab={tab} focused={focused()} />
+        ) : isDocker ? (
+          <DockerPanel project={props.project} tab={tab} focused={focused()} />
         ) : (
           <div class="body" ref={termEl} />
         )}
+        <Show when={!targetInBar && target()}>
+          {(t) => (
+            <div class="holdtarget" aria-hidden="true">
+              <span class="big"><For each={t().focus}>{(k) => <HintCaps id={k} big />}</For></span>
+              <Show when={rect().h >= 170 && rect().w >= 150}>
+                <span class="to">Focus {tabName(tab)}</span>
+                <Show when={t().swap.length}><small><For each={t().swap}>{(k) => <HintCaps id={k} />}</For> to swap</small></Show>
+              </Show>
+            </div>
+          )}
+        </Show>
         <div class="tip">{tipText()}</div>
       </div>
     );
@@ -656,6 +731,6 @@ export function requestClose(projectId: string, tabId: string): void {
       msg: `Closed ${tabName(tab)}${title ? " · " + title : ""}.`,
       undo: () => restoreTab(projectId, tab, index),
     },
-    () => (tab.kind === "browser" ? (closeBrowser(tab), forgetDownloads(tabId)) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : tab.kind === "db" ? closeDbSession(tabId) : undefined),
+    () => (tab.kind === "browser" ? (closeBrowser(tab), forgetDownloads(tabId)) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : tab.kind === "db" ? closeDbSession(tabId) : tab.kind === "docker" ? closeDockerWindow(tabId) : undefined),
   );
 }

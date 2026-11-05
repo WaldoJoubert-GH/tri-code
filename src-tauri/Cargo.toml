@@ -15,7 +15,7 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["unstable"] }
+tauri = { version = "2", features = ["unstable", "tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 portable-pty = "0.9"
@@ -76,7 +76,8 @@ security-framework = "3"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-process = "2"
-# No `zip`: every zip 2–4 release is yanked, and it only handles v1-style zipped
+tauri-plugin-single-instance = "2"
+# No `zip`: every zip 2â€“4 release is yanked, and it only handles v1-style zipped
 # Windows bundles and compressed AppImages, which we don't ship.
 tauri-plugin-updater = { version = "2.14", default-features = false, features = ["rustls-tls", "system-proxy"] }
 

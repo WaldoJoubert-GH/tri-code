@@ -3,18 +3,19 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { For, Show, createEffect, createSignal, on, onCleanup, onMount, untrack } from "solid-js";
 import {
   SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
-  persistChanges, repoOf, setLayout, space, tabName,
+  persistChanges, repoOf, sessionName, setLayout, space, tabName,
 } from "./state";
 import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
-import { TabMenu, TabStrip, tabMenuOpen } from "./tabs";
+import { HoldBar, TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import { CtxMenu, ctxMenuOpen } from "./ctxmenu";
 import ClaudeUsage, { CommandCodeUsage } from "./Usage";
 import { SettingsDialog, hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { startAgentWindows } from "./agentwin";
+import { startAgentWorktrees } from "./agentworktree";
 import { startAgentSetup } from "./agentsetup";
 import { SetupBanner } from "./SetupBanner";
 import { phoneStatus, startPhoneSync } from "./phone";
@@ -41,6 +42,8 @@ import { applyLook, themeOf } from "./look";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { flash, flashMsg, toast, undoToast } from "./ui";
 import { keyOf, withKey } from "./keymap";
+import { Caps, HoldFace, HoldKey } from "./Keys";
+import { hintsShown, holdMenuShown } from "./hints";
 import { appVersion, askRestart, installUpdate, startUpdateChecks, updateReady } from "./updater";
 import { RestartDialog } from "./RestartDialog";
 import { type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
@@ -63,10 +66,12 @@ export default function App() {
       const owner = app.projects.find((p) => p.tabs.some((t) => t.id === tabId))?.id ?? app.activeProject;
       if (owner) openUrlInProject(owner, url, tabId);
     });
-    // After a webview reload, PTYs and browser webviews from the previous page are unreachable.
-    await invoke("pty_kill_all");
+    // After a webview reload, browser webviews from the previous page are unreachable.
     await invoke("browser_close_all").catch((e) => console.warn("browser_close_all failed:", e));
     await loadState();
+    // Terminals run on in the terminal host and tabs attach to them; one with no tab left has to go.
+    const keep = app.projects.flatMap((p) => p.tabs.filter((t) => isTerminal(t) && !t.demo).map((t) => sessionName(p, t)));
+    await invoke("pty_reap", { keep }).catch((e) => console.warn("pty_reap failed:", e));
     await syncEnvs();
     for (const p of app.projects) {
       if (p.bg !== "image") continue;
@@ -85,6 +90,7 @@ export default function App() {
   persistChanges(ready);
   createEffect(on(ready, (r) => r && startPhoneSync(), { defer: true }));
   createEffect(on(ready, (r) => r && startAgentWindows(), { defer: true }));
+  createEffect(on(ready, (r) => r && startAgentWorktrees(), { defer: true }));
   createEffect(on(ready, (r) => r && startAgentSetup(), { defer: true }));
 
   // Start a session for every terminal tab once, including tabs added later.
@@ -124,8 +130,8 @@ export default function App() {
   // store holds the defaults and would undo the look restored from the last launch.
   createEffect(() => {
     if (!ready()) return;
-    const { theme, fontUi, fontMono } = app.settings;
-    applyLook({ theme, fontUi, fontMono });
+    const { theme, fontUi, fontMono, accentKeys } = app.settings;
+    applyLook({ theme, fontUi, fontMono, accentKeys });
     // The title bar, and the system theme web pages see in browser windows.
     const forced = themeOf({ theme });
     getCurrentWindow().setTheme(forced === "system" ? null : forced).catch((e) => console.warn("setTheme failed:", e));
@@ -142,7 +148,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen()));
+  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   // The backdrop and Transparency are the active project's repo's.
@@ -154,7 +160,7 @@ export default function App() {
   createEffect(() => applyTerminalClear());
 
   return (
-    <div class="app" classList={{ rail: app.sidebarCollapsed, peek: sidebarPeek(), ...see().classes }} style={see().vars}>
+    <div class="app" classList={{ rail: app.sidebarCollapsed, peek: sidebarPeek(), holding: hintsShown(), ...see().classes }} style={see().vars}>
       <Backdrop project={repo()} />
       <Sidebar />
       <Toolbar />
@@ -224,7 +230,7 @@ function Toolbar() {
                         flash(`workspace ${i + 1}`);
                       }}
                     >
-                      {i + 1}
+                      <HoldFace id={`ws-${i + 1}`}>{i + 1}</HoldFace>
                     </button>
                   );
                 }}
@@ -233,13 +239,13 @@ function Toolbar() {
             <div class="sep" />
             <div class="seg" role="group" aria-label="Tiling layout">
               <button aria-label="Main + stack" aria-pressed={space(p).layout === "master"} title={withKey("Main + stack", "layout")} onClick={() => setLayout(p.id, "master")}>
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6.5" height="11" rx="1.2" /><rect x="9.5" y="2.5" width="5" height="5" rx="1.2" /><rect x="9.5" y="8.5" width="5" height="5" rx="1.2" /></svg>
+                <HoldFace id="layout" when={space(p).layout === "master"}><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6.5" height="11" rx="1.2" /><rect x="9.5" y="2.5" width="5" height="5" rx="1.2" /><rect x="9.5" y="8.5" width="5" height="5" rx="1.2" /></svg></HoldFace>
               </button>
               <button aria-label="Grid" aria-pressed={space(p).layout === "grid"} title={withKey("Grid", "layout")} onClick={() => setLayout(p.id, "grid")}>
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6" height="5" rx="1.2" /><rect x="9" y="2.5" width="5.5" height="5" rx="1.2" /><rect x="1.5" y="8.5" width="6" height="5" rx="1.2" /><rect x="9" y="8.5" width="5.5" height="5" rx="1.2" /></svg>
+                <HoldFace id="layout" when={space(p).layout === "grid"}><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="6" height="5" rx="1.2" /><rect x="9" y="2.5" width="5.5" height="5" rx="1.2" /><rect x="1.5" y="8.5" width="6" height="5" rx="1.2" /><rect x="9" y="8.5" width="5.5" height="5" rx="1.2" /></svg></HoldFace>
               </button>
               <button aria-label="Mono (centered column)" aria-pressed={space(p).layout === "mono"} title={withKey("Mono", "layout")} onClick={() => setLayout(p.id, "mono")}>
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="11" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="5.75" y="2.5" width="4.5" height="11" rx="1.2" /></svg>
+                <HoldFace id="layout" when={space(p).layout === "mono"}><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="11" y="2.5" width="3.5" height="11" rx="1.2" opacity=".4" /><rect x="5.75" y="2.5" width="4.5" height="11" rx="1.2" /></svg></HoldFace>
               </button>
             </div>
             <div class="sep" />
@@ -257,23 +263,23 @@ function Toolbar() {
         onClick={togglePalette}
       >
         <Show when={activeProject()}>
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
+          <HoldFace id="go-to-file"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg></HoldFace>
           <span class="wp"><bdi>{where()}</bdi></span>
-          <Show when={keyOf("go-to-file", " ")}>{(k) => <kbd>{k()}</kbd>}</Show>
+          <Caps id="go-to-file" class="hover-caps" />
         </Show>
       </button>
       <InProgressChips />
       <Show when={activeProject()}>
         <button class="tool theme-btn" id="themeBtn" title={withKey("Project appearance", "appearance")} onClick={(e) => toggleAppearance(e.currentTarget)}>
-          <i />
+          <HoldFace id="appearance"><i /></HoldFace>
           Appearance
         </button>
       </Show>
       <button class="tool" id="palBtn" title={withKey("Command palette", "palette")} aria-label="Command palette" onClick={togglePalette}>
-        <Icon name="square-chevron-right" size={14} />
+        <HoldFace id="palette"><Icon name="square-chevron-right" size={14} /></HoldFace>
       </button>
       <button class="tool" title={withKey("Hotkeys", "help")} aria-pressed={hotkeysOpen()} onClick={toggleHotkeys}>
-        ?
+        <HoldFace id="help">?</HoldFace>
       </button>
     </div>
   );
@@ -283,7 +289,10 @@ function StatusBar() {
   return (
     <div class="status">
       <BranchStatus />
-      <span class="flash">{flashMsg()}</span>
+      {/* A chord's message still shows mid-hold: it says why the key did nothing. */}
+      <Show when={hintsShown() && !flashMsg() && activeProject()} fallback={<span class="flash">{flashMsg()}</span>}>
+        <HoldBar />
+      </Show>
       <StatusTimer />
       <SignalCounts />
       <Show when={updateReady()}>
@@ -352,6 +361,7 @@ function SignalCounts() {
   return (
     <Show when={parts().length}>
       <button class="sigs" title={parts().some((x) => x.s !== "working") ? withKey("Go to the next agent that needs you", "next-signal") : "Agents at work"} onClick={nextSignal}>
+        <HoldKey id="next-signal" when={parts().some((x) => x.s !== "working")} />
         <For each={parts()}>{(x) => <span class={`s-${x.s}`}><span class={`sg s-${x.s}`} />{label(x.s, x.n)}</span>}</For>
       </button>
     </Show>

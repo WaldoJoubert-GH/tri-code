@@ -101,9 +101,8 @@
 .grow.dir .gn { font-weight: 600; }
 .grow.dir .gn::after { content: "/"; color: var(--muted); font-weight: 400; }
 .gnone { padding: 22px 12px; text-align: center; color: var(--muted); }
-.gfoot { display: flex; gap: 12px; align-items: center; padding: 5px 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; }
+.gfoot { flex: none; display: flex; gap: 12px; align-items: center; padding: 5px 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; }
 .gfoot span { display: flex; gap: 3px; align-items: center; }
-.gfoot kbd { font-size: 10px; padding: 0 3px; }
 .gfoot .src { margin-left: auto; font: 10.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
 
 .gtf.pal { left: 50%; top: 52px; transform: translateX(-50%); width: 640px; }
@@ -113,7 +112,6 @@
 .prow .ph { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11.5px; }
 .prow .ph b { font-weight: 600; }
 .prow .pk { flex: none; display: flex; gap: 3px; }
-.prow .pk kbd { font-size: 10px; padding: 0 4px; }
 
 /* Image, video and audio, centred and scaled down to fit. A checkerboard shows transparency. */
 .fmedia {

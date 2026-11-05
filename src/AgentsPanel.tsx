@@ -23,6 +23,7 @@ import { Icon, toggleIconPicker } from "./lucide";
 import { flash, showToast } from "./ui";
 import { modDown, modLabel } from "./modkey";
 import "./agents.css";
+import { KeyList } from "./Keys";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph"]);
 
@@ -55,7 +56,7 @@ function HotkeyField(props: { agent: Agent }) {
     >
       <Show when={!on()} fallback={<span>press {modLabel()} + a key…</span>}>
         <Show when={props.agent.hotkey} fallback={<span>no hotkey</span>}>
-          {(h) => <For each={hotkeyKeys(h())}>{(k) => <kbd>{k}</kbd>}</For>}
+          {(h) => <KeyList keys={hotkeyKeys(h())} />}
         </Show>
       </Show>
     </button>

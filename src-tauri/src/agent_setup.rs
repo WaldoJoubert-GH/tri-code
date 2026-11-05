@@ -143,6 +143,12 @@ fn read(path: Option<PathBuf>) -> String {
     path.and_then(|p| fs::read_to_string(p).ok()).unwrap_or_default()
 }
 
+/// Whether Node is on PATH, checked once: it is asked at every terminal start (resume.rs).
+pub fn node_present() -> bool {
+    static NODE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *NODE.get_or_init(|| present("node"))
+}
+
 pub fn status(app: &AppHandle) -> Result<Setup, String> {
     let shim = shim_path(app)?;
     let shim_s = shim.to_string_lossy().into_owned();

@@ -2,6 +2,15 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.45 — 2026-11-03
+
+- Terminals now run in a small host process, so closing or updating tri-code no longer ends running agents; the next launch attaches to them and takes back their recent output. Closing the window with terminals running hides it to a tray icon, whose menu quits and either keeps them or stops them. A second launch shows the running window instead of starting another, and a tab can resume its Claude conversation after a restart. The update to this version still ends local terminals, because 0.1.44 runs them itself. ([#49](https://github.com/WaldoJoubert-GH/tri-code/pull/49))
+- The Docker Window (`Alt+Y`) lists the project's containers and their ports above a log pane. Picking a Stack follows its compose logs, and picking a container follows its own. Containers and Stacks can be started and stopped, and a Port Chip opens a Page, or copies the address when the port isn't HTTP. Over ssh it runs on the project's host and opens an `ssh -L` tunnel for a port. ([#50](https://github.com/WaldoJoubert-GH/tri-code/pull/50))
+- Holding the Hotkey Modifier now shows the keys in place: each control's icon turns into its key, across the workspaces, sidebar, Palette and the focused window's title bar, and the New Window Menu opens with its rows showing theirs. A chord pressed during the hold runs as always and shows nothing. ([#48](https://github.com/WaldoJoubert-GH/tri-code/pull/48))
+- Keys look the same everywhere in the app, with Shift, Enter and Backspace as keyboard symbols. Settings › Appearance › Keys makes them neutral or the project's accent colour.
+- Moving between windows only follows directions the layout has: a tall main window no longer treats the right-hand stack as above or below it.
+- In Browser windows, a page's `confirm()` no longer counts as accepted without asking, and its `alert()` no longer vanishes.
+
 ## 0.1.44 — 2026-11-02
 
 - Settings › Appearance sets the theme (System, Light or Dark) and the Interface and Code fonts, chosen from the fonts installed on the machine. They apply across the whole app, including terminals and the window title bar, and the first paint matches the last launch. ([#42](https://github.com/WaldoJoubert-GH/tri-code/pull/42))

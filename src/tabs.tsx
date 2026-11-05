@@ -4,23 +4,26 @@
 // took about 330px of the 34px toolbar — the widest thing in it — and said nothing about what
 // was already open.
 
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Project, Tab, TabKind, activePage, addTab, agentOf, focusTab, live, projectById, space, tabName, tabProfile, visibleTabs } from "./state";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focusTab, lastMinimised, live, projectById, space, tabName, tabProfile, visibleTabs } from "./state";
 import { profileColor, profilesInUse } from "./profiles";
 import { nativeBrowsers } from "./browsers";
 import { openEditor } from "./files";
 import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
 import { openDbWindow } from "./db";
-import { hotkeyProblem, hotkeyText, launchAgent, offeredIn, openAgentsPanel } from "./agents";
+import { openDockerPanel } from "./docker";
+import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "./agents";
 import { Icon } from "./lucide";
 import { SIG_TEXT, sigOf } from "./signals";
 import { flash } from "./ui";
-import { keyOf } from "./keymap";
+import { groupKeys, heldKeys } from "./keymap";
+import { Caps, HoldFace, KeyList } from "./Keys";
+import { hintChord, hintsShown, holdMenuShown } from "./hints";
 
 /** Glyphs of the windows that aren't terminals (those show their agent's icon). */
 const GLYPH: Record<Exclude<TabKind, "term">, string> = {
-  browser: "◎", issues: "☑", editor: "▤", git: "±", agents: "⚙", db: "⛁",
+  browser: "◎", issues: "☑", editor: "▤", git: "±", agents: "⚙", db: "⛁", docker: "▣",
 };
 
 /** The panels the New window menu offers under the agents, with the key that also opens one. */
@@ -30,6 +33,7 @@ const PANELS: { kind: Exclude<TabKind, "term">; /** The Keymap action that also 
   { kind: "editor", key: "files" },
   { kind: "git", key: "git" },
   { kind: "db", key: "db" },
+  { kind: "docker", key: "docker" },
   { kind: "agents", key: "agents" },
 ];
 
@@ -60,6 +64,7 @@ function newPanel(p: Project, kind: (typeof PANELS)[number]["kind"]) {
   if (kind === "git") return void openGitPanel(p);
   if (kind === "agents") return void openAgentsPanel(p);
   if (kind === "db") return void openDbWindow(p);
+  if (kind === "docker") return void openDockerPanel(p);
   addTab(p.id, kind);
   flash(`new ${kind}`);
 }
@@ -71,6 +76,7 @@ export const tabMenuOpen = () => menu() !== null;
 
 export function closeTabMenu() {
   setMenu(null);
+  hintChord(); // a pick from the menu the hold opened closes it too
 }
 
 /** Open the New window menu under its `+` button, or close it if it is already open. */
@@ -94,12 +100,21 @@ export function TabMenu() {
   onMount(() => document.addEventListener("pointerdown", onDown));
   onCleanup(() => document.removeEventListener("pointerdown", onDown));
 
+  /** The menu a click opened, or the one holding the modifier opens under the `+`. */
+  const shown = createMemo((): Menu | null => {
+    const open = menu();
+    if (open) return open;
+    const p = holdMenuShown() ? activeProject() : undefined;
+    const anchor = p && document.querySelector<HTMLElement>(".tab-add");
+    return p && anchor ? { projectId: p.id, anchor } : null;
+  });
+
   return (
-    <Show when={menu()} keyed>
+    <Show when={shown()} keyed>
       {(m) => (
         <Show when={projectById(m.projectId)} keyed>
           {(p) => (
-            <div class="tabmenu" role="menu" aria-label="New window" ref={(el) => requestAnimationFrame(() => placeMenu(el, m.anchor))}>
+            <div class="tabmenu" classList={{ held: hintsShown() }} role="menu" aria-label="New window" ref={(el) => requestAnimationFrame(() => placeMenu(el, m.anchor))}>
               <div class="mt">New window</div>
               <For each={offeredIn(p)}>
                 {(a) => (
@@ -110,9 +125,9 @@ export function TabMenu() {
                       launchAgent(p, a);
                     }}
                   >
-                    <Icon name={a.icon} size={13} class="glyph" />
+                    <span class="mslot"><HoldFace keys={a.hotkey && !hotkeyProblem(a) ? heldKeys(a.hotkey) : undefined}><Icon name={a.icon} size={13} class="glyph" /></HoldFace></span>
                     {a.name || "untitled"}
-                    <Show when={a.hotkey && !hotkeyProblem(a) && a.hotkey}>{(h) => <kbd>{hotkeyText(h())}</kbd>}</Show>
+                    <Show when={!hintsShown() && a.hotkey && !hotkeyProblem(a) && a.hotkey}>{(h) => <KeyList keys={hotkeyKeys(h())} />}</Show>
                   </button>
                 )}
               </For>
@@ -126,9 +141,9 @@ export function TabMenu() {
                       newPanel(p, k.kind);
                     }}
                   >
-                    <span class="glyph" aria-hidden="true">{GLYPH[k.kind]}</span>
+                    <span class="mslot"><HoldFace id={k.key}><span class="glyph" aria-hidden="true">{GLYPH[k.kind]}</span></HoldFace></span>
                     {k.kind === "agents" ? "commands" : k.kind === "db" ? "database" : k.kind}
-                    <Show when={keyOf(k.key)}>{(t) => <kbd>{t()}</kbd>}</Show>
+                    <Show when={!hintsShown()}><Caps id={k.key} /></Show>
                   </button>
                 )}
               </For>
@@ -137,6 +152,27 @@ export function TabMenu() {
         </Show>
       )}
     </Show>
+  );
+}
+
+/** The keys with no control to sit on, in the order the Hold Bar gives up room from the right. */
+const NO_CONTROL = [
+  { label: "shell", ids: ["term-like"] },
+  { label: "workspace", ids: ["workspace-prev", "workspace-next"] },
+  { label: "gap", ids: ["gap-less", "gap-more"] },
+  { label: "swap", ids: ["swap-left", "swap-down", "swap-up", "swap-right"] },
+  { label: "send", ids: ["send-1", "send-2", "send-3", "send-4"] },
+  { label: "split", ids: ["split-left", "split-right"] },
+];
+
+/** The status line while the modifier is held: the keys with no control. It has the room, and no webview ever covers it. */
+export function HoldBar() {
+  return (
+    <span class="holdbar" aria-hidden="true">
+      <For each={NO_CONTROL}>
+        {(g) => <span class="lbl">{g.label}<KeyList keys={groupKeys(g.ids)} /></span>}
+      </For>
+    </span>
   );
 }
 
@@ -153,7 +189,7 @@ export function TabStrip(props: { project: Project }) {
             title={`${tabName(t)}${hint(t) ? " · " + hint(t) : ""}${sigOf(t) ? " · " + SIG_TEXT[sigOf(t)!] : ""}${t.min ? " · minimised, click to bring back" : ""}`}
             onClick={() => focusTab(props.project.id, t.id)}
           >
-            <Glyph tab={t} />
+            <HoldFace id="restore-last" when={lastMinimised(props.project)?.id === t.id}><Glyph tab={t} /></HoldFace>
             {label(t)}
             <Show when={t.kind === "browser" && nativeBrowsers && profilesInUse()}>
               <span class="tab-pf" style={{ background: profileColor(tabProfile(props.project, t)) }} title={tabProfile(props.project, t).name} />

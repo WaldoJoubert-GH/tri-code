@@ -6,6 +6,7 @@ mod db;
 mod devfs;
 mod downloads;
 mod dirs;
+mod docker;
 mod envs;
 mod envssh;
 mod folders;
@@ -17,8 +18,10 @@ mod passwords;
 mod phone;
 mod plane;
 mod pty;
+pub mod ptyd;
 mod push;
 mod remote;
+mod resume;
 mod spawn;
 mod store;
 mod tour;
@@ -26,8 +29,58 @@ mod usage;
 
 use std::sync::Arc;
 
-use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{LogicalPosition, Manager, WebviewBuilder, WebviewUrl};
+
+/// The tray icon, once it exists. Without one (no tray on this desktop), closing the window quits.
+struct Tray(TrayIcon);
+
+fn show_main(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+/// Closing the window with terminals running leaves the app here, so agents that are still working
+/// stay visible. Its menu is the way out: leaving them to the terminal host, or stopping them.
+fn build_tray(app: &tauri::App) -> tauri::Result<TrayIcon> {
+    let menu = Menu::with_items(
+        app,
+        &[
+            &MenuItem::with_id(app, "open", "Open tri-code", true, None::<&str>)?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "quit-keep", "Quit and keep agents running", true, None::<&str>)?,
+            &MenuItem::with_id(app, "quit-stop", "Quit and stop agents", true, None::<&str>)?,
+        ],
+    )?;
+    let mut tray = TrayIconBuilder::with_id("main")
+        .tooltip("tri-code")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "open" => show_main(app),
+            "quit-keep" => app.exit(0),
+            "quit-stop" => {
+                app.state::<Arc<pty::Ptys>>().kill_all();
+                // The request has to leave before the process does.
+                std::thread::sleep(std::time::Duration::from_millis(200));
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                show_main(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.build(app)
+}
 
 /// The macOS menu bar: About, Quit and the Edit items that copy and paste in the webview.
 /// It replaces Tauri's default, whose Close Window (Cmd+W), Minimize (Cmd+M) and Hide (Cmd+H)
@@ -70,7 +123,22 @@ pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = builder.menu(mac_menu);
+    // Only one app can hold the terminal host, so a second launch shows the first. Not in a debug
+    // build, which runs beside the installed app.
+    #[cfg(all(desktop, not(debug_assertions)))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)));
     builder
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let app = window.app_handle();
+                let running = app.state::<Arc<pty::Ptys>>().running();
+                if window.label() == "main" && running > 0 && let Some(tray) = app.try_state::<Tray>() {
+                    api.prevent_close();
+                    let _ = tray.0.set_tooltip(Some(format!("tri-code: {running} terminals running")));
+                    let _ = window.hide();
+                }
+            }
+        })
         .plugin(browser::DialogPlugin::new())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
@@ -81,7 +149,14 @@ pub fn run() {
             let ptys = Arc::clone(app.state::<Arc<pty::Ptys>>().inner());
             let hub = agent_windows::AgentWindows::new(app.handle().clone(), Arc::clone(&ptys));
             agent_windows::serve(Arc::clone(&hub));
+            ptys.configure(app.path().app_local_data_dir()?, Arc::clone(&hub));
             app.manage(hub);
+            match build_tray(app) {
+                Ok(tray) => {
+                    app.manage(Tray(tray));
+                }
+                Err(e) => eprintln!("no tray icon, closing the window will quit: {e}"),
+            }
             app.manage(phone::Phone::new(app.handle().clone(), ptys));
             // The main window is built here rather than in tauri.conf.json: browser
             // panes are child webviews, and a plain Window with an auto-resizing
@@ -106,10 +181,11 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_kill,
-            pty::pty_kill_all,
+            pty::pty_reap,
             pty::remote_kill_session,
             agent_windows::agent_allowed,
             agent_windows::agent_open_failed,
+            agent_windows::agent_worktree_made,
             agent_setup::agent_setup_status,
             agent_setup::agent_setup_install,
             agent_setup::agent_setup_remove,
@@ -170,6 +246,13 @@ pub fn run() {
             db::db_apply,
             db::db_env_vars,
             db::db_secret_set,
+            docker::docker_ps,
+            docker::docker_action,
+            docker::docker_logs,
+            docker::docker_events,
+            docker::docker_stop,
+            docker::docker_forward,
+            docker::docker_unforward,
             devfs::dev_read,
             devfs::dev_write,
             devfs::save_pasted_image,
@@ -244,8 +327,10 @@ pub fn run() {
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 app.state::<Arc<phone::Phone>>().shutdown();
-                app.state::<Arc<pty::Ptys>>().kill_all();
+                // Terminals carry on in the host; the next launch attaches to them.
+                app.state::<Arc<pty::Ptys>>().detach();
                 db::close_all();
+                docker::close_all();
             }
         });
 }

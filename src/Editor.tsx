@@ -25,6 +25,7 @@ import { fileMarks, markAt, peekStatus } from "./git";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { openExternal, openUrlInProject } from "./browsers";
 import { capsOf, withKey } from "./keymap";
+import { HoldKey, KeyList } from "./Keys";
 import { ask, flash } from "./ui";
 import { type DiffMode, changeMarks, diffStats, makePatch, parseUnified, sameText } from "./diff";
 import DiffView, { diffKeys, stepHunk } from "./DiffView";
@@ -554,7 +555,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
       return (
         <div class="fempty">
           <p>No file open.</p>
-          <p>Pick one in the tree{k ? <>, or press <kbd>{k.join("+")}</kbd></> : ""}.</p>
+          <p>Pick one in the tree{k ? <>, or press <KeyList keys={k} /></> : ""}.</p>
         </div>
       );
     }
@@ -670,6 +671,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
                 <Show when={diffable()}>
                   <button aria-pressed={diffing()} title={withKey("HEAD → buffer", "diff")} onClick={() => setModes(path(), "diff")}>
                     Diff<Show when={barCount()}><span class="segn">{barCount()}</span></Show>
+                    <HoldKey id="diff" when={props.focused} />
                   </button>
                 </Show>
               </div>

@@ -1,11 +1,11 @@
-// The app-wide theme and fonts (Settings › Appearance), applied to <html> as data-theme, --ui and --mono.
+// The app-wide theme, fonts and key colour (Settings › Appearance), applied to <html> as data-theme, --ui, --mono and data-keys.
 // The last look is kept in localStorage too: state.json loads after the first paint, and a forced
 // theme would otherwise start in the OS's colours on every launch.
 
 export type Theme = "system" | "light" | "dark";
 export type FontKind = "ui" | "mono";
 /** The settings this module reads. Unset is the system theme and the default fonts. */
-export type Look = { theme?: "light" | "dark"; fontUi?: string; fontMono?: string };
+export type Look = { theme?: "light" | "dark"; fontUi?: string; fontMono?: string; accentKeys?: boolean };
 
 const KEY = "tri-code-look";
 
@@ -38,13 +38,15 @@ function paint(look: Look) {
   else root.style.removeProperty("--ui");
   if (look.fontMono) root.style.setProperty("--mono", fontStack("mono", look.fontMono));
   else root.style.removeProperty("--mono");
+  if (look.accentKeys) root.dataset.keys = "accent";
+  else delete root.dataset.keys;
 }
 
 /** Paint a Look and remember it for the next launch. */
 export function applyLook(look: Look) {
   paint(look);
   try {
-    localStorage.setItem(KEY, JSON.stringify({ theme: look.theme, fontUi: look.fontUi, fontMono: look.fontMono }));
+    localStorage.setItem(KEY, JSON.stringify({ theme: look.theme, fontUi: look.fontUi, fontMono: look.fontMono, accentKeys: look.accentKeys }));
   } catch {
     // only costs the first paint of the next launch
   }

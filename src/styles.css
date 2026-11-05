@@ -47,6 +47,8 @@
   --p-ocean: #2f7fb8; --p-marigold: #c98a12; --p-terracotta: #c0583a; --p-moss: #5b8a2e; --p-plum: #8a4fb0; --p-slate: #5f6878;
   --ui: system-ui, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* keycaps (kbd below): the top, the rim, the front edge and the legend */
+  --key: #ffffff; --key-edge: #cfd3dc; --key-base: #a4a9b7; --key-ink: #23262d;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -57,6 +59,7 @@
     --dusk-a: #1b1533; --dusk-b: #2c1a3c; --dusk-c: #43202f; --dusk-d: #16100f;
     --accent: var(--accent-raw);
     --state-working: #7aa2f7;
+    --key: #e8eaf0; --key-edge: #f6f7fa; --key-base: #8b90a0; --key-ink: #15171c;
     --page-bg: #f7f8fa;
     --p-ocean: #5aa9e0; --p-marigold: #e8b043; --p-terracotta: #e47e5f; --p-moss: #8fbf5a; --p-plum: #b884dc; --p-slate: #9aa3b5;
     color-scheme: dark;
@@ -69,9 +72,15 @@
   --dusk-a: #1b1533; --dusk-b: #2c1a3c; --dusk-c: #43202f; --dusk-d: #16100f;
   --accent: var(--accent-raw);
   --state-working: #7aa2f7;
+  --key: #e8eaf0; --key-edge: #f6f7fa; --key-base: #8b90a0; --key-ink: #15171c;
   --page-bg: #f7f8fa;
   --p-ocean: #5aa9e0; --p-marigold: #e8b043; --p-terracotta: #e47e5f; --p-moss: #8fbf5a; --p-plum: #b884dc; --p-slate: #9aa3b5;
   color-scheme: dark;
+}
+/* Settings › Appearance › Keys: keycaps in the project's accent, in either theme */
+:root[data-keys="accent"] {
+  --key: var(--accent); --key-edge: color-mix(in srgb, var(--accent) 80%, #fff);
+  --key-base: color-mix(in srgb, var(--accent) 60%, #000); --key-ink: var(--bg);
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -81,10 +90,26 @@ body {
 }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 button:focus-visible, select:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+/* The one keycap (Keys.tsx). Every key in the app is this; a place may lay it out, not restyle it. */
 kbd {
-  font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line);
-  border-bottom-width: 2px; border-radius: 3px; color: var(--text); background: var(--panel);
+  display: inline-grid; place-items: center; height: 17px; min-width: 16px; padding: 0 3px; vertical-align: middle;
+  border: 1px solid var(--key-edge); border-bottom: 3px solid var(--key-base); border-radius: 3px;
+  background: var(--key); color: var(--key-ink); font: 700 10px/1 var(--mono); font-style: normal; white-space: nowrap;
 }
+kbd + kbd { margin-left: 2px; }
+kbd svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+kbd.big { height: 44px; min-width: 40px; padding: 0 8px; border-radius: 7px; border-bottom-width: 5px; font-size: 20px; }
+kbd.big svg { width: 20px; height: 20px; }
+.keycaps { display: inline-flex; align-items: center; flex: none; vertical-align: middle; }
+.keycaps + .keycaps { margin-left: 4px; }
+.key-then { margin: 0 3px; color: var(--muted); font-size: 11px; }
+.key-sample { margin-left: 4px; }
+/* A key in a tile (Hold Hints) is centred on it and may be wider than it. One key fills it. */
+.project .swatch:has(kbd), .wt .wtile:has(kbd) { overflow: visible; background: none; border-color: transparent; box-shadow: none; }
+.project .swatch .keycaps, .wt .wtile .keycaps { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; }
+.project .swatch kbd svg { width: 10px; height: 10px; }
+.project .swatch kbd:only-of-type { height: 25px; min-width: 25px; border-radius: 5px; font-size: 13px; }
+.project:has(.swatch kbd + kbd) .name, .wt:has(.wtile kbd + kbd) .bn { margin-left: 4px; }
 
 .app {
   display: grid; height: 100%; position: relative; isolation: isolate;
@@ -113,7 +138,7 @@ aside > * { flex: none; }
 .collapse:hover { background: var(--hover); color: var(--text); }
 .rail:not(.peek) aside { padding-inline: 6px; }
 .rail:not(.peek) .side-head { justify-content: center; padding: 0; }
-.rail:not(.peek) .side-head span, .rail:not(.peek) .project .name, .rail:not(.peek) .project .rename, .rail:not(.peek) .project .count, .rail:not(.peek) .project .gear, .rail:not(.peek) .project .x { display: none; }
+.rail:not(.peek) .side-head > span, .rail:not(.peek) .project .name, .rail:not(.peek) .project .rename, .rail:not(.peek) .project .count, .rail:not(.peek) .project .gear, .rail:not(.peek) .project .x { display: none; }
 /* collapsed, an Environment header is just its icon under a divider: the same box as the open header,
    the divider drawn in its top margin, so nothing below moves when the rail opens */
 .rail:not(.peek) aside h2 { justify-content: center; margin-inline: 6px; padding: 0; position: relative; }
@@ -249,7 +274,7 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 .add .glyph { width: 28px; flex: none; text-align: center; font-size: 15px; line-height: 18px; }
 .add .glyph svg { display: block; margin: 0 auto; }
 .add:hover { background: var(--hover); color: var(--text); }
-.add kbd { margin-left: auto; font-size: 10px; color: var(--muted); }
+.add > .keycaps { margin-left: auto; }
 .rail:not(.peek) .add { justify-content: center; }
 
 /* Toolbar */
@@ -286,8 +311,8 @@ svg.lucide { flex: none; display: block; }
 .where svg { width: 12px; height: 12px; flex: none; }
 .where .wp { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--mono); direction: rtl; }
 .where .wp bdi { direction: ltr; }
-.where kbd { font-size: 10px; padding: 0 3px; white-space: nowrap; flex: none; margin-left: auto; opacity: 0; transition: opacity 120ms; }
-.where:hover kbd, .where[aria-expanded="true"] kbd { opacity: 1; }
+.where .hover-caps { margin-left: auto; opacity: 0; transition: opacity 120ms; }
+.where:hover .hover-caps, .where[aria-expanded="true"] .hover-caps { opacity: 1; }
 @container (max-width: 1275px) { .top .where { margin-left: 0; } }
 .top .sep { width: 1px; background: var(--line); margin: 7px 6px; flex: none; }
 .seg { display: flex; align-self: center; flex: none; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 0 4px; }
@@ -329,7 +354,10 @@ svg.lucide { flex: none; display: block; }
 .tabmenu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 5px; color: var(--muted); font-size: 12.5px; text-align: left; }
 .tabmenu button:hover { background: var(--hover); color: var(--text); }
 .tabmenu button .glyph { width: 14px; font-size: 12.5px; line-height: 1; text-align: center; }
-.tabmenu button kbd { margin-left: auto; }
+.tabmenu button > .keycaps { margin-left: auto; padding-left: 12px; }
+/* While held, each row's icon turns into its keys, in a slot wide enough for two so the names line up. */
+.mslot { display: contents; }
+.tabmenu.held .mslot { display: grid; place-items: center; width: 36px; flex: none; }
 .tabmenu svg.glyph { width: 14px; flex: none; }
 .tabmenu .msep { height: 1px; margin: 4px 2px; background: var(--line); }
 .tabmenu button:disabled { opacity: .45; }
@@ -524,7 +552,6 @@ canvas.bg { display: block; width: 100%; height: 100%; }
 .pop.feedback .foot span { flex: 1; }
 .pop.feedback .primary { padding: 4px 12px; border-radius: 4px; background: var(--accent); color: var(--bg); white-space: nowrap; }
 .pop.feedback .primary:disabled { opacity: .45; cursor: default; }
-.pop.feedback .primary kbd { font-size: 10px; background: none; color: inherit; border-color: currentColor; opacity: .75; }
 /* Signals settings: Appearance › Signals and the bell's popover */
 .pop .seg.wide { margin: 0; align-self: stretch; }
 .pop .seg.wide button { flex: 1; padding: 3px 6px; }
@@ -718,7 +745,6 @@ canvas.bg { display: block; width: 100%; height: 100%; }
 .picker .pfoot { display: flex; align-items: center; gap: 6px; padding: 6px; border-top: 1px solid var(--line); }
 .picker .pfoot .here { flex: 1; min-width: 0; font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .picker .keys { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 8px 6px; color: var(--muted); font-size: 11px; }
-.picker .keys kbd { font-size: 10px; }
 
 /* The Environment dialog: New environment and Edit environment */
 .env-dlg { display: flex; flex-direction: column; width: min(480px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow); }
@@ -861,7 +887,7 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg nav button { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 5px; text-align: left; color: var(--muted); }
 .settings-dlg nav button:hover { background: var(--hover); color: var(--text); }
 .settings-dlg nav button[aria-current="page"] { background: var(--raised); color: var(--text); }
-.settings-dlg nav kbd { margin-left: auto; font-size: 10px; }
+.settings-dlg nav .keycaps { margin-left: auto; }
 .settings-dlg .settings-page { min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
 .settings-dlg h4 { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
 .settings-page > h4:first-child, .hk-page > h4:first-child { margin-top: 0; }
@@ -991,15 +1017,14 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 @media (max-width: 640px) {
   .settings-dlg { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
   .settings-dlg nav { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
-  .settings-dlg nav kbd { display: none; }
+  .settings-dlg nav .keycaps { display: none; }
 }
 /* Settings › Hotkeys (HotkeySettings.tsx) */
 .hk-mods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .hk-mod { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); text-align: left; }
 .hk-mod:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
 .hk-mod[aria-checked="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); }
-.hk-mod .cap { grid-row: span 2; width: 46px; height: 40px; display: grid; place-items: center; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; background: var(--panel); font: 600 12px var(--mono); }
-.hk-mod[aria-checked="true"] .cap { border-color: var(--accent); }
+.hk-mod kbd { grid-row: span 2; font-size: 13px; }
 .hk-mod small { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
 .hk-search { position: sticky; top: -14px; z-index: 1; margin: 16px -18px 0; padding: 8px 18px; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
 .hk-search input { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--text); outline: none; }
@@ -1014,9 +1039,7 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .hk-list dd { display: flex; align-items: center; gap: 8px; }
 .hk-list dd .txt { flex: 1; }
 .hk-list dd small { color: var(--muted); }
-.hk-list kbd { font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--panel); white-space: nowrap; }
 .hk { display: inline-flex; gap: 3px; align-items: center; padding: 2px 4px; margin: -2px 0 -2px -4px; border-radius: 5px; border: 1px dashed transparent; }
-.hk .hk-then { color: var(--muted); font-size: 11px; margin: 0 2px; }
 .hk:hover { border-color: var(--line); background: var(--bg); }
 .hk.rec { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); outline: none; }
 .hk.rec span { font-size: 11.5px; color: var(--accent); }

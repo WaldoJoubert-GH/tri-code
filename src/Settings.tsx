@@ -5,11 +5,12 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource, createSignal } from "solid-js";
-import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
+import { Caps, KeyList } from "./Keys";
 import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./RemoteSettings";
 import { BrowserPage } from "./profiles";
@@ -112,6 +113,21 @@ function AppearancePage() {
         </span>
       </div>
       <p class="note">{theme() === "system" ? "Follows your OS, and changes when it does." : `Stays ${theme()} whatever your OS is set to.`} Terminals and the editor change too. Colours you picked under Git and Signals are kept.</p>
+      <h4>Keys</h4>
+      <div class="row">
+        Key colour
+        <span class="set-seg" role="radiogroup" aria-label="Key colour">
+          <For each={[[false, "Neutral", "Plain keys, like a keyboard's"], [true, "Accent", "Keys in the project's accent colour"]] as const}>
+            {([accent, name, title]) => (
+              <button type="button" role="radio" aria-checked={!!app.settings.accentKeys === accent} title={title} onClick={() => setSettings({ accentKeys: accent || undefined })}>
+                {name}
+              </button>
+            )}
+          </For>
+        </span>
+        <KeyList keys={["Shift", "W"]} class="key-sample" />
+      </div>
+      <p class="note">Every key the app draws, in hints, panels, dialogs and Settings.</p>
       <h4>Fonts</h4>
       <FontRow kind="ui" name="Interface" fonts={fonts()?.all ?? null} installed={fonts()?.all ?? null} />
       <FontRow kind="mono" name="Code" fonts={fonts()?.mono ?? null} installed={fonts()?.all ?? null} />
@@ -374,7 +390,7 @@ export function SettingsDialog() {
                   <button type="button" aria-current={p() === o.page ? "page" : undefined} onClick={() => setPage(o.page)}>
                     <Icon name={o.icon} size={14} />
                     {o.name}
-                    <Show when={o.page === "hotkeys" && keyOf("help", " ")}>{(k) => <kbd>{k()}</kbd>}</Show>
+                    <Show when={o.page === "hotkeys"}><Caps id="help" /></Show>
                   </button>
                 )}
               </For>

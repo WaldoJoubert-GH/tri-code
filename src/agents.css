@@ -60,7 +60,6 @@
   border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--muted); font-size: 11.5px; white-space: nowrap;
 }
 .ag-hk:hover { border-color: var(--accent); }
-.ag-hk kbd { color: var(--text); }
 .ag-hk.rec { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .ag-hk.bad { border-color: var(--bad); }
 

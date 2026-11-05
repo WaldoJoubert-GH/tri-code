@@ -22,6 +22,7 @@ import { Icon } from "./lucide";
 import { highlight, theme } from "./cm";
 import { ask, flash } from "./ui";
 import "./db.css";
+import { Key, KeyText } from "./Keys";
 
 const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", sqlite: "SQLITE", mongo: "MONGO" };
 const KIND_NAME: Record<DbKind, string> = { postgres: "PostgreSQL", sqlite: "SQLite", mongo: "MongoDB" };
@@ -354,7 +355,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
             <span class="db-obname">{objLabel()}</span>
             <div class="db-views">
               <For each={[["data", "Data", "1"], ["query", "Query", "2"], ["structure", "Structure", "3"]] as const}>
-                {([v, label, k]) => <button classList={{ on: w()?.view === v }} onClick={() => setView(id, v)}>{label} <kbd>{k}</kbd></button>}
+                {([v, label, k]) => <button classList={{ on: w()?.view === v }} onClick={() => setView(id, v)}>{label} <Key k={k} /></button>}
               </For>
             </div>
             <span class="db-grow" />
@@ -633,10 +634,10 @@ function DataView(props: { project: Project; tab: Tab; conn: DbConn; win: Win | 
             {(err) => <span class="db-grow mono">{err()}</span>}
           </Show>
           <span class="db-grow" />
-          <button class="db-btn db-ghost" onClick={() => undo(id)}>Undo <kbd>Ctrl+Z</kbd></button>
+          <button class="db-btn db-ghost" onClick={() => undo(id)}>Undo <KeyText text="Ctrl+Z" /></button>
           <button class="db-btn" onClick={() => discard(id)}>Discard</button>
           <button class="db-btn" classList={{ "db-pri": props.conn.tag !== "prod", "db-danger": props.conn.tag === "prod" }} disabled={!count()} onClick={() => review(props.project, id)}>
-            Review &amp; apply <kbd>Ctrl+S</kbd>
+            Review &amp; apply <KeyText text="Ctrl+S" />
           </button>
         </div>
       </Show>
@@ -778,9 +779,9 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
     <div class="db-qv">
       <div class="db-ed" ref={host} />
       <div class="db-qbar">
-        <button class="db-btn db-pri" disabled={w()?.running} onClick={run}><Icon name="play" size={12} />Run <kbd>Ctrl+Enter</kbd></button>
+        <button class="db-btn db-pri" disabled={w()?.running} onClick={run}><Icon name="play" size={12} />Run <KeyText text="Ctrl+Enter" /></button>
         <Show when={w()?.running}>
-          <button class="db-btn" onClick={() => cancelQuery(id)}>Cancel <kbd>Esc</kbd></button>
+          <button class="db-btn" onClick={() => cancelQuery(id)}>Cancel <Key k="Esc" /></button>
           <span class="muted"><Icon name="loader" size={12} class="spin" /> running…</span>
         </Show>
         <Show when={!w()?.running && cur()}>

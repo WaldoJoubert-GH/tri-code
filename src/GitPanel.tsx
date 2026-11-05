@@ -19,6 +19,7 @@ import { type DiffMode, diffStats, firstChange, parseUnified } from "./diff";
 import DiffView, { type Drill, diffKeys, stepHunk } from "./DiffView";
 import { flash } from "./ui";
 import { withKey } from "./keymap";
+import { HoldKey, KeyText } from "./Keys";
 import "./git.css";
 
 function BranchIcon(): JSX.Element {
@@ -555,9 +556,9 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                   <button class="g-btn primary more" disabled={!ready()} aria-haspopup="menu" onClick={() => setMenu(!menu())}>▾</button>
                   <Show when={menu()}>
                     <div class="g-menu" role="menu">
-                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p(), "push"); }}>Commit &amp; push<span class="k">Ctrl+Shift+↵</span></button>
+                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p(), "push"); }}>Commit &amp; push<KeyText text="Ctrl+Shift+↵" /></button>
                       <button role="menuitem" disabled={onBase()} onClick={() => { setMenu(false); void commit(p(), "pr"); }}>Commit, push &amp; open PR…</button>
-                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p()); }}>Commit<span class="k">Ctrl+↵</span></button>
+                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p()); }}>Commit<KeyText text="Ctrl+↵" /></button>
                     </div>
                   </Show>
                 </span>
@@ -599,7 +600,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                     >▥<span class="lbl"> Split</span></button>
                   </span>
                   <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : "Open the file at its first change"} onClick={() => openAt("source")}>↗ Editor</button>
-                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : withKey("Open the editor in its diff view", "diff")} onClick={() => openAt("diff")}>Diff</button>
+                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : withKey("Open the editor in its diff view", "diff")} onClick={() => openAt("diff")}>Diff<HoldKey id="diff" when={!!(props.focused && g().sel && first() && !deleted())} /></button>
                 </div>
                 <Show when={!g().repoError} fallback={<div class="g-note bad">{g().repoError}</div>}>
                   <DiffView

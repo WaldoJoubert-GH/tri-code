@@ -52,6 +52,7 @@ export const ACTIONS: Action[] = [
   { id: "go-to-file", group: "Windows and links", desc: "Command palette (a second key for it)", def: [k("KeyT")] },
   { id: "git", group: "Windows and links", desc: "Git", def: [k("KeyC")] },
   { id: "db", group: "Windows and links", desc: "Database: the latest database window, or a new one", def: [sh("KeyD")] },
+  { id: "docker", group: "Windows and links", desc: "Docker", def: [k("KeyY")] },
   { id: "diff", group: "Windows and links", desc: "Editor: switch between Source and Diff. Git: open the file's diff in the editor", def: [k("KeyD")] },
   { id: "agents", group: "Windows and links", desc: "Commands window", def: [k("Semicolon")] },
   { id: "palette", group: "Windows and links", desc: "Command palette: run a command or open a file", def: [k("KeyX")] },
@@ -89,10 +90,10 @@ export const sameChord = (a: Chord, b: Chord): boolean =>
 
 /** An action's keys now. */
 export const keysOf = (id: string): Chord[] => app.settings.hotkeys?.[id] ?? BY_ID.get(id)?.def ?? [];
+/** One key of the chord as <kbd> labels, without the Hotkey Modifier (it is being held). */
+export const heldKeys = (c: Chord) => [...(c.ctrl ? ["Ctrl"] : []), ...(c.meta ? [metaName] : []), ...(c.shift ? ["Shift"] : []), keyLabel(c.code)];
 /** One key of the chord as <kbd> labels, the modifier first. */
-const strokeKeys = (c: Chord) => [
-  ...(c.bare ? [] : [modLabel()]), ...(c.ctrl ? ["Ctrl"] : []), ...(c.meta ? [metaName] : []), ...(c.shift ? ["Shift"] : []), keyLabel(c.code),
-];
+const strokeKeys = (c: Chord) => [...(c.bare ? [] : [modLabel()]), ...heldKeys(c)];
 /** The chord as <kbd> labels; a second key follows a `then` label. */
 export const chordKeys = (c: Chord): string[] => [...strokeKeys(c), ...(c.then ? [THEN, ...strokeKeys(c.then)] : [])];
 /** Stands between a chord's two keys in `chordKeys`, printed as a gap rather than a key. */
@@ -103,6 +104,20 @@ export const capsOf = (id: string) => {
   const c = keysOf(id)[0];
   return c && chordKeys(c);
 };
+/** An action's first key without the Hotkey Modifier (it is being held), for the Hold Hints: ["N"], or ["Shift", "N"]. */
+export const hintKeys = (id: string): string[] => {
+  const c = keysOf(id)[0];
+  return c ? heldKeys(c) : [];
+};
+/** Several actions' first keys with a modifier they all share printed once: ["Shift", "H", "J"]. */
+export const groupKeys = (ids: string[]): string[] => {
+  const keys = ids.map(hintKeys).filter((k) => k.length);
+  const mods = keys[0]?.slice(0, -1) ?? [];
+  const shared = keys.every((k) => k.length === mods.length + 1 && mods.every((m, i) => k[i] === m));
+  return shared ? [...mods, ...keys.map((k) => k[k.length - 1])] : keys.flat();
+};
+/** A chord written as text, as <kbd> labels: "Ctrl+Enter" → ["Ctrl", "Enter"]; "Ctrl++" keeps its plus. */
+export const splitKeys = (text: string) => text.split(/\+(?=.)/);
 /** An action's first key as text ("Alt+W", or "Alt W" with sep " "), or "". */
 export const keyOf = (id: string, sep = "+") => {
   const c = keysOf(id)[0];
