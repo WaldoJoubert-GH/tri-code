@@ -2,6 +2,7 @@ import { createEffect, on } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 import type { DiffMode } from "./diff";
+import type { Clear, Fx } from "./backdrop";
 
 export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db";
 
@@ -203,6 +204,10 @@ export type Project = {
   bg: string;
   /** Dim over the background, 0..85 (percent). */
   dim: number;
+  /** The Backdrop Effect: the background dithered or printed in dots. Unset or strength 0 is off. */
+  fx?: Fx;
+  /** Transparency: how much of the backdrop shows through panels and terminals. Unset is solid. */
+  clear?: Clear;
   /** Favourite pages, in bar order; shared by every browser window of the project. */
   favs: Fav[];
   /** The Browser Profile its browser windows open in (unset: the app's default). A Worktree uses its repo's. */
@@ -817,7 +822,7 @@ export function setProjectNotify(projectId: string, patch: ProjectNotify) {
   });
 }
 
-export function setAppearance(projectId: string, patch: Partial<Pick<Project, "accent" | "bg" | "dim">>) {
+export function setAppearance(projectId: string, patch: Partial<Pick<Project, "accent" | "bg" | "dim" | "fx" | "clear">>) {
   edit(projectId, (p) => Object.assign(p, patch));
 }
 
@@ -1111,6 +1116,8 @@ export function migrate(raw: any): Persisted {
       id: p.id, name: p.name, host: p.host || "local", path: p.path, tabs,
       ws: p.ws ?? 0, spaces,
       accent: p.accent ?? ACCENTS[i % ACCENTS.length], bg: p.bg ?? "none", dim: p.dim ?? 0,
+      ...(p.fx ? { fx: p.fx } : {}),
+      ...(p.clear ? { clear: p.clear } : {}),
       favs: p.favs ?? [], diffMode: p.diffMode, icon: p.icon, notify: p.notify, profile: p.profile,
       ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.title ? { title: p.title } : {}), ...(p.copy ? { copy: p.copy } : {}) } : {}),
       ...(p.setup ? { setup: p.setup } : {}),

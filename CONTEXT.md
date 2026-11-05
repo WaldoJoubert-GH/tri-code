@@ -116,7 +116,19 @@ The path field that is also the folder list: typing filters, `Enter` goes in or 
 What the sidebar draws for a project: a logo file from the project, an uploaded image, a lucide icon or the first letter. **Auto** is tri-code's pick (the first logo found, else the letter); any other choice in the Appearance panel is an override until "reset to auto".
 
 **Look**:
-The theme (System, Light or Dark) and the two fonts, Interface and Code, set in Settings › Appearance for the whole app (`look.ts`). A project's name, icon, accent and background are not part of it; they are in the project's Appearance panel. A saved font that isn't installed stays saved and the default shows until it is.
+The theme (System, Light or Dark) and the two fonts, Interface and Code, set in Settings › Appearance for the whole app (`look.ts`). A project's name, icon, accent, Backdrop, Backdrop Effect and Transparency are not part of it; they are in the project's Appearance panel. A saved font that isn't installed stays saved and the default shows until it is.
+
+**Backdrop**:
+What a project's windows sit on: its background (a preset drawn from the accent, or an uploaded image) with its Dim. A Worktree shows its repo's. It fills the canvas, or the whole window when Transparency takes in the sidebar and bars.
+_Avoid_: Wallpaper.
+
+**Backdrop Effect**:
+The Backdrop redrawn through Zeron's Dither or Halftone (`backdrop.ts`, ported under its MIT notice), laid over the picture at a Strength from 0 (off) to 100; in the picture's colours or the accent's alone. Drawn on a canvas, with the Dim in its pixels, so it runs again on a resize or a theme change.
+_Avoid_: Filter, shader.
+
+**Transparency**:
+How much of the Backdrop shows through panel windows and through terminals, each 0 to 85%, per project; optionally frosted (Blur) and taken into the sidebar, toolbar and status line at the panels' value. Browser windows stay solid: they are native webviews over the page.
+_Avoid_: Opacity (the text stays opaque), glass.
 
 **Configuration Export**:
 One JSON file (`format: "tri-code-config"`) holding the sections picked in Settings › Backup: Preferences (`settings`, `notify`, `gap`), Commands, Browser Profiles (names and colours only, never cookies or passwords), Environments (with `envSsh`) and Projects (place and appearance, with their uploaded backgrounds, icons and sounds inlined as data URLs). Made for moving to a new machine (`config.ts`). Worktrees, the Sample Project, window layouts, PIN Locks and Remote Control pairing are left out. **Import** previews each section, then merges: entries with a matching id are replaced, a project at the same host and path keeps its windows and takes the file's appearance, anything else is added, nothing is deleted. Read through the same `migrate()` as `state.json`, so older exports keep working.

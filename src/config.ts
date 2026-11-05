@@ -187,7 +187,7 @@ export function applyImport(s: Persisted, f: ConfigFile, picks: Section[], newId
       const here = exportable(s).find((q) => sameProject(q, p));
       const id = here?.id ?? newId();
       ids.set(fileId, id);
-      const fields = { name: p.name, accent: p.accent, bg: p.bg, dim: p.dim, favs: p.favs as Fav[], icon: p.icon, notify: p.notify, profile: p.profile, diffMode: p.diffMode, setup: p.setup, branchPrefix: p.branchPrefix };
+      const fields = { name: p.name, accent: p.accent, bg: p.bg, dim: p.dim, fx: p.fx, clear: p.clear, favs: p.favs as Fav[], icon: p.icon, notify: p.notify, profile: p.profile, diffMode: p.diffMode, setup: p.setup, branchPrefix: p.branchPrefix };
       // An uploaded file the export lacked falls back to the default.
       for (const a of assetsOf({ ...p, id: fileId })) {
         const dataUrl = f.assets[assetName(a)];

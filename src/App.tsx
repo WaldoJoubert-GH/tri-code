@@ -18,7 +18,8 @@ import { startAgentWindows } from "./agentwin";
 import { startAgentSetup } from "./agentsetup";
 import { SetupBanner } from "./SetupBanner";
 import { phoneStatus, startPhoneSync } from "./phone";
-import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
+import { AppearancePopover, Backdrop, appearanceOpen, setBgImage, toggleAppearance } from "./Appearance";
+import { clearLook } from "./backdrop";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
@@ -35,7 +36,7 @@ import { ProfileMenu, profileMenuOpen } from "./profiles";
 import { DownloadMenu, downloadMenuOpen } from "./downloads";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./Tour";
-import { applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
+import { applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
 import { applyLook, themeOf } from "./look";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { flash, flashMsg, toast, undoToast } from "./ui";
@@ -144,18 +145,20 @@ export default function App() {
   createEffect(() => setBrowsersOverlaid(appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
-  const backdrop = () => {
+  // The backdrop and Transparency are the active project's repo's.
+  const repo = () => {
     const p = activeProject();
-    const r = p && repoOf(p);
-    return r ? { background: backgroundCss(r), "--dim": String(r.dim / 100) } : { background: "var(--canvas)", "--dim": "0" };
+    return p && repoOf(p);
   };
+  const see = () => clearLook(repo()?.clear);
+  createEffect(() => applyTerminalClear());
 
   return (
-    <div class="app" classList={{ rail: app.sidebarCollapsed, peek: sidebarPeek() }}>
+    <div class="app" classList={{ rail: app.sidebarCollapsed, peek: sidebarPeek(), ...see().classes }} style={see().vars}>
+      <Backdrop project={repo()} />
       <Sidebar />
       <Toolbar />
       <div class="stage">
-        <div class="bg" style={backdrop()} />
         <Show when={activeProject()} keyed fallback={<div class="empty">{withKey("Open a project", "open-project")} to get started.</div>}>
           {(p) => <Show when={!envLocked(p.host)} fallback={<PinPad host={p.host} />}><Canvas project={p} /></Show>}
         </Show>
