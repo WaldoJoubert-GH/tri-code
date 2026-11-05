@@ -39,6 +39,8 @@ pub fn url() -> String {
 }
 
 const OPEN_TIMEOUT: Duration = Duration::from_secs(10);
+/// `git worktree add` checks out the whole tree, which takes a while in a big repo.
+const WORKTREE_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_WAIT: Duration = Duration::from_secs(300);
 const POLL: Duration = Duration::from_millis(200);
 /// Lines of output a read or a wait returns.
@@ -78,6 +80,7 @@ pub struct Window {
 /// Who a request comes from: the project and window its token belongs to.
 pub struct Caller {
     pub project: String,
+    pub tab: String,
 }
 
 /// The pure state: tokens, windows, the allowed Commands and the opens waiting to start.
@@ -135,7 +138,14 @@ impl Registry {
     pub fn caller(&self, token: &str) -> Option<Caller> {
         let tab = self.tokens.get(token)?;
         let w = self.windows.get(tab)?;
-        Some(Caller { project: w.project.clone() })
+        Some(Caller { project: w.project.clone(), tab: w.tab.clone() })
+    }
+
+    /// A window's tab moved to another project: its token now sees that project's windows.
+    pub fn move_window(&mut self, tab: &str, project: &str) {
+        if let Some(w) = self.windows.get_mut(tab) {
+            w.project = project.to_string();
+        }
     }
 
     /// A window the caller may see: one in its own project.
@@ -403,6 +413,36 @@ async fn close(State(hub): State<Arc<AgentWindows>>, headers: HeaderMap, Path(id
 }
 
 #[derive(Deserialize)]
+struct WorktreeBody {
+    branch: String,
+}
+
+/// Make a Worktree and move the calling window to it. The webview does both (agentworktree.ts) and
+/// answers with `agent_worktree_made`, or `agent_open_failed` with the reason.
+async fn worktree(State(hub): State<Arc<AgentWindows>>, headers: HeaderMap, axum::Json(body): axum::Json<WorktreeBody>) -> Reply {
+    let c = caller(&hub, &headers)?;
+    if body.branch.trim().is_empty() {
+        return Err(fail(StatusCode::BAD_REQUEST, "branch is empty"));
+    }
+    let req = new_token();
+    let (tx, rx) = oneshot::channel();
+    hub.reg.lock().unwrap().park(req.clone(), tx);
+    let sent = hub.app.emit("agent-worktree", json!({ "req": req, "project": c.project, "tab": c.tab, "branch": body.branch }));
+    if let Err(e) = sent {
+        hub.reg.lock().unwrap().unpark(&req);
+        return Err(fail(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
+    match tokio::time::timeout(WORKTREE_TIMEOUT, rx).await {
+        Ok(Ok(Ok(made))) => serde_json::from_str(&made).map(axum::Json).map_err(|e| fail(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+        Ok(Ok(Err(e))) => Err(fail(StatusCode::CONFLICT, e)),
+        _ => {
+            hub.reg.lock().unwrap().unpark(&req);
+            Err(fail(StatusCode::GATEWAY_TIMEOUT, "the worktree wasn't ready in time; check the sidebar before trying again"))
+        }
+    }
+}
+
+#[derive(Deserialize)]
 struct SessionBody {
     kind: String,
     id: String,
@@ -430,6 +470,7 @@ async fn session(State(hub): State<Arc<AgentWindows>>, headers: HeaderMap, axum:
 fn router(hub: Arc<AgentWindows>) -> Router {
     Router::new()
         .route("/v1/session", axum::routing::post(session))
+        .route("/v1/worktrees", axum::routing::post(worktree))
         .route("/v1/windows", get(list).post(open))
         .route("/v1/windows/{id}", get(status).delete(close))
         .route("/v1/windows/{id}/output", get(output))
@@ -462,6 +503,15 @@ pub fn agent_allowed(hub: tauri::State<'_, Arc<AgentWindows>>, allowed: HashMap<
 #[tauri::command]
 pub fn agent_open_failed(hub: tauri::State<'_, Arc<AgentWindows>>, req: String, error: String) {
     hub.resolve(&req, Err(error));
+}
+
+/// The Worktree an agent asked for is made and its window has moved there. The move comes first, so
+/// the agent's next call already sees the new project.
+#[tauri::command]
+pub fn agent_worktree_made(hub: tauri::State<'_, Arc<AgentWindows>>, req: String, tab: String, project: String, made: Value) {
+    let mut reg = hub.reg.lock().unwrap();
+    reg.move_window(&tab, &project);
+    reg.resolve(&req, Ok(made.to_string()));
 }
 
 #[cfg(test)]
@@ -503,6 +553,19 @@ mod tests {
         assert!(r.window(&a, "t2").is_none());
         assert_eq!(r.windows_of("tri").count(), 1);
         assert!(r.caller("nope").is_none());
+    }
+
+    #[test]
+    fn a_moved_window_sees_its_new_project_with_the_same_token() {
+        let mut r = Registry::default();
+        r.issue(&owner("tri", "t1"), 1, "tok-a".into());
+        r.issue(&owner("tri-wt", "t2"), 2, "tok-b".into());
+        r.move_window("t1", "tri-wt");
+        let a = r.caller("tok-a").unwrap();
+        assert_eq!(a.project, "tri-wt");
+        assert_eq!(a.tab, "t1");
+        assert!(r.window(&a, "t2").is_some());
+        assert_eq!(r.windows_of("tri").count(), 0);
     }
 
     #[test]

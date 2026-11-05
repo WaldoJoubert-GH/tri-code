@@ -114,6 +114,8 @@ export type Tab = {
   cmd?: string;
   /** Local `term` tabs: the agent's conversation, so a new process can reopen it when the old one is gone. */
   resume?: AgentSession;
+  /** `term` tabs moved to another project (moveTab): the session name they started with, so they still attach to it. */
+  session?: string;
   /** `term` tabs with a multi-line `cmd`: its lines were typed into the shell, so a restart or reattach doesn't type them again. */
   typed?: true;
   /** `term` tabs only: a Worktree's setup (setup.ts). Its window closes when the command succeeds. */
@@ -374,7 +376,7 @@ export const isRemote = (p: Project) => p.host !== "local" && p.host !== "";
 export const isLocalHost = (host: string) => host === "local" || host === "";
 
 /** Stable name of the persistent remote session behind a tab. */
-export const sessionName = (p: Project, t: Tab) => `tri-${p.id}-${t.id}`;
+export const sessionName = (p: Project, t: Tab) => t.session ?? `tri-${p.id}-${t.id}`;
 
 const newSpace = (): Space => ({ layout: "master", ratio: 0.55 });
 
@@ -610,6 +612,33 @@ export function removeTab(projectId: string, tabId: string) {
     }
   });
   setLive(produce((l) => delete l[tabId]));
+}
+
+/** Move a tab to another project's active workspace and focus it there. Its terminal keeps running:
+ *  it keeps the session name it started with, so a later launch still attaches to it. */
+export function moveTab(fromId: string, toId: string, tabId: string) {
+  if (fromId === toId) return;
+  setApp(produce((s) => {
+    const from = s.projects.find((p) => p.id === fromId);
+    const to = s.projects.find((p) => p.id === toId);
+    const i = from?.tabs.findIndex((t) => t.id === tabId) ?? -1;
+    if (!from || !to || i < 0) return;
+    const name = sessionName(from, from.tabs[i]);
+    const [tab] = from.tabs.splice(i, 1);
+    const sp = from.spaces[tab.space];
+    if (sp.mono === tabId) sp.mono = undefined;
+    if (sp.focus === tabId) {
+      const same = from.tabs.filter((t) => t.space === tab.space && !t.min);
+      const before = same.filter((t) => from.tabs.indexOf(t) < i).pop();
+      sp.focus = (before ?? same[0])?.id;
+    }
+    tab.session = name;
+    tab.space = to.ws;
+    delete tab.min;
+    to.tabs.push(tab);
+    to.spaces[to.ws].focus = tabId;
+    to.spaces[to.ws].mono = undefined;
+  }));
 }
 
 /** Re-insert a tab removed with removeTab (undo), at its old index. */
@@ -848,6 +877,16 @@ export function becomeShell(projectId: string, tabId: string) {
 /** The conversation this tab reopens after a restart; unset starts a new one. */
 export function setTabResume(projectId: string, tabId: string, resume: AgentSession | undefined) {
   editTab(projectId, tabId, (t) => { t.resume = resume; });
+}
+
+/** Whether tri-code can start this tab's pi over in another folder with its conversation: a plain
+ *  `pi` it launched itself, which resume.rs can add flags to (`agent_of`), with a session id. */
+export function piCanFollow(t: Pick<Tab, "cmd" | "resume" | "once">): boolean {
+  const cmd = t.cmd?.trim() ?? "";
+  if (t.once || t.resume?.kind !== "pi" || /[&|;<>`$%^()\n"']/.test(cmd)) return false;
+  const [program, ...flags] = cmd.split(/\s+/);
+  const choosing = ["-r", "--resume", "-c", "--continue", "--session", "--session-id", "--settings", "--fork", "--no-session", "-p", "--print", "--export", "--session-dir", "--fork-session"];
+  return ["pi", "pi.cmd", "pi.exe"].includes(program) && !flags.some((f) => choosing.includes(f.split("=")[0]));
 }
 
 /** Two tabs can't reopen one conversation: the first keeps it, a later one starts new. Pure, for bun test. */

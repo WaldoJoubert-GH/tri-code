@@ -19,6 +19,10 @@ use crate::agent_setup;
 pub struct Resume {
     pub kind: String,
     pub id: String,
+    /// pi only, for one launch: copy this session into the current folder as `id`. pi keeps sessions
+    /// per folder, so this is how a conversation follows its tab to a Worktree (agentworktree.ts).
+    #[serde(default)]
+    pub fork: Option<String>,
 }
 
 /// What to run, and any environment the command refers to.
@@ -68,20 +72,40 @@ pub fn build(cmd: &str, resume: Option<&Resume>, settings: Option<&str>) -> Stri
             }
             out
         }
-        "pi" => match id {
-            Some(id) => format!("{cmd} --session-id {id}"),
-            None => cmd.to_string(),
+        "pi" => match (id, fork_of(resume)) {
+            (Some(id), Some(from)) => format!("{cmd} --fork {from} --session-id {id}"),
+            (Some(id), None) => format!("{cmd} --session-id {id}"),
+            _ => cmd.to_string(),
         },
         _ => cmd.to_string(),
     }
 }
 
+/// The session to fork, if this launch forks one and the id is safe on a command line.
+fn fork_of(resume: Option<&Resume>) -> Option<&str> {
+    resume.filter(|r| r.kind == "pi" && valid_id(&r.id)).and_then(|r| r.fork.as_deref()).filter(|f| valid_id(f))
+}
+
 const SETTINGS_VAR: &str = "TRICODE_CLAUDE_SETTINGS";
+const NOTE_VAR: &str = "TRICODE_PI_NOTE";
+/// pi's first message after following its tab to a Worktree, so it carries on without being asked.
+const FORK_NOTE: &str = "tri-code restarted you in the new worktree to continue this conversation: your working directory is now that worktree. Carry on with what you were doing there.";
+
+/// A forked pi with its first message added. It goes in a variable on Windows for the reason the
+/// hook's path does (see `launch`).
+fn with_note(cmd: String, windows: bool) -> Launch {
+    if windows {
+        Launch { cmd: format!("{cmd} %{NOTE_VAR}%"), env: vec![(NOTE_VAR.into(), format!("\"{FORK_NOTE}\""))] }
+    } else {
+        Launch { cmd: format!("{cmd} {}", crate::spawn::sq(FORK_NOTE)), env: Vec::new() }
+    }
+}
 
 /// What a tab's command becomes when it starts locally.
 pub fn launch(app: &AppHandle, cmd: &str, resume: Option<&Resume>) -> Launch {
     if agent_of(cmd) != Some("claude") {
-        return Launch { cmd: build(cmd, resume, None), env: Vec::new() };
+        let built = build(cmd, resume, None);
+        return if agent_of(cmd) == Some("pi") && fork_of(resume).is_some() { with_note(built, cfg!(windows)) } else { Launch { cmd: built, env: Vec::new() } };
     }
     let Some(file) = hook_settings(app) else {
         return Launch { cmd: build(cmd, resume, None), env: Vec::new() };
@@ -127,10 +151,40 @@ mod tests {
     use super::*;
 
     fn r(kind: &str, id: &str) -> Resume {
-        Resume { kind: kind.into(), id: id.into() }
+        Resume { kind: kind.into(), id: id.into(), fork: None }
     }
 
     const ID: &str = "0b6b1c1e-7a11-4a57-9d6a-2f9a4c3e8f10";
+    const OLD: &str = "01a186b9-071f-779e-818b-5c57baf79c7b";
+
+    #[test]
+    fn a_followed_pi_forks_its_old_session_into_the_new_id() {
+        let f = Resume { fork: Some(OLD.into()), ..r("pi", ID) };
+        assert_eq!(build("pi", Some(&f), None), format!("pi --fork {OLD} --session-id {ID}"));
+    }
+
+    #[test]
+    fn a_fork_id_that_could_run_something_is_ignored() {
+        let f = Resume { fork: Some("a & calc".into()), ..r("pi", ID) };
+        assert_eq!(build("pi", Some(&f), None), format!("pi --session-id {ID}"));
+        assert!(fork_of(Some(&f)).is_none());
+    }
+
+    #[test]
+    fn only_pi_forks() {
+        let f = Resume { fork: Some(OLD.into()), ..r("claude", ID) };
+        assert_eq!(build("claude", Some(&f), None), format!("claude --resume {ID}"));
+    }
+
+    #[test]
+    fn the_note_reaches_pi_as_one_argument() {
+        let w = with_note("pi".into(), true);
+        assert_eq!(w.cmd, format!("pi %{NOTE_VAR}%"));
+        assert_eq!(w.env, vec![(NOTE_VAR.to_string(), format!("\"{FORK_NOTE}\""))]);
+        // Inside the quotes cmd.exe still reads these, and a shell reads the last.
+        assert!(!FORK_NOTE.contains(['"', '%', '^', '\'', '&', '|', '<', '>', '(', ')']));
+        assert_eq!(with_note("pi".into(), false).cmd, format!("pi '{FORK_NOTE}'"));
+    }
 
     #[test]
     fn claude_gets_the_hook_and_its_session() {
