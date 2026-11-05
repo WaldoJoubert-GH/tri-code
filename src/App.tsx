@@ -15,6 +15,7 @@ import { CtxMenu, ctxMenuOpen } from "./ctxmenu";
 import ClaudeUsage, { CommandCodeUsage } from "./Usage";
 import { SettingsDialog, hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { startAgentWindows } from "./agentwin";
+import { startAgentWorktrees } from "./agentworktree";
 import { startAgentSetup } from "./agentsetup";
 import { SetupBanner } from "./SetupBanner";
 import { phoneStatus, startPhoneSync } from "./phone";
@@ -88,6 +89,7 @@ export default function App() {
   persistChanges(ready);
   createEffect(on(ready, (r) => r && startPhoneSync(), { defer: true }));
   createEffect(on(ready, (r) => r && startAgentWindows(), { defer: true }));
+  createEffect(on(ready, (r) => r && startAgentWorktrees(), { defer: true }));
   createEffect(on(ready, (r) => r && startAgentSetup(), { defer: true }));
 
   // Start a session for every terminal tab once, including tabs added later.

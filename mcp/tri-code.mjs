@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // tri-code's MCP server for agent windows: lets the agent in a tri-code terminal open, read and
-// type into, wait on and close the terminal windows of its own project. It speaks MCP over stdio
+// type into, wait on and close the terminal windows of its own project, and make a Worktree and
+// move there. It speaks MCP over stdio
 // with no dependencies. tri-code sets TRICODE_URL and TRICODE_TOKEN in every terminal; the
 // endpoint (src-tauri/src/agent_windows.rs) decides what the token may see.
 
@@ -67,6 +68,16 @@ const TOOLS = [
     description: "Close a window that an agent opened. Windows you opened are not closed by agents.",
     inputSchema: { type: "object", properties: { window: WINDOW }, required: ["window"] },
   },
+  {
+    name: "create_worktree",
+    description:
+      "Make a tri-code Worktree of this project (its folder, sidebar row and saved setup script) and move this window to it. Use it instead of EnterWorktree's name option or git worktree add when the user asks for a worktree. Afterwards, switch your working directory to the path it returns.",
+    inputSchema: {
+      type: "object",
+      properties: { branch: { type: "string", description: "The branch name. A new branch gets the repo's branch prefix; an existing branch is checked out as it is." } },
+      required: ["branch"],
+    },
+  },
 ];
 
 async function api(method, path, body) {
@@ -114,6 +125,16 @@ async function run(name, args) {
       await api("DELETE", `/windows/${win(args)}`);
       return "closed";
     }
+    case "create_worktree": {
+      const r = await api("POST", "/worktrees", { branch: args.branch });
+      return [
+        `Worktree on branch ${r.branch} at ${r.path}. This window has moved there in tri-code, but your working directory has not.`,
+        r.restart
+          ? "tri-code restarts you in that folder, with this conversation, as soon as this turn ends. Don't call any more tools or edit anything: end your turn now with one short line."
+          : `Claude: call EnterWorktree with path "${r.path}" now. If you already entered a worktree this session, call ExitWorktree with action "keep" first. Other agents: use that folder's full path for every file and command, because your process is still in the old folder.`,
+        ...(r.setup ? [`Its setup script is running in window ${r.setup}. The window closes when it succeeds and stays open if it fails.`] : []),
+      ].join("\n");
+    }
     default:
       throw new Error(`unknown tool ${name}`);
   }
@@ -133,6 +154,8 @@ async function handle(msg) {
         protocolVersion: params.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
         serverInfo: { name: "tri-code", version: "0.1.0" },
+        instructions:
+          "When the user asks to create or work in a worktree, call create_worktree here first, not EnterWorktree with a name or git worktree add, then do what its answer says. That keeps the worktree in tri-code's sidebar with the repo's setup, and this window with it.",
       };
     } else if (method === "ping") {
       result = {};

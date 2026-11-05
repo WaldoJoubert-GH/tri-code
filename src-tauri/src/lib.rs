@@ -185,6 +185,7 @@ pub fn run() {
             pty::remote_kill_session,
             agent_windows::agent_allowed,
             agent_windows::agent_open_failed,
+            agent_windows::agent_worktree_made,
             agent_setup::agent_setup_status,
             agent_setup::agent_setup_install,
             agent_setup::agent_setup_remove,

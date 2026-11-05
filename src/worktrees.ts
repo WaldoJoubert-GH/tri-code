@@ -14,6 +14,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { type Agent, type Project, addTab, addWorktree, app, focusTab, isLocalHost, projectById, repoOf, setApp, worktreesOf } from "./state";
+import { cleanPrefix, toBranch } from "./branchname";
 import { setupCommand, setupLines } from "./setup";
 import { launchAgent } from "./agents";
 import { dropProject } from "./Sidebar";
@@ -173,21 +174,13 @@ export async function startNextFeature(p: Project, branch: string): Promise<void
   flash([`${branch} in ${made.join(", ") || "no repo"}`, dirty.length ? `${dirty.join(", ")} has uncommitted changes, so it stayed` : ""].filter(Boolean).join(" · "));
 }
 
-/** A branch name from free text: lowercase, words joined by `-`, `/` kept for prefixes. */
-export const toBranch = (text: string) =>
-  text.trim().toLowerCase().replace(/[^a-z0-9/._-]+/g, "-").replace(/-{2,}/g, "-").replace(/^[-/.]+|[-/.]+$/g, "").slice(0, 60);
+export { cleanPrefix, toBranch };
 
 /** The branch for an issue, with its Slug-ID first so the git window links the two. */
 export function issueBranch(slug: string, title: string): string {
   const b = toBranch(`${slug}-${title}`);
   return b.length <= 40 ? b : b.slice(0, 41).replace(/-[^-]*$/, "");
 }
-
-/** A branch prefix as git gets it (`Waldo` → `waldo/`): ending in one `/`, or "" for none. */
-export const cleanPrefix = (prefix?: string) => {
-  const t = toBranch(prefix ?? "").replace(/\/+$/, "");
-  return t ? `${t}/` : "";
-};
 
 /** `branch` less the repo's branch prefix (or `prefix`): what its folder and sidebar label show. */
 export function unprefixed(repo: Project, branch: string, prefix = repo.branchPrefix): string {
@@ -252,13 +245,16 @@ export const setupFor = (repo: Project, branch: string, script: string, prefix =
 
 /** Make a Worktree of `repo` on `branch` (from `base` if new) and switch to it. In the new checkout,
  *  `setup` gets a window of its own and the focus, which closes once it succeeds (setup.ts); each of
- *  `open` opens beside it. They start together: nothing waits for the setup to finish. */
-export async function createWorktree(repo: Project, branch: string, opts: { base: string; issue?: string; setup?: string; open: Agent[] }): Promise<void> {
+ *  `open` opens beside it. They start together: nothing waits for the setup to finish. `background`
+ *  leaves the view where it is. Returns the Worktree and its setup window. */
+export async function createWorktree(repo: Project, branch: string, opts: { base: string; issue?: string; setup?: string; open: Agent[]; background?: boolean }): Promise<{ project: string; setup?: string }> {
   const taken = worktreesOf(repo.id).find((w) => w.branch === branch);
   if (taken) {
-    setApp("activeProject", taken.id);
-    flash(`${branch} already has a worktree`);
-    return;
+    if (!opts.background) {
+      setApp("activeProject", taken.id);
+      flash(`${branch} already has a worktree`);
+    }
+    return { project: taken.id };
   }
   const dir = worktreeDir(repo, branch);
   const kind = kinds[repo.id] ?? (await scanFolder(repo));
@@ -268,20 +264,22 @@ export async function createWorktree(repo: Project, branch: string, opts: { base
   } else {
     copy = { repos: await copyFolder(repo, dir, branch, kind.repos) };
   }
-  const id = addWorktree(repo.id, { path: dir, branch, issue: opts.issue, ...(copy ? { copy } : {}) });
+  const id = addWorktree(repo.id, { path: dir, branch, issue: opts.issue, ...(copy ? { copy } : {}) }, !opts.background);
   const p = projectById(id);
+  let setup: string | undefined;
   if (p) {
     const lines = setupFor(repo, branch, opts.setup ?? "");
     // PowerShell only for a project on this Windows machine; an ssh host runs its own login shell.
     const windows = isLocalHost(repo.host) && /Windows/i.test(navigator.userAgent);
-    const setup = lines.length
+    setup = lines.length
       ? addTab(p.id, "term", { agent: { id: "setup", name: "setup", command: setupCommand(lines, windows), icon: "wrench" }, once: true })
       : undefined;
     for (const a of opts.open) launchAgent(p, a);
-    if (setup) focusTab(p.id, setup);
+    if (setup && !opts.background) focusTab(p.id, setup);
   }
   flash(`${copy ? "copy" : "worktree"} ${branch} · ${dir}`);
   void loadWorktrees(repo);
+  return { project: id, setup };
 }
 
 /** Copy `repo`'s folder to `dir` without its nested repos, then add each back as a git worktree on

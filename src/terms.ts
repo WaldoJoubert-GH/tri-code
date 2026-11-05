@@ -18,6 +18,8 @@ import { isKey } from "./keymap";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;
+/** How long pi gets to end its turn before it follows its tab to a Worktree anyway. */
+const FOLLOW_TIMEOUT_MS = 30_000;
 
 const DARK = {
   background: "#0e0f12",
@@ -91,6 +93,11 @@ class TermSession {
   private cmd: string;
   /** A multi-line command's lines, still to be typed into its login shell ("" once typed). */
   private script: string;
+  /** Set while this tab's pi is finishing its turn before it follows the tab (followAfterTurn). */
+  private turnEnded?: () => void;
+  private followTimer?: ReturnType<typeof setTimeout>;
+  /** For the next start only: the session pi copies into this folder. */
+  private forkFrom?: string;
   /** Which start() is current: a PTY from an earlier one is ignored. */
   private run = 0;
   private retry?: ReturnType<typeof setTimeout>;
@@ -276,11 +283,13 @@ class TermSession {
     const prev = live[this.tab.id]?.agent;
     if (state !== "working" && state !== "blocked" && state !== "done" && state !== "error") {
       if (prev) this.update({ agent: undefined });
+      this.turnEnded?.();
       return;
     }
     const looking = this.visible && document.hasFocus();
     this.update({ agent: { state: state as AgentState, msg, at: prev?.state === state ? prev.at : Date.now(), seen: looking } });
     if (prev?.state !== state) onSignal(this.project.id, this.tab, state as AgentState, msg, looking);
+    if (state !== "working" && state !== "blocked") this.turnEnded?.();
   }
 
   /** On screen in a focused app: a bell or a finished report has been seen. */
@@ -295,6 +304,46 @@ class TermSession {
     if (this.disposed) return;
     if (patch.status) this.status = patch.status;
     setLive(this.tab.id, (prev) => ({ ...{ status: this.status, attention: false, title: "" }, ...prev, ...patch }));
+  }
+
+  /** Its tab moved to another project (state.moveTab). The program keeps running where it is. */
+  rehome(project: Project) {
+    this.project = project;
+  }
+
+  /** pi can't change folder while it runs, so once this turn ends it starts over in the project's
+   *  folder, on a copy of its conversation. It may never report the end (or may ignore being told to
+   *  stop), so a timeout does it instead, unless it is waiting on you. */
+  followAfterTurn() {
+    const go = () => {
+      this.cancelFollow();
+      this.restartForked();
+    };
+    const wait = () => {
+      this.followTimer = setTimeout(() => (live[this.tab.id]?.agent?.state === "blocked" ? wait() : go()), FOLLOW_TIMEOUT_MS);
+    };
+    this.turnEnded = go;
+    wait();
+  }
+
+  private cancelFollow() {
+    this.turnEnded = undefined;
+    clearTimeout(this.followTimer);
+  }
+
+  private restartForked() {
+    const old = this.tab.resume;
+    if (this.disposed || this.ptyId === undefined || old?.kind !== "pi") return;
+    const pty = this.ptyId;
+    this.run++;
+    this.ptyId = undefined;
+    call("pty_kill", { id: pty });
+    this.forkFrom = old.id;
+    setTabResume(this.project.id, this.tab.id, { kind: "pi", id: crypto.randomUUID() });
+    this.update({ agent: undefined });
+    this.status = "connecting";
+    this.term.write(`\r\n\x1b[90m[restarting pi in ${this.project.path}]\x1b[0m\r\n`);
+    void this.start();
   }
 
   /** Its Environment now points at another destination: end the session on the old host and start
@@ -366,6 +415,8 @@ class TermSession {
     const resume = !remote && this.cmd && !this.tab.once ? this.tab.resume : undefined;
     if (resume && this.run === 1) await resumeSlot();
     if (run !== this.run || this.disposed) return;
+    const fork = this.forkFrom;
+    this.forkFrom = undefined;
     try {
       const started = await invoke<Started>("pty_spawn", {
         spec: {
@@ -373,7 +424,7 @@ class TermSession {
           cwd: this.project.path,
           cmd: this.cmd || null,
           session: sessionName(this.project, this.tab),
-          resume: resume ? { kind: resume.kind, id: resume.id } : null,
+          resume: resume ? { kind: resume.kind, id: resume.id, fork: fork ?? null } : null,
         },
         cols,
         rows,
@@ -425,6 +476,7 @@ class TermSession {
 
   private exited(code: number) {
     this.ptyId = undefined;
+    this.cancelFollow();
     if (this.disposed) return;
     this.update({ pty: undefined });
     if (isRemote(this.project) && code === SSH_CONNECTION_FAILED) {
@@ -694,6 +746,16 @@ export function pasteText(tabId: string, text: string): boolean {
 /** The tour: make a scripted pi stop and ask for permission. */
 export function askDemo(tabId: string) {
   sessions.get(tabId)?.askDemo();
+}
+
+/** Start this tab's pi over in its project's folder once its turn ends. */
+export function followAfterTurn(tabId: string): void {
+  sessions.get(tabId)?.followAfterTurn();
+}
+
+/** A terminal's tab moved to `project`: its session follows. */
+export function rehomeSession(tabId: string, project: Project): void {
+  sessions.get(tabId)?.rehome(project);
 }
 
 /** Restart these terminals after their Environment moved off `oldHost` (state.moveEnvironment). */
