@@ -538,6 +538,32 @@ canvas.bg { display: block; width: 100%; height: 100%; }
 /* Remote control is on: a green phone, with how many are connected */
 .status .bellbtn.phonebtn { width: auto; min-width: 24px; padding: 0 5px; display: flex; gap: 4px; color: var(--ok); font-size: 11px; }
 
+/* Leftovers (leftovers.ts): the status line's chip, a sidebar row's count, and the popover */
+.status .bellbtn.leftbtn { width: auto; padding: 0 6px; display: flex; gap: 5px; color: var(--warn); font-size: 11px; white-space: nowrap; }
+.left-count {
+  flex: none; font: 600 10px/14px var(--mono); padding: 0 5px; border-radius: 8px; color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 50%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+.left-count:hover { background: color-mix(in srgb, var(--warn) 26%, transparent); }
+.rail:not(.peek) .left-count { display: none; }
+.wt.stale { color: var(--muted); }
+.wt.stale .wtile { background: var(--panel); border: 1px dashed var(--muted); color: var(--muted); }
+.wt.stale .sub { font: 10.5px var(--mono); }
+.pop.leftovers { width: 360px; padding: 10px 0 8px; gap: 6px; }
+.pop.leftovers .ttl { padding: 0 12px; }
+.pop.leftovers .ttl .danger { margin-left: auto; font-size: 11.5px; font-weight: 400; padding: 1px 8px; border-radius: 4px; color: var(--bad); border: 1px solid color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.pop.leftovers .ttl .danger:hover { background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.pop.leftovers .note, .pop.leftovers .snote { padding: 0 12px; }
+.pop.leftovers .lrows { max-height: 300px; overflow-y: auto; }
+.pop.leftovers .lrow { display: flex; align-items: center; gap: 8px; padding: 4px 12px; font-size: 12px; }
+.pop.leftovers .lrow:hover { background: var(--hover); }
+.pop.leftovers .lrow > span:first-child { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; background: var(--raised); color: var(--muted); }
+.pop.leftovers .lk-stray, .pop.leftovers .lk-ghost { color: var(--warn) !important; }
+.pop.leftovers .lmain { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop.leftovers .lmain span { margin-left: 6px; color: var(--muted); font: 11px var(--mono); }
+.pop.leftovers .lend { flex: none; font-size: 11px; padding: 1px 7px; border-radius: 4px; color: var(--muted); border: 1px solid var(--line); }
+.pop.leftovers .lend:hover { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+
 /* Feedback popover (status line) */
 .pop.feedback { width: 340px; }
 .pop.feedback .ttl .seg { margin: 0 0 0 auto; }

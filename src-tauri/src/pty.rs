@@ -273,6 +273,11 @@ impl Ptys {
         self.sessions.lock().unwrap().len()
     }
 
+    /// Each running terminal's id and key, leaving out those already asked to end.
+    pub fn keys(&self) -> Vec<(u32, String)> {
+        self.sessions.lock().unwrap().iter().filter(|(_, s)| !s.killed.load(Ordering::Relaxed)).map(|(id, s)| (*id, s.key.clone())).collect()
+    }
+
     /// Lets go of the host at app exit. Its terminals carry on.
     pub fn detach(&self) {
         if let Some(c) = self.conn.lock().unwrap().take() {
@@ -342,6 +347,9 @@ impl Ptys {
         conn.waiting.lock().unwrap().insert(req, Waiting { tx, session });
         let mut env: Vec<(String, String)> = std::env::vars().collect();
         env.extend(extra_env);
+        // Inherited by all it starts, so a program left running after the tab closes is known as one
+        // of tri-code's (leftovers.rs) and never mistaken for an editor started in the folder.
+        env.push((crate::leftovers::SESSION_ENV.into(), key.clone()));
         conn.send(&ToHost::Spawn { req, key, meta: token, program: prog.program, args: prog.args, cwd: prog.cwd, env, cols, rows })?;
         rx.recv_timeout(Duration::from_secs(15)).map_err(|_| HOST_GONE.to_string())?
     }

@@ -25,6 +25,8 @@ import { withKey } from "./keymap";
 import { isMac } from "./modkey";
 import { envLocked, lockEnv } from "./envlock";
 import { settingsOpen, toggleSettings } from "./Settings";
+import { LeftoverCount } from "./LeftoversPopover";
+import { endLeftover, staleCheckouts } from "./leftovers";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
 const FULL = 220;
@@ -196,6 +198,8 @@ export default function Sidebar() {
     const s = app.activeProject === p.id ? null : topSig(p.tabs, true);
     return s ? { s, n: p.tabs.filter((t) => sigOf(t) === s).length } : null;
   };
+  /** The repo lists its checkouts under it: it has Worktrees, or a folder of one git forgot. */
+  const hasRows = (p: Project) => worktreesOf(p.id).length > 0 || staleCheckouts(p.id).length > 0;
   /** The repo project or one of its Worktrees is the active project. */
   const inFamily = (p: Project) => app.activeProject === p.id || worktreesOf(p.id).some((w) => w.id === app.activeProject);
 
@@ -250,6 +254,7 @@ export default function Sidebar() {
         <Show when={shelf}>
           <span class="sub">{shelvedRepo ? labelOf(w).text : repo().name}{isLocalHost(repo().host) ? "" : ` · ${envName(repo().host)}`}</span>
         </Show>
+        <Show when={!shelf}><LeftoverCount place={w.id} /></Show>
         <Show when={locked()} fallback={<span class="count">{w.tabs.length || ""}</span>}>
           <span class="lk" title={`${envName(repo().host)} is locked`}><Icon name="lock" size={11} /></span>
         </Show>
@@ -452,6 +457,7 @@ export default function Sidebar() {
                       <For each={miniBar(p)}>{(c) => <i style={{ flex: String(c.n), background: c.color }} />}</For>
                     </span>
                   </Show>
+                  <Show when={!hasRows(p)}><LeftoverCount place={p.id} /></Show>
                   <span class="count">{worktreesOf(p.id).length ? "" : p.tabs.length || ""}</span>
                   <Show when={!p.sample}>
                     <button
@@ -477,11 +483,22 @@ export default function Sidebar() {
                   </button>
                   <button class="x" title="Remove project" aria-label={`Remove ${p.name}`} onClick={(e) => (e.stopPropagation(), remove(p))}>×</button>
                 </div>
-                <Show when={worktreesOf(p.id).length}>
+                <Show when={hasRows(p)}>
                   {/* Every checkout of the repo, the repo's own folder first: one row each, open or
-                      collapsed, with the tile in the same place so nothing moves when the rail peeks. */}
+                      collapsed, with the tile in the same place so nothing moves when the rail peeks.
+                      A folder git no longer lists follows, dashed, until it is deleted. */}
                   <div class="wts" classList={{ "drop-after": dropAt()?.id === p.id && dropAt()!.after }} data-drop={p.id}>
                     <For each={[p, ...worktreesOf(p.id)]}>{(w) => wtRow(w)}</For>
+                    <For each={staleCheckouts(p.id)}>
+                      {(l) => (
+                        <div class="wt stale" title={`${l.dir}\nGit doesn't list this folder as a worktree any more: the rest of a removal that couldn't finish.`}>
+                          <span class="wtile"><Icon name="folder-x" size={11} /></span>
+                          <span class="bn">{l.label}</span>
+                          <span class="sub">not in git</span>
+                          <button class="x" title="Delete this folder" aria-label={`Delete ${l.label}`} onClick={(e) => (e.stopPropagation(), void endLeftover(l))}>×</button>
+                        </div>
+                      )}
+                    </For>
                     <button class="wt new" title={withKey("New worktree", "new-worktree")} onClick={() => openNewWorktree(p)}>
                       <span class="wtile"><HoldFace id="new-worktree" when={inFamily(p)}><Icon name="git-branch-plus" size={12} /></HoldFace></span><span class="bn">New worktree</span>
                     </button>

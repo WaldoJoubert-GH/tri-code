@@ -44,6 +44,8 @@ webpki-roots = { version = "1.0.11", optional = true }
 mongodb = { version = "3.9.1", default-features = false, features = ["rustls-tls", "dns-resolver", "compat-3-0-0"], optional = true }
 futures-util = { version = "0.3.34", default-features = false, optional = true }
 fontdb = "0.24.0"
+# Leftovers (leftovers.rs): each process's working folder, command line and environment, on every OS.
+sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 
 # Dev builds: keep link time and memory low (4 GB build machines).
 [profile.dev]

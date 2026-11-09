@@ -20,6 +20,7 @@ import { launchAgent } from "./agents";
 import { dropProject } from "./Sidebar";
 import { folderStatus, gitOf, peekStatus } from "./git";
 import { ask, flash } from "./ui";
+import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "./leftovers";
 
 /** One entry of `git worktree list`. */
 export type GitWorktree = { path: string; branch: string | null; main: boolean };
@@ -28,9 +29,6 @@ export type GitWorktree = { path: string; branch: string | null; main: boolean }
 export const [listed, setListed] = createStore<Record<string, GitWorktree[]>>({});
 
 const norm = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-/** git prints absolute paths; a project's path may start with `~`, so compare what follows it. */
-const samePath = (gitPath: string, path: string) =>
-  path.startsWith("~") ? norm(gitPath).endsWith(norm(path.slice(1))) : norm(gitPath) === norm(path);
 
 /** What a project's folder is, for New worktree: a repo, or a folder to copy with the repos nested in it. Runtime only. */
 export type FolderKind = { git: true } | { git: false; repos: string[] };
@@ -331,7 +329,9 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
     dirty.length ? `throw away uncommitted changes in ${dirty.join(", ")}` : "",
     `delete ${p.path}`,
   ].filter(Boolean).join("; ");
-  if (!await ask(`Finish ${title}? This will ${what}.`)) return;
+  const held = await holdersOf(p);
+  const lines = held.end.length ? `\n\nLeft running there, ended with it:${held.end.map((l) => `\n  ${l.label} · ${l.detail}`).join("")}` : "";
+  if (!await ask(`Finish ${title}? This will ${what}.${lines}`)) return;
   // Changed on both sides: no git to merge them, so one side wins.
   const theirs = ch.conflicts.length && await ask(
     `${ch.conflicts.length} file${ch.conflicts.length > 1 ? "s" : ""} changed in ${repo.name} too since the copy was made:${listed8(ch.conflicts)}\n\nOK keeps the copy's version. Cancel keeps ${repo.name}'s.`,
@@ -339,6 +339,7 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
 
   if (app.activeProject === p.id) setApp("activeProject", repo.id);
   dropProject(p);
+  await endHolders(p, held.end);
   await new Promise((r) => setTimeout(r, 300));
   const kept: string[] = [];
   for (const r of repos) {
@@ -353,10 +354,29 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
   try {
     await invoke("folder_finish", { host: repo.host, src: repo.path, dest: p.path, files: [...ch.changed, ...theirs], delete: ch.deleted });
   } catch (e) {
-    return flash(`finishing ${title}: ${e}. ${p.path} is still there.`);
+    flash(`finishing ${title}: ${e}. ${p.path} is still there.`);
+    return void scanLeftovers(true);
   }
   const back = ch.changed.length + theirs.length + ch.deleted.length;
   flash([`finished ${title}`, back ? `${back} file${back > 1 ? "s" : ""} back in ${repo.name}` : "", kept.length ? `kept ${kept.join(", ")} (not merged)` : ""].filter(Boolean).join(" · "));
+}
+
+/** The folder of a removed Worktree couldn't be deleted: name what still has it open and offer to end
+ *  that and try again; with nothing to name, offer to show the folder. What is left is listed as a
+ *  leftover checkout either way, so it can be deleted later from the sidebar. */
+async function stillHeld(p: Project, err: string): Promise<void> {
+  const held = await holdersOf(p);
+  const all = [...held.end.filter((l) => l.kind === "stray").map((l) => ({ name: l.label, pid: l.pid!, cmd: "" })), ...held.others];
+  if (!all.length) {
+    if (await ask(`Couldn't delete ${p.path}: something still has files open there. ${err}\n\nShow the folder?`)) void revealItemInDir(p.path).catch(() => {});
+    return void scanLeftovers(true);
+  }
+  const list = all.map((h) => `\n  ${holderLine(h)}`).join("");
+  if (!await ask(`Couldn't delete ${p.path}. These still have files open there:${list}\n\nEnd them and try again?`)) return void scanLeftovers(true);
+  await endHolders(p, held.end, held.others);
+  await new Promise((r) => setTimeout(r, 500));
+  await invoke("worktree_dir_delete", { host: p.host, dir: p.path }).catch((e) => flash(`couldn't delete ${p.path}: ${e}`));
+  void scanLeftovers(true);
 }
 
 /** Close a Worktree's windows, delete its folder and, if it is merged or you agree, its branch.
@@ -373,15 +393,23 @@ export async function removeWorktree(p: Project): Promise<void> {
   } catch {
     gone = true; // the folder is already gone; git only needs to forget it
   }
+  // What the folder's windows don't account for: programs left running in it, and others' (an editor).
+  const held = gone ? { end: [], others: [] } : await holdersOf(p);
   const what = [
     p.tabs.length ? `close its ${p.tabs.length} window${p.tabs.length > 1 ? "s" : ""}` : "",
+    held.end.length ? `end ${held.end.length} left running there` : "",
     `delete ${p.path}`,
     dirty ? `throw away ${dirty} uncommitted change${dirty > 1 ? "s" : ""}` : "",
   ].filter(Boolean).join(", ");
-  if (!await ask(`Remove worktree ${branch}? This will ${what}.`)) return;
+  const lines = [
+    held.end.length ? `\n\nLeft running there, ended with it:${held.end.map((l) => `\n  ${l.label} · ${l.detail}`).join("")}` : "",
+    held.others.length ? `\n\nAlso open there, not ended (close ${held.others.length > 1 ? "them" : "it"} first, or the folder stays):${held.others.map((h) => `\n  ${holderLine(h)}`).join("")}` : "",
+  ].join("");
+  if (!await ask(`Remove worktree ${branch}? This will ${what}.${lines}`)) return;
 
   if (app.activeProject === p.id) setApp("activeProject", repo.id);
   dropProject(p);
+  await endHolders(p, held.end);
   // Windows will not delete a folder a closing terminal still has open.
   await new Promise((r) => setTimeout(r, 300));
   try {
@@ -393,9 +421,7 @@ export async function removeWorktree(p: Project): Promise<void> {
     await invoke("worktree_dir_delete", { host: repo.host, dir: p.path });
   } catch (e) {
     if (!isLocalHost(repo.host)) flash(`couldn't delete ${p.path}: ${e}`);
-    else if (await ask(`Couldn't delete ${p.path}: something still has files open there (a dev server, an editor). ${e}\n\nShow the folder?`)) {
-      void revealItemInDir(p.path).catch(() => {});
-    }
+    else await stillHeld(p, String(e));
   }
 
   if (branch !== "detached") {
