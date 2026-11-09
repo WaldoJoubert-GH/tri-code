@@ -21,8 +21,14 @@ import { sigOf } from "./sigs";
 import { iconSvg } from "./lucide";
 import { pasteText } from "./terms";
 import { flash } from "./ui";
+import { onReopened, pageFwd, releasePage, remoteUrl, resolveUrl } from "./tunnels";
+import { targetOf, toLocal } from "./tunnelmap";
 
-export type BrowserInfo = { url: string; title: string; loading: boolean; /** framed mode: bumped to reload */ rev?: number };
+export type BrowserInfo = {
+  url: string; title: string; loading: boolean;
+  /** framed mode: bumped to reload */ rev?: number;
+  /** framed mode: what the iframe loads when it differs from `url` (through a remote tunnel) */ src?: string;
+};
 
 /** False on Linux, where the canvas falls back to an iframe. */
 export const nativeBrowsers = !/Linux/i.test(navigator.userAgent) || /Android/i.test(navigator.userAgent);
@@ -87,10 +93,11 @@ const touch = (tabId: string) => lastUsed.set(tabId, Date.now());
  *  leaving it at a stale rect, on top of other windows, or hidden (a white window). */
 const queues = new Map<string, Promise<unknown>>();
 
-/** Fire-and-forget call on a page's webview, after its earlier ones; logs instead of raising. */
-function send(pageId: string, cmd: string, args: Record<string, unknown> = {}) {
+/** Fire-and-forget call on a page's webview, after its earlier ones; logs instead of raising.
+ *  `args` may still be coming (an address waiting for its tunnel); later calls wait behind it. */
+function send(pageId: string, cmd: string, args: Record<string, unknown> | Promise<Record<string, unknown>> = {}) {
   const lbl = label(pageId); // now: a remade page's close goes to the webview it replaces
-  const run = () => invoke(cmd, { label: lbl, ...args }).catch((e) => console.warn(`${cmd} failed:`, e));
+  const run = async () => invoke(cmd, { label: lbl, ...(await args) }).catch((e) => console.warn(`${cmd} failed:`, e));
   queues.set(pageId, (queues.get(pageId) ?? Promise.resolve()).then(run));
 }
 
@@ -103,6 +110,35 @@ function ownerOf(pageId: string): { project: Project; tab: Tab; page: Page } | u
     }
   }
 }
+
+/**
+ * The address a page's webview loads for `url`: in a remote project, a `localhost` or `file:`
+ * address goes through its tunnel (tunnels.ts). Never fails: a tunnel that can't open leaves the
+ * page blank while the window shows why, and the page loads once it opens.
+ */
+function localOf(pageId: string, url: string, here?: boolean): Promise<string> {
+  const o = ownerOf(pageId);
+  if (!o) return Promise.resolve(url);
+  return resolveUrl(o.project, pageId, url, here ?? !!o.page.here).catch(() => "about:blank");
+}
+
+/** The address to show and keep for one a page's webview reports. */
+function shownUrl(pageId: string, url: string): string {
+  const o = ownerOf(pageId);
+  return o && !o.page.here ? remoteUrl(o.project.host, pageId, url) : url;
+}
+
+// A tunnel opened again (after a drop or a failure): its pages load their addresses through it.
+onReopened((f) => {
+  for (const id of f.pages) {
+    const o = ownerOf(id);
+    const t = o && targetOf(o.page.url, o.project.path);
+    if (!o || !t || !f.local) continue;
+    const url = toLocal(o.page.url, t.target, f.local);
+    if (!nativeBrowsers) patchInfo(id, { src: url, rev: (browserInfo[id]?.rev ?? 0) + 1 });
+    else if (created.has(id)) send(id, "browser_navigate", { url });
+  }
+});
 
 /** The page a browser webview's event came from, its window, and whether it is on screen now. */
 export function pageOfLabel(lbl: string): { pageId: string; tab: Tab; shown: boolean } | undefined {
@@ -148,9 +184,12 @@ function apply(pageId: string, b: Box) {
 
 // Native events: keep the page URL and title in sync with the webview.
 listen<{ label: string; url: string; loading: boolean }>("browser-nav", (e) => {
-  const { label: lbl, url, loading } = e.payload;
+  const { label: lbl, loading } = e.payload;
   if (!current(lbl)) return;
   const id = pageIdOf(lbl);
+  // A page waiting for its tunnel sits on about:blank; it keeps showing the address it waits for.
+  if (e.payload.url === "about:blank" && pageFwd[id]) return patchInfo(id, { loading });
+  const url = shownUrl(id, e.payload.url);
   patchInfo(id, { url, loading });
   const o = ownerOf(id);
   if (o && !loading && url !== "about:blank" && o.page.url !== url) setPageUrl(o.project.id, o.tab.id, id, url);
@@ -186,7 +225,9 @@ listen<{ label: string; url: string; background: boolean }>("browser-open", (e) 
   const o = ownerOf(pageIdOf(lbl));
   if (!o) return;
   touch(o.tab.id);
-  addPage(o.project.id, o.tab.id, url, { opener: o.page.id, show: !background });
+  // A link out of a tunnelled page is reported as its local address: keep the remote one.
+  const id = addPage(o.project.id, o.tab.id, o.page.here ? url : remoteUrl(o.project.host, undefined, url), { opener: o.page.id, show: !background });
+  if (o.page.here) setPageUrl(o.project.id, o.tab.id, id, url, true);
   if (background) flash(`opened ${hostOf(url)} in a background tab`);
 }).catch((e) => console.warn("listen browser-open failed:", e));
 
@@ -286,6 +327,12 @@ function initFramed(page: Page) {
   const url = page.url;
   setBrowserInfo(page.id, { url, title: framedTitle(url), loading: false, rev: 0 });
   if (url) framedHistory.set(page.id, { list: [url], i: 0 });
+  if (url) frameSrc(page.id, url);
+}
+
+/** Framed mode: load `url` through its tunnel in a remote project. */
+function frameSrc(pageId: string, url: string, here?: boolean) {
+  void localOf(pageId, url, here).then((src) => patchInfo(pageId, { src: src === url ? undefined : src }));
 }
 
 /** A profile's switches as browser_open and browser_autofill take them. */
@@ -296,7 +343,8 @@ function create(page: Page, b: Box, prof: Profile) {
   created.add(page.id);
   madeIn.set(page.id, prof.id);
   setBrowserInfo(page.id, { url: page.url, title: page.url ? hostOf(page.url) : "New tab", loading: !!page.url });
-  send(page.id, "browser_open", { url: page.url, ...b, hidden: true, profile: prof.id, ...autofillOf(prof) });
+  const args = { ...b, hidden: true, profile: prof.id, ...autofillOf(prof) };
+  send(page.id, "browser_open", localOf(page.id, page.url).then((url) => ({ url, ...args })));
   lastSent.set(page.id, key(b));
 }
 
@@ -364,18 +412,21 @@ export function placeBrowser(project: Project, tab: Tab, rect: DOMRect | null): 
 }
 
 /** Record a page's address in the project. */
-function remember(pageId: string, url: string) {
+function remember(pageId: string, url: string, here?: boolean) {
   const o = ownerOf(pageId);
-  if (o) setPageUrl(o.project.id, o.tab.id, pageId, url);
+  if (o) setPageUrl(o.project.id, o.tab.id, pageId, url, here);
 }
 
 /** Framed mode: show `url` and record it in the project. */
-function frame(pageId: string, url: string) {
+function frame(pageId: string, url: string, here?: boolean) {
   patchInfo(pageId, { url, title: framedTitle(url), loading: false });
-  remember(pageId, url);
+  remember(pageId, url, here);
+  frameSrc(pageId, url, here);
 }
 
-export function navigateBrowser(pageId: string, url: string): void {
+/** Go to `url`. In a remote project `here` says whether `localhost` is this machine (Alt+Enter) or
+ *  the remote (Enter); left out, the page keeps what it had. */
+export function navigateBrowser(pageId: string, url: string, here?: boolean): void {
   const o = ownerOf(pageId);
   if (o) touch(o.tab.id);
   if (!nativeBrowsers) {
@@ -383,17 +434,22 @@ export function navigateBrowser(pageId: string, url: string): void {
     h.list = h.list.slice(0, h.i + 1).concat(url);
     h.i = h.list.length - 1;
     framedHistory.set(pageId, h);
-    return frame(pageId, url);
+    return frame(pageId, url, here);
   }
   if (!created.has(pageId)) {
     // Together: the canvas creates the webview as soon as the page stops being blank, from page.url.
     batch(() => {
-      remember(pageId, url);
+      remember(pageId, url, here);
       patchInfo(pageId, { url, title: browserInfo[pageId]?.title ?? "New tab", loading: !!url });
     });
     return;
   }
-  send(pageId, "browser_navigate", { url });
+  // Kept now rather than when the webview reports it: a page waiting for its tunnel loads this once it opens.
+  batch(() => {
+    remember(pageId, url, here);
+    patchInfo(pageId, { url, loading: true });
+  });
+  send(pageId, "browser_navigate", localOf(pageId, url, here).then((u) => ({ url: u })));
 }
 
 /** Start Select element in a page. Its composer lists the project's agent windows, the one "send to
@@ -451,6 +507,7 @@ export function closePage(pageId: string): void {
   madeIn.delete(pageId);
   gens.delete(pageId);
   framedHistory.delete(pageId);
+  releasePage(pageId);
   clearPrompt(pageId);
   setBrowserInfo(produce((s) => { delete s[pageId]; }));
 }
@@ -541,4 +598,16 @@ export function openUrlInProject(projectId: string, url: string, fromTabId?: str
 export function openExternal(url: string): void {
   openUrl(url).catch((e) => console.warn("openUrl failed:", e));
   flash(`opened in system browser: ${url}`);
+}
+
+/** Open a project's address in the system browser: a remote project's `localhost` through its
+ *  tunnel, which then stays open while the app runs (the system browser never says it is done). */
+export function openExternalIn(project: Project, url: string, here = false): void {
+  if (here || !isRemote(project) || !targetOf(url, project.path)) return openExternal(url);
+  resolveUrl(project, `ext:${project.host}:${url}`, url)
+    .then((local) => {
+      openUrl(local).catch((e) => console.warn("openUrl failed:", e));
+      flash(`opened ${url} on ${project.host} in the system browser, as ${local}`);
+    })
+    .catch((e) => flash(`can't reach ${url} on ${project.host}: ${String(e).replace(/^Error: /, "")}`));
 }

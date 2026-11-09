@@ -1,7 +1,7 @@
 import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
 import {
-  type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isTerminal, live, projectById, removePage,
+  type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isRemote, isTerminal, live, projectById, removePage,
   canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, tabProfile, toggleMono, visibleTabs,
 } from "./state";
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
@@ -12,8 +12,10 @@ import { Caps, HintCaps } from "./Keys";
 import { hintsShown } from "./hints";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
-  addressToUrl, answerPassword, openExternal, passwordPrompts, pickElement, placeBrowser, profilesSupported, setBrowsersSuspended,
+  addressToUrl, answerPassword, openExternalIn, passwordPrompts, pickElement, placeBrowser, profilesSupported, setBrowsersSuspended,
 } from "./browsers";
+import { fwdOfPage, heldBy } from "./tunnels";
+import { RemoteStart, TunnelBar, TunnelChip, TunnelHeld } from "./tunnelui";
 import { Icon } from "./lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
 import IssuesPanel from "./IssuesPanel";
@@ -281,7 +283,10 @@ export default function Canvas(props: { project: Project }) {
      * A blank browser shows the start page (favourite tiles), so its webview stays hidden until it has an address.
      * Native webviews draw above all HTML, so one under a maximized window is hidden too.
      */
-    const place = () => placeBrowser(props.project, tab, blank() || buried() ? null : pageEl.getBoundingClientRect());
+    /** Remote projects: the page's tunnel is opening or failed, so the window shows that instead of the webview. */
+    const held = () => (blank() ? undefined : heldBy(pageId()));
+    const here = () => !!page()?.here;
+    const place = () => placeBrowser(props.project, tab, blank() || buried() || held() ? null : pageEl.getBoundingClientRect());
     /** Keep the native webview on the placeholder while the window animates into place. */
     const follow = (ms = 250) => {
       cancelAnimationFrame(placeRaf);
@@ -311,7 +316,7 @@ export default function Canvas(props: { project: Project }) {
     });
 
     if (isBrowser) {
-      createEffect(on([rect, anyDrag, blank, pageId, buried, () => profile().id], () => follow(), { defer: true }));
+      createEffect(on([rect, anyDrag, blank, pageId, buried, () => profile().id, () => !!held(), () => fwdOfPage(pageId())?.state], () => follow(), { defer: true }));
       // A blank page has nothing to do but take an address.
       createEffect(() => {
         if (focused() && blank() && !bare()) requestAnimationFrame(() => inputEl.focus());
@@ -348,7 +353,8 @@ export default function Canvas(props: { project: Project }) {
 
     const onUrlKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
-        navigateBrowser(pageId(), addressToUrl(inputEl.value));
+        // In a remote project localhost is the remote's; Alt+Enter opens this machine's instead.
+        navigateBrowser(pageId(), addressToUrl(inputEl.value), isRemote(props.project) ? e.altKey : undefined);
         inputEl.blur();
       } else if (e.key === "Escape") {
         inputEl.value = url();
@@ -550,7 +556,8 @@ export default function Canvas(props: { project: Project }) {
               <button title="Back" onClick={() => browserBack(pageId())}>←</button>
               <button title="Forward" onClick={() => browserForward(pageId())}>→</button>
               <button title="Reload" onClick={() => browserReload(pageId())}>↻</button>
-              <span class="addr">
+              <span class="addr" classList={{ tunnelled: isRemote(props.project) && !blank() && (here() || !!fwdOfPage(pageId())) }}>
+                <TunnelChip project={props.project} pageId={pageId()} here={here() && !blank()} openExternal={() => openExternalIn(props.project, url(), here())} />
                 <input
                   class="url"
                   spellcheck={false}
@@ -589,7 +596,7 @@ export default function Canvas(props: { project: Project }) {
               <Show when={nativeBrowsers}>
                 <DownloadButton tabId={id} />
               </Show>
-              <button title="Open in system browser" onClick={() => openExternal(url())}>↗</button>
+              <button title="Open in system browser" onClick={() => openExternalIn(props.project, url(), here())}>↗</button>
               <Show when={!bare()}>{loadBar()}</Show>
             </div>
             <Show when={passwordPrompts[pageId()]}>
@@ -605,6 +612,7 @@ export default function Canvas(props: { project: Project }) {
                 </div>
               )}
             </Show>
+            <Show when={fwdOfPage(pageId())}>{(f) => <TunnelBar fwd={f()} />}</Show>
             <DownloadBar tabId={id} />
             <Show when={!bare()}>
               <FavBar projectId={props.project.id} favs={props.project.favs} url={url()} onOpen={open} />
@@ -612,9 +620,15 @@ export default function Canvas(props: { project: Project }) {
             <div class="page" ref={pageEl}>
               <Show when={blank()}>
                 <StartPage favs={props.project.favs} onOpen={open} />
+                <Show when={isRemote(props.project)}>
+                  <RemoteStart project={props.project} onOpen={open} />
+                </Show>
+              </Show>
+              <Show when={held()}>
+                {(f) => <TunnelHeld project={props.project} fwd={f()} url={url()} onHere={() => navigateBrowser(pageId(), url(), true)} />}
               </Show>
               {/* Linux has no positionable native webviews, so the page is framed here instead. */}
-              <Show when={!nativeBrowsers && url() ? `${pageId()}|${browserInfo[pageId()]?.rev ?? 0}|${url()}` : false} keyed>
+              <Show when={!nativeBrowsers && url() && !held() ? `${pageId()}|${browserInfo[pageId()]?.rev ?? 0}|${browserInfo[pageId()]?.src ?? url()}` : false} keyed>
                 {(k) => <iframe class="frame" src={k.split("|").slice(2).join("|")} title={url()} />}
               </Show>
             </div>

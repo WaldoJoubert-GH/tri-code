@@ -200,7 +200,7 @@ export function phaseTone(c: Container): Tone {
 }
 
 /** Ports that don't speak HTTP, so a click copies the address rather than opening a page. */
-const NOT_HTTP = new Set([21, 22, 25, 53, 110, 143, 465, 587, 993, 995, 1025, 1433, 1521, 2181, 3306, 4222, 5432, 5672, 6379, 9042, 9092, 9229, 11211, 27017, 27018]);
+export const NOT_HTTP = new Set([21, 22, 25, 53, 110, 143, 465, 587, 993, 995, 1025, 1433, 1521, 2181, 3306, 4222, 5432, 5672, 6379, 9042, 9092, 9229, 11211, 27017, 27018]);
 const HTTPS = new Set([443, 4443, 8443, 9443]);
 
 export const opensPage = (p: Port) => p.proto === "tcp" && !NOT_HTTP.has(p.cont);

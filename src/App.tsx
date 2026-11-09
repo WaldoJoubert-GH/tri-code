@@ -34,8 +34,9 @@ import { newWorktreeOpen } from "./worktrees";
 import { loadIcons } from "./icons";
 import { installHotkeys } from "./hotkeys";
 import { installClipboardFallback } from "./clipboard";
-import { openExternal, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended } from "./browsers";
+import { openExternal, openExternalIn, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended } from "./browsers";
 import { FavPopover, favEditOpen } from "./favs";
+import { TunnelPopover, tunnelPopOpen } from "./tunnelui";
 import { ProfileMenu, profileMenuOpen } from "./profiles";
 import { DownloadMenu, downloadMenuOpen } from "./downloads";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
@@ -62,11 +63,14 @@ export default function App() {
     startClock();
     installClipboardFallback();
     setLinkHandler((url, tabId, external) => {
+      const ownerProject = app.projects.find((p) => p.tabs.some((t) => t.id === tabId));
       if (external) {
-        openExternal(url);
+        // A remote terminal's localhost link opens through its tunnel.
+        if (ownerProject) openExternalIn(ownerProject, url);
+        else openExternal(url);
         return;
       }
-      const owner = app.projects.find((p) => p.tabs.some((t) => t.id === tabId))?.id ?? app.activeProject;
+      const owner = ownerProject?.id ?? app.activeProject;
       if (owner) openUrlInProject(owner, url, tabId);
     });
     // After a webview reload, browser webviews from the previous page are unreachable.
@@ -153,7 +157,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen()));
+  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || tunnelPopOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   // The backdrop and Transparency are the active project's repo's.
@@ -191,6 +195,7 @@ export default function App() {
       <AppearancePopover />
       <SettingsDialog />
       <FavPopover />
+      <TunnelPopover />
       <ProfileMenu />
       <DownloadMenu />
       <Palette />

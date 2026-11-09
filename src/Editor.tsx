@@ -12,7 +12,8 @@ import { For, Show, createEffect, createMemo, createResource, createSignal, on, 
 import { createStore } from "solid-js/store";
 import type { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { type Project, type Tab, diffModeOf, focusTab, setEditorTab, setProjectDiffMode } from "./state";
+import { type Project, type Tab, diffModeOf, focusTab, isRemote, setEditorTab, setProjectDiffMode } from "./state";
+import { fileUrlOf } from "./tunnelmap";
 import {
   CHANGED, type Doc, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
   markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor, watchFiles,
@@ -533,9 +534,11 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     else flash(`no heading #${id}`);
   };
 
-  /** Best-effort `file://` URL for the local HTML "open in a browser window" button. */
+  /** Best-effort `file://` URL for the HTML "open in a browser window" button. A remote project's
+   *  file is served from its host through a tunnel (tunnels.ts), `~/` and all. */
   const fileUrl = () => {
     const p = text()?.file?.path;
+    if (p && isRemote(props.project)) return fileUrlOf(p);
     if (!p || p.startsWith("~")) return "";
     let s = p.replace(/\\/g, "/");
     if (/^[a-zA-Z]:/.test(s)) s = `/${s}`;
@@ -676,7 +679,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
                 </Show>
               </div>
             </Show>
-            <Show when={kind() === "html" && props.project.host === "local" && fileUrl()}>
+            <Show when={kind() === "html" && fileUrl()}>
               <button title="Open in a browser window (relative assets load there)" onClick={() => openUrlInProject(props.project.id, fileUrl(), tabId)}>
                 Open ↗
               </button>

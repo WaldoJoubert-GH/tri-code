@@ -11,6 +11,7 @@ mod envs;
 mod envssh;
 mod folders;
 mod fonts;
+mod forward;
 mod fs;
 mod git;
 mod github;
@@ -259,6 +260,10 @@ pub fn run() {
             docker::docker_stop,
             docker::docker_forward,
             docker::docker_unforward,
+            forward::forward_port,
+            forward::forward_dir,
+            forward::forward_close,
+            forward::remote_listening,
             devfs::dev_read,
             devfs::dev_write,
             devfs::save_pasted_image,
@@ -337,6 +342,7 @@ pub fn run() {
                 app.state::<Arc<pty::Ptys>>().detach();
                 db::close_all();
                 docker::close_all();
+                forward::close_all();
             }
         });
 }
