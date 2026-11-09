@@ -203,22 +203,29 @@ export async function ensureStruct(tabId: string, sel: Sel, force = false): Prom
 export const structOf = (w: Win | undefined) => (w?.obj ? w.structs[objKey(w.obj)] : undefined);
 export const pendingOf = (w: Win | undefined) => (w?.obj ? w.pending[objKey(w.obj)] : undefined);
 
+/** The latest page request by window: an older reply arriving later is dropped. */
+const pageReq = new Map<string, number>();
+
 export async function loadPage(tabId: string) {
   const w = wins[tabId];
   if (!w?.session || !w.obj) return;
   const obj = w.obj;
+  const n = (pageReq.get(tabId) ?? 0) + 1;
+  pageReq.set(tabId, n);
   up(tabId, (x) => { x.loading = true; });
   try {
     const page = await invoke<Page>("db_rows", {
       session: w.session,
       req: { group: obj.group, name: obj.name, offset: w.offset, filter: w.filter, sort: w.sort?.col ?? null, desc: !!w.sort?.desc, key: structOf(w)?.key ?? [] },
     });
+    if (pageReq.get(tabId) !== n) return;
     up(tabId, (x) => {
       if (x.obj && objKey(x.obj) !== objKey(obj)) return;
       Object.assign(x, { page, loading: false, pageError: undefined });
       x.sel.r = Math.min(x.sel.r, Math.max(0, page.rows.length - 1));
     });
   } catch (e) {
+    if (pageReq.get(tabId) !== n) return;
     up(tabId, (x) => Object.assign(x, { loading: false, pageError: errText(e) }));
   }
 }

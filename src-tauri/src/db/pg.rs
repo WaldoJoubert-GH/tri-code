@@ -188,6 +188,15 @@ impl Pg {
 
     pub async fn rows(&self, req: &RowsReq) -> Result<Page, String> {
         let from = format!("{}.{}", qi(&req.group), qi(&req.name));
+        // Without an ORDER BY, Postgres may return rows in a different order on each query, so
+        // OFFSET pages repeat and skip rows. A table with no primary key is ordered by ctid.
+        let by_ctid;
+        let req = if req.key.is_empty() && self.heap(&from).await {
+            by_ctid = RowsReq { group: req.group.clone(), name: req.name.clone(), offset: req.offset, filter: req.filter.clone(), sort: req.sort.clone(), desc: req.desc, key: vec!["ctid".into()] };
+            &by_ctid
+        } else {
+            req
+        };
         let sql = page_sql(&from, req, false)?;
         let mut set = self.simple(&sql, PAGE + 1).await?.into_iter().next().unwrap_or_default();
         let more = set.rows.len() > PAGE;
@@ -205,6 +214,12 @@ impl Pg {
             None
         };
         Ok(Page { columns: set.columns, rows: set.rows, more, total })
+    }
+
+    /// A plain or materialized table: one whose rows have a ctid.
+    async fn heap(&self, rel: &str) -> bool {
+        let r = self.client.query_one("SELECT relkind::text FROM pg_class WHERE oid = $1::text::regclass", &[&rel]).await;
+        r.is_ok_and(|r| matches!(r.get::<_, String>(0).as_str(), "r" | "m"))
     }
 
     async fn count(&self, sql: &str) -> Option<u64> {
