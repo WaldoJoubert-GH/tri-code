@@ -8,6 +8,8 @@ import {
 import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
+import { LeftoversChip, LeftoversPopover } from "./LeftoversPopover";
+import { leftoversOpen, watchLeftovers } from "./leftovers";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { HoldBar, TabMenu, TabStrip, tabMenuOpen } from "./tabs";
@@ -85,6 +87,7 @@ export default function App() {
     loadIcons();
     setReady(true);
     startUpdateChecks();
+    watchLeftovers();
     // A first launch (or one that quit mid-tour) opens the tour's sample project.
     if (!app.toured) void startTour();
   });
@@ -150,7 +153,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen()));
+  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   // The backdrop and Transparency are the active project's repo's.
@@ -199,6 +202,7 @@ export default function App() {
       <RestartDialog />
       <SignalsPopover />
       <FeedbackPopover />
+      <LeftoversPopover />
       <IconPicker />
       <Tour />
     </div>
@@ -315,6 +319,7 @@ function StatusBar() {
           <Show when={phoneStatus().devices.filter((d) => d.online).length}>{(n) => <span>{n()}</span>}</Show>
         </button>
       </Show>
+      <LeftoversChip />
       <button
         class="bellbtn"
         id="feedbackBtn"

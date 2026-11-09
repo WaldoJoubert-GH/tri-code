@@ -644,22 +644,27 @@ pub struct Worktree {
     pub branch: Option<String>,
     /// The repo's own folder (the first entry), not an added worktree.
     pub main: bool,
+    /// Its folder is gone: git still holds its branch until `git worktree prune`.
+    pub prunable: bool,
 }
 
 /// Parse `git worktree list --porcelain`: blank-line separated records, the main one first.
-fn parse_worktrees(out: &str) -> Vec<Worktree> {
+pub(crate) fn parse_worktrees(out: &str) -> Vec<Worktree> {
     out.split("\n\n")
         .filter_map(|rec| {
             let mut path = None;
             let mut branch = None;
+            let mut prunable = false;
             for l in rec.lines() {
                 if let Some(p) = l.strip_prefix("worktree ") {
                     path = Some(p.to_string());
                 } else if let Some(b) = l.strip_prefix("branch ") {
                     branch = Some(b.strip_prefix("refs/heads/").unwrap_or(b).to_string());
+                } else if l == "prunable" || l.starts_with("prunable ") {
+                    prunable = true;
                 }
             }
-            path.map(|path| Worktree { path, branch, main: false })
+            path.map(|path| Worktree { path, branch, main: false, prunable })
         })
         .enumerate()
         .map(|(i, w)| Worktree { main: i == 0, ..w })
@@ -761,6 +766,12 @@ pub async fn git_worktree_remove(host: String, path: String, dir: String, force:
         exec_with_paths(&host, &path, &args, &[at]).map(|_| ())
     })
     .await
+}
+
+/// Forget the worktrees whose folders are gone, which frees their branches.
+#[tauri::command]
+pub async fn git_worktree_prune(host: String, path: String) -> Result<(), String> {
+    blocking(move || exec(&host, &path, "git", &["worktree", "prune"], None).map(|_| ())).await
 }
 
 /// Delete a local branch; `force` also deletes one git thinks is unmerged (a squash-merged PR's).
@@ -913,11 +924,12 @@ mod tests {
 
     #[test]
     fn worktree_list_marks_the_main_one_and_detached_heads() {
-        let w = parse_worktrees("worktree /r\nHEAD aaa\nbranch refs/heads/main\n\nworktree /r.worktrees/feat-x\nHEAD bbb\nbranch refs/heads/feat/x\n\nworktree /tmp/d\nHEAD ccc\ndetached\n\n");
+        let w = parse_worktrees("worktree /r\nHEAD aaa\nbranch refs/heads/main\n\nworktree /r.worktrees/feat-x\nHEAD bbb\nbranch refs/heads/feat/x\n\nworktree /tmp/d\nHEAD ccc\ndetached\n\nworktree /r.worktrees/gone\nHEAD ddd\nbranch refs/heads/gone\nprunable gitdir file points to non-existent location\n\n");
         assert_eq!(w, vec![
-            Worktree { path: "/r".into(), branch: Some("main".into()), main: true },
-            Worktree { path: "/r.worktrees/feat-x".into(), branch: Some("feat/x".into()), main: false },
-            Worktree { path: "/tmp/d".into(), branch: None, main: false },
+            Worktree { path: "/r".into(), branch: Some("main".into()), main: true, prunable: false },
+            Worktree { path: "/r.worktrees/feat-x".into(), branch: Some("feat/x".into()), main: false, prunable: false },
+            Worktree { path: "/tmp/d".into(), branch: None, main: false, prunable: false },
+            Worktree { path: "/r.worktrees/gone".into(), branch: Some("gone".into()), main: false, prunable: true },
         ]);
     }
 

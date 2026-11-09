@@ -14,6 +14,7 @@ mod fonts;
 mod fs;
 mod git;
 mod github;
+mod leftovers;
 mod passwords;
 mod phone;
 mod plane;
@@ -183,6 +184,10 @@ pub fn run() {
             pty::pty_kill,
             pty::pty_reap,
             pty::remote_kill_session,
+            leftovers::leftovers_local,
+            leftovers::leftovers_end,
+            leftovers::leftovers_remote,
+            leftovers::leftovers_checkouts,
             agent_windows::agent_allowed,
             agent_windows::agent_open_failed,
             agent_windows::agent_worktree_made,
@@ -231,6 +236,7 @@ pub fn run() {
             git::git_fetch,
             git::git_worktree_add,
             git::git_worktree_remove,
+            git::git_worktree_prune,
             git::git_branch_delete,
             git::git_switch_create,
             git::git_push_delete,

@@ -30,6 +30,7 @@ import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, ste
 import { nextSignal } from "./signals";
 import { closeSignals, signalsOpen } from "./SignalSettings";
 import { closeFeedback, feedbackOpen } from "./Feedback";
+import { closeLeftovers, leftoversOpen } from "./leftovers";
 import { flash } from "./ui";
 import { hasSelection } from "./terms";
 import { actionFor, editorKey } from "./keymap";
@@ -198,6 +199,7 @@ function onKey(e: KeyboardEvent) {
     else if (settingsOpen()) closeSettings();
     else if (signalsOpen()) closeSignals();
     else if (feedbackOpen()) closeFeedback();
+    else if (leftoversOpen()) closeLeftovers();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
     else if (profileMenuOpen()) closeProfileMenu();

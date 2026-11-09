@@ -15,6 +15,7 @@ import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
 import { Demo, playDemo } from "./demo";
 import { isKey } from "./keymap";
+import { rescanSoon } from "./leftovers";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;
@@ -804,6 +805,8 @@ export async function moveSessions(tabIds: string[], oldHost: string): Promise<v
 export function closeSession(tabId: string) {
   sessions.get(tabId)?.dispose();
   sessions.delete(tabId);
+  // What it started may outlive it; the sidebar says so.
+  rescanSoon();
 }
 
 export function setLinkHandler(fn: (url: string, tabId: string, external: boolean) => void): void {
