@@ -2,6 +2,11 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.47 — 2026-11-09
+
+- tri-code now finds what a closed window left behind: a terminal session no tab shows, a dev server an agent backgrounded, a remote session, a Worktree folder git no longer lists, or a Worktree whose folder is gone while git still holds its branch. Each project row shows its count and the status line the total; click it for the list, with End buttons. Only processes started in tri-code terminals are ended; anything else is named, not killed. Remove worktree names what still holds its folder and offers to end it first. ([#55](https://github.com/WaldoJoubert-GH/tri-code/pull/55))
+- In Browser windows, Select element now sends its text only to agent windows, never to a dev server or plain shell. The composer lists the agents to choose from or starts a new claude or pi, and the text is typed in unsent so it can be edited before sending. Copy puts it on the clipboard instead. ([#54](https://github.com/WaldoJoubert-GH/tri-code/pull/54))
+
 ## 0.1.46 — 2026-11-05
 
 - A project's Appearance panel adds a Backdrop Effect, which redraws the background through a Dither or Halftone at a chosen Strength, in the picture's colours or the accent's alone. Transparency lets the Backdrop show through panel windows and terminals, each up to 85%, optionally frosted and taken into the sidebar, toolbar and status line. Browser windows stay solid. Both are saved with the project and travel in a Configuration Export. ([#52](https://github.com/WaldoJoubert-GH/tri-code/pull/52))
