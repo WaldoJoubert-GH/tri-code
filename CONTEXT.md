@@ -198,7 +198,8 @@ Whose cookies, sign-ins, saved passwords, autofill and history a browser window 
 _Avoid_: Account, session, container, identity.
 
 **Select element**:
-Pointing an agent at part of a Page: an overlay that `src-tauri/src/pick.js` draws inside the page (tri-code's own HTML cannot paint over a native webview). The picked elements and areas, with the user's comment, become text pasted into the project's agent window (the one "send to agent" uses); Ctrl+Enter also submits it. Text only for now: no screenshot.
+Pointing an agent at part of a Page: an overlay that `src-tauri/src/pick.js` draws inside the page (tri-code's own HTML cannot paint over a native webview). The picked elements and areas, with the user's comment, become text pasted into an agent window with Send or Enter (Shift+Enter is a new line). It is never submitted: the user edits it in the agent and sends it from there. Copy puts the same text on the clipboard instead. Its keys are drawn as tri-code's Keycap, in the colours tri-code passes in, since the page can't use the app's stylesheet. The composer's "→" menu lists the project's agent windows (with their Agent Signal, last message and workspace), the one "send to agent" uses chosen, then New claude and New pi, which start one in the project and paste once it answers the signal probe. With no agent open, new claude is chosen. Text only for now: no screenshot. Chosen from design/select-element-target.html (variant A).
+_Agent window_: a terminal that answered the signal probe or reported, has a conversation to resume, or runs claude or pi (`isAgentWindow`). Plain shells and Commands like a dev server or lazygit are not; "send to agent" never types into them. It prefers the focused agent window, then the one last focused or chosen in the project.
 _Avoid_: Inspector, element picker (in UI text).
 
 **Download**:

@@ -1,8 +1,10 @@
 // Select element: injected into every browser page by src-tauri/src/browser.rs and dormant
-// until tri-code calls window.__tricodePick({ agent, accent }). It draws over the page itself,
-// since tri-code's own HTML cannot paint above a native webview. Click an element, Shift+click
-// to add more, drag for an area (the elements inside it); describe the change; Enter hands the
-// text to tri-code to type into the agent, Ctrl+Enter to type and send it. It reports by
+// until tri-code calls window.__tricodePick(opts). It draws over the page itself, since
+// tri-code's own HTML cannot paint above a native webview. Click an element, Shift+click to add
+// more, drag for an area (the elements inside it); describe the change (Shift+Enter for a new
+// line); choose the agent window under "→", or a new claude or pi; Enter hands the text to
+// tri-code, which types it into the agent unsent, so it can be edited there; Copy copies it
+// instead. It reports by
 // navigating to https://tricode.invalid/pick, which browser.rs cancels and forwards.
 (() => {
   if (window.top !== window || window.__tricodePick) return;
@@ -16,14 +18,52 @@
     session = opts ? start(opts) : null;
   };
 
-  function start({ agent = "", accent = "#7aa2f7" }) {
+  /** `agents`: the project's agent windows ({ id, name, icon, sig, msg, ws }); `target`: the one
+   *  chosen at first; `new`: agents that can be started for the result ({ id, name, icon }). */
+  function start({ accent = "#7aa2f7", agents = [], target = "", new: starts = [], colors = {}, keys = {} }) {
     const host = document.createElement("div");
     host.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none";
     const root = host.attachShadow({ mode: "closed" });
+    const safe = (v) => typeof v === "string" && /^[#\w(),.%\s-]+$/.test(v);
+    const SIG = { working: "#7aa2f7", blocked: "#e0af68", done: "#9ece6a", error: "#f7768e" };
+    for (const [k, v] of Object.entries(colors)) if (safe(v)) SIG[k] = v;
+    // tri-code's keycap colours (styles.css --key*), in its theme and Keys setting.
+    const KEY = { key: "#e8eaf0", "key-edge": "#f6f7fa", "key-base": "#8b90a0", "key-ink": "#15171c" };
+    for (const [k, v] of Object.entries(keys)) if (k in KEY && safe(v) && v) KEY[k] = v;
     // Constructed sheets rather than <style>: a page's CSP (claude.ai, GitHub) blocks inline styles.
     adopt(root, `
       :host { all: initial; }
       * { box-sizing: border-box; font-family: system-ui, "Segoe UI", sans-serif; }
+      .to { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 210px; padding: 0 6px 0 4px;
+        color: #6b7080; font-size: 11.5px; }
+      .to b { color: #23262d; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .to .car { font-size: 9px; }
+      .to.open { background: #e6e8ee; }
+      .to:disabled { cursor: default; background: none; }
+      .av { position: relative; width: 16px; height: 16px; flex: none; display: grid; place-items: center; border-radius: 4px;
+        color: ${accent}; background: color-mix(in srgb, ${accent} 20%, transparent); }
+      .av svg { width: 11px; height: 11px; }
+      .av.new { background: transparent; border: 1px dashed #d9dce3; color: #6b7080; }
+      .dot { position: absolute; right: -2px; bottom: -2px; width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1.5px #fbfbfc; }
+      ${Object.entries(SIG).map(([k, v]) => `.dot.${k} { background: ${v}; }`).join("\n")}
+      .menu { position: absolute; left: -2px; bottom: calc(100% + 6px); width: min(300px, calc(100vw - 32px)); max-height: min(340px, 60vh);
+        overflow: auto; display: none; padding: 5px; border-radius: 9px; background: #fbfbfc; border: 1px solid #d9dce3;
+        box-shadow: 0 14px 40px -10px rgba(20,24,34,.45); }
+      .menu.on { display: block; }
+      .menu h6 { display: flex; justify-content: space-between; margin: 3px 7px 4px; font-size: 10px; font-weight: 600;
+        letter-spacing: .08em; text-transform: uppercase; color: #6b7080; }
+      .menu h6 em { font-style: normal; font-weight: 400; letter-spacing: 0; }
+      .menu hr { border: 0; border-top: 1px solid #d9dce3; margin: 4px 3px; }
+      .mi { display: flex; align-items: center; gap: 9px; width: 100%; height: auto; min-height: 30px; padding: 4px 7px;
+        border-radius: 6px; text-align: left; }
+      .mi.kb { background: #e6e8ee; }
+      .mi .ck { width: 10px; flex: none; color: ${accent}; font-weight: 700; }
+      .mi .t { flex: 1; min-width: 0; display: grid; }
+      .mi .t b { font-weight: 500; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mi .t small { color: #6b7080; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mi .ws { font: 10.5px ui-monospace, Consolas, monospace; color: #6b7080; border: 1px solid #d9dce3; border-radius: 3px; padding: 0 4px; }
+      .mi.new { min-height: 28px; color: #6b7080; }
+      .none { padding: 4px 7px 6px; font-size: 11.5px; color: #6b7080; }
       .box { position: fixed; pointer-events: none; border: 1.5px solid ${accent}; border-radius: 2px;
         background: color-mix(in srgb, ${accent} 10%, transparent); }
       .box.sel { border-width: 2px; background: color-mix(in srgb, ${accent} 16%, transparent); }
@@ -39,7 +79,7 @@
       button { font: inherit; color: inherit; background: none; border: 1px solid transparent; border-radius: 5px;
         cursor: pointer; height: 24px; padding: 0 9px; font-size: 12px; }
       button:hover { background: #e6e8ee; }
-      .composer { bottom: 12px; width: min(380px, calc(100vw - 24px)); display: none; gap: 6px; padding: 8px;
+      .composer { bottom: 12px; width: min(440px, calc(100vw - 24px)); display: none; gap: 6px; padding: 8px;
         border-radius: 10px; font-size: 13px; }
       .composer.on { display: grid; }
       .chips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -51,32 +91,91 @@
       textarea { font: 13px/1.4 system-ui, "Segoe UI", sans-serif; color: inherit; background: transparent; border: 0;
         border-bottom: 1px solid #d9dce3; padding: 4px 0; resize: none; outline: none; }
       textarea:focus { border-bottom-color: ${accent}; }
-      .row { display: flex; align-items: center; gap: 6px; }
-      .to { flex: 1; color: #6b7080; font-size: 11.5px; }
-      .to b { color: #23262d; }
-      .row button { border-color: #d9dce3; }
-      .row .primary { background: ${accent}; border-color: ${accent}; color: #fff; }
+      .row { position: relative; display: flex; align-items: center; gap: 6px; }
+      .row .sp { flex: 1; }
+      /* The keycap, as tri-code draws it (Keys.tsx, kbd in styles.css). */
+      kbd { display: inline-grid; place-items: center; height: 17px; min-width: 16px; padding: 0 3px; vertical-align: middle;
+        border: 1px solid ${KEY["key-edge"]}; border-bottom: 3px solid ${KEY["key-base"]}; border-radius: 3px;
+        background: ${KEY.key}; color: ${KEY["key-ink"]}; font: 700 10px/1 ui-monospace, "Cascadia Mono", Consolas, monospace;
+        font-style: normal; white-space: nowrap; }
+      kbd + kbd { margin-left: 2px; }
+      kbd svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+      .keys { display: inline-flex; align-items: center; flex: none; vertical-align: middle; }
+      .hint { display: inline-flex; align-items: center; gap: 5px; color: #6b7080; font-size: 11px; white-space: nowrap; }
+      .row > button:not(.to) { display: inline-flex; align-items: center; gap: 6px; border-color: #d9dce3; }
+      .row .primary { background: ${accent}; border-color: ${accent}; color: #fff; padding-right: 4px; }
+      .copy.done { color: ${accent}; }
       @media (prefers-color-scheme: dark) {
-        .card { color: #d6d8de; background: #15171c; border-color: #2c3039; box-shadow: 0 14px 40px -12px #000; }
-        .bar span, .to, .chip button { color: #7d828f; }
+        .card, .menu { color: #d6d8de; background: #15171c; border-color: #2c3039; box-shadow: 0 14px 40px -12px #000; }
+        .bar span, .to, .chip button, .menu h6, .mi .t small, .mi .ws, .mi.new, .none, .av.new, .hint { color: #7d828f; }
         .to b { color: #d6d8de; }
-        button:hover { background: #232733; }
+        button:hover, .to.open, .mi.kb { background: #232733; }
+        .row .primary:hover { background: ${accent}; }
         .chip { background: #232733; }
-        textarea, .row button { border-color: #2c3039; }
+        textarea, .menu hr, .mi .ws, .av.new, .row > button:not(.to):not(.primary) { border-color: #2c3039; }
+        .dot { box-shadow: 0 0 0 1.5px #15171c; }
       }`);
     root.innerHTML = `
-    <div class="card bar"><span>Click an element · drag an area · <b>Shift</b> adds</span><button data-a="end">Esc</button></div>
+    <div class="card bar"><span>Click an element · drag an area · ${caps("Shift")} adds</span><button data-a="end" title="Stop selecting">${caps("Esc")}</button></div>
     <div class="card composer">
       <div class="chips"></div>
       <textarea rows="2" placeholder="Describe the change…"></textarea>
-      <div class="row"><span class="to"></span>
-        <button data-a="type" title="Type into the agent without sending (Enter)">Type ⏎</button>
-        <button class="primary" data-a="send" title="Type and send (Ctrl+Enter)">Send ⌃⏎</button></div>
+      <div class="row"><div class="menu" role="listbox"></div>
+        <button class="to" data-a="menu" title="Which agent gets it"></button><span class="sp"></span>
+        <span class="hint">${caps("Shift", "Enter")} new line</span>
+        <button class="copy" data-a="copy" title="Copy the description instead">Copy</button>
+        <button class="primary" data-a="send" title="Type into the agent without submitting it, to edit there">Send ${caps("Enter")}</button></div>
     </div>`;
     const composer = root.querySelector(".composer");
     const chips = root.querySelector(".chips");
     const comment = root.querySelector("textarea");
-    root.querySelector(".to").innerHTML = agent ? `→ <b>${esc(agent)}</b>` : "no agent window open";
+    const toBtn = root.querySelector(".to");
+    const menu = root.querySelector(".menu");
+
+    // Where the result goes: an agent window ({ to }) or an agent to start ({ new }).
+    const choices = [...agents.map((a) => ({ to: a.id, a })), ...starts.map((a) => ({ new: a.id, a }))];
+    let choice = choices.find((c) => c.to === target) ?? choices[0] ?? null;
+    let kb = -1;
+    const avatar = (a, isNew) =>
+      `<span class="av${isNew ? " new" : ""}">${isNew ? "+" : a.icon || ""}${a.sig ? `<span class="dot ${esc(a.sig)}"></span>` : ""}</span>`;
+
+    function paintTarget() {
+      toBtn.disabled = !choices.length;
+      toBtn.innerHTML = !choice ? "no agent to send to"
+        : `→ ${avatar(choice.a, false)}<b>${choice.new ? "new " : ""}${esc(choice.a.name)}</b><span class="car">▾</span>`;
+    }
+
+    function paintMenu() {
+      const rows = choices.map((c, i) => {
+        const on = c === choice ? "✓" : "";
+        const cls = `mi${c.new ? " new" : ""}${i === kb ? " kb" : ""}`;
+        const sub = c.new ? "" : `<small>${esc(c.a.msg || "")}</small>`;
+        const ws = c.new ? "" : `<span class="ws">${esc(String(c.a.ws))}</span>`;
+        return `<button class="${cls}" data-i="${i}"><span class="ck">${on}</span>${avatar(c.a, !!c.new)}`
+          + `<span class="t"><b>${c.new ? "New " : ""}${esc(c.a.name)}</b>${sub}</span>${ws}</button>`;
+      });
+      const head = `<h6>Agents in this project <em>${agents.length}</em></h6>`;
+      const none = agents.length ? "" : `<div class="none">None open. Start one and the selection goes to it.</div>`;
+      const split = agents.length && starts.length ? "<hr>" : "";
+      menu.innerHTML = head + none + rows.slice(0, agents.length).join("") + split + rows.slice(agents.length).join("");
+      menu.querySelector(".kb")?.scrollIntoView({ block: "nearest" });
+    }
+
+    const menuOpen = () => menu.classList.contains("on");
+    function openMenu(on) {
+      if (!choices.length) return;
+      kb = on ? Math.max(0, choices.indexOf(choice)) : -1;
+      menu.classList.toggle("on", on);
+      toBtn.classList.toggle("open", on);
+      if (on) paintMenu();
+      else comment.focus();
+    }
+    function choose(i) {
+      if (choices[i]) choice = choices[i];
+      paintTarget();
+      openMenu(false);
+    }
+    paintTarget();
     const cursor = adopt(document, "html, html * { cursor: crosshair !important; }");
     document.documentElement.append(host);
 
@@ -87,11 +186,11 @@
     const boxes = [];
 
     const inOverlay = (e) => e.composedPath().includes(host);
-    const block = (e) => {
-      if (inOverlay(e)) return;
+    const stop = (e) => {
       e.preventDefault();
       e.stopImmediatePropagation();
     };
+    const block = (e) => inOverlay(e) || stop(e);
 
     function box(r, cls, label) {
       const b = document.createElement("div");
@@ -153,6 +252,7 @@
     function onDown(e) {
       if (inOverlay(e) || e.button !== 0) return;
       block(e);
+      if (menuOpen()) openMenu(false);
       drag = { x: e.clientX, y: e.clientY, rect: null, shift: e.shiftKey, target: hover };
     }
 
@@ -174,28 +274,74 @@
     }
 
     function onKey(e) {
+      if (menuOpen()) {
+        const keys = { ArrowDown: 1, ArrowUp: -1 };
+        if (e.key in keys) kb = (kb + keys[e.key] + choices.length) % choices.length, paintMenu();
+        else if (e.key === "Enter" || e.key === " ") choose(kb);
+        else if (e.key === "Escape" || e.key === "Tab") openMenu(false);
+        else return;
+        return stop(e);
+      }
       if (e.key === "Escape") return block(e), end();
+      if (root.activeElement === toBtn && (e.key === "ArrowUp" || e.key === "ArrowDown")) return stop(e), openMenu(true);
       // The shadow root is closed, so the event path seen from window stops at the host.
       if (root.activeElement === comment && e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        submit(e.ctrlKey || e.metaKey);
+        submit();
       }
       // Keys typed into the composer stay out of the page's own shortcuts.
       if (inOverlay(e)) e.stopImmediatePropagation();
     }
 
     root.addEventListener("click", (e) => {
+      const item = e.target.closest?.(".mi");
+      if (item) return choose(+item.dataset.i);
       const a = e.target.closest?.("button[data-a]")?.dataset.a;
+      if (a === "menu") return openMenu(!menuOpen());
+      if (menuOpen()) openMenu(false);
       if (a === "end") end();
-      else if (a === "type" || a === "send") submit(a === "send");
+      else if (a === "copy") copy(e.target.closest("button"));
+      else if (a === "send") submit();
     });
 
-    function submit(send) {
+    function text() {
+      const t = describeAll(sel, comment.value.trim());
+      return t.length > MAX_OUT ? t.slice(0, MAX_OUT) + "\n…" : t;
+    }
+
+    /** Copy the description, show it worked, then stop picking. Inside the click, so the page's
+     *  clipboard allows it; execCommand covers pages that aren't a secure context. */
+    function copy(btn) {
       if (!sel.length) return;
-      let text = describeAll(sel, comment.value.trim());
-      if (text.length > MAX_OUT) text = text.slice(0, MAX_OUT) + "\n…";
+      const t = text();
+      const fallback = () => {
+        const ta = document.createElement("textarea");
+        ta.value = t;
+        ta.style.cssText = "position:fixed;opacity:0";
+        root.append(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
+      };
+      const done = (ok) => {
+        btn.textContent = ok ? "Copied ✓" : "Copy failed";
+        btn.classList.add("done");
+        setTimeout(end, ok ? 700 : 1500);
+      };
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        navigator.clipboard.writeText(t).then(() => done(true), () => done(fallback()));
+      } else done(fallback());
+    }
+
+    /** Hand the text to tri-code, which types it into the agent without submitting it, to edit there. */
+    function submit() {
+      if (!sel.length) return;
+      const t = text();
       end();
-      location.href = `https://tricode.invalid/pick?send=${send ? 1 : 0}&d=${encodeURIComponent(text)}`;
+      const to = choice?.to ? `&to=${encodeURIComponent(choice.to)}` : "";
+      const fresh = choice?.new ? `&new=${encodeURIComponent(choice.new)}` : "";
+      location.href = `https://tricode.invalid/pick?d=${encodeURIComponent(t)}${to}${fresh}`;
     }
 
     const listeners = [
@@ -252,6 +398,21 @@
       (target === document ? document.documentElement : target).append(style);
       return style;
     }
+  }
+
+  // Keys a keyboard marks with a symbol, drawn as that symbol (as Keys.tsx does).
+  const KEY_ICONS = {
+    Shift: ["Shift", "M12 3l9 10h-5v8H8v-8H3z"],
+    Enter: ["Enter", "M20 5v6a3 3 0 0 1-3 3H5M10 9l-5 5 5 5"],
+  };
+
+  /** Keycaps for a chord, as tri-code's Keycap draws them. */
+  function caps(...keys) {
+    const one = (k) => {
+      const icon = KEY_ICONS[k];
+      return icon ? `<kbd><svg viewBox="0 0 24 24" role="img" aria-label="${icon[0]}"><path d="${icon[1]}"/></svg></kbd>` : `<kbd>${esc(k)}</kbd>`;
+    };
+    return `<span class="keys">${keys.map(one).join("")}</span>`;
   }
 
   function esc(s) {

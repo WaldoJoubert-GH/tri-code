@@ -4,7 +4,7 @@
 // Window (AgentsPanel.tsx); the list lives in state.json as `agents`, in + menu order.
 
 import { createSignal } from "solid-js";
-import { Agent, Hotkey, Project, Tab, addAgent, addTab, app, focusTab, isWebApp, newId } from "./state";
+import { Agent, Hotkey, Project, addAgent, addTab, app, focusTab, isWebApp, newId } from "./state";
 import { normalizeUrl } from "./browsers";
 import { flash } from "./ui";
 import { modDown } from "./modkey";
@@ -86,14 +86,7 @@ export function newShell(p: Project) {
   else flash(`no commands · add one in the ${withKey("commands window", "agents")}`);
 }
 
-/**
- * The window "send to agent" types into: the focused terminal, else one on this workspace, else
- * any. Plain shells are skipped, since an issue or a review note typed there is just a command.
- */
-export function agentTarget(p: Project, focus: string | undefined): Tab | undefined {
-  const terms = p.tabs.filter((t) => t.kind === "term" && !!t.cmd?.trim());
-  return terms.find((t) => t.id === focus) ?? terms.find((t) => t.space === p.ws) ?? terms[0];
-}
+export { agentTarget, agentWindows, isAgentWindow, rememberAgent } from "./agenttarget";
 
 /** Open or focus the project's commands window. */
 export function openAgentsPanel(project: Project): string {

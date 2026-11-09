@@ -9,9 +9,17 @@ import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { batch, createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, Page, Profile, Project, profileById, projectById, setPageUrl, space, Tab, tabName, tabProfile, visibleTabs } from "./state";
-import { agentTarget, looksLikeUrl } from "./agents";
-import { pasteText, sendText } from "./terms";
+import {
+  type Agent, DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, isRemote, isWebApp, live, Page, Profile, Project, profileById,
+  projectById, setPageUrl, space, Tab, tabIcon, tabName, tabProfile, visibleTabs,
+} from "./state";
+import { looksLikeUrl } from "./agents";
+import { agentTarget, agentWindows, rememberAgent } from "./agenttarget";
+import { offeredIn } from "./scope";
+import { setupStatus } from "./agentsetup";
+import { sigOf } from "./sigs";
+import { iconSvg } from "./lucide";
+import { pasteText } from "./terms";
 import { flash } from "./ui";
 
 export type BrowserInfo = { url: string; title: string; loading: boolean; /** framed mode: bumped to reload */ rev?: number };
@@ -182,18 +190,74 @@ listen<{ label: string; url: string; background: boolean }>("browser-open", (e) 
   if (background) flash(`opened ${hostOf(url)} in a background tab`);
 }).catch((e) => console.warn("listen browser-open failed:", e));
 
-// Select element finished in a page: type its description into the project's agent window.
-listen<{ label: string; text: string; send: boolean }>("browser-pick", (e) => {
-  const { label: lbl, text, send: submit } = e.payload;
+// Select element finished in a page: type its description into the agent window chosen in the
+// composer (`to`), or start a new claude or pi (`new`) and type it there once it is ready.
+// Never submitted: the user edits it in the agent and sends it from there.
+listen<{ label: string; text: string; to: string; new: string }>("browser-pick", (e) => {
+  const { label: lbl, text, to, new: start } = e.payload;
   const o = ownerOf(pageIdOf(lbl));
   if (!o || !text) return;
-  const target = agentTarget(o.project, space(o.project).focus);
-  if (!target || !pasteText(target.id, text)) return flash("open an agent window first (the + menu)");
-  // After the paste has landed, so the agent reads Enter as submit rather than as part of it.
-  if (submit) setTimeout(() => sendText(target.id, "\r"), 150);
-  focusTab(o.project.id, target.id);
-  flash(submit ? `sent the selection to ${tabName(target)}` : `typed the selection into ${tabName(target)}, not sent`);
+  if (start) return void typeIntoNew(o.project, start, text);
+  const chosen = agentWindows(o.project).find((t) => t.id === to);
+  const target = chosen ?? agentTarget(o.project, space(o.project).focus);
+  if (!target) return flash("no agent in this project · start one from Select element or the + menu");
+  rememberAgent(o.project.id, target.id);
+  deliver(o.project, target, text, to && !chosen ? " (the one chosen had closed)" : "");
 }).catch((e) => console.warn("listen browser-pick failed:", e));
+
+/** Type a selection into an agent window, unsent, and show that window to edit it there. */
+function deliver(project: Project, target: Tab, text: string, note = "") {
+  if (!pasteText(target.id, text)) return flash(`${tabName(target)} isn't running · open it and try again`);
+  focusTab(project.id, target.id);
+  flash(`typed the selection into ${tabName(target)} · edit it there and press Enter to send${note}`);
+}
+
+/** How long a new agent gets to answer the signal probe before the selection is typed anyway. */
+const START_TIMEOUT = 20_000;
+
+/** Start agent `agentId` (claude or pi) in the project, wait until it reads input, then deliver. */
+async function typeIntoNew(project: Project, agentId: string, text: string) {
+  const agent = newAgentsFor(project).find((a) => a.id === agentId);
+  if (!agent) return flash(`${agentId} isn't offered in this project`);
+  const id = addTab(project.id, "term", { agent });
+  rememberAgent(project.id, id);
+  flash(`starting ${agent.name} for the selection…`);
+  const started = Date.now();
+  while (!live[id]?.ready && !live[id]?.agent && Date.now() - started < START_TIMEOUT) await sleep(100);
+  // The probe comes as the agent starts; give its input box a moment to appear.
+  await sleep(600);
+  const tab = projectById(project.id)?.tabs.find((t) => t.id === id);
+  if (!tab) return flash(`${agent.name} closed before the selection was typed`);
+  deliver(project, tab, text, live[id]?.ready || live[id]?.agent ? "" : ` (${agent.name} was slow to start)`);
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** The agents Select element offers to start: claude and pi, when the project offers them and,
+ *  locally, they are installed. */
+function newAgentsFor(project: Project): Agent[] {
+  const s = setupStatus();
+  return offeredIn(project).filter((a) => (a.id === "claude" || a.id === "pi") && !isWebApp(a)
+    && (isRemote(project) || !s || s[a.id].present));
+}
+
+/** What the composer's target menu shows: the project's agent windows, as the phone names them. */
+function pickTargets(project: Project) {
+  const seen: Record<string, number> = {};
+  return agentWindows(project).map((t) => {
+    const name = tabName(t);
+    seen[name] = (seen[name] ?? 0) + 1;
+    const l = live[t.id];
+    return {
+      id: t.id,
+      name: seen[name] > 1 ? `${name} · ${seen[name]}` : name,
+      icon: iconSvg(tabIcon(t)),
+      sig: sigOf(t) ?? "",
+      msg: l?.agent?.msg || l?.title || "",
+      ws: t.space + 1,
+    };
+  });
+}
 
 /** Normalise an address typed by the user: add a scheme when missing. */
 export function normalizeUrl(s: string): string {
@@ -332,11 +396,24 @@ export function navigateBrowser(pageId: string, url: string): void {
   send(pageId, "browser_navigate", { url });
 }
 
-/** Start Select element in a page; the result goes to the agent window "send to agent" would use. */
+/** Start Select element in a page. Its composer lists the project's agent windows, the one "send to
+ *  agent" would use chosen, and offers to start a new claude or pi. */
 export function pickElement(project: Project, pageId: string): void {
   if (!created.has(pageId)) return;
-  const agent = agentTarget(project, space(project).focus);
-  send(pageId, "browser_pick", { agent: agent ? tabName(agent) : "", accent: project.accent });
+  const target = agentTarget(project, space(project).focus);
+  const css = getComputedStyle(document.documentElement);
+  const colors = Object.fromEntries(["working", "blocked", "done", "error"].map((s) => [s, css.getPropertyValue(`--state-${s}`).trim()]));
+  // The keycap's colours (Keys.tsx), so the composer's keys look like the app's, in its theme and Keys setting.
+  const keys = Object.fromEntries(["key", "key-edge", "key-base", "key-ink"].map((k) => [k, css.getPropertyValue(`--${k}`).trim()]));
+  const opts = {
+    accent: project.accent,
+    agents: pickTargets(project),
+    target: target?.id ?? "",
+    new: newAgentsFor(project).map((a) => ({ id: a.id, name: a.name, icon: iconSvg(a.icon) })),
+    colors,
+    keys,
+  };
+  send(pageId, "browser_pick", { opts });
   flash("select element · Esc to stop");
 }
 

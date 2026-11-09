@@ -29,8 +29,10 @@ struct PickPayload {
     label: String,
     /// The selection described for the agent, ready to type.
     text: String,
-    /// Ctrl+Enter: type and submit.
-    send: bool,
+    /// The agent window chosen in the composer (a tab id), or "" for the default.
+    to: String,
+    /// An agent to start first and type into ("claude", "pi"), or "".
+    new: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -41,7 +43,7 @@ struct TitlePayload {
 
 /// Ctrl/Cmd+click and middle-click reach on_new_window looking the same as target=_blank, so
 /// the page reports them as a navigation to this host instead, which on_navigation cancels:
-/// `/open?u=` for a background page, `/pick?send=&d=` for a Select element result.
+/// `/open?u=` for a background page, `/pick?d=&to=&new=` for a Select element result.
 const BG_HOST: &str = "tricode.invalid";
 
 /// Select element: dormant until browser_pick starts it.
@@ -240,7 +242,8 @@ pub async fn browser_open(
                     PickPayload {
                         label: bg_label.clone(),
                         text: param("d").unwrap_or_default(),
-                        send: param("send").as_deref() == Some("1"),
+                        to: param("to").unwrap_or_default(),
+                        new: param("new").unwrap_or_default(),
                     },
                 );
                 return false;
@@ -427,17 +430,11 @@ pub async fn browser_navigate(app: AppHandle, label: String, url: String) -> Res
     find(&app, &label)?.navigate(url).map_err(|e| e.to_string())
 }
 
-/// Starts Select element in a page and gives it the keyboard. `agent` names the window the
-/// result is typed into ("" when there is none); `accent` colours the overlay.
+/// Starts Select element in a page and gives it the keyboard. `opts` goes to pick.js as it is:
+/// the accent, the agent windows the result can go to and the chosen one, and the agents it can start.
 #[tauri::command]
-pub async fn browser_pick(
-    app: AppHandle,
-    label: String,
-    agent: String,
-    accent: String,
-) -> Result<(), String> {
+pub async fn browser_pick(app: AppHandle, label: String, opts: serde_json::Value) -> Result<(), String> {
     let webview = find(&app, &label)?;
-    let opts = serde_json::json!({ "agent": agent, "accent": accent });
     webview
         .eval(format!("window.__tricodePick && window.__tricodePick({opts})"))
         .map_err(|e| e.to_string())?;
