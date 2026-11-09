@@ -222,7 +222,8 @@ fn end_tree(sys: &System, pid: u32) {
     let mut i = 0;
     while i < order.len() {
         let at = order[i];
-        order.extend(procs.values().filter(|p| p.parent() == Some(at) && !order.contains(&p.pid())).map(|p| p.pid()));
+        let children: Vec<Pid> = procs.values().filter(|p| p.parent() == Some(at) && !order.contains(&p.pid())).map(|p| p.pid()).collect();
+        order.extend(children);
         i += 1;
     }
     for p in order.iter().rev() {
