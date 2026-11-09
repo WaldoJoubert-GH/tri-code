@@ -445,6 +445,8 @@ mod tests {
         std::fs::remove_dir_all(&root).ok();
     }
 
+    // Runs the scripts with /bin/sh, which Windows doesn't have.
+    #[cfg(unix)]
     #[test]
     fn remote_scripts_run_in_a_real_shell() {
         let root = std::env::temp_dir().join(format!("tri-rfolders-{}", std::process::id()));
