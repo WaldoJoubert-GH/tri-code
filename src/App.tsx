@@ -16,6 +16,7 @@ import ClaudeUsage, { CommandCodeUsage } from "./Usage";
 import { SettingsDialog, hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { startAgentWindows } from "./agentwin";
 import { startAgentSetup } from "./agentsetup";
+import { trackAgentFocus } from "./agenttarget";
 import { SetupBanner } from "./SetupBanner";
 import { phoneStatus, startPhoneSync } from "./phone";
 import { AppearancePopover, appearanceOpen, backgroundCss, setBgImage, toggleAppearance } from "./Appearance";
@@ -89,6 +90,7 @@ export default function App() {
   createEffect(on(ready, (r) => r && startPhoneSync(), { defer: true }));
   createEffect(on(ready, (r) => r && startAgentWindows(), { defer: true }));
   createEffect(on(ready, (r) => r && startAgentSetup(), { defer: true }));
+  createEffect(on(ready, (r) => r && trackAgentFocus(), { defer: true }));
 
   // Start a session for every terminal tab once, including tabs added later.
   const started = new Set<string>();

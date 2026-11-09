@@ -244,6 +244,7 @@ class TermSession {
       if (this.replaying) return true;
       if (data.startsWith("?")) {
         this.term.input("\x1b]7501;?\x1b\\", false);
+        this.update({ ready: true });
         return true;
       }
       const r = parseReport(data);
@@ -443,7 +444,7 @@ class TermSession {
     if (this.cmd) {
       // An agent quit: restarting it rarely helps, so carry on in a plain shell.
       this.term.write(`\r\n\x1b[90m[${this.tab.name ?? "agent"} exited with code ${code}, starting a shell]\x1b[0m\r\n`);
-      this.update({ agent: undefined });
+      this.update({ agent: undefined, ready: undefined });
       // Quitting on purpose ends the conversation. A failed resume, or being killed by a shutdown,
       // doesn't: the tab stays an agent and tries again at the next launch.
       if (code === 0 || !this.tab.resume) becomeShell(this.project.id, this.tab.id);
@@ -456,7 +457,7 @@ class TermSession {
       return closeSession(this.tab.id);
     }
     this.term.write(`\r\n\x1b[90m[exited with code ${code}, press Enter to restart]\x1b[0m\r\n`);
-    this.update({ status: "exited", agent: undefined });
+    this.update({ status: "exited", agent: undefined, ready: undefined });
   }
 
   setVisible(visible: boolean) {

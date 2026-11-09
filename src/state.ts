@@ -355,7 +355,8 @@ export type AgentReport = { state: AgentState; msg: string; at: number; seen: bo
 
 /** Runtime-only info about live tabs; never persisted. `attention` is the terminal bell; `pty` is
  *  the running PTY's id, which phones watch it by. */
-export type Live = { status: TabStatus; attention: boolean; title: string; agent?: AgentReport; pty?: number };
+/** `ready`: the program answered the signal probe, so it is an agent and reads what is typed. */
+export type Live = { status: TabStatus; attention: boolean; title: string; agent?: AgentReport; pty?: number; ready?: true };
 
 export const SPACES = 4;
 /** Steps for Alt+, / Alt+. ; any whole px up to GAP_MAX can be typed in Settings or the status line. */
