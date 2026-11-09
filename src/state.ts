@@ -78,6 +78,8 @@ export type Page = {
   url: string;
   /** The page it was opened from, so links opened from one page line up after it in order. */
   opener?: string;
+  /** In a remote project: `localhost` and `file:` mean this machine, not the remote (Alt+Enter). */
+  here?: true;
 };
 
 /** A window on the canvas. Terminals run a PTY; browsers are native child webviews;
@@ -920,10 +922,14 @@ export function markTyped(projectId: string, tabId: string) {
   editTab(projectId, tabId, (t) => { t.typed = true; });
 }
 
-export function setPageUrl(projectId: string, tabId: string, pageId: string, url: string) {
+/** Set a page's address; `here` (when given) says whether it is on this machine rather than a remote project's host. */
+export function setPageUrl(projectId: string, tabId: string, pageId: string, url: string, here?: boolean) {
   editTab(projectId, tabId, (t) => {
     const pg = t.pages?.find((x) => x.id === pageId);
-    if (pg) pg.url = url;
+    if (!pg) return;
+    pg.url = url;
+    if (here) pg.here = true;
+    else if (here === false) delete pg.here;
   });
 }
 

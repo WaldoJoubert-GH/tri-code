@@ -20,10 +20,39 @@ impl Drop for Tunnel {
     }
 }
 
+impl Tunnel {
+    /// Whether ssh is still running; a dropped connection (sleep, network change) ends it.
+    pub fn alive(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(None))
+    }
+}
+
+/// Whether nothing here answers on `port`: it binds on 127.0.0.1, and on ::1 where there is one,
+/// and nothing accepts a connection to it.
+pub fn free(port: u16) -> bool {
+    if port == 0 || TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), Duration::from_millis(100)).is_ok() {
+        return false;
+    }
+    let v4 = TcpListener::bind(("127.0.0.1", port)).is_ok();
+    let v6 = match TcpListener::bind(("::1", port)) {
+        Ok(_) => true,
+        Err(e) => e.kind() != std::io::ErrorKind::AddrInUse,
+    };
+    v4 && v6
+}
+
 /// Forward a local port to `to_host:to_port` as `host` sees it, and wait until it accepts.
 pub async fn open(host: &str, to_host: &str, to_port: u16) -> Result<Tunnel, String> {
+    open_at(host, to_host, to_port, None).await
+}
+
+/// `open`, on `prefer` when nothing here uses it, else on a free port.
+pub async fn open_at(host: &str, to_host: &str, to_port: u16, prefer: Option<u16>) -> Result<Tunnel, String> {
     envssh::check(host)?;
-    let port = TcpListener::bind("127.0.0.1:0").and_then(|l| l.local_addr()).map_err(|e| e.to_string())?.port();
+    let port = match prefer.filter(|p| free(*p)) {
+        Some(p) => p,
+        None => TcpListener::bind("127.0.0.1:0").and_then(|l| l.local_addr()).map_err(|e| e.to_string())?.port(),
+    };
     let to = if to_host.contains(':') { format!("[{to_host}]") } else { to_host.to_string() };
     let mut cmd = Command::new("ssh");
     cmd.args(["-N", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=30"])

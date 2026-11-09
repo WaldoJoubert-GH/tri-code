@@ -15,6 +15,7 @@ import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees"
 import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeCtxMenu, ctxMenuOpen } from "./ctxmenu";
 import { closeFavEdit, favEditOpen } from "./favs";
+import { closeTunnelPop, tunnelPopOpen } from "./tunnelui";
 import { closeProfileMenu, profileMenuOpen } from "./profiles";
 import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
 import { openIssuePanel } from "./issues";
@@ -202,6 +203,7 @@ function onKey(e: KeyboardEvent) {
     else if (leftoversOpen()) closeLeftovers();
     else if (tabMenuOpen()) closeTabMenu();
     else if (favEditOpen()) closeFavEdit();
+    else if (tunnelPopOpen()) closeTunnelPop();
     else if (profileMenuOpen()) closeProfileMenu();
     else if (downloadMenuOpen()) closeDownloadMenu();
     else return;

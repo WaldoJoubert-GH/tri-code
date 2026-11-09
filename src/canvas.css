@@ -189,6 +189,74 @@
 /* Favourites: a star in the address field, a bar under the nav, tiles on a blank window (src/favs.tsx). */
 .addr { flex: 1; min-width: 0; margin: 0 4px; position: relative; display: flex; }
 .addr .url { margin: 0; padding-right: 26px; }
+/* Remote browser tunnels (src/tunnelui.tsx): a chip at the start of the address field, joined to it. */
+.addr.tunnelled .url { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.nav .tunchip {
+  width: auto; height: auto; flex: none; display: flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 4px 0 0 4px;
+  font-size: 11.5px; font-weight: 600; color: var(--accent); max-width: 150px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg)); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-right: 0;
+}
+.nav .tunchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav .tunchip:hover { background: color-mix(in srgb, var(--accent) 24%, var(--bg)); color: var(--accent); }
+.nav .tunchip:is(.s-opening, .s-reconnecting) { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--bg)); border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
+.nav .tunchip.s-failed { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--bg)); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.nav .tunchip.here { color: var(--muted); background: var(--raised); border-color: var(--line); font-weight: 500; }
+.lucide.spin { animation: spin .9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .lucide.spin { animation: none; } }
+.pop.tunpop { width: 360px; gap: 10px; }
+.tunpop .tunhead { display: flex; align-items: center; gap: 8px; }
+.tunpop .tunhead svg { color: var(--accent); flex: none; }
+.tunpop .tunhead b { flex: 1; min-width: 0; }
+.tunstate { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.tunstate i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.tunstate.s-open { color: var(--ok); }
+.tunstate:is(.s-opening, .s-reconnecting) { color: var(--warn); }
+.tunstate.s-failed { color: var(--bad); }
+.tunpop .tungrid { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 6px 10px; margin: 0; font-size: 12px; }
+.tunpop .tungrid dt { color: var(--muted); }
+.tunpop .tungrid dd { margin: 0; overflow-wrap: anywhere; }
+.tunpop .mono, .tunheld .mono, .remstart .mono { font-family: var(--mono); }
+.tunpop .dim, .tunheld .dim, .remstart .dim { color: var(--muted); }
+.tunpop .tunerr { margin: 0; font: 11.5px var(--mono); color: var(--bad); overflow-wrap: anywhere; }
+.tunpop .tunnote { margin: 0; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.tunpop .acts, .tunheld .acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.tunpop .acts button, .tunheld .acts button { padding: 3px 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--text); font-size: 12px; }
+.tunpop .acts button:hover, .tunheld .acts button:hover { background: var(--hover); }
+.tunpop .acts button:disabled { opacity: .45; cursor: default; background: none; }
+.tunpop .acts .primary, .tunheld .acts .primary { background: var(--accent); border-color: var(--accent); color: var(--bg-solid); }
+.tunpop .acts .primary:hover, .tunheld .acts .primary:hover { background: var(--accent); filter: brightness(1.08); }
+/* While a page's tunnel opens or after it failed, the window shows this in place of the webview. */
+.tunheld { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; font-size: 12.5px; }
+.tunheld.failed { align-items: flex-start; justify-content: flex-start; text-align: left; padding: 36px 40px; gap: 10px; }
+.tunheld.failed .acts { justify-content: flex-start; margin-top: 4px; }
+.tunheld b { font-size: 14px; }
+.tunheld .small, .remstart .small { font-size: 11.5px; }
+.tunheld > svg { color: var(--warn); }
+.tunbar svg { color: var(--warn); }
+/* A new tab in a remote project: the remote's listening ports and the project's HTML files. */
+.remstart { padding: 0 28px 28px; display: grid; gap: 22px; max-width: 980px; font-size: 13px; }
+.remstart section { display: grid; gap: 10px; min-width: 0; }
+.remstart h4 { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.remstart h4 .link { margin-left: auto; font-size: 11.5px; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+.remstart h4 .link:hover { color: var(--text); }
+.remstart .ports { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.remstart .port {
+  min-width: 0; display: grid; gap: 4px; padding: 10px 12px; text-align: left; color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+}
+.remstart .port:hover { border-color: var(--accent); }
+.remstart .port.live { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.remstart .port.nothttp { opacity: .7; }
+.remstart .port .top { display: flex; align-items: center; gap: 8px; }
+.remstart .port .top b { font-size: 14px; }
+.remstart .port .top > span { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 11px; }
+.remstart .port .ok { color: var(--ok); }
+.remstart .port .ok i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.remstart .port small { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.remstart .htmls { display: grid; gap: 2px; }
+.remstart .hrow { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 6px; color: var(--text); text-align: left; font-size: 12px; min-width: 0; }
+.remstart .hrow:hover { background: var(--hover); }
+.remstart .hrow .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav .star { position: absolute; right: 1px; top: 1px; width: 22px; height: 20px; font-size: 14px; line-height: 1; }
 .nav .star[aria-pressed="true"] { color: var(--warn); }
 .nav .star:disabled { opacity: .35; background: none; cursor: default; }
