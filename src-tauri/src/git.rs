@@ -45,11 +45,30 @@ pub struct Status {
     pub upstream: Option<String>,
     pub ahead: u32,
     pub behind: u32,
-    /// The remote's default branch (origin/HEAD), "main" if unknown.
+    /// What the branch merges into: its own destination (`branch.<b>.tri-base`), else `default_base`.
     pub base: String,
+    /// The remote's default branch (origin/HEAD), "main" if unknown.
+    #[serde(rename = "defaultBase")]
+    pub default_base: String,
     pub files: Vec<Change>,
     /// The last few commits on HEAD, newest first.
     pub commits: Vec<Commit>,
+    /// A pull (or merge) stopped on a conflict: "rebase" or "merge".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub op: Option<String>,
+}
+
+/// The git config key holding a branch's destination (the PR base tri-code uses for it).
+fn base_key(branch: &str) -> String {
+    format!("branch.{branch}.tri-base")
+}
+
+/// `branch`'s destination from `git config --get-regexp` output (`branch.<b>.tri-base <value>` lines).
+fn parse_base(out: &str, branch: &str) -> Option<String> {
+    out.lines().find_map(|l| {
+        let (b, v) = l.strip_prefix("branch.")?.split_once(".tri-base ")?;
+        (b == branch && !v.trim().is_empty()).then(|| v.trim().to_string())
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -261,6 +280,11 @@ const STATUS_CMDS: &[&[&str]] = &[
     &["diff", "--numstat", "-z"],
     // origin/HEAD is only set by `git clone`: without it, guess from the usual names.
     &["for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin/main", "refs/remotes/origin/master"],
+    // A rebase or merge stopped on a conflict (exit 0 while one is in progress).
+    &["rev-parse", "--quiet", "--verify", "REBASE_HEAD"],
+    &["rev-parse", "--quiet", "--verify", "MERGE_HEAD"],
+    // Each branch's destination, set from the git window.
+    &["config", "--get-regexp", r"^branch\..*\.tri-base$"],
 ];
 
 /// Parse one repo's status outputs (the commands in STATUS_CMDS).
@@ -274,7 +298,10 @@ fn status_from(r: &[Result<String, i32>]) -> Result<Status, String> {
     let base = r.get(1).and_then(|x| x.as_ref().ok()).map(|b| b.trim().to_string()).unwrap_or_default();
     let ok = |i: usize| r.get(i).and_then(|x| x.as_ref().ok()).map(String::as_str).unwrap_or("");
     let guess = ok(6).lines().map(str::trim).find(|b| !b.is_empty()).map(String::from);
-    s.base = base.split_once('/').map(|(_, b)| b.to_string()).filter(|b| !b.is_empty()).or(guess).unwrap_or_else(|| "main".into());
+    s.default_base = base.split_once('/').map(|(_, b)| b.to_string()).filter(|b| !b.is_empty()).or(guess).unwrap_or_else(|| "main".into());
+    s.base = s.branch.as_deref().and_then(|b| parse_base(ok(9), b)).unwrap_or_else(|| s.default_base.clone());
+    let done = |i: usize| matches!(r.get(i), Some(Ok(_)));
+    s.op = if done(7) { Some("rebase".into()) } else if done(8) { Some("merge".into()) } else { None };
     s.commits = parse_log(ok(2), ok(3));
     let (index, work) = (parse_numstat(ok(4)), parse_numstat(ok(5)));
     for c in &mut s.files {
@@ -581,14 +608,311 @@ pub async fn git_commit(host: String, path: String, message: String) -> Result<S
     blocking(move || exec(&host, &path, "git", &["commit", "-q", "-F", "-"], Some(message))).await
 }
 
-/// Push the branch; a branch with no upstream is pushed to origin and tracks it.
+/// Push the branch. With `remote` and `branch`, to that branch on that remote (tracking it when
+/// `set_upstream`); without, to its upstream, or to origin (tracking it) when it has none.
 #[tauri::command]
-pub async fn git_push(host: String, path: String, set_upstream: bool) -> Result<(), String> {
+pub async fn git_push(host: String, path: String, set_upstream: bool, remote: Option<String>, branch: Option<String>) -> Result<(), String> {
     blocking(move || {
-        let args: &[&str] = if set_upstream { &["push", "-u", "origin", "HEAD"] } else { &["push"] };
-        exec(&host, &path, "git", args, None).map(|_| ())
+        let refspec = branch.as_deref().filter(|b| !b.trim().is_empty()).map(|b| format!("HEAD:{}", b.trim()));
+        let mut args = vec!["push"];
+        match (remote.as_deref().filter(|r| !r.is_empty()), refspec.as_deref()) {
+            (Some(r), Some(spec)) => {
+                if set_upstream {
+                    args.push("-u");
+                }
+                args.extend([r, spec]);
+            }
+            _ if set_upstream => args.extend(["-u", "origin", "HEAD"]),
+            _ => {}
+        }
+        exec(&host, &path, "git", &args, None).map(|_| ())
     })
     .await
+}
+
+/// The remotes' names (`origin`, a fork's `upstream`), for the Push drawer.
+#[tauri::command]
+pub async fn git_remotes(host: String, path: String) -> Result<Vec<String>, String> {
+    blocking(move || exec(&host, &path, "git", &["remote"], None).map(|o| o.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect()))
+        .await
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct Incoming {
+    pub sha: String,
+    pub subject: String,
+    pub when: String,
+    pub author: String,
+}
+
+fn parse_incoming(out: &str) -> Vec<Incoming> {
+    out.lines()
+        .filter_map(|l| {
+            let mut f = l.split('\u{1f}');
+            Some(Incoming { sha: f.next()?.into(), subject: f.next()?.into(), when: f.next()?.into(), author: f.next()?.into() })
+        })
+        .collect()
+}
+
+/// The commits on the upstream that are not here yet (what a pull brings in), newest first.
+#[tauri::command]
+pub async fn git_incoming(host: String, path: String) -> Result<Vec<Incoming>, String> {
+    blocking(move || {
+        exec(&host, &path, "git", &["log", "-n", "50", "--format=%H%x1f%s%x1f%cr%x1f%an", "HEAD..@{upstream}"], None).map(|o| parse_incoming(&o))
+    })
+    .await
+}
+
+/// Pull the upstream into the branch. `mode`: rebase (the default), merge, or ff (fast-forward
+/// only). `autostash` sets local changes aside first and puts them back after. A conflict leaves
+/// the rebase or merge stopped; the status's `op` then says which, for Continue and Abort.
+#[tauri::command]
+pub async fn git_pull(host: String, path: String, mode: String, autostash: bool) -> Result<(), String> {
+    blocking(move || {
+        // core.editor=true: a merge commit takes its default message instead of waiting on an editor.
+        let mut args = vec!["-c", "core.editor=true", "pull", "--quiet"];
+        args.push(match mode.as_str() {
+            "merge" => "--no-rebase",
+            "ff" => "--ff-only",
+            _ => "--rebase",
+        });
+        if mode == "merge" {
+            args.push("--no-edit");
+        }
+        if autostash {
+            args.push("--autostash");
+        }
+        exec(&host, &path, "git", &args, None).map(|_| ())
+    })
+    .await
+}
+
+/// Continue or abort the rebase or merge a pull stopped. `op` is the status's `op`.
+#[tauri::command]
+pub async fn git_op(host: String, path: String, op: String, action: String) -> Result<(), String> {
+    blocking(move || {
+        let op = if op == "merge" { "merge" } else { "rebase" };
+        let action = if action == "abort" { "--abort" } else { "--continue" };
+        exec(&host, &path, "git", &["-c", "core.editor=true", op, action], None).map(|_| ())
+    })
+    .await
+}
+
+/// A file's content before a discard: a blob written to the object store, or None when there was
+/// no file (a deletion was discarded). Undo puts these back.
+#[derive(Debug, Serialize, serde::Deserialize, PartialEq, Clone)]
+pub struct Saved {
+    pub path: String,
+    pub blob: Option<String>,
+}
+
+/// Throw changes away, saving each file's content first so `git_restore_saved` can undo it.
+/// `files`: tracked files, restored from the index, or from HEAD (index too) when `staged`.
+/// `added`: files new in the index, removed from it and from disk. `untracked`: deleted (folders too).
+#[tauri::command]
+pub async fn git_discard(host: String, path: String, files: Vec<String>, staged: bool, added: Vec<String>, untracked: Vec<String>) -> Result<Vec<Saved>, String> {
+    blocking(move || discard(&host, &path, &files, staged, &added, &untracked)).await
+}
+
+fn discard(host: &str, path: &str, files: &[String], staged: bool, added: &[String], untracked: &[String]) -> Result<Vec<Saved>, String> {
+    // An untracked folder is listed as `dir/`: it is deleted, but there is no blob to save.
+    let all: Vec<&String> = files.iter().chain(added).chain(untracked).filter(|f| !f.ends_with('/')).collect();
+    let sets: Vec<Vec<&str>> = all.iter().map(|f| vec!["hash-object", "-w", "--", f.as_str()]).collect();
+    let cmds: Vec<&[&str]> = sets.iter().map(|v| v.as_slice()).collect();
+    let saved: Vec<Saved> = if cmds.is_empty() { Vec::new() } else { multi(host, path, &cmds)? }
+        .into_iter()
+        .zip(&all)
+        .map(|(r, f)| Saved { path: f.to_string(), blob: r.ok().map(|b| b.trim().to_string()).filter(|b| !b.is_empty()) })
+        .collect();
+    let with = |base: &[&str], paths: &[String]| -> Result<(), String> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+        let mut args = base.to_vec();
+        args.extend(paths.iter().map(String::as_str));
+        exec(host, path, "git", &args, None).map(|_| ())
+    };
+    if staged {
+        with(&["restore", "--source=HEAD", "--staged", "--worktree", "--"], files)?;
+    } else {
+        with(&["restore", "--worktree", "--"], files)?;
+    }
+    with(&["rm", "-f", "-q", "--"], added)?;
+    with(&["clean", "-f", "-d", "-q", "--"], untracked)?;
+    Ok(saved)
+}
+
+/// Undo a discard: write each saved blob back to its file, and delete the files that did not exist.
+#[tauri::command]
+pub async fn git_restore_saved(host: String, path: String, saved: Vec<Saved>) -> Result<(), String> {
+    blocking(move || restore_saved(&host, &path, &saved)).await
+}
+
+fn restore_saved(host: &str, path: &str, saved: &[Saved]) -> Result<(), String> {
+    if !matches!(host, "" | "local") {
+        let steps: Vec<String> = saved
+            .iter()
+            .map(|s| match &s.blob {
+                Some(b) => format!("mkdir -p \"$(dirname {f})\" && git cat-file blob {} > {f}", sq(b), f = sq(&s.path)),
+                None => format!("rm -f {}", sq(&s.path)),
+            })
+            .collect();
+        if steps.is_empty() {
+            return Ok(());
+        }
+        return remote::run(host, &format!("cd {} && {}", remote_path(path), steps.join(" && "))).map(|_| ());
+    }
+    let root = std::path::PathBuf::from(expand_home(path));
+    for s in saved {
+        let to = root.join(&s.path);
+        match &s.blob {
+            Some(b) => {
+                // Bytes, not text: the file may be binary.
+                let out = command(host, path, "git", &["cat-file", "blob", b])?.output().map_err(|e| e.to_string())?;
+                if !out.status.success() {
+                    return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+                }
+                if let Some(dir) = to.parent() {
+                    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+                }
+                std::fs::write(&to, out.stdout).map_err(|e| format!("{}: {e}", s.path))?;
+            }
+            None => {
+                let _ = std::fs::remove_file(&to);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Stop tracking files but keep them on disk (`git rm --cached`).
+#[tauri::command]
+pub async fn git_untrack(host: String, path: String, files: Vec<String>) -> Result<(), String> {
+    blocking(move || {
+        let mut args = vec!["rm", "--cached", "-q", "-r", "--"];
+        args.extend(files.iter().map(String::as_str));
+        exec(&host, &path, "git", &args, None).map(|_| ())
+    })
+    .await
+}
+
+/// Add a line to the repo's .gitignore, starting it on a new line.
+#[tauri::command]
+pub async fn git_ignore(host: String, path: String, entry: String) -> Result<(), String> {
+    blocking(move || {
+        if !matches!(host.as_str(), "" | "local") {
+            let script = format!(
+                "cd {} && f=.gitignore && {{ [ ! -s \"$f\" ] || [ -z \"$(tail -c1 \"$f\")\" ] || echo >> \"$f\"; }} && printf '%s\\n' {} >> \"$f\"",
+                remote_path(&path),
+                sq(&entry)
+            );
+            return remote::run(&host, &script).map(|_| ());
+        }
+        let file = std::path::PathBuf::from(expand_home(&path)).join(".gitignore");
+        let mut text = std::fs::read_to_string(&file).unwrap_or_default();
+        if !text.is_empty() && !text.ends_with('\n') {
+            text.push('\n');
+        }
+        text.push_str(&entry);
+        text.push('\n');
+        std::fs::write(&file, text).map_err(|e| e.to_string())
+    })
+    .await
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct Stash {
+    /// `stash@{n}`: shifts as stashes come and go, so actions check `sha` too.
+    #[serde(rename = "ref")]
+    pub at: String,
+    pub sha: String,
+    /// "On main: message" / "WIP on main: abc subject", as git names it.
+    pub subject: String,
+    pub when: String,
+}
+
+fn parse_stashes(out: &str) -> Vec<Stash> {
+    out.lines()
+        .filter_map(|l| {
+            let mut f = l.split('\u{1f}');
+            Some(Stash { at: f.next()?.into(), sha: f.next()?.into(), subject: f.next()?.into(), when: f.next()?.into() })
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub async fn git_stash_list(host: String, path: String) -> Result<Vec<Stash>, String> {
+    blocking(move || exec(&host, &path, "git", &["stash", "list", "--format=%gd%x1f%H%x1f%gs%x1f%cr"], None).map(|o| parse_stashes(&o))).await
+}
+
+/// Stash the changes (staged and not): every file, or only `files`. `untracked` takes new files too.
+#[tauri::command]
+pub async fn git_stash_push(host: String, path: String, message: String, untracked: bool, files: Vec<String>) -> Result<(), String> {
+    blocking(move || {
+        let mut args = vec!["stash", "push", "-q"];
+        if untracked {
+            args.push("-u");
+        }
+        let message = message.trim().to_string();
+        if !message.is_empty() {
+            args.extend(["-m", message.as_str()]);
+        }
+        if !files.is_empty() {
+            args.push("--");
+            args.extend(files.iter().map(String::as_str));
+        }
+        exec(&host, &path, "git", &args, None).map(|_| ())
+    })
+    .await
+}
+
+/// Apply, pop or drop the stash at `at`, after checking it is still `sha` (another session's
+/// stash may have shifted the numbers).
+#[tauri::command]
+pub async fn git_stash_op(host: String, path: String, op: String, at: String, sha: String) -> Result<(), String> {
+    blocking(move || {
+        let now = exec(&host, &path, "git", &["rev-parse", "--verify", "--quiet", &at], None).unwrap_or_default();
+        if now.trim() != sha {
+            return Err(format!("{at} has changed since the list was read; refresh and try again"));
+        }
+        let op = match op.as_str() {
+            "pop" => "pop",
+            "drop" => "drop",
+            _ => "apply",
+        };
+        exec(&host, &path, "git", &["stash", op, "-q", &at], None).map(|_| ())
+    })
+    .await
+}
+
+/// A stash's patch, its untracked files included where git supports that (2.32+).
+#[tauri::command]
+pub async fn git_stash_show(host: String, path: String, at: String) -> Result<String, String> {
+    blocking(move || {
+        exec(&host, &path, "git", &["stash", "show", "-p", "--no-color", "--include-untracked", &at], None)
+            .or_else(|_| exec(&host, &path, "git", &["stash", "show", "-p", "--no-color", &at], None))
+    })
+    .await
+}
+
+/// Set the branch's destination (what it merges into); an empty `base` goes back to the default.
+#[tauri::command]
+pub async fn git_set_base(host: String, path: String, branch: String, base: String) -> Result<(), String> {
+    blocking(move || {
+        let key = base_key(&branch);
+        if base.trim().is_empty() {
+            // exit 5: it was not set
+            return run(command(&host, &path, "git", &["config", "--unset", &key])?, None, &[5]).map(|_| ());
+        }
+        exec(&host, &path, "git", &["config", &key, base.trim()], None).map(|_| ())
+    })
+    .await
+}
+
+/// Retarget the branch's open PR at another base branch.
+#[tauri::command]
+pub async fn gh_pr_edit_base(host: String, path: String, base: String) -> Result<(), String> {
+    blocking(move || exec(&host, &path, "gh", &["pr", "edit", "--base", &base], None).map(|_| ())).await
 }
 
 const PR_FIELDS: &str = "number,title,body,state,url,isDraft,baseRefName,mergeable,statusCheckRollup";
@@ -899,6 +1223,85 @@ mod tests {
         assert_eq!(renamed_from(ns, "src/new.ts").as_deref(), Some("src/old.ts"));
         assert_eq!(renamed_from(ns, "b.ts"), None);
         assert_eq!(renamed_from("", "x"), None);
+    }
+
+    #[test]
+    fn base_is_read_for_the_current_branch_only() {
+        let out = "branch.main.tri-base develop\nbranch.feat/x.y.tri-base release/0.2\n";
+        assert_eq!(parse_base(out, "feat/x.y").as_deref(), Some("release/0.2"));
+        assert_eq!(parse_base(out, "main").as_deref(), Some("develop"));
+        assert_eq!(parse_base(out, "other"), None);
+        assert_eq!(parse_base("", "main"), None);
+    }
+
+    #[test]
+    fn stash_and_incoming_lists_parse() {
+        let s = parse_stashes("stash@{0}\u{1f}abc\u{1f}On main: try it\u{1f}2 days ago\n");
+        assert_eq!(s, vec![Stash { at: "stash@{0}".into(), sha: "abc".into(), subject: "On main: try it".into(), when: "2 days ago".into() }]);
+        let i = parse_incoming("abc\u{1f}Fix it\u{1f}1 hour ago\u{1f}Sam\n");
+        assert_eq!(i[0].author, "Sam");
+        assert_eq!(i[0].subject, "Fix it");
+    }
+
+    #[test]
+    fn pull_conflict_abort_discard_undo_and_destination_against_real_repos() {
+        let dir = std::env::temp_dir().join(format!("tri-sync-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("o")).unwrap();
+        let at = |r: &str| dir.join(r).to_str().unwrap().to_string();
+        let (o, c) = (at("o"), at("c"));
+        let git = |p: &str, args: &[&str]| exec("local", p, "git", args, None).unwrap();
+        git(&o, &["init", "-q", "-b", "main"]);
+        for (k, v) in [("user.email", "t@example.com"), ("user.name", "T"), ("core.autocrlf", "false")] {
+            git(&o, &["config", k, v]);
+        }
+        std::fs::write(dir.join("o/a.txt"), "one\n").unwrap();
+        git(&o, &["add", "a.txt"]);
+        git(&o, &["commit", "-q", "-m", "first"]);
+        git(dir.to_str().unwrap(), &["clone", "-q", "-c", "core.autocrlf=false", "o", "c"]);
+        git(&c, &["config", "user.email", "t@example.com"]);
+        git(&c, &["config", "user.name", "T"]);
+
+        // Both sides change the same line: the incoming commit shows, and a rebase pull stops.
+        std::fs::write(dir.join("o/a.txt"), "theirs\n").unwrap();
+        git(&o, &["commit", "-q", "-am", "theirs"]);
+        std::fs::write(dir.join("c/a.txt"), "mine\n").unwrap();
+        git(&c, &["commit", "-q", "-am", "mine"]);
+        git(&c, &["fetch", "-q"]);
+        let inc = parse_incoming(&git(&c, &["log", "--format=%H%x1f%s%x1f%cr%x1f%an", "HEAD..@{upstream}"]));
+        assert_eq!(inc.iter().map(|i| i.subject.as_str()).collect::<Vec<_>>(), ["theirs"]);
+        assert!(exec("local", &c, "git", &["-c", "core.editor=true", "pull", "--quiet", "--rebase"], None).is_err());
+        let s = status_from(&multi("local", &c, STATUS_CMDS).unwrap()).unwrap();
+        assert_eq!(s.op.as_deref(), Some("rebase"));
+        assert!(s.files.iter().any(|f| f.path == "a.txt" && f.x == "U"));
+        git(&c, &["rebase", "--abort"]);
+        let s = status_from(&multi("local", &c, STATUS_CMDS).unwrap()).unwrap();
+        assert_eq!((s.op, s.base.as_str(), s.default_base.as_str()), (None, "main", "main"));
+
+        // Discard a change and delete an untracked file, then undo both.
+        std::fs::write(dir.join("c/a.txt"), "dirty\n").unwrap();
+        std::fs::create_dir_all(dir.join("c/new")).unwrap();
+        std::fs::write(dir.join("c/new/n.txt"), "fresh\n").unwrap();
+        let saved = discard("local", &c, &["a.txt".into()], false, &[], &["new/n.txt".into()]).unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("c/a.txt")).unwrap(), "mine\n");
+        assert!(!dir.join("c/new/n.txt").exists());
+        restore_saved("local", &c, &saved).unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("c/a.txt")).unwrap(), "dirty\n");
+        assert_eq!(std::fs::read_to_string(dir.join("c/new/n.txt")).unwrap(), "fresh\n");
+
+        // A staged discard goes back to HEAD; a staged new file is removed.
+        git(&c, &["add", "-A"]);
+        let saved = discard("local", &c, &["a.txt".into()], true, &["new/n.txt".into()], &[]).unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("c/a.txt")).unwrap(), "mine\n");
+        assert!(!dir.join("c/new/n.txt").exists());
+        assert!(git(&c, &["status", "--porcelain"]).trim().is_empty());
+        assert_eq!(saved.len(), 2);
+
+        // The destination is per branch.
+        git(&c, &["config", &base_key("main"), "develop"]);
+        let s = status_from(&multi("local", &c, STATUS_CMDS).unwrap()).unwrap();
+        assert_eq!((s.base.as_str(), s.default_base.as_str()), ("develop", "main"));
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

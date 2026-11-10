@@ -1,17 +1,22 @@
 // The git window: one per project. The commit box and the staged / unstaged lists on the left,
-// the selected file's diff on the right, and the branch's next steps (push, PR, merge) in the
+// the selected file's diff on the right, and the branch's next steps (pull, push, PR, merge) in the
 // header, each opening a drawer over the diff. The diff is unified or split (design/diff.html,
 // variant A), and a double-click opens the file in the editor at that line.
+// The `→ base` chip picks the branch's destination; file rows discard / delete (with Undo), stash,
+// stop tracking or ignore; stashes list under Changes; a pull stopped on a conflict shows a
+// Continue / Abort banner (design/git-sync.html).
 // A folder that is not itself a repo gets an accordion of its nested repos and an active repo;
 // the active repo owns the commit box, commits, PR and push (design/diff.html, folder of repos).
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import { type Project, type Tab, diffModeOf, isRemote, setProjectDiffMode } from "./state";
 import {
-  type Change, type CtxId, type Drawer, type RepoStatus, type Sel, commit, copyFinding, draftCommit, draftPr, gitOf, isStaged, isUnstaged, linkedIssue,
-  loadPr, merge, openDrawer, openPr, push, refresh, repoRoot, review, select, selectCommit, selectRepo, setField, setOpt, stage, stepOf,
-  toggleCtx, unpushed, unstage,
+  type Change, type CtxId, type Drawer, type RepoStatus, type Sel, type Stash, closeStash, commit, copyFinding, discard, draftCommit, draftPr, fetchRemotes,
+  finishOp, gitOf, ignore, isStaged, isUnstaged, linkedIssue, loadBranches, loadPr, markOf, merge, openDrawer, openPr, pull, push, refresh,
+  repoRoot, review, select, selectCommit, selectRepo, selectStash, setBase, setField, setOpt, setPushTarget, stage, stashOp, stashPush, stepOf,
+  toggleCtx, unpushed, unstage, untrack, upstreamOf,
 } from "./git";
+import { copyText } from "./clipboard";
 import { openFile } from "./files";
 import { openUrlInProject } from "./browsers";
 import { removeWorktree } from "./worktrees";
@@ -49,6 +54,24 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
   const s = () => g().status;
   const [menu, setMenu] = createSignal(false);
   const [repoMenu, setRepoMenu] = createSignal(false);
+  /** The destination picker under `→ base`, and its filter. */
+  const [destMenu, setDestMenu] = createSignal(false);
+  const [destQ, setDestQ] = createSignal("");
+  const [destAt, setDestAt] = createSignal({ x: 0, y: 0 });
+  /** A row's menu (right-click or ⋯), placed in the window. */
+  const [ctx, setCtx] = createSignal<{ c: Change; staged: boolean; x: number; y: number } | null>(null);
+  /** The Stash… form under the Changes header. */
+  const [stashForm, setStashForm] = createSignal<{ x: number; y: number } | null>(null);
+  const [stashMsg, setStashMsg] = createSignal("");
+  const [stashU, setStashU] = createSignal(true);
+  /** The row asking "Discard…?" / "Drop…?": `w:path`, `s:path`, `*` (all changes) or `drop:sha`. */
+  const [confirm, setConfirm] = createSignal<string | null>(null);
+  let winEl: HTMLDivElement | undefined;
+  /** A point in the window for a popover, from a viewport point; kept inside the window. */
+  const at = (clientX: number, clientY: number, w = 260) => {
+    const r = winEl!.getBoundingClientRect();
+    return { x: Math.max(4, Math.min(clientX - r.left, r.width - w - 4)), y: clientY - r.top };
+  };
   /** A folder of repos: one git window with an accordion and an active repo. */
   const multiRepo = () => (g().repos?.length ?? 0) > 1;
   const nestedRepo = () => !!g().repo;
@@ -122,7 +145,18 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     const el = e.target as Element;
     if (!el.closest(".g-split")) setMenu(false);
     if (!el.closest(".g-repo, .g-repomenu")) setRepoMenu(false);
+    if (!el.closest(".g-dest, .g-destmenu")) setDestMenu(false);
+    if (!el.closest(".g-ctx")) setCtx(null);
+    if (!el.closest(".g-stashform, .g-stashbtn")) setStashForm(null);
+    if (!el.closest(".g-confirm, .g-ask")) setConfirm(null);
   };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || !(ctx() || stashForm() || destMenu() || confirm())) return;
+    setCtx(null); setStashForm(null); setDestMenu(false); setConfirm(null);
+    e.stopPropagation();
+  };
+  // A new status (refresh, another repo) closes what pointed at the old one.
+  createEffect(on(() => g().status, () => { setCtx(null); setConfirm(null); }, { defer: true }));
   onMount(() => document.addEventListener("pointerdown", onDown));
   onCleanup(() => document.removeEventListener("pointerdown", onDown));
 
@@ -157,35 +191,155 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
 
   const Thinking = (pr: { what: string }) => <span class="g-thinking">{pr.what}</span>;
 
+  const conflicted = (c: Change) => markOf(c) === "C";
+  const untrackedC = (c: Change) => c.x === "?";
+  const short = (path: string) => path.replace(/\/$/, "").split("/").pop() ?? path;
+  const keyOf = (c: Change, staged: boolean) => `${staged ? "s" : "w"}:${c.path}`;
+  /** Delete for a new file (untracked, or added from the Staged list), Discard for the rest. */
+  const deletes = (c: Change, staged: boolean) => untrackedC(c) || (staged && c.x === "A");
+
+  const Confirm = (cp: { q: JSX.Element; yes: string; onYes: () => void }) => (
+    <div class="g-confirm" role="alertdialog">
+      <span class="q">{cp.q}</span>
+      <span class="grow" />
+      <button class="g-btn sm" onClick={() => setConfirm(null)}>Keep</button>
+      <button class="g-btn sm danger" ref={(el) => queueMicrotask(() => el.focus())} onClick={() => { setConfirm(null); cp.onYes(); }}>{cp.yes}</button>
+    </div>
+  );
+
   const FileRow = (fp: { c: Change; inStaged: boolean }) => {
-    const sel = () => g().sel?.path === fp.c.path && g().sel?.staged === fp.inStaged && g().sel?.repo === g().repo;
+    const sel = () => g().sel?.path === fp.c.path && g().sel?.staged === fp.inStaged && g().sel?.repo === g().repo && !g().stash;
     const i = fp.c.path.lastIndexOf("/");
+    const del = () => deletes(fp.c, fp.inStaged);
+    const openMenu = (x: number, y: number) => {
+      select(p(), { repo: g().repo, path: fp.c.path, staged: fp.inStaged });
+      setCtx({ c: fp.c, staged: fp.inStaged, ...at(x, y, 250) });
+    };
     return (
-      <div
-        class="g-frow"
-        classList={{ sel: sel() }}
-        title={fp.c.path}
-        onClick={() => select(p(), { repo: g().repo, path: fp.c.path, staged: fp.inStaged })}
-        onDblClick={() => {
-          if (fp.c.x === "D" || fp.c.y === "D") return flash("deleted: there is no working copy to open");
-          openFile(p(), abs({ repo: g().repo, path: fp.c.path, staged: fp.inStaged }), { from: props.tab.id });
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={fp.inStaged}
-          title={fp.inStaged ? "Unstage" : "Stage"}
-          onClick={(e) => {
-            e.stopPropagation();
-            void (fp.inStaged ? unstage(p(), [fp.c.path]) : stage(p(), [fp.c.path]));
-          }}
+      <Show when={confirm() !== keyOf(fp.c, fp.inStaged)} fallback={
+        <Confirm
+          q={<>{del() ? "Delete" : fp.inStaged ? "Discard all changes to" : "Discard changes to"} <b>{short(fp.c.path)}</b>?</>}
+          yes={del() ? "Delete" : "Discard"}
+          onYes={() => void discard(p(), [fp.c], fp.inStaged)}
         />
-        <span class={`g-st s-${letter(fp.c, fp.inStaged)}`}>{letter(fp.c, fp.inStaged)}</span>
-        <span class="g-fp"><span class="d">{i >= 0 ? fp.c.path.slice(0, i + 1) : ""}</span>{fp.c.path.slice(i + 1)}</span>
-        <RowStat n={fp.inStaged ? fp.c.index : fp.c.work} />
-      </div>
+      }>
+        <div
+          class="g-frow"
+          classList={{ sel: sel(), conf: conflicted(fp.c) }}
+          title={fp.c.path}
+          onClick={() => select(p(), { repo: g().repo, path: fp.c.path, staged: fp.inStaged })}
+          onContextMenu={(e) => { e.preventDefault(); openMenu(e.clientX, e.clientY); }}
+          onDblClick={() => {
+            if (fp.c.x === "D" || fp.c.y === "D") return flash("deleted: there is no working copy to open");
+            openFile(p(), abs({ repo: g().repo, path: fp.c.path, staged: fp.inStaged }), { from: props.tab.id });
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={fp.inStaged}
+            title={conflicted(fp.c) ? "Mark resolved (stage)" : fp.inStaged ? "Unstage" : "Stage"}
+            onClick={(e) => {
+              e.stopPropagation();
+              void (fp.inStaged ? unstage(p(), [fp.c.path]) : stage(p(), [fp.c.path]));
+            }}
+          />
+          <span class={`g-st s-${conflicted(fp.c) ? "C" : letter(fp.c, fp.inStaged)}`}>{conflicted(fp.c) ? "C" : letter(fp.c, fp.inStaged)}</span>
+          <span class="g-fp"><span class="d">{i >= 0 ? fp.c.path.slice(0, i + 1) : ""}</span>{fp.c.path.slice(i + 1)}</span>
+          <RowStat n={fp.inStaged ? fp.c.index : fp.c.work} />
+          <span class="g-racts" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+            <Show when={conflicted(fp.c)} fallback={
+              <button class="bad g-ask" title={del() ? "Delete file…" : "Discard changes…"} onClick={() => setConfirm(keyOf(fp.c, fp.inStaged))}>
+                {del() ? "🗑" : "↺"}
+              </button>
+            }>
+              <button class="txt" title="Mark resolved (git add)" onClick={() => stage(p(), [fp.c.path])}>resolved</button>
+            </Show>
+            <button title="More" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.right - 250, r.bottom + 2); }}>⋯</button>
+          </span>
+        </div>
+      </Show>
     );
   };
+
+  /** A row's menu: stage, stash, discard / delete, stop tracking, ignore. */
+  const RowMenu = () => (
+    <Show when={ctx()}>
+      {(m) => {
+        const c = () => m().c;
+        const close = () => setCtx(null);
+        const run = (f: () => unknown) => () => { close(); void f(); };
+        return (
+          <div class="g-menu g-ctx" role="menu" style={{ left: `${m().x}px`, top: `${m().y}px` }}>
+            <button role="menuitem" disabled={c().x === "D" || c().y === "D"}
+              onClick={run(() => openFile(p(), abs({ repo: g().repo, path: c().path, staged: m().staged }), { from: props.tab.id }))}>Open in editor</button>
+            <button role="menuitem" onClick={run(() => { copyText(c().path); flash("copied the path"); })}>Copy path</button>
+            <hr />
+            <button role="menuitem" onClick={run(() => (m().staged ? unstage(p(), [c().path]) : stage(p(), [c().path])))}>
+              {conflicted(c()) ? "Mark resolved" : m().staged ? "Unstage" : "Stage"}
+            </button>
+            <button role="menuitem" disabled={conflicted(c()) || c().path.endsWith("/")}
+              onClick={run(() => stashPush(p(), { message: short(c().path), untracked: untrackedC(c()), files: [c().path] }))}>Stash this file</button>
+            <hr />
+            <Show when={untrackedC(c())}>
+              <button role="menuitem" onClick={run(() => ignore(p(), c().path))}>Add to .gitignore</button>
+            </Show>
+            <Show when={!untrackedC(c()) && c().x !== "A" && c().x !== "D"}>
+              <button role="menuitem" onClick={run(() => untrack(p(), c().path))}>Stop tracking (keep on disk)</button>
+            </Show>
+            <button role="menuitem" class="bad g-ask" disabled={conflicted(c())}
+              onClick={() => { const k = keyOf(c(), m().staged); close(); setConfirm(k); }}>
+              {deletes(c(), m().staged) ? "Delete file…" : "Discard changes…"}
+            </button>
+          </div>
+        );
+      }}
+    </Show>
+  );
+
+  const StashForm = () => (
+    <Show when={stashForm()}>
+      {(f) => {
+        const n = () => (s()?.files ?? []).filter((c) => !conflicted(c) && (stashU() || !untrackedC(c))).length;
+        const go = async () => {
+          if (!n()) return;
+          if (await stashPush(p(), { message: stashMsg(), untracked: stashU() })) { setStashForm(null); setStashMsg(""); }
+        };
+        return (
+          <div class="g-menu g-stashform" style={{ left: `${f().x}px`, top: `${f().y}px` }}>
+            <div class="g-group">Stash changes</div>
+            <input class="g-in" placeholder={`WIP on ${s()?.branch ?? "HEAD"}`} value={stashMsg()} ref={(el) => queueMicrotask(() => el.focus())}
+              onInput={(e) => setStashMsg(e.currentTarget.value)} onKeyDown={(e) => { if (e.key === "Enter") void go(); }} />
+            <label class="g-hint g-check-l"><input type="checkbox" checked={stashU()} onChange={(e) => setStashU(e.currentTarget.checked)} /> include untracked files</label>
+            <div class="g-row">
+              <span class="g-hint">Staged and unstaged both go in.</span>
+              <span class="grow" />
+              <button class="g-btn sm" onClick={() => setStashForm(null)}>Cancel</button>
+              <button class="g-btn sm primary" disabled={!n() || !!g().working} onClick={() => void go()}>
+                {g().working === "stash" ? "Stashing…" : `Stash ${n()}`}
+              </button>
+            </div>
+          </div>
+        );
+      }}
+    </Show>
+  );
+
+  const StashRow = (sp: { st: Stash }) => (
+    <Show when={confirm() !== `drop:${sp.st.sha}`} fallback={
+      <Confirm q={<>Drop <b>{sp.st.ref}</b>? It can't be undone.</>} yes="Drop" onYes={() => void stashOp(p(), sp.st, "drop")} />
+    }>
+      <div class="g-srow pad" classList={{ sel: g().stash?.key === sp.st.sha }} title={`${sp.st.subject}\n${sp.st.when}`} onClick={() => void selectStash(p(), sp.st)}>
+        <span class="ix">{sp.st.ref.replace(/^stash/, "")}</span>
+        <span class="s">{sp.st.subject}</span>
+        <span class="w">{sp.st.when}</span>
+        <span class="g-racts" onClick={(e) => e.stopPropagation()}>
+          <button class="txt" title="git stash apply: keep the stash" disabled={!!g().working} onClick={() => stashOp(p(), sp.st, "apply")}>Apply</button>
+          <button class="txt" title="git stash pop: apply, then drop it" disabled={!!g().working} onClick={() => stashOp(p(), sp.st, "pop")}>Pop</button>
+          <button class="bad g-ask" title="Drop…" onClick={() => setConfirm(`drop:${sp.st.sha}`)}>×</button>
+        </span>
+      </div>
+    </Show>
+  );
 
   const Lists = (lp: { sub?: boolean }) => (
     <>
@@ -194,10 +348,37 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
       </div>
       <For each={stagedList()}>{(c) => <FileRow c={c} inStaged={true} />}</For>
       <div class="g-sec" classList={{ sub: lp.sub }}>Changes <span class="n">{unstagedList().length}</span>
-        <button title="Stage all" onClick={() => stage(p(), unstagedList().map((c) => c.path))}>+ all</button>
+        <Show when={unstagedList().length}>
+          <span class="acts">
+            <button class="g-stashbtn" title="Stash the changes…" onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setStashForm(stashForm() ? null : at(r.right - 290, r.bottom + 4, 290));
+            }}>Stash…</button>
+            <button class="bad g-ask" title="Discard all changes…" onClick={() => setConfirm("*")}>↺ all</button>
+            <button title="Stage all" onClick={() => stage(p(), unstagedList().map((c) => c.path))}>+ all</button>
+          </span>
+        </Show>
       </div>
+      <Show when={confirm() === "*"}>
+        {(() => {
+          const live = () => unstagedList().filter((c) => !conflicted(c));
+          const n = () => live().filter((c) => !untrackedC(c)).length;
+          const u = () => live().filter(untrackedC).length;
+          return (
+            <Confirm
+              q={<>{n() ? <>Discard <b>{n()}</b> changed</> : ""}{n() && u() ? ", " : ""}{u() ? <>delete <b>{u()}</b> untracked</> : ""}?</>}
+              yes="Discard all"
+              onYes={() => void discard(p(), live(), false)}
+            />
+          );
+        })()}
+      </Show>
       <For each={unstagedList()}>{(c) => <FileRow c={c} inStaged={false} />}</For>
       <Show when={s() && !s()!.files.length && !g().loading}><div class="g-hint pad">Working tree clean.</div></Show>
+      <Show when={g().stashes?.length}>
+        <div class="g-sec" classList={{ sub: lp.sub }}>Stashes <span class="n">{g().stashes!.length}</span></div>
+        <For each={g().stashes}>{(st) => <StashRow st={st} />}</For>
+      </Show>
       <div class="g-sec" classList={{ sub: lp.sub }}>Commits</div>
       <For each={s()?.commits ?? []}>
         {(c) => (
@@ -244,10 +425,10 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     );
   };
 
-  const FlowStep = (fp: { id: Drawer; label: string; done: boolean; now: boolean; disabled?: string }) => (
+  const FlowStep = (fp: { id: Drawer; label: string; done: boolean; now: boolean; warn?: boolean; disabled?: string }) => (
     <button
       class="g-fs"
-      classList={{ done: fp.done, now: fp.now, open: g().drawer === fp.id }}
+      classList={{ done: fp.done && !fp.now, now: fp.now, warn: fp.now && fp.warn, open: g().drawer === fp.id }}
       disabled={!!fp.disabled}
       title={fp.disabled ?? ""}
       onClick={() => openDrawer(p(), g().drawer === fp.id ? null : fp.id)}
@@ -361,20 +542,190 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     </Show>
   );
 
+  const DestMenu = () => (
+    <Show when={destMenu() && s()}>
+      {(() => {
+        const names = () => {
+          const q = destQ().trim().toLowerCase();
+          const list = (g().branches ?? []).filter((b) => b !== s()!.branch && b.toLowerCase().includes(q));
+          // The default first, then the rest as git lists them.
+          return [...list.filter((b) => b === s()!.defaultBase), ...list.filter((b) => b !== s()!.defaultBase)];
+        };
+        const pick = (b: string) => { setDestMenu(false); void setBase(p(), b); };
+        return (
+          <div class="g-menu g-destmenu" role="menu" style={{ left: `${destAt().x}px`, top: `${destAt().y}px` }}>
+            <input class="g-in g-destq" placeholder="Find a branch" value={destQ()} spellcheck={false} ref={(el) => queueMicrotask(() => el.focus())}
+              onInput={(e) => setDestQ(e.currentTarget.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && names()[0]) pick(names()[0]); }} />
+            <div class="g-group">{s()!.branch} merges into</div>
+            <div class="g-destlist">
+              <Show when={g().branches} fallback={<div class="g-hint pad">Reading branches…</div>}>
+                <For each={names()} fallback={<div class="g-hint pad">No match.</div>}>
+                  {(b) => (
+                    <button role="menuitemradio" aria-checked={b === s()!.base} classList={{ on: b === s()!.base }} onClick={() => pick(b)}>
+                      <span class="ck">{b === s()!.base ? "✓" : ""}</span><span class="nm">{b}</span>
+                      <Show when={b === s()!.defaultBase}><span class="keycaps g-hint">default</span></Show>
+                    </button>
+                  )}
+                </For>
+              </Show>
+            </div>
+            <div class="g-foot">
+              The PR base, and what ✦ Draft PR and ✦ Review compare against. Kept for this branch
+              {g().pr?.state === "OPEN" ? `; PR #${g().pr!.number} is retargeted too` : ""}.
+            </div>
+          </div>
+        );
+      })()}
+    </Show>
+  );
+
+  /** A pull stopped on a conflict: fix, stage, then Continue (or Abort). */
+  const OpBanner = () => (
+    <Show when={s()?.op}>
+      {(op) => {
+        const left = () => (s()?.files ?? []).filter(conflicted).length;
+        const name = () => (op() === "merge" ? "Merge" : "Rebase");
+        return (
+          <div class="g-banner" role="status">
+            <b>{name()} stopped</b>
+            <span>{left() ? `${left()} conflict${left() === 1 ? "" : "s"}: fix the file, then mark it resolved` : "conflicts resolved: continue when ready"}</span>
+            <span class="grow" />
+            <button class="g-btn sm" disabled={!!g().working} onClick={() => finishOp(p(), "abort")}>Abort {op()}</button>
+            <button class="g-btn sm primary" disabled={!!g().working || left() > 0} onClick={() => finishOp(p(), "continue")}>
+              {g().working === "rebase" ? "Working…" : "Continue"}
+            </button>
+          </div>
+        );
+      }}
+    </Show>
+  );
+
+  const StashView = () => (
+    <Show when={g().stash}>
+      {(st) => {
+        const entry = () => g().stashes?.find((x) => x.sha === st().key);
+        return (
+          <>
+            <div class="g-cmsg">
+              <div class="g-crow">
+                <span class="sha stash">{entry()?.ref ?? st().ref}</span>
+                <span class="g-hint">{entry()?.when}</span>
+                <span class="grow" />
+                <Show when={entry()}>
+                  {(e) => (
+                    <Show when={confirm() !== `drop:${e().sha}`} fallback={
+                      <Confirm q={<>Drop <b>{e().ref}</b>?</>} yes="Drop" onYes={() => void stashOp(p(), e(), "drop")} />
+                    }>
+                      <button class="g-btn sm" disabled={!!g().working} title="git stash apply: keep the stash" onClick={() => stashOp(p(), e(), "apply")}>Apply</button>
+                      <button class="g-btn sm primary" disabled={!!g().working} title="git stash pop: apply, then drop it" onClick={() => stashOp(p(), e(), "pop")}>Pop</button>
+                      <button class="g-btn sm ghostdanger g-ask" onClick={() => setConfirm(`drop:${e().sha}`)}>Drop</button>
+                    </Show>
+                  )}
+                </Show>
+                <button class="g-icon" title="Close the stash" onClick={() => closeStash(p())}>×</button>
+              </div>
+              <h3>{st().subject}</h3>
+            </div>
+            <div class="g-changes-head">Changes</div>
+            <Show when={!st().error} fallback={<div class="g-note bad">{st().error}</div>}>
+              <Show when={st().text !== undefined} fallback={<div class="g-note">Loading stash…</div>}>
+                <DiffView text={st().text!} mode={mode()} onMode={setMode} />
+              </Show>
+            </Show>
+          </>
+        );
+      }}
+    </Show>
+  );
   const DrawerView = () => {
     const d = () => g().drawer;
-    const title = () => (d() === "push" ? "Push" : d() === "pr" ? "Open pull request" : `Merge #${g().pr?.number ?? ""}`);
+    const title = () => (d() === "pull" ? "Pull" : d() === "push" ? "Push" : d() === "pr" ? "Open pull request" : `Merge #${g().pr?.number ?? ""}`);
+    const target = () => `${g().pushRemote}/${g().pushBranch.trim()}`;
+    /** Pushing somewhere other than the upstream (or a branch with none). */
+    const elsewhere = () => target() !== (s()?.upstream ?? "");
+    const ffBlocked = () => g().pullMode === "ff" && (s()?.ahead ?? 0) > 0;
+    const dirty = () => (s()?.files.length ?? 0) > 0;
     return (
       <Show when={d()}>
         <div class="g-drawer">
           <div class="g-dh">{title()}<button class="x" title="Close" onClick={() => openDrawer(p(), null)}>×</button></div>
           <div class="g-db">
+            <Show when={d() === "pull"}>
+              <div class="g-hint">from <b class="g-mono">{s()?.upstream}</b> into <b class="g-mono">{s()?.branch}</b></div>
+              <div class="g-group">Incoming {s()?.behind ?? 0}</div>
+              <Show when={g().incoming} fallback={<div class="g-hint">Reading the remote…</div>}>
+                <Show when={!g().incomingError} fallback={<div class="g-hint bad">{g().incomingError}</div>}>
+                  <For each={g().incoming} fallback={<div class="g-hint">Nothing new{g().working === "fetch" ? " yet: fetching…" : "."}</div>}>
+                    {(c) => (
+                      <div class="g-commit in" title={`${c.sha}\n${c.author} · ${c.when}`}>
+                        <span class="sha">{c.sha.slice(0, 7)}</span><span class="s">{c.subject}</span><span class="w">{c.author}</span>
+                      </div>
+                    )}
+                  </For>
+                </Show>
+              </Show>
+              <Show when={up()}>
+                <div class="g-group">Yours, not pushed {up()}</div>
+                <For each={(s()?.commits ?? []).filter((c) => !c.pushed)}>
+                  {(c) => <div class="g-commit"><span class="sha">{c.sha.slice(0, 7)}</span><span class="s">{c.subject}</span></div>}
+                </For>
+              </Show>
+              <div class="g-row">
+                <span class="g-hint">How</span>
+                <span class="g-seg">
+                  <For each={[["rebase", "rebase"], ["merge", "merge"], ["ff", "fast-forward only"]] as const}>
+                    {([k, label]) => <button aria-pressed={g().pullMode === k} onClick={() => setOpt(p(), "pullMode", k)}>{label}</button>}
+                  </For>
+                </span>
+              </div>
+              <div class="g-hint">
+                {g().pullMode === "rebase" ? "Your local commits are replayed on top of the incoming ones; history stays straight."
+                  : g().pullMode === "merge" ? "Adds a merge commit when both sides have new commits."
+                  : "Only moves forward; refuses if you have local commits."}
+              </div>
+              <Show when={ffBlocked()}>
+                <div class="g-note warn">You have {s()!.ahead} local commit{s()!.ahead === 1 ? "" : "s"}, so this can't fast-forward. Pick rebase or merge.</div>
+              </Show>
+              <Show when={dirty()}>
+                <div class="g-note" classList={{ warn: !g().autostash }}>
+                  <label class="g-check-l">
+                    <input type="checkbox" checked={g().autostash} onChange={(e) => setOpt(p(), "autostash", e.currentTarget.checked)} />
+                    Stash my {s()!.files.length} changed file{s()!.files.length === 1 ? "" : "s"} first, and put them back after
+                  </label>
+                  <Show when={!g().autostash}><div class="g-hint warn">Without this, git refuses if an incoming commit touches one of them.</div></Show>
+                </div>
+              </Show>
+            </Show>
             <Show when={d() === "push"}>
-              <div class="g-hint">{s()?.upstream ? `to ${s()!.upstream}` : `to origin/${s()?.branch ?? ""} (new on the remote)`}</div>
+              <div class="g-field">
+                <span class="l">to</span>
+                <span class="g-target">
+                  <select value={g().pushRemote} onChange={(e) => setPushTarget(p(), "pushRemote", e.currentTarget.value)}>
+                    <For each={g().remotes?.length ? g().remotes : [g().pushRemote]}>{(r) => <option value={r}>{r}</option>}</For>
+                  </select>
+                  <span class="g-hint">/</span>
+                  <input value={g().pushBranch} spellcheck={false} onInput={(e) => setPushTarget(p(), "pushBranch", e.currentTarget.value)} />
+                </span>
+                <span />
+                <span class="g-row">
+                  <label class="g-hint g-check-l">
+                    <input type="checkbox" checked={g().track} onChange={(e) => setOpt(p(), "track", e.currentTarget.checked)} /> track it (set upstream)
+                  </label>
+                  <Show when={!s()?.upstream || elsewhere()}>
+                    <span class="g-hint warn">{s()?.upstream ? `not the upstream (${s()!.upstream})` : "new on the remote"}</span>
+                  </Show>
+                </span>
+              </div>
               <For each={(s()?.commits ?? []).filter((c) => !c.pushed)} fallback={<div class="g-hint">Nothing to push.</div>}>
                 {(c) => <div class="g-commit"><span class="sha">{c.sha.slice(0, 7)}</span><span class="s">{c.subject}</span></div>}
               </For>
-              <Show when={s()?.behind}><div class="g-hint warn">{s()!.behind} commit(s) on the remote are not here yet; the push may be refused.</div></Show>
+              <Show when={s()?.behind && !elsewhere()}>
+                <div class="g-note warn">
+                  {s()!.behind} commit{s()!.behind === 1 ? " is" : "s are"} on {s()!.upstream} but not here yet; the push will be refused.
+                  <button class="g-btn sm" style={{ "margin-left": "6px" }} onClick={() => openDrawer(p(), "pull")}>Pull first</button>
+                </div>
+              </Show>
             </Show>
             <Show when={d() === "pr"}>
               <Show when={!g().pr || g().pr!.state !== "OPEN"} fallback={<><div class="g-hint">This branch already has an open PR.</div><PrCard /></>}>
@@ -414,9 +765,28 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             </Show>
           </div>
           <div class="g-df">
+            <Show when={d() === "pull"}>
+              <button class="g-btn sm" disabled={!!g().working} title="git fetch --all --prune" onClick={() => fetchRemotes(p())}>
+                {g().working === "fetch" ? "Fetching…" : "Fetch"}
+              </button>
+              <span class="grow" />
+              <button class="g-btn primary" disabled={!!g().working || !s()?.behind || ffBlocked()} onClick={() => pull(p())}>
+                {g().working === "pull" ? "Pulling…" : s()?.behind ? `Pull ↓${s()!.behind}` : "Up to date"}
+              </button>
+            </Show>
             <Show when={d() === "push"}>
               <span class="grow" />
-              <button class="g-btn primary" disabled={!!g().working || (!up() && !!s()?.upstream)} onClick={() => push(p())}>
+              <button
+                class="g-btn primary"
+                disabled={!!g().working || !g().pushBranch.trim() || (!up() && !!s()?.upstream && !elsewhere())}
+                onClick={async () => {
+                  const t = { remote: g().pushRemote, branch: g().pushBranch, track: g().track };
+                  // The default target is the plain push (to the upstream, or origin tracked).
+                  const u = upstreamOf(s());
+                  const same = u ? u.remote === t.remote && u.branch === t.branch.trim() : t.remote === "origin" && t.branch.trim() === s()?.branch && t.track;
+                  if (await push(p(), same ? undefined : t)) openDrawer(p(), null);
+                }}
+              >
                 {g().working === "push" ? "Pushing…" : up() ? `Push ↑${up()}` : "Push"}
               </button>
             </Show>
@@ -455,7 +825,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
   };
 
   return (
-    <div class="gitwin">
+    <div class="gitwin" ref={(el) => (winEl = el)} onKeyDown={onKey}>
       <div class="g-head" classList={{ "g-head-open": repoMenu() }}>
         <Show when={multiRepo()}>
           <button class="g-repo" title="Active repo: click to switch" aria-haspopup="menu" aria-expanded={repoMenu()} onClick={() => setRepoMenu(!repoMenu())}>
@@ -487,15 +857,42 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         <Show when={s()} fallback={<span class="g-hint" classList={{ bad: !!g().repoError }}>{g().repoError ?? (isRemote(p()) ? `${p().host}:${p().path}` : p().path)}</span>}>
           <span class="g-branch"><BranchIcon /> {s()!.branch ?? "detached HEAD"}</span>
           <span class="g-arrow">→</span>
-          <span class="g-branch base">{s()!.base}</span>
+          <button
+            class="g-dest"
+            classList={{ open: destMenu() }}
+            disabled={!s()!.branch}
+            title={`Destination: what ${s()!.branch ?? "this branch"} merges into (the PR base). Click to change.`}
+            aria-haspopup="menu"
+            aria-expanded={destMenu()}
+            onClick={(e) => {
+              const open = !destMenu();
+              const r = e.currentTarget.getBoundingClientRect();
+              setDestAt(at(r.left, r.bottom + 4, 290));
+              setDestMenu(open);
+              setDestQ("");
+              if (open) void loadBranches(p());
+            }}
+          >
+            {s()!.base}<span class="cv">▾</span>
+          </button>
           <span class="g-ahead">
-            {s()!.behind ? `↓${s()!.behind} ` : ""}{s()!.files.length ? `${s()!.files.length} changed` : ""}
+            {s()!.behind ? <span class="in" title={`${s()!.behind} on ${s()!.upstream} not here yet`}>↓{s()!.behind} </span> : ""}
+            {s()!.files.length ? `${s()!.files.length} changed` : ""}
           </span>
         </Show>
         <span class="grow" />
         <Show when={s()}>
           <div class="g-flow">
-            <FlowStep id="push" label={up() ? `Push ↑${up()}` : "Push"} done={!up() && !!s()!.upstream} now={step() === "push"} />
+            <FlowStep
+              id="pull"
+              label={s()!.behind ? `Pull ↓${s()!.behind}` : "Pull"}
+              done={!!s()!.upstream && !s()!.behind}
+              now={s()!.behind > 0}
+              warn
+              disabled={!s()!.upstream ? "No upstream yet: push the branch first" : undefined}
+            />
+            <span class="sepa">›</span>
+            <FlowStep id="push" label={up() ? `Push ↑${up()}` : "Push"} done={!up() && !!s()!.upstream} now={step() === "push" && !s()!.behind} />
             <span class="sepa">›</span>
             <FlowStep
               id={g().pr?.state === "OPEN" ? "merge" : "pr"}
@@ -527,6 +924,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         <button class="g-icon" title="Refresh" classList={{ spin: g().loading }} onClick={() => refresh(p())}>⟳</button>
       </div>
 
+      <OpBanner />
       <Show when={!g().error} fallback={<div class="g-note bad">{g().error}</div>}>
         <div class="g-main">
           <div class="g-left">
@@ -572,6 +970,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             </div>
           </div>
           <div class="g-right" ref={(el) => (rightEl = el)}>
+            <Show when={!g().stash} fallback={<StashView />}>
             <Show when={g().commit} fallback={
               <>
                 <div class="g-diffhead">
@@ -616,10 +1015,14 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             }>
               {(c) => <CommitView sha={c().key} />}
             </Show>
+            </Show>
             <DrawerView />
           </div>
         </div>
       </Show>
+      <DestMenu />
+      <RowMenu />
+      <StashForm />
     </div>
   );
 }
