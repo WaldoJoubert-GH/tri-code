@@ -253,6 +253,85 @@
 .g-hunks { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; flex: none; }
 .g-hunks .g-icon { width: 22px; height: 18px; border-radius: 0; color: var(--text); font-size: 11px; }
 .g-hunks .g-icon + .g-icon { border-left: 1px solid var(--line); }
+/* Pull, destination, discard and stash (design/git-sync.html). */
+.gitwin { position: relative; }
+.g-dest {
+  display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 6px; flex: none;
+  font: 11.5px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px;
+}
+.g-dest:hover:not(:disabled), .g-dest.open { color: var(--text); background: var(--hover); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.g-dest .cv { font-size: 9px; }
+.g-ahead .in { color: var(--warn); }
+.g-fs.now.warn { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.g-banner {
+  flex: none; display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 10px; font-size: 12px; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--bad) 10%, var(--bg)); border-bottom: 1px solid color-mix(in srgb, var(--bad) 35%, var(--line));
+}
+.g-banner b { color: var(--bad); }
+.g-btn.danger { background: var(--bad); border-color: var(--bad); color: #fff; font-weight: 600; }
+.g-btn.danger:hover:not(:disabled) { background: color-mix(in oklab, var(--bad) 85%, #000); }
+.g-btn.ghostdanger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.g-mono { font: 600 11px var(--mono); color: var(--text); }
+.g-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.g-note.warn { color: var(--text); border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 8%, var(--bg)); }
+.g-db .g-note { padding: 7px 9px; border-radius: 6px; font-size: 11.5px; }
+.g-db .g-note:not(.warn) { border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+.g-db .g-commit { padding: 2px 0; }
+.g-commit.in .sha { color: var(--warn); }
+.g-field { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 6px 8px; align-items: center; }
+.g-field .l { color: var(--muted); font-size: 11px; }
+.g-target { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.g-target select, .g-target input {
+  height: 24px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--text);
+  font: 11.5px var(--mono); padding: 0 6px; outline: none;
+}
+.g-target input { flex: 1; min-width: 0; user-select: text; }
+.g-target select:focus, .g-target input:focus { border-color: var(--accent); }
+
+/* Row actions: on hover they take the line counts' place. */
+.g-racts { display: none; margin-left: auto; gap: 1px; flex: none; }
+.g-frow:hover .g-rstat, .g-srow:hover .w { display: none; }
+.g-frow:hover .g-racts, .g-srow:hover .g-racts { display: inline-flex; }
+.g-racts button { min-width: 20px; height: 18px; padding: 0 3px; border-radius: 3px; color: var(--muted); font-size: 12px; }
+.g-racts button:hover:not(:disabled) { background: var(--raised); color: var(--text); }
+.g-racts button.bad:hover { color: var(--bad); }
+.g-racts button.txt { padding: 0 5px; font-size: 11px; }
+.g-racts button:disabled { opacity: .45; }
+.g-frow.conf { background: color-mix(in srgb, var(--bad) 9%, transparent); box-shadow: inset 2px 0 var(--bad); }
+.g-st.s-C { color: var(--git-del); }
+.g-sec .acts { margin-left: auto; display: flex; gap: 2px; }
+.g-sec .acts button { margin-left: 0; }
+.g-sec .acts button.bad:hover { color: var(--bad); }
+.g-confirm {
+  display: flex; align-items: center; gap: 6px; min-height: 26px; padding: 2px 6px 2px 10px; font-size: 11.5px; white-space: nowrap;
+  background: color-mix(in srgb, var(--bad) 9%, var(--bg)); box-shadow: inset 2px 0 var(--bad);
+}
+.g-confirm .q { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.g-confirm .q b { font: 600 11.5px var(--mono); }
+.g-crow .g-confirm { box-shadow: none; border-radius: 5px; }
+.g-srow { display: flex; align-items: center; gap: 7px; height: 24px; white-space: nowrap; cursor: default; }
+.g-srow:hover { background: var(--hover); }
+.g-srow.sel { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 2px 0 var(--accent); }
+.win:not(.focused) .g-srow.sel { background: var(--hover); box-shadow: inset 2px 0 var(--muted); }
+.g-srow .ix { font: 11px var(--mono); color: var(--violet); flex: none; }
+.g-srow .s { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.g-srow .w { margin-left: auto; font-size: 10.5px; color: var(--muted); flex: none; }
+.g-crow .sha.stash { color: var(--violet); }
+
+/* Popovers placed in the window: a row's menu, the destination picker, the stash form. */
+.g-ctx, .g-destmenu, .g-stashform { right: auto; z-index: 8; }
+.g-menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+.g-menu button.bad:not(:disabled) { color: var(--bad); }
+.g-destmenu { width: 290px; display: flex; flex-direction: column; gap: 4px; }
+.g-destq { height: 26px; padding: 3px 7px; }
+.g-destmenu .g-group { padding: 2px 6px 0; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 11px; }
+.g-destlist { max-height: min(50vh, 320px); overflow: auto; }
+.g-destmenu .ck { width: 10px; color: var(--accent); flex: none; }
+.g-destmenu .nm { font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+.g-destmenu .keycaps { margin-left: auto; }
+.g-foot { padding: 6px 6px 2px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); white-space: normal; }
+.g-stashform { width: 290px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
 /* A narrow diff pane: the orientation toggle drops its words and the staged label goes. */
 .g-right { container-type: inline-size; }
 @container (max-width: 560px) {

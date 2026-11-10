@@ -9,7 +9,7 @@ import { createStore, produce } from "solid-js/store";
 import { type DraftKind, type Project, addTab, draftCommand, focusTab, repoOf } from "./state";
 import { copyText } from "./clipboard";
 import { devOf, inProgress, slugOf } from "./issues";
-import { flash } from "./ui";
+import { flash, showToast } from "./ui";
 import { bumpRepoEpoch, invalidateRepos } from "./repos";
 
 /** `index` / `work`: lines added and removed on each side (absent for untracked or binary);
@@ -19,10 +19,17 @@ export type Commit = { sha: string; subject: string; when: string; pushed: boole
 export type CommitDetail = {
   sha: string; author: string; when: string; message: string; stat: string; diff: string;
 };
+/** `base`: what the branch merges into (its destination, else `defaultBase`, the remote's default).
+ *  `op`: a pull stopped on a conflict. */
 export type GitStatus = {
-  branch: string | null; upstream: string | null; ahead: number; behind: number; base: string;
-  files: Change[]; commits: Commit[];
+  branch: string | null; upstream: string | null; ahead: number; behind: number; base: string; defaultBase: string;
+  files: Change[]; commits: Commit[]; op?: "rebase" | "merge";
 };
+export type Incoming = { sha: string; subject: string; when: string; author: string };
+/** `ref` is stash@{n}, which shifts; `sha` pins the entry. */
+export type Stash = { ref: string; sha: string; subject: string; when: string };
+export type PullMode = "rebase" | "merge" | "ff";
+type Saved = { path: string; blob: string | null };
 export type CheckState = "pending" | "pass" | "fail" | "skip";
 export type Check = { name: string; state: CheckState };
 export type Pr = {
@@ -30,7 +37,7 @@ export type Pr = {
   isDraft: boolean; baseRefName: string; mergeable: string; checks: Check[];
 };
 export type Finding = { sev: "fix" | "note" | "ok"; loc: string; text: string };
-export type Drawer = "push" | "pr" | "merge";
+export type Drawer = "pull" | "push" | "pr" | "merge";
 export type CtxId = "diff" | "issue" | "style" | "terms";
 /** One repo's status when a project is a folder of repos; `repo` is relative to the project. */
 export type RepoStatus = { repo: string; status?: GitStatus; error?: string };
@@ -54,6 +61,21 @@ type GitUi = {
   diff?: { key: string; text?: string; error?: string };
   /** A commit opened from the Commits list; while set, its detail replaces the file diff. */
   commit?: { key: string; detail?: CommitDetail; error?: string };
+  /** A stash opened from the Stashes list (key: its sha); like `commit`, it replaces the file diff. */
+  stash?: { key: string; ref: string; subject: string; text?: string; error?: string };
+  stashes?: Stash[];
+  /** The upstream's commits not here yet, read when the Pull drawer opens. */
+  incoming?: Incoming[];
+  incomingError?: string;
+  pullMode: PullMode;
+  autostash: boolean;
+  /** The Push drawer's target. */
+  remotes?: string[];
+  pushRemote: string;
+  pushBranch: string;
+  track: boolean;
+  /** Branch names for the destination picker. */
+  branches?: string[];
   msg: string;
   /** The text in the box is a ✦ draft the user has not edited yet. */
   msgAi: boolean;
@@ -68,7 +90,7 @@ type GitUi = {
   /** The ✦ draft in progress. */
   busy: "commit" | "pr" | "review" | null;
   /** The git/gh action in progress. */
-  working: "commit" | "push" | "pr" | "merge" | "stage" | null;
+  working: "commit" | "push" | "pr" | "merge" | "stage" | "pull" | "fetch" | "rebase" | "discard" | "stash" | "destination" | null;
   ctx: Record<CtxId, boolean>;
   /** CONTEXT.md from the project root; null when there is none. */
   terms?: string | null;
@@ -81,6 +103,7 @@ export const [git, setGit] = createStore<Record<string, GitUi>>({});
 const fresh = (): GitUi => ({
   loading: false, repo: "", msgs: {}, msg: "", msgAi: false, prTitle: "", prBody: "", prAi: false, prDraft: false,
   drawer: null, strategy: "squash", delBranch: true, busy: null, working: null,
+  pullMode: "rebase", autostash: true, pushRemote: "origin", pushBranch: "", track: true,
   ctx: { diff: true, issue: true, style: true, terms: true },
 });
 
@@ -274,6 +297,7 @@ export async function refresh(p: Project): Promise<void> {
       g.review = undefined;
       g.drawer = null;
       g.commit = undefined;
+      clearRepoState(g);
     }
     g.repo = repo.repo;
     g.status = repo.status;
@@ -296,6 +320,8 @@ export async function refresh(p: Project): Promise<void> {
   }
 
   await loadDiff(p);
+  void loadStashes(p);
+  if (gitOf(p.id).drawer === "pull") void loadIncoming(p);
   if (gitOf(p.id).status?.branch) void loadPr(p);
   if (gitOf(p.id).terms === undefined) void loadTerms(p);
 }
@@ -320,11 +346,23 @@ export function selectRepo(p: Project, repo: string): void {
     g.review = undefined;
     g.drawer = null;
     g.commit = undefined;
+    clearRepoState(g);
     g.sel = first ? { repo, path: first.path, staged: isStaged(first) } : undefined;
     g.diff = undefined;
   });
   void loadDiff(p);
+  void loadStashes(p);
   if (rs?.status?.branch) void loadPr(p);
+}
+
+/** What belongs to one repo besides its status: dropped when the active repo changes. */
+function clearRepoState(g: GitUi): void {
+  g.stash = undefined;
+  g.stashes = undefined;
+  g.incoming = undefined;
+  g.incomingError = undefined;
+  g.remotes = undefined;
+  g.branches = undefined;
 }
 
 /** gh's statusCheckRollup mixes check runs and commit statuses; reduce both to four states. */
@@ -404,14 +442,17 @@ export function select(p: Project, sel: Sel): void {
       g.prAi = false;
       g.review = undefined;
       g.drawer = null;
+      clearRepoState(g);
     }
     g.repo = sel.repo;
     g.status = rs?.status;
     g.repoError = rs?.error;
     g.sel = sel;
     g.commit = undefined;
+    g.stash = undefined;
   });
   void loadDiff(p);
+  if (repoChanged) void loadStashes(p);
   if (repoChanged && rs?.status?.branch) void loadPr(p);
 }
 
@@ -421,6 +462,7 @@ export function selectCommit(p: Project, sha: string): void {
     set(p, (g) => { g.commit = undefined; });
     return;
   }
+  set(p, (g) => { g.stash = undefined; });
   void loadCommit(p, sha);
 }
 
@@ -481,14 +523,216 @@ export async function commit(p: Project, then: "push" | "pr" | null = null): Pro
   if (then === "pr" && !gitOf(p.id).pr) openDrawer(p, "pr");
 }
 
-export async function push(p: Project): Promise<boolean> {
+/** Push to the upstream (origin, tracked, when there is none). `to`: the Push drawer's target. */
+export async function push(p: Project, to?: { remote: string; branch: string; track: boolean }): Promise<boolean> {
   const s = gitOf(p.id).status;
   if (!s?.branch) { flash("detached HEAD: check out a branch to push"); return false; }
-  const ok = await act(p, "push", () => invoke("git_push", { ...argsAt(p, gitOf(p.id).repo), setUpstream: !s.upstream }));
+  const target = to && to.remote && to.branch.trim() ? to : undefined;
+  const ok = await act(p, "push", () => invoke("git_push", {
+    ...argsAt(p, gitOf(p.id).repo),
+    setUpstream: target ? target.track : !s.upstream,
+    remote: target?.remote ?? null,
+    branch: target?.branch.trim() ?? null,
+  }));
   if (!ok) return false;
-  flash(`pushed ${s.branch}`);
+  flash(`pushed ${s.branch}${target ? ` to ${target.remote}/${target.branch.trim()}` : ""}`);
   await refresh(p);
   return true;
+}
+
+/** The upstream split into remote and branch ("origin/feat/x" → origin, feat/x). */
+export function upstreamOf(s?: GitStatus): { remote: string; branch: string } | undefined {
+  const u = s?.upstream;
+  const i = u ? u.indexOf("/") : -1;
+  return u && i > 0 ? { remote: u.slice(0, i), branch: u.slice(i + 1) } : undefined;
+}
+
+// ── pull ────────────────────────────────────────────────────────────
+
+export async function loadIncoming(p: Project): Promise<void> {
+  const repo = gitOf(p.id).repo;
+  if (!gitOf(p.id).status?.upstream) return set(p, (g) => { g.incoming = []; g.incomingError = undefined; });
+  try {
+    const list = await invoke<Incoming[]>("git_incoming", argsAt(p, repo));
+    set(p, (g) => { if (g.repo === repo) { g.incoming = list; g.incomingError = undefined; } });
+  } catch (e) {
+    set(p, (g) => { if (g.repo === repo) { g.incoming = []; g.incomingError = String(e).split("\n")[0]; } });
+  }
+}
+
+/** Fetch every remote, then re-read the status (↓n); refresh re-reads the Pull drawer's incoming list. */
+export async function fetchRemotes(p: Project, quiet = false): Promise<void> {
+  const repo = gitOf(p.id).repo;
+  const ok = await act(p, "fetch", () => invoke("git_fetch", argsAt(p, repo)));
+  if (!ok) return;
+  await refresh(p);
+  if (!quiet) {
+    const n = gitOf(p.id).status?.behind ?? 0;
+    flash(n ? `fetched: ${n} new on ${gitOf(p.id).status?.upstream}` : "fetched: up to date");
+  }
+}
+
+export async function pull(p: Project): Promise<void> {
+  const g = gitOf(p.id);
+  if (!g.status?.upstream) return flash("this branch has no upstream to pull from: push it first");
+  const n = g.status.behind;
+  const ok = await act(p, "pull", () => invoke("git_pull", { ...argsAt(p, g.repo), mode: g.pullMode, autostash: g.autostash }));
+  bumpRepoEpoch();
+  await refresh(p);
+  const op = gitOf(p.id).status?.op;
+  if (op) {
+    set(p, (g) => { g.drawer = null; });
+    flash(`${op} stopped on a conflict: fix the files, mark them resolved, then Continue`);
+    return;
+  }
+  if (!ok) return;
+  set(p, (g) => { g.drawer = null; g.incoming = undefined; });
+  flash(`pulled ${n} commit${n === 1 ? "" : "s"}`);
+}
+
+/** Continue or abort the rebase or merge a pull stopped. */
+export async function finishOp(p: Project, action: "continue" | "abort"): Promise<void> {
+  const g = gitOf(p.id);
+  const op = g.status?.op;
+  if (!op) return;
+  const ok = await act(p, "rebase", () => invoke("git_op", { ...argsAt(p, g.repo), op, action }));
+  bumpRepoEpoch();
+  await refresh(p);
+  if (ok) flash(action === "abort" ? `${op} aborted: back where you were` : gitOf(p.id).status?.op ? `${op} continues: next conflict` : `${op} done`);
+}
+
+// ── discard, untrack, ignore ────────────────────────────────────────
+
+/** Throw away the changes to `changes` as they are listed (Staged: back to HEAD; Changes: back to
+ *  the index; untracked files deleted). The toast's Undo writes the saved contents back. */
+export async function discard(p: Project, changes: Change[], fromStaged: boolean): Promise<void> {
+  const g = gitOf(p.id);
+  const repo = g.repo;
+  const live = changes.filter((c) => markOf(c) !== "C");
+  if (!live.length) return;
+  const untracked = fromStaged ? [] : live.filter((c) => c.x === "?").map((c) => c.path);
+  const added = fromStaged ? live.filter((c) => c.x === "A").map((c) => c.path) : [];
+  const files = live.filter((c) => c.x !== "?" && !(fromStaged && c.x === "A")).map((c) => c.path);
+  let saved: Saved[] = [];
+  const ok = await act(p, "discard", async () => {
+    saved = await invoke<Saved[]>("git_discard", { ...argsAt(p, repo), files, staged: fromStaged, added, untracked });
+  });
+  await refresh(p);
+  if (!ok) return;
+  const name = live.length === 1 ? live[0].path.replace(/\/$/, "").split("/").pop() : `${live.length} files`;
+  const what = live.every((c) => c.x === "?") ? `deleted ${name}` : `discarded changes to ${name}`;
+  showToast({
+    msg: what,
+    undo: saved.length ? () => void act(p, "discard", () => invoke("git_restore_saved", { ...argsAt(p, repo), saved })).then(() => refresh(p)) : undefined,
+  });
+}
+
+/** Stop tracking a file and keep it on disk. */
+export async function untrack(p: Project, path: string): Promise<void> {
+  const repo = gitOf(p.id).repo;
+  if (await act(p, "stage", () => invoke("git_untrack", { ...argsAt(p, repo), files: [path] }))) {
+    flash(`stopped tracking ${path}; it stays on disk`);
+    await refresh(p);
+  }
+}
+
+/** Add an untracked file (or folder) to the repo's .gitignore, anchored at the repo root. */
+export async function ignore(p: Project, path: string): Promise<void> {
+  const repo = gitOf(p.id).repo;
+  if (await act(p, "stage", () => invoke("git_ignore", { ...argsAt(p, repo), entry: `/${path}` }))) {
+    flash(`added /${path} to .gitignore`);
+    await refresh(p);
+  }
+}
+
+// ── stashes ─────────────────────────────────────────────────────────
+
+export async function loadStashes(p: Project): Promise<void> {
+  const repo = gitOf(p.id).repo;
+  if (!gitOf(p.id).status) return;
+  try {
+    const list = await invoke<Stash[]>("git_stash_list", argsAt(p, repo));
+    set(p, (g) => {
+      if (g.repo !== repo) return;
+      g.stashes = list;
+      // The open stash went away (popped, dropped elsewhere): back to the file diff.
+      if (g.stash && !list.some((s) => s.sha === g.stash!.key)) g.stash = undefined;
+    });
+  } catch {
+    set(p, (g) => { if (g.repo === repo) g.stashes = []; });
+  }
+}
+
+/** Stash the changes: all of them, or only `files`. */
+export async function stashPush(p: Project, opts: { message: string; untracked: boolean; files?: string[] }): Promise<boolean> {
+  const repo = gitOf(p.id).repo;
+  const ok = await act(p, "stash", () => invoke("git_stash_push", { ...argsAt(p, repo), message: opts.message, untracked: opts.untracked, files: opts.files ?? [] }));
+  await refresh(p);
+  if (ok) flash(opts.files?.length === 1 ? `stashed ${opts.files[0]}` : "stashed the changes");
+  return ok;
+}
+
+export async function stashOp(p: Project, s: Stash, op: "apply" | "pop" | "drop"): Promise<void> {
+  const repo = gitOf(p.id).repo;
+  const ok = await act(p, "stash", () => invoke("git_stash_op", { ...argsAt(p, repo), op, at: s.ref, sha: s.sha }));
+  if (ok && op !== "apply") set(p, (g) => { if (g.stash?.key === s.sha) g.stash = undefined; });
+  await refresh(p);
+  if (ok) flash(op === "drop" ? `dropped ${s.ref}` : `${op === "pop" ? "popped" : "applied"} ${s.ref}`);
+}
+
+export function closeStash(p: Project): void {
+  set(p, (g) => { g.stash = undefined; });
+}
+
+/** Open a stash's patch in the diff pane; clicking the open one goes back to the file diff. */
+export async function selectStash(p: Project, s: Stash): Promise<void> {
+  if (gitOf(p.id).stash?.key === s.sha) return set(p, (g) => { g.stash = undefined; });
+  const repo = gitOf(p.id).repo;
+  set(p, (g) => { g.stash = { key: s.sha, ref: s.ref, subject: s.subject }; g.commit = undefined; });
+  try {
+    const text = await invoke<string>("git_stash_show", { ...argsAt(p, repo), at: s.sha });
+    set(p, (g) => { if (g.stash?.key === s.sha) g.stash.text = text; });
+  } catch (e) {
+    set(p, (g) => { if (g.stash?.key === s.sha) g.stash.error = String(e); });
+  }
+}
+
+// ── destination ─────────────────────────────────────────────────────
+
+export async function loadBranches(p: Project): Promise<void> {
+  const repo = gitOf(p.id).repo;
+  try {
+    const list = await invoke<{ name: string }[]>("git_branches", argsAt(p, repo));
+    set(p, (g) => { if (g.repo === repo) g.branches = list.map((b) => b.name); });
+  } catch {
+    set(p, (g) => { if (g.repo === repo) g.branches = []; });
+  }
+}
+
+/** Set what the branch merges into; the default base clears it. An open PR is retargeted too. */
+export async function setBase(p: Project, base: string): Promise<void> {
+  const g = gitOf(p.id);
+  const s = g.status;
+  if (!s?.branch || base === s.base) return;
+  const repo = g.repo;
+  const ok = await act(p, "destination", async () => {
+    await invoke("git_set_base", { ...argsAt(p, repo), branch: s.branch, base: base === s.defaultBase ? "" : base });
+    if (g.pr?.state === "OPEN" && g.pr.baseRefName !== base) await invoke("gh_pr_edit_base", { ...argsAt(p, repo), base });
+  });
+  if (!ok) return;
+  set(p, (g) => { g.review = undefined; });
+  flash(`${s.branch} now merges into ${base}`);
+  await refresh(p);
+}
+
+export async function loadRemotes(p: Project): Promise<void> {
+  const repo = gitOf(p.id).repo;
+  try {
+    const list = await invoke<string[]>("git_remotes", argsAt(p, repo));
+    set(p, (g) => { if (g.repo === repo) g.remotes = list; });
+  } catch {
+    set(p, (g) => { if (g.repo === repo) g.remotes = []; });
+  }
 }
 
 export async function openPr(p: Project): Promise<void> {
@@ -526,9 +770,25 @@ export async function merge(p: Project): Promise<void> {
 }
 
 export function openDrawer(p: Project, d: Drawer | null): void {
-  set(p, (g) => { g.drawer = d; });
+  set(p, (g) => {
+    g.drawer = d;
+    if (d === "push") {
+      // The target starts at the upstream, or origin/<branch> for a branch not pushed yet.
+      const u = upstreamOf(g.status);
+      g.pushRemote = u?.remote ?? "origin";
+      g.pushBranch = u?.branch ?? g.status?.branch ?? "";
+      g.track = true;
+    }
+  });
   const g = gitOf(p.id);
   if (d === "pr" && !g.prTitle && !g.busy) void draftPr(p);
+  if (d === "push") void loadRemotes(p);
+  // Fetch first, so ↓n and the incoming list are what the remote has now.
+  if (d === "pull") { void loadIncoming(p); void fetchRemotes(p, true); }
+}
+
+export function setPushTarget(p: Project, k: "pushRemote" | "pushBranch", v: string): void {
+  set(p, (g) => { g[k] = v; });
 }
 
 export function setField(p: Project, k: "msg" | "prTitle" | "prBody", v: string): void {
@@ -543,7 +803,7 @@ export function setField(p: Project, k: "msg" | "prTitle" | "prBody", v: string)
   });
 }
 
-export function setOpt<K extends "prDraft" | "strategy" | "delBranch">(p: Project, k: K, v: GitUi[K]): void {
+export function setOpt<K extends "prDraft" | "strategy" | "delBranch" | "pullMode" | "autostash" | "track">(p: Project, k: K, v: GitUi[K]): void {
   set(p, (g) => { g[k] = v; });
 }
 
