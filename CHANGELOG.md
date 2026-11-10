@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.49 — 2026-11-10
+
+- The git window now pulls, with rebase, merge or fast-forward only, optionally stashing local changes first; a drawer lists the incoming commits, and a pull stopped by a conflict shows Continue and Abort. Push goes to any remote and branch, with tracking optional. Discard and delete ask first and can be undone. Each file's menu can stash it, stop tracking it or add it to .gitignore, and stashes can be listed, applied, popped, dropped and shown. The header picks the branch's destination, which also retargets its open PR. ([#57](https://github.com/WaldoJoubert-GH/tri-code/pull/57))
+- Browser windows in a project on an ssh Environment reach the remote's localhost through a tunnel, kept on the same local port when free so cookies and hot reload keep working, and open the remote's HTML files the same way. The window shows when a tunnel is opening or has failed, and reconnects a dropped one. A new tab lists the remote's listening ports and the project's HTML files, and Alt+Enter in the address field opens this machine's address instead. ([#56](https://github.com/WaldoJoubert-GH/tri-code/pull/56))
+- Database windows no longer repeat or skip rows when paging through a table without a key.
+
 ## 0.1.48 — 2026-11-09
 
 - tri-code now finds what a closed window left behind: a terminal session no tab shows, a dev server an agent backgrounded, a remote session, a Worktree folder git no longer lists, or a Worktree whose folder is gone while git still holds its branch. Each project row shows its count and the status line the total; click it for the list, with End buttons. Only processes started in tri-code terminals are ended; anything else is named, not killed. Remove worktree names what still holds its folder and offers to end it first. ([#55](https://github.com/WaldoJoubert-GH/tri-code/pull/55))
