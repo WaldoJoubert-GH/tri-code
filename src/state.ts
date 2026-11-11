@@ -328,6 +328,10 @@ export type Settings = {
   draftCommands?: Partial<Record<DraftKind, string>>;
   /** false hides Claude's session and weekly usage in the status line (and stops fetching it). Unset shows it. */
   claudeUsage?: boolean;
+  /** % of Claude's weekly limit to use per day; marks the week meter with a pace line (pace.ts). Unset is none. */
+  claudeDailyTarget?: number;
+  /** How that pace line moves: "smooth" by the minute. Unset jumps once a day. */
+  claudePace?: "smooth";
   /** false hides Command Code's limits in the status line. Unset shows them, when there is a login. */
   commandCodeUsage?: boolean;
   /** Remote Control (phone.ts): the signals that push to a phone (unset: all of them). Whether
@@ -824,6 +828,17 @@ export function setDraftCommand(kind: DraftKind, cmd: string | undefined) {
 /** Show or hide Claude's usage in the status line. */
 export function setClaudeUsage(on: boolean) {
   setApp("settings", "claudeUsage", on ? undefined : false);
+}
+
+/** Claude's daily target, % of the weekly limit; 0 or undefined turns the pace line off. */
+export function setClaudeDailyTarget(pct: number | undefined) {
+  const v = pct === undefined || !Number.isFinite(pct) ? 0 : Math.min(100, Math.max(0, Math.round(pct * 10) / 10));
+  setApp("settings", "claudeDailyTarget", v || undefined);
+}
+
+/** Whether the pace line jumps once a day or moves smoothly. */
+export function setClaudePace(pace: "day" | "smooth") {
+  setApp("settings", "claudePace", pace === "smooth" ? "smooth" : undefined);
 }
 
 /** Show or hide Command Code's usage in the status line. */

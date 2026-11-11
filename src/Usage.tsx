@@ -6,6 +6,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Icon } from "./lucide";
+import { weekTarget } from "./pace";
+import { app } from "./state";
 
 type Window = { percent: number; resetsAt: string | null };
 /** Command Code's pool: dollars left, and the plan's grant they come out of. */
@@ -30,14 +32,24 @@ function untilReset(at: string | null): string {
 /** "$52.7", "$70": a tenth below $100, whole dollars above it. */
 const money = (n: number) => `$${n >= 100 ? Math.round(n) : Math.round(n * 10) / 10}`;
 
-function Meter(props: { label: string; w: Window }) {
+/** `target`: where a pace line goes, % of this limit (pace.ts); undefined draws none. */
+function Meter(props: { label: string; w: Window; target?: number }) {
   const pct = () => Math.round(props.w.percent);
   const level = () => (pct() >= 90 ? "bad" : pct() >= 70 ? "warn" : "ok");
   const reset = () => untilReset(props.w.resetsAt);
+  const pace = () => {
+    const t = props.target;
+    if (t === undefined) return "";
+    const d = Math.round(props.w.percent - t);
+    return `\ntarget ${Math.round(t)}% by now · ${d > 0 ? `${d}% ahead` : d < 0 ? `${-d}% under` : "on pace"}`;
+  };
   return (
-    <span class="meter" data-level={level()} title={`${props.label}: ${pct()}% used${reset() ? `, resets in ${reset()}` : ""}`}>
+    <span class="meter" data-level={level()} title={`${props.label}: ${pct()}% used${reset() ? `, resets in ${reset()}` : ""}${pace()}`}>
       {props.label}
-      <i style={{ "--pct": `${Math.min(100, pct())}%` }} />
+      <i
+        classList={{ paced: props.target !== undefined }}
+        style={{ "--pct": `${Math.min(100, pct())}%`, "--target": props.target !== undefined ? `${props.target}%` : undefined }}
+      />
       <b>{pct()}%</b>
       <Show when={reset()}>
         <em>{reset()}</em>
@@ -61,7 +73,8 @@ function CreditsMeter(props: { c: Credits }) {
 }
 
 export default function ClaudeUsage() {
-  return <Meters name="Claude" icon="asterisk" load={() => invoke<Usage>("claude_usage")} />;
+  const target = (w: Window) => weekTarget(app.settings.claudeDailyTarget, w.resetsAt, now(), app.settings.claudePace ?? "day");
+  return <Meters name="Claude" icon="asterisk" load={() => invoke<Usage>("claude_usage")} weekTarget={target} />;
 }
 
 /** Command Code's limits, from the billing surface its own `/usage` reads. Quiet: an app you may
@@ -71,8 +84,9 @@ export const CommandCodeUsage = () => (
 );
 
 /** One provider's meters: fetched on mount, every 5 minutes, and on click. `quiet` renders nothing
- *  until it has data, so a missing login is not an error on screen. */
-function Meters(props: { name: string; icon: string; load: () => Promise<Usage>; quiet?: boolean }) {
+ *  until it has data, so a missing login is not an error on screen. `weekTarget` puts a pace line
+ *  on the week meter. */
+function Meters(props: { name: string; icon: string; load: () => Promise<Usage>; quiet?: boolean; weekTarget?: (w: Window) => number | undefined }) {
   const [usage, setUsage] = createSignal<Usage | null>(null);
   const [error, setError] = createSignal("");
 
@@ -110,7 +124,7 @@ function Meters(props: { name: string; icon: string; load: () => Promise<Usage>;
           {(u) => (
             <>
               <Show when={u().session}>{(w) => <Meter label="session" w={w()} />}</Show>
-              <Show when={u().weekly}>{(w) => <Meter label="week" w={w()} />}</Show>
+              <Show when={u().weekly}>{(w) => <Meter label="week" w={w()} target={props.weekTarget?.(w())} />}</Show>
               <Show when={u().credits}>{(c) => <CreditsMeter c={c()} />}</Show>
             </>
           )}
