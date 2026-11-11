@@ -532,6 +532,11 @@ pub fn launch(exe: &Path, info_file: &Path) -> std::io::Result<()> {
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
+    // Not the app's folder: the dll search looks in the working directory too, and the host
+    // shouldn't hold the install folder open.
+    if let Some(d) = exe.parent() {
+        cmd.current_dir(d);
+    }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -555,9 +560,16 @@ pub fn launch(exe: &Path, info_file: &Path) -> std::io::Result<()> {
     cmd.spawn().map(|_| ())
 }
 
-/// What to run the host from. On Windows a running exe can't be replaced, so a host running the
-/// installed exe would make every update fail. It runs a copy under a name the installer doesn't
-/// look for, named by size and time so a new build gets a new copy; older copies are removed if free.
+/// The host's exe inside its folder of the cache.
+const HOST_EXE: &str = "tri-code-host.exe";
+/// Files next to the app's exe that the host loads or starts. ConPTY looks for `conpty.dll` next to
+/// the exe and starts `OpenConsole.exe` from next to the dll, so the host needs its own copies.
+const HOST_COMPANIONS: [&str; 2] = ["conpty.dll", "OpenConsole.exe"];
+
+/// What to run the host from. On Windows a running exe or loaded dll can't be replaced, so a host
+/// running from the install folder would make every update fail while a terminal is open. It runs
+/// from a copy of the exe and its ConPTY files in a folder per build (named by size and time); older
+/// folders are removed once their host has exited.
 pub fn host_exe(cache_dir: &Path) -> PathBuf {
     let current = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("tri-code"));
     if !cfg!(windows) {
@@ -570,26 +582,69 @@ fn copy_for_host(current: &Path, dir: &Path) -> std::io::Result<PathBuf> {
     let meta = std::fs::metadata(current)?;
     let stamp = meta.modified()?.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     std::fs::create_dir_all(dir)?;
-    let name = format!("tri-code-host-{}-{stamp}.exe", meta.len());
+    let name = format!("{}-{stamp}", meta.len());
     let target = dir.join(&name);
-    if !target.exists() {
+    if !target.join(HOST_EXE).exists() {
         let tmp = dir.join(format!("{name}.tmp"));
-        std::fs::copy(current, &tmp)?;
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp)?;
+        std::fs::copy(current, tmp.join(HOST_EXE))?;
+        let from = current.parent().unwrap_or(Path::new("."));
+        for f in HOST_COMPANIONS {
+            if from.join(f).exists() {
+                std::fs::copy(from.join(f), tmp.join(f))?;
+            }
+        }
+        let _ = std::fs::remove_dir_all(&target);
         std::fs::rename(&tmp, &target)?;
     }
     for entry in std::fs::read_dir(dir)?.flatten() {
         let n = entry.file_name();
-        let n = n.to_string_lossy();
-        if n.starts_with("tri-code-host-") && *n != *name {
-            let _ = std::fs::remove_file(entry.path());
+        if *n.to_string_lossy() == *name {
+            continue;
+        }
+        let p = entry.path();
+        if p.is_dir() {
+            // Deleting the exe fails while its host runs; only then is the rest of the folder free.
+            let exe = p.join(HOST_EXE);
+            if !exe.exists() || std::fs::remove_file(&exe).is_ok() {
+                let _ = std::fs::remove_dir_all(&p);
+            }
+        } else if n.to_string_lossy().starts_with("tri-code-host-") {
+            // A copy from before hosts had their own folders.
+            let _ = std::fs::remove_file(&p);
         }
     }
-    Ok(target)
+    Ok(target.join(HOST_EXE))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn host_copy_brings_its_conpty_and_clears_old_copies() {
+        let root = std::env::temp_dir().join(format!("tri-code-hostcopy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (app, cache) = (root.join("app"), root.join("cache"));
+        std::fs::create_dir_all(&app).unwrap();
+        std::fs::create_dir_all(cache.join("1-1")).unwrap();
+        std::fs::write(cache.join("1-1").join(HOST_EXE), "old").unwrap();
+        std::fs::write(cache.join("1-1").join("conpty.dll"), "old").unwrap();
+        std::fs::write(cache.join("tri-code-host-1-1.exe"), "old").unwrap();
+        for f in ["tri-code.exe", "conpty.dll", "OpenConsole.exe"] {
+            std::fs::write(app.join(f), f).unwrap();
+        }
+
+        let exe = copy_for_host(&app.join("tri-code.exe"), &cache).unwrap();
+        let dir = exe.parent().unwrap();
+        assert_eq!(exe.file_name().unwrap(), HOST_EXE);
+        assert_eq!(std::fs::read_to_string(dir.join("conpty.dll")).unwrap(), "conpty.dll");
+        assert_eq!(std::fs::read_to_string(dir.join("OpenConsole.exe")).unwrap(), "OpenConsole.exe");
+        let left: Vec<_> = std::fs::read_dir(&cache).unwrap().flatten().map(|e| e.path()).collect();
+        assert_eq!(left, vec![dir.to_path_buf()]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn answers_the_probes_a_program_waits_on() {
