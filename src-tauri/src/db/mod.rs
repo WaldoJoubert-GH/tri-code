@@ -17,6 +17,8 @@ mod mongo;
 #[cfg(feature = "db-pg")]
 mod pg;
 #[cfg(feature = "db-sqlite")]
+mod sheet;
+#[cfg(feature = "db-sqlite")]
 mod sqlite;
 #[cfg(feature = "db-pg")]
 mod tls;
@@ -55,13 +57,15 @@ pub enum Kind {
     Mongo,
 }
 
-/// `{ "env": "DATABASE_URL" }`, `{ "url": "postgres://…" }` or `{ "file": "./dev.db" }`.
+/// `{ "env": "DATABASE_URL" }`, `{ "url": "postgres://…" }` or `{ "file": "./dev.db" }`; or
+/// `{ "sheet": "/abs/data.csv" }`, a spreadsheet file loaded into memory (never saved as a Connection).
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
     Env(String),
     Url(String),
     File(String),
+    Sheet(String),
 }
 
 #[derive(Deserialize, Clone, Copy, PartialEq, Default)]
@@ -172,6 +176,8 @@ enum Driver {
     Pg(pg::Pg),
     #[cfg(feature = "db-sqlite")]
     Sqlite(sqlite::Lite),
+    #[cfg(feature = "db-sqlite")]
+    Sheet(sheet::Sheet),
     #[cfg(feature = "db-mongo")]
     Mongo(mongo::Mongo),
     /// A build with every driver left out still compiles; it can't open anything.
@@ -188,6 +194,8 @@ macro_rules! each {
             Driver::Pg($d) => $body,
             #[cfg(feature = "db-sqlite")]
             Driver::Sqlite($d) => $body,
+            #[cfg(feature = "db-sqlite")]
+            Driver::Sheet($d) => $body,
             #[cfg(feature = "db-mongo")]
             Driver::Mongo($d) => $body,
             #[cfg(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo")))]
@@ -219,6 +227,19 @@ pub fn close_all() {
 
 #[tauri::command]
 pub async fn db_open(host: String, root: String, conn: Connection) -> Result<Opened, String> {
+    // A spreadsheet file is read on the project's host and queried here, so ssh projects work too.
+    if let Target::Sheet(path) = &conn.target {
+        #[cfg(feature = "db-sqlite")]
+        {
+            let (d, version, book) = sheet::open(&host, path).await?;
+            let id = NEXT.fetch_add(1, Ordering::Relaxed);
+            let s = Session { driver: Driver::Sheet(d), read_only: conn.read_only || book, busy: Default::default(), _tunnel: None };
+            SESSIONS.lock().unwrap().insert(id, Arc::new(s));
+            return Ok(Opened { session: id, version, tunnel: None });
+        }
+        #[allow(unreachable_code)]
+        return Err(format!("this build of tri-code can't open {path} as a table"));
+    }
     let remote = !matches!(host.as_str(), "" | "local");
     let url = target::resolve(&host, &root, &conn).await?;
     if conn.kind == Kind::Sqlite && remote {
@@ -330,6 +351,15 @@ pub async fn db_apply(session: u64, ops: Vec<Value>) -> Result<u64, String> {
     }
     let _busy = s.busy.lock().await;
     each!(&s.driver, d => d.apply(ops).await)
+}
+
+/// A workbook (`.xlsx`, `.xls`, `.ods`…) as tables for the editor's read-only table view.
+#[tauri::command]
+pub async fn sheet_read(host: String, path: String) -> Result<serde_json::Value, String> {
+    #[cfg(feature = "db-sqlite")]
+    return serde_json::to_value(sheet::read_book(host, path).await?).map_err(|e| e.to_string());
+    #[allow(unreachable_code)]
+    Err(format!("this build of tri-code can't read {path}: {host}"))
 }
 
 /// `.env` keys whose value looks like a database URL, for the connection form.

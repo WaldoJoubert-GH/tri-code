@@ -34,3 +34,5 @@ Projects want to look at and change their databases without leaving tri-code. We
 - Remote SQLite and `db.x.find(...)` syntax for Mongo are left for later.
 
 Phases: (1) SQLite local, Data + Query + Pending Edits; (2) Postgres, tunnels, `.env` Connections; (3) Mongo; (4) agent MCP tool.
+
+Addendum (2026-11-11): Spreadsheet Files (CSV, TSV, Excel, OpenDocument) open in the same window through a fourth target, `{ sheet: path }`, which is never saved as a Connection. `db/sheet.rs` reads the file on the project's host (`csv` and `calamine`, behind `db-sqlite`) into an in-memory SQLite, so the window, its SQL and its Pending Edits are unchanged; Apply on a CSV runs the statements and rewrites the file in one step, rolling both back if the file changed on disk. Unlike a SQLite Connection this works for ssh projects: only the bytes travel. Workbooks are read-only.

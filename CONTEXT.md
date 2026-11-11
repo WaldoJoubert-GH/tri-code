@@ -84,7 +84,7 @@ The file half of the Command Palette (`Alt+T` and a click on the toolbar path op
 _Avoid_: Quick open, file palette, Ctrl+P.
 
 **Editor Window**:
-A canvas Window (`TabKind` `"editor"`, `Alt+E`) with the project's file tree, a tab per open file, a CodeMirror 6 editor and a status bar; Markdown, HTML and SVG also show rendered, media files play. Replaced the Files and File Windows; chosen from design/editor.html (variant B). A file opens in the Editor Window it was picked from, else the one used last; `Ctrl`+click opens a second one beside. A changed file also has a **Diff** mode beside Source, comparing `HEAD` with the live buffer (unsaved edits and all), unified or side by side; chosen from design/diff.html (variant A). Source marks the same changes with bars in the gutter. No extension host: language smarts are to come from language servers run on the project's host.
+A canvas Window (`TabKind` `"editor"`, `Alt+E`) with the project's file tree, a tab per open file, a CodeMirror 6 editor and a status bar; Markdown, HTML and SVG also show rendered, media files play, and a Spreadsheet File shows as a table. Replaced the Files and File Windows; chosen from design/editor.html (variant B). A file opens in the Editor Window it was picked from, else the one used last; `Ctrl`+click opens a second one beside. A changed file also has a **Diff** mode beside Source, comparing `HEAD` with the live buffer (unsaved edits and all), unified or side by side; chosen from design/diff.html (variant A). Source marks the same changes with bars in the gutter. No extension host: language smarts are to come from language servers run on the project's host.
 _Avoid_: Files window, file viewer, IDE.
 
 **Preview Tab**:
@@ -252,8 +252,12 @@ A page a project keeps for its browser windows: a URL and a name, in `state.json
 _Avoid_: Bookmark.
 
 **Database Window**:
-A canvas Window, one per Connection, for browsing, querying and editing a project's database: a schema tree and Data, Query and Structure views. New `TabKind` `"db"`. Plain HTML; `Alt+Shift+D` addresses the most recent. Postgres, SQLite (local projects only) and MongoDB. See ADR 0004.
+A canvas Window, one per Connection, for browsing, querying and editing a project's database: a schema tree and Data, Query and Structure views. New `TabKind` `"db"`. Plain HTML; `Alt+Shift+D` addresses the most recent. Postgres, SQLite (local projects only) and MongoDB. See ADR 0004. It also opens a Spreadsheet File.
 _Avoid_: DB client, db viewer, studio.
+
+**Spreadsheet File**:
+A CSV or TSV file, or an Excel / OpenDocument workbook (`.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`), shown as tables. In the Editor Window a CSV opens in **Table** mode beside Source and Diff: the grid is a view of the text buffer (`csv.ts`), so a cell edit replaces just that field and saving, Diff, undo and the modified dot work as for any edit. A workbook opens as read-only sheets with a tab per sheet. **Open in Database ↗** opens a Database Window on the file (`db` is `sheet:<path>`, never saved to `databases.json`): Rust reads it on the project's host, so ssh projects work, and loads it into an in-memory SQLite, one table per CSV or sheet, with column types guessed from the cells (`db/sheet.rs`). There a CSV's Apply writes the file back with its own delimiter, line endings and BOM, untouched rows byte for byte, after checking its Stamp; Query runs on the copy and saves nothing. Workbooks stay read-only: writing one back would lose its formatting and formulas. Files up to 50 MB. Chosen from design/csv-xlsx.html (variant C).
+_Avoid_: Spreadsheet connection, data file, import (nothing is imported: the file stays the source).
 
 **Connection**:
 A saved database target of a project, in `.dev/databases.json` (written only by tri-code): a name, a kind (`postgres`, `sqlite`, `mongo`), a target (a `.env` variable, or a URL whose password lives in `~/.tri-code/secrets/databases.json` on the host), `via` (`direct`, or `host` for an ssh tunnel), `readOnly` and an optional `prod` tag. Opening one makes a Session.

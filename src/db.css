@@ -18,6 +18,8 @@
 .db-kind.postgres { background: #336791; }
 .db-kind.sqlite { background: #3f7f9f; }
 .db-kind.mongo { background: #3f8f4f; }
+.db-kind.csv { background: #3d8a5a; }
+.db-kind.xlsx { background: #1f7a46; }
 .db-pill { font: 600 10.5px var(--mono); padding: 1px 6px; border-radius: 4px; display: inline-flex; gap: 4px; align-items: center; flex: none; white-space: nowrap; }
 .db-pill.prod { background: var(--bad); color: #fff; }
 .db-pill.ro { border: 1px solid var(--line); color: var(--muted); font-weight: 400; }

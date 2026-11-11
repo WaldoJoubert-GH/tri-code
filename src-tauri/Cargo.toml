@@ -43,6 +43,9 @@ tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring
 webpki-roots = { version = "1.0.11", optional = true }
 mongodb = { version = "3.9.1", default-features = false, features = ["rustls-tls", "dns-resolver", "compat-3-0-0"], optional = true }
 futures-util = { version = "0.3.34", default-features = false, optional = true }
+# CSV and Excel / OpenDocument files as tables (db/sheet.rs), loaded into an in-memory SQLite.
+csv = { version = "1.4.0", optional = true }
+calamine = { version = "0.38.0", optional = true }
 fontdb = "0.24.0"
 # Leftovers (leftovers.rs): each process's working folder, command line and environment, on every OS.
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
@@ -87,5 +90,5 @@ tauri-plugin-updater = { version = "2.14", default-features = false, features = 
 [features]
 default = ["db-pg", "db-sqlite", "db-mongo"]
 db-pg = ["dep:tokio-postgres", "dep:tokio-rustls", "dep:webpki-roots", "dep:futures-util"]
-db-sqlite = ["dep:rusqlite"]
+db-sqlite = ["dep:rusqlite", "dep:csv", "dep:calamine"]
 db-mongo = ["dep:mongodb", "dep:futures-util"]
