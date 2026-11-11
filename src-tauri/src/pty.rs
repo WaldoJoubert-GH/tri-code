@@ -447,6 +447,15 @@ fn start_session(
         env.extend(launch.env);
         spec.cmd = Some(launch.cmd);
     }
+    // `tri` works in tri-code's own terminals as soon as it is installed: the terminal host keeps
+    // the PATH it started with, from before the install.
+    if local && let Some(bin) = crate::cli::terminal_bin(app) {
+        let sep = if cfg!(windows) { ";" } else { ":" };
+        let path = std::env::var("PATH").unwrap_or_default();
+        if !crate::cli::path_has(&path, &bin) {
+            env.push(("PATH".into(), format!("{}{sep}{path}", bin.display())));
+        }
+    }
     let prog = spawn::build(&spec);
     // portable-pty silently falls back to the home dir for a missing cwd.
     if let Some(cwd) = &prog.cwd

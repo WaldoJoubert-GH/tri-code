@@ -2,6 +2,7 @@ mod agent_setup;
 mod agent_windows;
 mod bg;
 mod browser;
+mod cli;
 mod db;
 mod devfs;
 mod downloads;
@@ -125,10 +126,14 @@ pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let builder = builder.menu(mac_menu);
-    // Only one app can hold the terminal host, so a second launch shows the first. Not in a debug
-    // build, which runs beside the installed app.
+    // Only one app can hold the terminal host, so a second launch shows the first, and hands it the
+    // paths it was given (`tri .`, cli.rs). Not in a debug build, which runs beside the installed app.
     #[cfg(all(desktop, not(debug_assertions)))]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _, _| show_main(app)));
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+        let argv: Vec<std::ffi::OsString> = argv.into_iter().map(Into::into).collect();
+        cli::queue(app, &argv, std::path::Path::new(&cwd));
+        show_main(app)
+    }));
     builder
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -147,7 +152,12 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(Arc::new(pty::Ptys::default()))
+        .manage(cli::Pending::default())
         .setup(|app| {
+            // A first launch with paths (`tri .` with the app closed) opens them once the UI loads.
+            if let Ok(cwd) = std::env::current_dir() {
+                cli::queue(app.handle(), &std::env::args_os().collect::<Vec<_>>(), &cwd);
+            }
             let ptys = Arc::clone(app.state::<Arc<pty::Ptys>>().inner());
             let hub = agent_windows::AgentWindows::new(app.handle().clone(), Arc::clone(&ptys));
             agent_windows::serve(Arc::clone(&hub));
@@ -195,6 +205,10 @@ pub fn run() {
             agent_setup::agent_setup_status,
             agent_setup::agent_setup_install,
             agent_setup::agent_setup_remove,
+            cli::cli_take,
+            cli::cli_status,
+            cli::cli_install,
+            cli::cli_remove,
             dirs::list_dirs,
             fonts::font_list,
             folders::folder_repos,
