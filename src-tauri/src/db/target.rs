@@ -24,7 +24,7 @@ pub async fn resolve(host: &str, root: &str, conn: &Connection) -> Result<String
             Some(pw) => with_password(url, &pw),
             None => url.clone(),
         }),
-        Target::File(path) => Ok(path.clone()),
+        Target::File(path) | Target::Sheet(path) => Ok(path.clone()),
     })
     .await
     .map_err(|e| e.to_string())?

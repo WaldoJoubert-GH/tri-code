@@ -1,0 +1,23 @@
+/* The Editor Window's Table mode (SheetView.tsx): the Database Window's grid (db.css) with rows
+   drawn only where it is scrolled to, so every row is exactly 24px tall (ROW in SheetView.tsx). */
+.sg-wrap, .sg-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Not `.sg`: that is the Agent Signal dot (styles.css). */
+.sheet-grid { position: relative; }
+.sheet-grid:focus-visible { outline: 0; }
+.sheet-grid td { height: 24px; box-sizing: border-box; line-height: 22px; }
+.sheet-grid td.editing input { height: 22px; }
+.sheet-grid tr.sg-pad td, .sheet-grid tr.sg-pad { padding: 0; border: 0; }
+.sheet-grid tr:hover td:not(.rn) { background: color-mix(in srgb, var(--hover) 70%, transparent); }
+.sheet-grid tr.sg-pad:hover td { background: none; }
+.sg-bar, .sg-sheets {
+  flex: none; display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 8px;
+  border-top: 1px solid var(--line); background: var(--panel); font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow-x: auto;
+}
+.sg-bar .db-btn, .sg-sheets .db-btn { padding: 2px 8px; font-size: 11.5px; }
+.sg-sheets { padding-left: 0; gap: 0; }
+.sg-sheets [role="tab"] { align-self: stretch; padding: 0 14px; border-right: 1px solid var(--line); color: var(--muted); font-size: 12px; display: inline-flex; align-items: center; gap: 5px; }
+.sg-sheets [role="tab"]:hover { background: var(--hover); color: var(--text); }
+.sg-sheets [role="tab"][aria-selected="true"] { background: var(--bg); color: var(--text); font-weight: 600; box-shadow: inset 0 2px var(--accent); }
+.sg-sheets .n { font: 400 10px var(--mono); color: var(--muted); }
+.sg-sheets .sg-label { margin-right: 8px; }
+.sg-more { flex: none; padding: 5px 10px; font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--line); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

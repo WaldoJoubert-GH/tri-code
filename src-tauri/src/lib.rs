@@ -267,6 +267,7 @@ pub fn run() {
             db::db_apply,
             db::db_env_vars,
             db::db_secret_set,
+            db::sheet_read,
             docker::docker_ps,
             docker::docker_action,
             docker::docker_logs,

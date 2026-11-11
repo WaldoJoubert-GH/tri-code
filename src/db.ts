@@ -11,7 +11,8 @@ import {
 } from "./dbsql";
 import { flash } from "./ui";
 
-export type DbTarget = { env: string } | { url: string } | { file: string };
+/** `sheet` is a CSV or workbook loaded into memory: never saved, made up from the window's id. */
+export type DbTarget = { env: string } | { url: string } | { file: string } | { sheet: string };
 
 /** A saved Connection. */
 export type DbConn = {
@@ -82,7 +83,33 @@ const fileOf = (p: Project) => `${repoOf(p).path.replace(/[\\/]+$/, "")}/.dev/da
 export const rootOf = (p: Project) => repoOf(p).path;
 
 export const connsOf = (p: Project) => conns[repoOf(p).id];
-export const connOf = (p: Project, id: string | undefined) => (id ? connsOf(p)?.find((c) => c.id === id) : undefined);
+export const connOf = (p: Project, id: string | undefined) =>
+  !id ? undefined : id.startsWith(SHEET) ? sheetConn(id.slice(SHEET.length)) : connsOf(p)?.find((c) => c.id === id);
+
+// ── spreadsheet files ───────────────────────────────────────────────
+// A CSV or workbook opened from the editor ("Open in Database") is a window whose `db` is
+// `sheet:<path>`. Rust loads the file into an in-memory SQLite (db/sheet.rs), so the window
+// treats it as SQLite: a CSV's Apply writes the file back, a workbook is read-only.
+
+const SHEET = "sheet:";
+export const isSheet = (c: DbConn | undefined) => !!c && "sheet" in c.target;
+export const sheetPathOf = (c: DbConn) => ("sheet" in c.target ? c.target.sheet : "");
+export const isBookConn = (c: DbConn) => isSheet(c) && !/\.(csv|tsv|tab|psv)$/i.test(sheetPathOf(c));
+
+function sheetConn(path: string): DbConn {
+  const conn: DbConn = { id: SHEET + path, name: path.split(/[\\/]/).pop() ?? path, kind: "sqlite", target: { sheet: path } };
+  if (!/\.(csv|tsv|tab|psv)$/i.test(path)) conn.readOnly = true;
+  return conn;
+}
+
+/** Focus the Database Window on a spreadsheet file, or open one after `after` (the editor). */
+export function openSheetDb(p: Project, path: string, after?: string): string {
+  const id = SHEET + path;
+  const existing = p.tabs.find((t) => t.kind === "db" && t.db === id);
+  const tabId = existing?.id ?? addTab(p.id, "db", { db: id, after });
+  focusTab(p.id, tabId);
+  return tabId;
+}
 
 export async function loadConns(p: Project): Promise<DbConn[]> {
   const raw = await invoke<string | null>("dev_read", { host: p.host, path: fileOf(p) }).catch(() => null);
@@ -355,7 +382,8 @@ export function review(p: Project, tabId: string) {
 
 export const closeReview = (tabId: string) => up(tabId, (x) => { x.review = undefined; });
 
-export async function apply(tabId: string) {
+/** Run the reviewed statements. `file` names the CSV a spreadsheet window writes back. */
+export async function apply(tabId: string, file?: string) {
   const w = wins[tabId];
   if (!w?.session || !w.review || !w.obj) return;
   const key = objKey(w.obj);
@@ -363,8 +391,10 @@ export async function apply(tabId: string) {
     const n = await invoke<number>("db_apply", { session: w.session, ops: unwrap(w.review.ops) });
     undoLog.set(tabId, (undoLog.get(tabId) ?? []).filter((s) => s.key !== key));
     up(tabId, (x) => { x.review = undefined; x.pending[key] = emptyPending(); x.applyError = undefined; });
-    flash(`applied · ${n} ${n === 1 ? "row" : "rows"} changed`);
-    await loadPage(tabId);
+    flash(`applied · ${n} ${n === 1 ? "row" : "rows"} changed${file ? ` · saved ${file}` : ""}`);
+    // A CSV was loaded again from what was written: its rowids start over.
+    if (file) await loadSchema(tabId);
+    else await loadPage(tabId);
   } catch (e) {
     up(tabId, (x) => { x.review = undefined; x.applyError = errText(e); });
   }

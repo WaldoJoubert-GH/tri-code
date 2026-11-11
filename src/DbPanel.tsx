@@ -14,7 +14,7 @@ import { json } from "@codemirror/lang-json";
 import { type Project, type Tab, isRemote, newId, setTabDb } from "./state";
 import {
   type DbConn, type DbTarget, type EnvVar, type Obj, type ResultSet, type Win, addRow, apply, cancelQuery, closeReview, connOf, connsOf, discard,
-  envVars, loadConns, loadPage, loadSchema, openObj, openSession, pendingOf, removeConn, review, rowObj, runQuery, saveConn, setCell, setDoc,
+  envVars, isBookConn, isSheet, loadConns, loadPage, loadSchema, openObj, openSession, pendingOf, removeConn, review, rowObj, runQuery, saveConn, setCell, setDoc, sheetPathOf,
   setFilter, setQuery, setResTab, setSelCell, setView, structOf, testConn, toggleDelete, toggleGroup, toggleSort, turnPage, undo, wins,
 } from "./db";
 import { type Cell, type DbKind, cellText, editText, isNested, isOpaque, parseInput, pendingCount, rowKey, writes } from "./dbsql";
@@ -28,7 +28,15 @@ const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", sqlite: "SQLITE", m
 const KIND_NAME: Record<DbKind, string> = { postgres: "PostgreSQL", sqlite: "SQLite", mongo: "MongoDB" };
 const OBJ_ICON: Record<Obj["kind"], string> = { table: "table-2", view: "eye", system: "table-2", collection: "braces" };
 
-const targetText = (t: DbTarget) => ("env" in t ? `.env ${t.env}` : "url" in t ? t.url.replace(/:[^:@/]*@/, ":•••@") : t.file);
+const targetText = (t: DbTarget) => ("env" in t ? `.env ${t.env}` : "url" in t ? t.url.replace(/:[^:@/]*@/, ":•••@") : "sheet" in t ? t.sheet : t.file);
+/** The kind chip: a spreadsheet file shows CSV or its extension, not the SQLite it is loaded into. */
+const kindChip = (c: DbConn) => {
+  if (!isSheet(c)) return { cls: c.kind, label: KIND_LABEL[c.kind] };
+  const ext = sheetPathOf(c).split(".").pop()?.toUpperCase() ?? "";
+  return isBookConn(c) ? { cls: "xlsx", label: ext } : { cls: "csv", label: ext === "TSV" || ext === "TAB" ? "TSV" : "CSV" };
+};
+/** A name for the Query view: quoted when SQL needs it. */
+const sqlName = (n: string) => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(n) ? n : `"${n.replace(/"/g, '""')}"`);
 const fmtCount = (n: number | null) => (n == null ? "" : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}k` : n.toLocaleString());
 
 export default function DbPanel(props: { project: Project; tab: Tab; focused: boolean }): JSX.Element {
@@ -298,7 +306,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
           <pre class="db-err">{w()?.error}</pre>
           <div class="db-row">
             <button class="db-btn db-pri" onClick={() => openSession(props.project, props.tab, true)}><Icon name="refresh-cw" size={13} />Retry</button>
-            <button class="db-btn" onClick={props.onEdit}><Icon name="settings" size={13} />Edit connection</button>
+            <Show when={!isSheet(props.conn)}><button class="db-btn" onClick={props.onEdit}><Icon name="settings" size={13} />Edit connection</button></Show>
             <button class="db-btn db-ghost" onClick={() => setTabDb(props.project.id, id, undefined)}>Other connections</button>
           </div>
         </div>
@@ -308,7 +316,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
         <div class="db-tree">
           <div class="db-tree-h">
             <div class="db-search"><Icon name="search" size={12} /><input placeholder={props.conn.kind === "mongo" ? "Filter collections" : "Filter tables"} value={q()} onInput={(e) => setQ(e.currentTarget.value)} /></div>
-            <button class="db-ib" title="Reload the schema" onClick={() => loadSchema(id)}><Icon name="refresh-cw" size={13} /></button>
+            <button class="db-ib" title={isSheet(props.conn) ? "Read the file again if it changed" : "Reload the schema"} onClick={() => loadSchema(id)}><Icon name="refresh-cw" size={13} /></button>
           </div>
           <div class="db-tree-b">
             <Show when={w()?.status === "opening"}><div class="db-dim"><Icon name="loader" size={13} class="spin" /> connecting{props.conn.via === "host" && isRemote(props.project) ? ` through ${props.project.host}` : ""}…</div></Show>
@@ -317,7 +325,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
                 <>
                   <div class="db-grp" classList={{ shut: w()?.shut.includes(g.name) }} onClick={() => toggleGroup(id, g.name)}>
                     <Icon name="chevron-down" size={12} class="chev" />
-                    {props.conn.kind === "mongo" ? "database · " : props.conn.kind === "postgres" ? "schema · " : ""}{g.name}
+                    {isSheet(props.conn) ? (isBookConn(props.conn) ? "sheets · " : "file · ") + props.conn.name : <>{props.conn.kind === "mongo" ? "database · " : props.conn.kind === "postgres" ? "schema · " : ""}{g.name}</>}
                     <span class="db-grow" /><span class="db-c">{g.objects.length}</span>
                   </div>
                   <Show when={!w()?.shut.includes(g.name)}>
@@ -343,15 +351,15 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
           <div class="db-tree-f">
             <span class="live" classList={{ on: w()?.status === "open" }} />
             <span class="db-grow">{w()?.version ?? "…"}{w()?.tunnel ? ` · tunnel :${w()!.tunnel}` : ""}</span>
-            <Show when={props.conn.readOnly}><span class="db-pill ro" title="Read-only Connection"><Icon name="lock" size={10} />read-only</span></Show>
+            <Show when={props.conn.readOnly}><span class="db-pill ro" title={isSheet(props.conn) ? "Workbooks open read-only" : "Read-only Connection"}><Icon name="lock" size={10} />read-only</span></Show>
             <Show when={props.conn.tag === "prod"}><span class="db-pill prod">prod</span></Show>
-            <button class="db-ib" title="Edit connection" onClick={props.onEdit}><Icon name="settings" size={13} /></button>
+            <Show when={!isSheet(props.conn)}><button class="db-ib" title="Edit connection" onClick={props.onEdit}><Icon name="settings" size={13} /></button></Show>
             <button class="db-ib" title="Other connections" onClick={() => setTabDb(props.project.id, id, undefined)}><Icon name="list" size={13} /></button>
           </div>
         </div>
         <div class="db-pane">
           <div class="db-ph">
-            <span class={`db-kind ${props.conn.kind}`}>{KIND_LABEL[props.conn.kind]}</span>
+            <span class={`db-kind ${kindChip(props.conn).cls}`} title={isSheet(props.conn) ? sheetPathOf(props.conn) : undefined}>{kindChip(props.conn).label}</span>
             <span class="db-obname">{objLabel()}</span>
             <div class="db-views">
               <For each={[["data", "Data", "1"], ["query", "Query", "2"], ["structure", "Structure", "3"]] as const}>
@@ -373,7 +381,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
 
 /** Why the shown table can't be edited, or nothing. */
 function lockReason(conn: DbConn, win: Win | undefined): string | null {
-  if (conn.readOnly) return "Read-only Connection";
+  if (conn.readOnly) return isSheet(conn) ? "Workbooks open read-only" : "Read-only Connection";
   const o = win?.obj;
   if (!o) return "";
   if (o.kind === "view") return "Views can't be edited";
@@ -686,7 +694,8 @@ function Review(props: { project: Project; tabId: string; conn: DbConn; review: 
   let goEl!: HTMLButtonElement;
   onMount(() => goEl.focus());
   const prod = () => props.conn.tag === "prod";
-  const go = async () => { setBusy(true); await apply(props.tabId); setBusy(false); };
+  const sheet = () => isSheet(props.conn);
+  const go = async () => { setBusy(true); await apply(props.tabId, sheet() ? props.conn.name : undefined); setBusy(false); };
   return (
     <div class="db-scrim" onClick={(e) => e.target === e.currentTarget && closeReview(props.tabId)} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); closeReview(props.tabId); } }}>
       <div class="db-dlg">
@@ -697,7 +706,9 @@ function Review(props: { project: Project; tabId: string; conn: DbConn; review: 
           </Show>
           <pre class="db-stmts">{props.review.text.join("\n")}</pre>
           <div class="muted small">
-            {props.conn.kind === "mongo"
+            {sheet()
+              ? `Applying rewrites ${props.conn.name} with its own delimiter and line endings; rows and cells you didn't change are written as they were. If the file changed on disk since it was loaded, nothing is written.`
+              : props.conn.kind === "mongo"
               ? "Each update also matches the old values. If a document changed since it was loaded, it stops there; the changes before it stay written (a transaction needs a replica set)."
               : "Each UPDATE also matches the cell's old value. If a row changed since it was loaded, nothing is written."}
           </div>
@@ -728,7 +739,7 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
   let view: EditorView | undefined;
   const lang = new Compartment();
   const qname = (o?: { group: string; name: string }) =>
-    !o ? undefined : props.conn.kind === "postgres" ? (o.group === "public" ? o.name : `${o.group}.${o.name}`) : o.name;
+    !o ? undefined : props.conn.kind === "postgres" ? (o.group === "public" ? o.name : `${o.group}.${o.name}`) : props.conn.kind === "sqlite" ? sqlName(o.name) : o.name;
 
   const language = () => {
     if (props.conn.kind === "mongo") return json();
@@ -793,7 +804,9 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
             <For each={sets()}>{(_, i) => <button classList={{ on: (w()?.resTab ?? 0) === i() }} onClick={() => setResTab(id, i())}>{i() + 1}</button>}</For>
           </div>
         </Show>
-        <span class="muted small">{props.conn.kind === "mongo" ? "a runCommand document · EJSON" : props.conn.kind === "postgres" ? "PostgreSQL · timeout 30 s" : "SQLite"} · max 500 rows</span>
+        <span class="muted small" title={isSheet(props.conn) ? `Queries run on a copy of ${props.conn.name} in memory: what they change isn't saved. Edit cells in Data to change the file.` : undefined}>
+          {isSheet(props.conn) ? "SQLite · in-memory copy, not saved" : props.conn.kind === "mongo" ? "a runCommand document · EJSON" : props.conn.kind === "postgres" ? "PostgreSQL · timeout 30 s" : "SQLite"} · max 500 rows
+        </span>
       </div>
       <div class="db-res">
         <Show when={w()?.runError}>{(e) => <pre class="db-err">{e()}</pre>}</Show>

@@ -29,17 +29,24 @@ import { capsOf, withKey } from "./keymap";
 import { HoldKey, KeyList } from "./Keys";
 import { ask, flash } from "./ui";
 import { type DiffMode, changeMarks, diffStats, makePatch, parseUnified, sameText } from "./diff";
+import type { Change } from "./csv";
 import DiffView, { diffKeys, stepHunk } from "./DiffView";
 import { headText, repoEpoch, repoOfFile, type RepoRef } from "./repos";
+import { isBookPath, isCsvPath } from "./csv";
+import { BookView, CsvTable } from "./SheetView";
+import { openSheetDb } from "./db";
+import { redo, undo } from "@codemirror/commands";
 import "./files.css";
 
-type Preview = "md" | "html" | "svg";
+/** What Preview shows: rendered Markdown, HTML or SVG, or a CSV as a table (Table mode). */
+type Preview = "md" | "html" | "svg" | "csv";
 
 function previewKind(path: string): Preview | null {
   const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
   if (ext === "md" || ext === "markdown") return "md";
   if (ext === "html" || ext === "htm") return "html";
   if (ext === "svg") return "svg";
+  if (isCsvPath(path)) return "csv";
   return null;
 }
 
@@ -89,6 +96,8 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   const files = () => filesOf(props.tab);
   const text = () => textState(props.project, path());
   const media = () => (path() ? mediaType(path()) : null);
+  /** A workbook: shown as read-only tables (SheetView), never read as text. */
+  const book = () => !!path() && isBookPath(path());
   const kind = () => previewKind(path());
 
   let host!: HTMLDivElement;
@@ -176,7 +185,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   createEffect(on(
     () => [path(), text()?.file] as const,
     ([f, file]) => {
-      if (!f || media()) return;
+      if (!f || media() || book()) return;
       loadText(props.project, f);
       if (!file || file.binary) return;
       const d = mine.get(f);
@@ -232,7 +241,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
 
   const marks = createMemo(() => fileMarks(props.project));
 
-  const showingEditor = () => !!path() && !media() && !previewing() && !diffing() && ready() === path() && !!text()?.file && !text()!.file!.binary;
+  const showingEditor = () => !!path() && !media() && !book() && !previewing() && !diffing() && ready() === path() && !!text()?.file && !text()!.file!.binary;
   // The view measures itself; one shown again after being hidden (or a window made visible) re-measures.
   createEffect(on(showingEditor, (on) => on && view?.requestMeasure()));
 
@@ -266,7 +275,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   const reload = async () => {
     const f = path();
     if (!f) return;
-    if (media()) return setReloads((n) => n + 1);
+    if (media() || book()) return setReloads((n) => n + 1);
     if (isDirty(f) && !await ask(`Discard your changes to ${name(f)}?`)) return;
     mine.delete(f);
     markDirty(tabId, f, false);
@@ -292,6 +301,35 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   // ---- previews -----------------------------------------------------------------------------
 
   const source = () => (rev(), mine.get(path())?.state.doc.toString() ?? text()?.file?.text ?? "");
+
+  // ---- Table mode (CSV) and workbooks (design/csv-xlsx.html, variant C) ----------------------
+
+  /** A CSV's Table mode shows: it edits the same doc Source does, through the hidden view. */
+  const tableShown = () => kind() === "csv" && previewing() && ready() === path() && !!text()?.file && !text()!.file!.binary;
+  const editCsv = (ch: Change) => {
+    if (view && current === path()) view.dispatch({ changes: ch, userEvent: "input.table" });
+  };
+  /** Save, undo and redo while the table has focus, as in Source. */
+  const tableKeys = (e: KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || !view) return;
+    const k = e.key.toLowerCase();
+    if (k === "s") void save(path());
+    else if (k === "z" && !e.shiftKey) undo(view);
+    else if (k === "y" || (k === "z" && e.shiftKey)) redo(view);
+    else return;
+    e.preventDefault();
+  };
+  /** Open the file in a Database Window beside this one, which reads it from disk. */
+  const toDb = async () => {
+    const f = path();
+    if (!f) return;
+    if (isDirty(f)) {
+      if (!await ask(`Save ${name(f)} first? The Database Window reads the file as it is on disk.`)) return;
+      await save(f);
+      if (isDirty(f)) return;
+    }
+    openSheetDb(props.project, f, tabId);
+  };
 
   // ---- the file's changes, for Source | Diff ------------------------------------------------
 
@@ -324,7 +362,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
         setHeadTried("");
         setHeadNote("");
       }
-      if (!f || media() || binary) return;
+      if (!f || media() || book() || binary) return;
       if (truncated || (text()?.file?.size ?? 0) > 1_500_000) {
         setHeadTried(f);
         setHeadNote("This file is too large to diff.");
@@ -564,6 +602,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     }
     const m = media();
     if (m) return <MediaView project={props.project} path={path()} media={m[0]} mime={m[1]} reloads={reloads()} />;
+    if (book()) return <BookView project={props.project} path={path()} reloads={reloads()} onOpenDb={() => void toDb()} />;
     const st = text();
     if (st?.error) return <div class="fnote bad">{st.error}</div>;
     const f = st?.file;
@@ -571,6 +610,8 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     if (f.binary) return <div class="fnote">Binary file · {bytes(f.size)}</div>;
     if (diffing()) return diffPane();
     if (!previewing()) return ready() === path() ? null : <div class="fnote">Loading…</div>;
+    // The table is drawn outside this memo (tableShown), so an edit doesn't build it again.
+    if (kind() === "csv") return ready() === path() ? null : <div class="fnote">Loading…</div>;
     const t = source();
     if (!t) return <div class="fnote">Empty file.</div>;
     if (kind() === "md") return markdown(t);
@@ -665,7 +706,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
             <Show when={text()?.file && !text()!.file!.binary && (!!kind() || diffable() || diffing())}>
               <div class="seg" role="group" aria-label="View mode">
                 <Show when={kind()}>
-                  <button aria-pressed={previewing()} onClick={() => setModes(path(), "preview")}>Preview</button>
+                  <button aria-pressed={previewing()} onClick={() => setModes(path(), "preview")}>{kind() === "csv" ? "Table" : "Preview"}</button>
                 </Show>
                 <button
                   aria-pressed={!previewing() && !diffing()}
@@ -678,6 +719,9 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
                   </button>
                 </Show>
               </div>
+            </Show>
+            <Show when={kind() === "csv" || book()}>
+              <button title="Query this file with SQL in a Database Window beside this one" onClick={() => void toDb()}>Open in Database ↗</button>
             </Show>
             <Show when={kind() === "html" && fileUrl()}>
               <button title="Open in a browser window (relative assets load there)" onClick={() => openUrlInProject(props.project.id, fileUrl(), tabId)}>
@@ -693,8 +737,13 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
         <div class="edbody">
           <div class="cmhost" ref={host} style={{ display: showingEditor() ? undefined : "none" }} onContextMenu={onEditorMenu} />
           {other()}
+          <Show when={tableShown()}>
+            <div class="sg-host" onKeyDown={tableKeys}>
+              <CsvTable text={source()} path={path()} readOnly={!!text()?.file?.truncated} onChange={editCsv} />
+            </div>
+          </Show>
         </div>
-        <Show when={path() && !media()}>
+        <Show when={path() && !media() && !book()}>
           <div class="estatus">
             <Show when={doc()}>
               {(d) => (

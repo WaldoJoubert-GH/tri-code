@@ -131,9 +131,16 @@ pub const CHANGED: &str = "changed on disk";
 /// error is `CHANGED`.
 #[tauri::command]
 pub async fn write_file(host: String, path: String, contents: String, stamp: Option<String>) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || match host.as_str() {
+    tauri::async_runtime::spawn_blocking(move || write_checked(&host, &path, contents.as_bytes(), stamp.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// `write_file`'s body, for callers on a blocking thread (the Database Window saving a CSV).
+pub(crate) fn write_checked(host: &str, path: &str, contents: &[u8], stamp: Option<&str>) -> Result<String, String> {
+    match host {
         "" | "local" => {
-            let p = expand_home(&path);
+            let p = expand_home(path);
             if let Some(want) = stamp {
                 let meta = std::fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?;
                 if local_stamp(&meta) != want {
@@ -146,16 +153,54 @@ pub async fn write_file(host: String, path: String, contents: String, stamp: Opt
         }
         _ => {
             // On a mismatch stdin is still drained, so ssh is not left writing into a closed pipe.
-            let check = match &stamp {
+            let check = match stamp {
                 Some(want) => format!("[ \"$(st)\" = {} ] || {{ cat > /dev/null; echo {} >&2; exit 4; }}; ", sq(want), sq(CHANGED)),
                 None => String::new(),
             };
-            let inner = format!("{REMOTE_STAMP} p={}; [ -f \"$p\" ] || exit 2; {check}cat > \"$p\"; st", remote_path(&path));
-            remote::run_stdin(&host, &format!("sh -c {}", sq(&inner)), contents.as_bytes()).map(|s| s.trim().to_string())
+            let inner = format!("{REMOTE_STAMP} p={}; [ -f \"$p\" ] || exit 2; {check}cat > \"$p\"; st", remote_path(path));
+            remote::run_stdin(host, &format!("sh -c {}", sq(&inner)), contents).map(|s| s.trim().to_string())
         }
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    }
+}
+
+/// A whole file's bytes and its stamp, refusing one over `limit` bytes. Blocking.
+pub(crate) fn read_bytes(host: &str, path: &str, limit: u64) -> Result<(Vec<u8>, String), String> {
+    let too_big = |n: u64| format!("{path} is {} MB: too large to open as a table (the limit is {} MB)", n / 1_000_000, limit / 1_000_000);
+    match host {
+        "" | "local" => {
+            let p = expand_home(path);
+            let meta = std::fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?;
+            if meta.len() > limit {
+                return Err(too_big(meta.len()));
+            }
+            let bytes = std::fs::read(&p).map_err(|e| format!("{path}: {e}"))?;
+            Ok((bytes, local_stamp(&meta)))
+        }
+        _ => {
+            let inner = format!("{REMOTE_STAMP} p={}; [ -f \"$p\" ] || exit 2; st; [ $(wc -c < \"$p\") -le {limit} ] || exit 0; cat \"$p\"", remote_path(path));
+            let out = remote::run_bytes(host, &format!("sh -c {}", sq(&inner)))?;
+            let nl = out.iter().position(|&b| b == b'\n').ok_or("unexpected output from ssh")?;
+            let stamp = String::from_utf8_lossy(&out[..nl]).trim().to_string();
+            let size: u64 = stamp.split_whitespace().nth(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+            if size > limit {
+                return Err(too_big(size));
+            }
+            Ok((out[nl + 1..].to_vec(), stamp))
+        }
+    }
+}
+
+/// One file's stamp, or None when it is gone. Blocking.
+pub(crate) fn stamp_of(host: &str, path: &str) -> Result<Option<String>, String> {
+    match host {
+        "" | "local" => Ok(std::fs::metadata(expand_home(path)).ok().map(|m| local_stamp(&m))),
+        _ => {
+            let inner = format!("{REMOTE_STAMP} p={}; st || echo -", remote_path(path));
+            let out = remote::run(host, &format!("sh -c {}", sq(&inner)))?;
+            let s = out.trim();
+            Ok((s != "-" && !s.is_empty()).then(|| s.to_string()))
+        }
+    }
 }
 
 /// Create an empty file, and the folders above it. Fails when something is already at `path`.

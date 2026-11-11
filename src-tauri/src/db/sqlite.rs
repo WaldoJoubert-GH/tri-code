@@ -40,6 +40,13 @@ pub fn open(target: &str, root: &str, read_only: bool) -> Result<(Lite, String),
     Ok((Lite { conn: Arc::new(Mutex::new(conn)), interrupt }, format!("SQLite {}", rusqlite::version())))
 }
 
+/// An empty in-memory database, which a spreadsheet file is loaded into (`sheet.rs`).
+pub fn memory() -> Result<Lite, String> {
+    let conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
+    let interrupt = conn.get_interrupt_handle();
+    Ok(Lite { conn: Arc::new(Mutex::new(conn)), interrupt })
+}
+
 fn cell(v: ValueRef) -> Value {
     match v {
         ValueRef::Null => Value::Null,
@@ -68,13 +75,30 @@ fn read_set(stmt: &mut rusqlite::Statement, max: usize) -> rusqlite::Result<Resu
 }
 
 #[derive(Deserialize)]
-struct Op {
+pub struct Op {
     sql: String,
     expect: Option<u64>,
 }
 
+pub fn parse_ops(ops: Vec<Value>) -> Result<Vec<Op>, String> {
+    ops.into_iter().map(serde_json::from_value).collect::<Result<_, _>>().map_err(|e| e.to_string())
+}
+
+/// Run Pending Edits inside a transaction the caller opened; on an error the caller rolls back.
+pub fn run_ops(c: &Connection, ops: &[Op]) -> Result<u64, String> {
+    let mut total = 0;
+    for (i, op) in ops.iter().enumerate() {
+        match c.execute(&op.sql, []) {
+            Ok(n) if op.expect.is_none_or(|e| e == n as u64) => total += n as u64,
+            Ok(n) => return Err(format!("statement {} matched {n} rows, not {}: the row changed since it was loaded", i + 1, op.expect.unwrap_or(0))),
+            Err(e) => return Err(format!("statement {}: {e}", i + 1)),
+        }
+    }
+    Ok(total)
+}
+
 impl Lite {
-    async fn on<T: Send + 'static>(&self, f: impl FnOnce(&Connection) -> Result<T, String> + Send + 'static) -> Result<T, String> {
+    pub async fn on<T: Send + 'static>(&self, f: impl FnOnce(&Connection) -> Result<T, String> + Send + 'static) -> Result<T, String> {
         let conn = self.conn.clone();
         tauri::async_runtime::spawn_blocking(move || f(&conn.lock().unwrap())).await.map_err(|e| e.to_string())?
     }
@@ -182,24 +206,13 @@ impl Lite {
     }
 
     pub async fn apply(&self, ops: Vec<Value>) -> Result<u64, String> {
-        let ops: Vec<Op> = ops.into_iter().map(serde_json::from_value).collect::<Result<_, _>>().map_err(|e| e.to_string())?;
+        let ops = parse_ops(ops)?;
         self.on(move |c| {
             c.execute_batch("BEGIN").map_err(|e| e.to_string())?;
-            let mut total = 0;
-            for (i, op) in ops.iter().enumerate() {
-                let fail = match c.execute(&op.sql, []) {
-                    Ok(n) if op.expect.is_none_or(|e| e == n as u64) => {
-                        total += n as u64;
-                        None
-                    }
-                    Ok(n) => Some(format!("statement {} matched {n} rows, not {}: the row changed since it was loaded", i + 1, op.expect.unwrap_or(0))),
-                    Err(e) => Some(format!("statement {}: {e}", i + 1)),
-                };
-                if let Some(f) = fail {
-                    let _ = c.execute_batch("ROLLBACK");
-                    return Err(format!("{f}. Nothing was written."));
-                }
-            }
+            let total = run_ops(c, &ops).inspect_err(|_| {
+                let _ = c.execute_batch("ROLLBACK");
+            });
+            let total = total.map_err(|f| format!("{f}. Nothing was written."))?;
             c.execute_batch("COMMIT").map_err(|e| e.to_string())?;
             Ok(total)
         })
