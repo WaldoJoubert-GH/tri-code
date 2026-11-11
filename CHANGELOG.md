@@ -2,6 +2,13 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.50 — 2026-11-11
+
+- CSV, TSV and Excel or OpenDocument workbooks open as tables. A CSV gets a Table mode in the Editor Window, and "Open in Database" opens any of them in a Database Window, with Data, Query and Pending Edits working as on a database. Apply writes a CSV back with its own delimiter, line endings and BOM, leaving untouched rows as they were, and won't overwrite a file changed on disk. Workbooks are read-only. Over ssh the file is read on the project's host. ([#59](https://github.com/WaldoJoubert-GH/tri-code/pull/59))
+- `tri .` or `tri <folder>` in a terminal opens that folder as a project, or focuses it if it already is one, and `tri <file>[:line[:col]]` opens the file in the Editor Window of the project that holds it. Settings › Command line installs the `tri` command. ([#58](https://github.com/WaldoJoubert-GH/tri-code/pull/58))
+- Settings › Windows sets a daily Claude usage target, and the week meter on the status line shows a pace tick for where that target puts you by now, stepping per day or moving smoothly. ([#60](https://github.com/WaldoJoubert-GH/tri-code/pull/60))
+- On Windows, updating no longer fails while a terminal is open: the terminal host now runs from its own folder with its ConPTY files, so it doesn't hold the install folder.
+
 ## 0.1.49 — 2026-11-10
 
 - The git window now pulls, with rebase, merge or fast-forward only, optionally stashing local changes first; a drawer lists the incoming commits, and a pull stopped by a conflict shows Continue and Abort. Push goes to any remote and branch, with tracking optional. Discard and delete ask first and can be undone. Each file's menu can stash it, stop tracking it or add it to .gitignore, and stashes can be listed, applied, popped, dropped and shown. The header picks the branch's destination, which also retargets its open PR. ([#57](https://github.com/WaldoJoubert-GH/tri-code/pull/57))
