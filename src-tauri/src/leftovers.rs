@@ -60,18 +60,18 @@ pub struct Local {
 }
 
 /// `/`-separated, no trailing slash, and on Windows lower case, for comparing paths.
-fn norm(p: &str) -> String {
+pub(crate) fn norm(p: &str) -> String {
     let s = p.replace('\\', "/");
     let s = s.trim_end_matches('/');
     if cfg!(windows) { s.to_lowercase() } else { s.to_string() }
 }
 
-fn under(path: &str, dir: &str) -> bool {
+pub(crate) fn under(path: &str, dir: &str) -> bool {
     path == dir || (path.len() > dir.len() && path.starts_with(dir) && path.as_bytes()[dir.len()] == b'/')
 }
 
 /// The first of `dirs` (normalized) that the process works in, runs from, or names in its arguments.
-fn place_of(p: &Process, dirs: &[String]) -> Option<usize> {
+pub(crate) fn place_of(p: &Process, dirs: &[String]) -> Option<usize> {
     let mut paths: Vec<String> = Vec::new();
     if let Some(c) = p.cwd() {
         paths.push(norm(&c.to_string_lossy()));
@@ -105,7 +105,7 @@ fn session_of(p: &Process) -> Option<String> {
     p.environ().iter().find_map(|e| e.to_str()?.strip_prefix(&prefix).map(str::to_string))
 }
 
-fn is_host(p: &Process) -> bool {
+pub(crate) fn is_host(p: &Process) -> bool {
     p.cmd().iter().any(|a| a == "--pty-daemon")
 }
 
@@ -208,14 +208,14 @@ pub async fn leftovers_end(pids: Vec<u32>, dirs: Vec<String>) -> Result<Vec<u32>
 }
 
 #[cfg(windows)]
-fn end_tree(_sys: &System, pid: u32) {
+pub(crate) fn end_tree(_sys: &System, pid: u32) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let _ = std::process::Command::new("taskkill").args(["/T", "/F", "/PID", &pid.to_string()]).creation_flags(CREATE_NO_WINDOW).output();
 }
 
 #[cfg(not(windows))]
-fn end_tree(sys: &System, pid: u32) {
+pub(crate) fn end_tree(sys: &System, pid: u32) {
     // Children first, so none is left with no parent to become a stray of its own.
     let procs = sys.processes();
     let mut order = vec![Pid::from_u32(pid)];

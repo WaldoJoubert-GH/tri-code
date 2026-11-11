@@ -21,6 +21,7 @@ import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { openDockerPanel } from "./docker";
+import { openMonitorPanel } from "./monitor";
 import { openGitPanel } from "./git";
 import { openDbWindow } from "./db";
 import { diffKeys } from "./DiffView";
@@ -105,6 +106,9 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
       return true;
     case "docker":
       openDockerPanel(p);
+      return true;
+    case "monitor":
+      openMonitorPanel(p);
       return true;
     case "agents":
       openAgentsPanel(p);

@@ -8,6 +8,7 @@ mod devfs;
 mod downloads;
 mod dirs;
 mod docker;
+mod monitor;
 mod envs;
 mod envssh;
 mod folders;
@@ -289,6 +290,9 @@ pub fn run() {
             docker::docker_stop,
             docker::docker_forward,
             docker::docker_unforward,
+            monitor::monitor_start,
+            monitor::monitor_stop,
+            monitor::monitor_end,
             forward::forward_port,
             forward::forward_dir,
             forward::forward_close,
@@ -371,6 +375,7 @@ pub fn run() {
                 app.state::<Arc<pty::Ptys>>().detach();
                 db::close_all();
                 docker::close_all();
+                monitor::close_all();
                 forward::close_all();
             }
         });
