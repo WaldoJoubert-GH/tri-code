@@ -606,6 +606,12 @@ canvas.bg { display: block; width: 100%; height: 100%; }
   width: 44px; height: 4px; border-radius: 2px; background: var(--raised);
   background-image: linear-gradient(var(--lvl), var(--lvl)); background-size: var(--pct) 100%; background-repeat: no-repeat;
 }
+/* The daily pace line (pace.ts): a red tick at today's share of the weekly limit, taller than the bar */
+.usage .meter i.paced { position: relative; }
+.usage .meter i.paced::after {
+  content: ""; position: absolute; top: -2px; bottom: -2px; left: calc(var(--target) - 0.75px);
+  width: 1.5px; border-radius: 1px; background: var(--bad); box-shadow: 0 0 0 1px var(--panel);
+}
 .usage .meter b { font: 600 11px var(--mono); color: var(--text); }
 .usage .meter em { font: normal 11px var(--mono); }
 .usage .meter[data-level="ok"] { --lvl: var(--ok); }

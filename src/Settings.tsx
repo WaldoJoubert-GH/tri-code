@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource, createSignal } from "solid-js";
-import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setClaudeDailyTarget, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
@@ -358,6 +358,29 @@ function WindowsPage() {
         </span>
       </div>
       <p class="note">The session and weekly limits at the bottom right, read with Claude Code's login every 5 minutes. Hidden, it isn't fetched.</p>
+      <label class="row">
+        Claude daily target
+        <span class="px">
+          <input
+            type="number" min={0} max={100} step={1} placeholder="off" value={app.settings.claudeDailyTarget ?? ""}
+            onInput={(e) => setClaudeDailyTarget(e.currentTarget.value === "" ? undefined : +e.currentTarget.value)}
+          />
+          % / day
+        </span>
+      </label>
+      <div class="row">
+        Pace line moves
+        <span class="set-seg" role="radiogroup" aria-label="Pace line moves">
+          <For each={[["day", "Per day"], ["smooth", "Smoothly"]] as const}>
+            {([pace, label]) => (
+              <button type="button" role="radio" aria-checked={(app.settings.claudePace ?? "day") === pace} onClick={() => setClaudePace(pace)}>
+                {label}
+              </button>
+            )}
+          </For>
+        </span>
+      </div>
+      <p class="note">A red line on Claude's week meter at where your daily target puts you by now: the target × days since the week began (7 days before it resets). Per day, it jumps to each day's full allowance at the day boundary; smoothly, it creeps forward through the day. Empty or 0 is off.</p>
       <div class="row">
         Command Code usage
         <span class="set-seg" role="radiogroup" aria-label="Command Code usage">
