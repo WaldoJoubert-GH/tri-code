@@ -39,15 +39,21 @@ export function closeOpenProject() {
 const baseName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() || path;
 const join = (dir: string, name: string) => `${dir.replace(/[\\/]$/, "")}/${name}`;
 
-/** Open `path` on `host` as a project, or focus it if it already is one. */
-function open(host: string, path: string) {
+/** Open `path` on `host` as a project, or focus it if it already is one. Returns the project's id. Also `tri .` (cli.ts). */
+export function openFolder(host: string, path: string): string {
   const existing = app.projects.find((p) => p.host === host && p.path === path);
   if (existing) {
     setApp("activeProject", existing.id);
     flash(`${existing.name} is already open`);
-  } else {
-    autoIcon(addProject(baseName(path), host, path));
+    return existing.id;
   }
+  const id = addProject(baseName(path), host, path);
+  autoIcon(id);
+  return id;
+}
+
+function open(host: string, path: string) {
+  openFolder(host, path);
   closeOpenProject();
 }
 

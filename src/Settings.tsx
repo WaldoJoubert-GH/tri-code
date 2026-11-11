@@ -16,8 +16,9 @@ import { RemotePage } from "./RemoteSettings";
 import { BrowserPage } from "./profiles";
 import { AgentsPage } from "./AgentSettings";
 import { BackupPage } from "./Backup";
+import { CliPage } from "./CliSettings";
 
-export type SettingsPage = "appearance" | "windows" | "agents" | "files" | "git" | "signals" | "browser" | "remote" | "hotkeys" | "backup";
+export type SettingsPage = "appearance" | "windows" | "agents" | "files" | "git" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "appearance", name: "Appearance", icon: "palette" },
@@ -28,6 +29,7 @@ const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "signals", name: "Signals", icon: "bell" },
   { page: "browser", name: "Browser", icon: "globe" },
   { page: "remote", name: "Remote", icon: "smartphone" },
+  { page: "cli", name: "Command line", icon: "square-terminal" },
   { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
   { page: "backup", name: "Backup", icon: "archive" },
 ];
@@ -404,6 +406,7 @@ export function SettingsDialog() {
               <Show when={p() === "signals"}><SignalsPage /></Show>
               <Show when={p() === "browser"}><BrowserPage /></Show>
               <Show when={p() === "remote"}><RemotePage /></Show>
+              <Show when={p() === "cli"}><CliPage /></Show>
               <Show when={p() === "hotkeys"}><HotkeysPage /></Show>
               <Show when={p() === "backup"}><BackupPage /></Show>
             </section>

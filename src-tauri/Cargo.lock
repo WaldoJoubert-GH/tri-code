@@ -5932,6 +5932,7 @@ dependencies = [
  "webpki-roots",
  "webview2-com",
  "windows-core",
+ "windows-registry",
 ]
 
 [[package]]

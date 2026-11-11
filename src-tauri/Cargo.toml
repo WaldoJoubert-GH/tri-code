@@ -67,6 +67,7 @@ strip = true
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
 windows-core = "0.62"
+windows-registry = "0.6"
 
 # Browser Profiles on macOS: WKWebView can't save passwords, so passwords.rs does, in the
 # Keychain. Same versions as wry's.

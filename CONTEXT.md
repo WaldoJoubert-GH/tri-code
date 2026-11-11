@@ -117,6 +117,10 @@ _Avoid_: Cheat sheet, overlay, tooltip (it is not a tooltip and does not wait fo
 **File Index**:
 A project's files for Go to File, as relative paths: `git ls-files --cached --others --exclude-standard` on the project's host plus the ignored files, walking into wholly ignored folders but not the skipped ones (Settings › Files; by default dependency and build folders like `node_modules`, `.venv`, `target`), or a walk that skips the same folders when the folder is not a repo. Fetched each time the box opens; the last one shows meanwhile.
 
+**tri Command**:
+Opening from a terminal, as `code .` does: `tri .` or `tri <folder>` opens that folder as a project, or shows it when it already is one; `tri <file>[:line[:col]]` opens the file in the Editor Window of the deepest project that holds it (a Worktree before its repo), else of a new project at its repo or folder. Local paths only. `tri` is a script that starts tri-code's exe; a running tri-code takes the paths and the caller's folder from that second launch (single instance), and the UI opens them once loaded (`cli.rs`, `cli.ts`). Settings › Command line writes it (`tri.cmd` in the app's `bin` folder, put on the user PATH, on Windows; `~/.local/bin/tri` elsewhere), and tri-code's own terminals get that folder on PATH at once. A debug build is not single instance, so it only takes paths when it starts.
+_Avoid_: CLI (in UI text), shell command, launcher.
+
 **Folder Picker**:
 The path field that is also the folder list: typing filters, `Enter` goes in or opens, `Backspace` on empty goes up, a `~` or `/` path jumps.
 
