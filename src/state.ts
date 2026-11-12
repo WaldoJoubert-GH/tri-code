@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { DiffMode } from "./diff";
 import type { Clear, Fx } from "./backdrop";
 
-export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker";
+export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker" | "monitor";
 
 /** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
@@ -147,7 +147,7 @@ export const isTerminal = (t: Tab) => t.kind === "term";
 
 export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
 
-const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database", docker: "container" };
+const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database", docker: "container", monitor: "activity" };
 
 /** A window's lucide icon: its agent's for a terminal or web app, else its kind's. */
 export const tabIcon = (t: Tab) =>
