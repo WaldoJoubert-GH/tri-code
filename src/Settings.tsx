@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource, createSignal } from "solid-js";
-import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setClaudeDailyTarget, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setClaudeDailyTarget, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
@@ -344,6 +344,20 @@ function WindowsPage() {
         </span>
       </label>
       <p class="note">The carousel gutter is the space each side of the centred window. Leave it empty for auto; 0 hides the neighbours.</p>
+      <h4>Sidebar</h4>
+      <div class="row">
+        Environment headers
+        <span class="set-seg" role="radiogroup" aria-label="Environment headers">
+          <For each={[["show", "Show", "A header over each Environment, always"], ["auto", "Auto", "Hidden while there's only one Environment"], ["hide", "Hide", "No headers: one list of projects"]] as const}>
+            {([v, label, title]) => (
+              <button type="button" role="radio" aria-checked={(app.settings.envHeaders ?? "show") === v} title={title} onClick={() => setEnvHeaders(v)}>
+                {label}
+              </button>
+            )}
+          </For>
+        </span>
+      </div>
+      <p class="note">Hidden, the projects run on as one list, still grouped by Environment. Right-click a project for its Environment, and a lock on its icon shows when it has a PIN. An Environment with no projects shows only in Open project.</p>
       <h4>Status line</h4>
       <div class="row">
         Claude usage

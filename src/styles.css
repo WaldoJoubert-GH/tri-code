@@ -212,6 +212,16 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
 }
 .project > .sb:empty { min-width: 0; width: 10px; height: 10px; padding: 0; left: 26px; top: 1px; }
 .project > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
+/* Environment headers hidden (Settings › Windows): one list, so the first Environment needs a little air
+   under the head; each locked Environment's lock sits on its tiles' top-left corner, the badge's opposite */
+.side-head + .env-flat, .pinned + .env-flat { margin-top: 4px; }
+.project > .lkb {
+  position: absolute; left: 0; top: 0; z-index: 1; display: grid; padding: 0; color: var(--warn);
+  filter: drop-shadow(0 0 1px var(--panel)) drop-shadow(0 0 1px var(--panel));
+}
+.project > .lkb.open { color: var(--muted); }
+.project > .lkb.open:hover, .project > .lkb.open:focus-visible { color: var(--warn); }
+.project.env-locked .swatch, .project.env-locked .name { opacity: .5; }
 @keyframes sbp { 50% { box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px color-mix(in srgb, var(--sc) 28%, transparent); } }
 /* Only working: a ring, spinning when it has no count (the count stays still when there is one) */
 .project > .sb.s-working, .wt > .sb.s-working { background: var(--panel); color: var(--sc); border: 1.5px solid var(--sc); box-sizing: border-box; }

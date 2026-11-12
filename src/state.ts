@@ -328,6 +328,9 @@ export type Settings = {
   draftCommands?: Partial<Record<DraftKind, string>>;
   /** false hides Claude's session and weekly usage in the status line (and stops fetching it). Unset shows it. */
   claudeUsage?: boolean;
+  /** The sidebar's Environment headers: "hide" never shows them, "auto" only once there are two
+   *  Environments or more. Unset always shows them. Chosen from design/env-headers.html (variant D). */
+  envHeaders?: "auto" | "hide";
   /** % of Claude's weekly limit to use per day; marks the week meter with a pace line (pace.ts). Unset is none. */
   claudeDailyTarget?: number;
   /** How that pace line moves: "smooth" by the minute. Unset jumps once a day. */
@@ -824,6 +827,15 @@ export function setDraftCommand(kind: DraftKind, cmd: string | undefined) {
     if (!Object.keys(c).length) delete s.settings.draftCommands;
   }));
 }
+
+/** Show, hide or auto-hide the sidebar's Environment headers. */
+export function setEnvHeaders(v: "show" | "auto" | "hide") {
+  setApp("settings", "envHeaders", v === "show" ? undefined : v);
+}
+
+/** Whether the sidebar leaves out its Environment headers just now. */
+export const envHeadersHidden = () =>
+  app.settings.envHeaders === "hide" || (app.settings.envHeaders === "auto" && app.environments.length < 2);
 
 /** Show or hide Claude's usage in the status line. */
 export function setClaudeUsage(on: boolean) {
