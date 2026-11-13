@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
-  Project, app, envIcon, envName, isLocalHost, isPinned, isTerminal, moveProject, projectById, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
+  Project, app, envHeadersHidden, envIcon, envName, isLocalHost, isPinned, isTerminal, moveProject, projectById, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
   setSidebarCollapsed, togglePin, worktreesOf,
 } from "./state";
 import { closeBrowser, setBrowsersCovered } from "./browsers";
@@ -113,8 +113,9 @@ function folderItem(p: Project): CtxItem {
 const pinItem = (p: Project): CtxItem => ({ label: isPinned(p.id) ? "Unpin" : "Pin to top", run: () => togglePin(p.id) });
 
 /** The right-click menu of a project's row (and its own folder's row under it): what the row's hover
- *  buttons do, which the collapsed rail has no room for, plus pinning and its folder. */
-function projectMenu(e: MouseEvent, p: Project) {
+ *  buttons do, which the collapsed rail has no room for, plus pinning and its folder. `env` is its
+ *  Environment's items, added while the sidebar hides Environment headers. */
+function projectMenu(e: MouseEvent, p: Project, env: CtxItem[] = []) {
   const anchor = e.currentTarget as HTMLElement;
   const items: CtxItem[] = [
     pinItem(p),
@@ -129,6 +130,7 @@ function projectMenu(e: MouseEvent, p: Project) {
     },
     "sep",
     folderItem(p),
+    ...(env.length ? ["sep" as const, ...env] : []),
   ];
   openCtxMenu(e, items);
 }
@@ -341,6 +343,20 @@ export default function Sidebar() {
     ]);
   };
 
+  /** The header's items for a project's menu while headers are hidden, named, since nothing on
+   *  screen says which Environment they act on. Rename and the icon are in Edit environment. */
+  const envItems = (host: string): CtxItem[] => {
+    const name = envName(host);
+    return [
+      { label: `Open project on ${name}…`, run: () => openProjectDialog(host) },
+      { label: `Edit ${name}…`, run: () => openEnvDialog(host) },
+      ...(!app.envLocks[host] ? []
+        : envLocked(host) ? [{ label: `Unlock ${name}…`, run: () => openEnvDialog(host) }]
+        : [{ label: `Lock ${name} now`, run: () => void lockEnv(host) }]),
+      { label: `Remove ${name}…`, run: () => void removeEnv(host) },
+    ];
+  };
+
   /** Active issues per State, in each Source's colours (the pi-todos widget). */
   const miniBar = (p: Project) => {
     const d = dev[p.id];
@@ -384,7 +400,8 @@ export default function Sidebar() {
       </Show>
       <For each={app.environments}>
         {(host) => (
-          <section>
+          <section classList={{ "env-flat": envHeadersHidden() }}>
+            <Show when={!envHeadersHidden()}>
             <h2
               title={app.sidebarCollapsed && !peek() ? (envName(host) === host ? host : `${envName(host)} · ${host}`) : undefined}
               onContextMenu={(e) => renaming() !== `env:${host}` && envMenu(e, host)}
@@ -426,9 +443,10 @@ export default function Sidebar() {
               <button class="env-add" title={`Open a project on ${host}`} aria-label={`Open a project on ${host}`} onClick={() => openProjectDialog(host)}>+</button>
               <button class="env-x" title="Remove environment" aria-label={`Remove environment ${host}`} onClick={() => removeEnv(host)}>×</button>
             </h2>
+            </Show>
             <For
               each={app.projects.filter((p) => p.host === host && !p.parent)}
-              fallback={<button class="env-empty" onClick={() => openProjectDialog(host)}>No projects · open one</button>}
+              fallback={<Show when={!envHeadersHidden()}><button class="env-empty" onClick={() => openProjectDialog(host)}>No projects · open one</button></Show>}
             >
               {(p) => (
                 <>
@@ -439,14 +457,39 @@ export default function Sidebar() {
                     lifted: dragging() === p.id,
                     "drop-before": dropAt()?.id === p.id && !dropAt()!.after,
                     "drop-after": dropAt()?.id === p.id && dropAt()!.after && !worktreesOf(p.id).length,
+                    "env-locked": envHeadersHidden() && envLocked(p.host),
                   }}
                   data-drop={p.id}
                   style={{ "--pa": p.accent }}
-                  title={[app.sidebarCollapsed && !peek() ? `${p.name} · ${envName(p.host)} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}` : "", sigSummary(p)].filter(Boolean).join("\n") || undefined}
+                  title={[
+                    (app.sidebarCollapsed && !peek()) || envHeadersHidden()
+                      ? `${p.name} · ${envName(p.host)}${envLocked(p.host) ? " · locked" : ""} · ${p.tabs.length} window${p.tabs.length === 1 ? "" : "s"}`
+                      : "",
+                    sigSummary(p),
+                  ].filter(Boolean).join("\n") || undefined}
                   onPointerDown={(e) => renaming() !== p.id && dragProject(e, p)}
                   onClick={() => !dragged && !inFamily(p) && setApp("activeProject", p.id)}
-                  onContextMenu={(e) => projectMenu(e, p)}
+                  onContextMenu={(e) => projectMenu(e, p, envHeadersHidden() ? envItems(p.host) : [])}
                 >
+                  {/* With headers hidden, an Environment's lock sits on the corner of each of its tiles:
+                      shut while locked (a click on the row opens the PIN pad), open while unlocked (a
+                      click locks it now). */}
+                  <Show when={envHeadersHidden() && app.envLocks[p.host]}>
+                    <Show
+                      when={!envLocked(p.host)}
+                      fallback={<span class="lkb" aria-label={`${envName(p.host)} is locked`}><Icon name="lock" size={12} /></span>}
+                    >
+                      <button
+                        class="lkb open"
+                        title={`${envName(p.host)} is unlocked: click to lock now`}
+                        aria-label={`Lock ${envName(p.host)}`}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => (e.stopPropagation(), void lockEnv(p.host))}
+                      >
+                        <Icon name="lock-open" size={12} />
+                      </button>
+                    </Show>
+                  </Show>
                   <span class="swatch"><HoldFace id={projectFace(p)}><IconFace project={p} /></HoldFace></span>
                   <Show when={badge(p)}>
                     {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
