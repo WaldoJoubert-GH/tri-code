@@ -10,6 +10,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, repoOf, sessionName, setLive, setTabResume } from "./state";
+import { onSandboxStep, readySandbox, runsInSandbox, sandboxOf } from "./sandbox";
 import { terminalFont } from "./look";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
@@ -415,11 +416,28 @@ class TermSession {
 
     const { cols, rows } = this.term;
     const remote = isRemote(this.project);
+    // A Sandboxed Worktree's agents run in its sandbox, where they keep their conversations: there is
+    // nothing on this machine to resume. The window waits while the sandbox is made (sandbox.ts),
+    // on this machine or on the project's ssh host by the sbx there.
+    const sandbox = runsInSandbox(this.project, this.cmd) ? this.project.sandbox! : null;
+    if (sandbox) {
+      const off = onSandboxStep(sandbox, (msg) => this.term.write(`\x1b[90m[sandbox] ${msg}\x1b[0m\r\n`));
+      try {
+        await readySandbox(this.project);
+      } catch (e) {
+        if (run !== this.run || this.disposed) return;
+        this.term.write(`\r\n\x1b[31m[sandbox] ${String(e).trim()}\x1b[0m\r\n\x1b[90m[press Enter to try again]\x1b[0m\r\n`);
+        return void this.update({ status: "exited" });
+      } finally {
+        off();
+      }
+      if (run !== this.run || this.disposed) return;
+    }
     // pi takes its session id up front; Claude's arrives from its hook once it has started.
-    if (!remote && !this.tab.resume && !this.tab.once && /^pi(\.cmd|\.exe)?(\s|$)/.test(this.cmd)) {
+    if (!remote && !sandbox && !this.tab.resume && !this.tab.once && /^pi(\.cmd|\.exe)?(\s|$)/.test(this.cmd)) {
       setTabResume(this.project.id, this.tab.id, { kind: "pi", id: crypto.randomUUID() });
     }
-    const resume = !remote && this.cmd && !this.tab.once ? this.tab.resume : undefined;
+    const resume = !remote && !sandbox && this.cmd && !this.tab.once ? this.tab.resume : undefined;
     if (resume && this.run === 1) await resumeSlot();
     if (run !== this.run || this.disposed) return;
     const fork = this.forkFrom;
@@ -432,6 +450,9 @@ class TermSession {
           cmd: this.cmd || null,
           session: sessionName(this.project, this.tab),
           resume: resume ? { kind: resume.kind, id: resume.id, fork: fork ?? null } : null,
+          sandbox,
+          // Its other terminals run on the host, but claude typed in one (or left when an agent quits) runs in the sandbox.
+          sandboxShim: (!sandbox && sandboxOf(this.project)) || null,
         },
         cols,
         rows,

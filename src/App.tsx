@@ -10,6 +10,7 @@ import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
 import { LeftoversChip, LeftoversPopover } from "./LeftoversPopover";
 import { leftoversOpen, watchLeftovers } from "./leftovers";
+import { adoptSandboxes } from "./sandbox";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { HoldBar, TabMenu, TabStrip, tabMenuOpen } from "./tabs";
@@ -90,6 +91,8 @@ export default function App() {
         .catch((e) => console.error("bg_load failed:", e));
     }
     loadIcons();
+    // Before any terminal starts: a Sandboxed Worktree's agents must not start outside its sandbox.
+    await adoptSandboxes().catch((e) => console.warn("adoptSandboxes failed:", e));
     setReady(true);
     startUpdateChecks();
     watchLeftovers();

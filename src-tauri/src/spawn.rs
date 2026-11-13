@@ -22,6 +22,14 @@ pub struct SpawnSpec {
     /// The conversation to reopen, for a local agent whose process is gone.
     #[serde(default)]
     pub resume: Option<crate::resume::Resume>,
+    /// A Sandboxed Worktree's sandbox: the command runs in it through `sbx` (sbx.rs), this machine's
+    /// or, for an ssh host, that host's.
+    #[serde(default)]
+    pub sandbox: Option<String>,
+    /// A Sandboxed Worktree's other terminals: they run here, but an agent typed in them runs in this
+    /// sandbox (a launcher first on PATH, sbx.rs).
+    #[serde(default)]
+    pub sandbox_shim: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -41,6 +49,11 @@ pub fn build(spec: &SpawnSpec) -> Program {
 
 fn local(spec: &SpawnSpec) -> Program {
     let cwd = Some(expand_home(&spec.cwd));
+    // sbx takes its arguments as they are: no shell in between, so nothing to quote.
+    if let Some(name) = spec.sandbox.as_deref().filter(|n| !n.is_empty()) {
+        let program = crate::sbx::exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|| "sbx".into());
+        return Program { program, args: crate::sbx::args(name, spec.cmd.as_deref()), cwd };
+    }
     if cfg!(windows) {
         let (program, args) = match &spec.cmd {
             Some(cmd) => ("cmd.exe", vec!["/d".into(), "/c".into(), cmd.clone()]),
@@ -57,9 +70,29 @@ fn local(spec: &SpawnSpec) -> Program {
     }
 }
 
+/// What a remote tab runs, once a Sandboxed Worktree has had its say: in the sandbox through the
+/// host's sbx (inside the persistent session, so the agent survives a disconnect too), or with the
+/// launchers first on PATH so claude typed in the shell runs in the sandbox (sbx.rs).
+fn remote_cmd(spec: &SpawnSpec) -> Option<String> {
+    let cmd = spec.cmd.as_deref().map(str::trim).filter(|c| !c.is_empty());
+    if let Some(name) = spec.sandbox.as_deref().filter(|n| !n.is_empty()) {
+        let words: Vec<String> = crate::sbx::args(name, cmd).iter().map(|a| sq(a)).collect();
+        return Some(format!("exec sbx {}", words.join(" ")));
+    }
+    if let Some(name) = spec.sandbox_shim.as_deref().filter(|n| !n.is_empty()) {
+        let pre = format!("export TRI_SANDBOX={} TRI_SBX=sbx PATH=\"$HOME/{}:$PATH\"; ", sq(name), crate::sbx::REMOTE_SHIM_DIR);
+        return Some(match cmd {
+            Some(c) => format!("{pre}{c}"),
+            None => format!("{pre}exec \"$SHELL\" -l"),
+        });
+    }
+    spec.cmd.clone()
+}
+
 fn ssh(host: &str, spec: &SpawnSpec) -> Program {
     let name = sanitize_session(&spec.session);
-    let run = spec.cmd.as_deref();
+    let wrapped = remote_cmd(spec);
+    let run = wrapped.as_deref();
 
     // shpool starts in $HOME unless told otherwise (`-d .` = where we cd'd), and
     // execs --cmd directly after shell-words splitting, so wrap it in a login
@@ -197,7 +230,41 @@ mod tests {
             cmd: cmd.map(Into::into),
             session: "tri-p1-t1".into(),
             resume: None,
+            sandbox: None,
+            sandbox_shim: None,
         }
+    }
+
+    #[test]
+    fn a_sandboxed_command_runs_through_sbx_without_a_shell() {
+        let mut s = spec("local", "/tmp", Some("claude"));
+        s.sandbox = Some("tri-app-fix".into());
+        let p = build(&s);
+        assert!(p.program.ends_with("sbx") || p.program.ends_with("sbx.exe"), "{}", p.program);
+        assert_eq!(p.args, ["exec", "-it", "tri-app-fix", "bash", "-lc", "claude"]);
+    }
+
+    #[test]
+    fn over_ssh_a_sandboxed_command_runs_through_the_hosts_sbx_in_the_session() {
+        let mut s = spec("box", "~/app", Some("claude --model opus"));
+        s.sandbox = Some("tri-app-fix".into());
+        assert_eq!(remote_cmd(&s).as_deref(), Some("exec sbx 'exec' '-it' 'tri-app-fix' 'bash' '-lc' 'claude --model opus'"));
+        let remote = &build(&s).args[6];
+        assert!(remote.contains("shpool attach") && remote.contains("tri-app-fix"), "{remote}");
+        s.cmd = None;
+        assert_eq!(remote_cmd(&s).as_deref(), Some("exec sbx 'exec' '-it' 'tri-app-fix' 'bash' '-l'"));
+    }
+
+    #[test]
+    fn over_ssh_a_sandboxed_worktrees_shell_finds_the_launchers_first() {
+        let mut s = spec("box", "~/app", None);
+        s.sandbox_shim = Some("tri-app-fix".into());
+        let c = remote_cmd(&s).unwrap();
+        assert!(c.starts_with("export TRI_SANDBOX='tri-app-fix' TRI_SBX=sbx PATH=\"$HOME/.local/share/tri-code/sbx-shims:$PATH\"; "), "{c}");
+        assert!(c.ends_with("exec \"$SHELL\" -l"), "{c}");
+        s.cmd = Some("pi".into());
+        assert!(remote_cmd(&s).unwrap().ends_with("; pi"));
+        assert_eq!(remote_cmd(&spec("box", "~", Some("pi"))).as_deref(), Some("pi"));
     }
 
     #[test]

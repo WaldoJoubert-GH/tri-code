@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource, createSignal } from "solid-js";
-import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setClaudeUsage, setClaudeDailyTarget, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
@@ -17,8 +17,13 @@ import { BrowserPage } from "./profiles";
 import { AgentsPage } from "./AgentSettings";
 import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
+import { SandboxPage } from "./SandboxSettings";
+import { PREVIEWS, previewOn, sandboxPreview } from "./preview";
 
-export type SettingsPage = "appearance" | "windows" | "agents" | "files" | "git" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup";
+export type SettingsPage = "appearance" | "windows" | "agents" | "files" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview";
+
+/** Pages that belong to a preview feature: listed only while it is on. */
+const shown = (p: SettingsPage) => p !== "sandbox" || sandboxPreview();
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "appearance", name: "Appearance", icon: "palette" },
@@ -26,12 +31,14 @@ const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "agents", name: "Agents", icon: "bot" },
   { page: "files", name: "Files", icon: "folder-search" },
   { page: "git", name: "Git", icon: "git-branch" },
+  { page: "sandbox", name: "Sandbox", icon: "shield" },
   { page: "signals", name: "Signals", icon: "bell" },
   { page: "browser", name: "Browser", icon: "globe" },
   { page: "remote", name: "Remote", icon: "smartphone" },
   { page: "cli", name: "Command line", icon: "square-terminal" },
   { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
   { page: "backup", name: "Backup", icon: "archive" },
+  { page: "preview", name: "Preview", icon: "flask-conical" },
 ];
 
 const [page, setPage] = createSignal<SettingsPage | null>(null);
@@ -45,9 +52,39 @@ export function closeSettings() {
   setPage(null);
 }
 
-/** Open on `page`, or the page used last. */
+/** Open on `page`, or the page used last (Windows when that page is hidden now). */
 export function openSettings(p?: SettingsPage) {
-  setPage(p ?? lastPage);
+  const want = p ?? lastPage;
+  setPage(shown(want) ? want : "windows");
+}
+
+/** Settings › Preview: each preview feature with its own switch, all off until turned on. */
+function PreviewPage() {
+  return (
+    <>
+      <h4>Preview features</h4>
+      <p class="note">Still being built and off by default. Turn one on to try it. Off, it is hidden everywhere; turning it on again brings back what it made.</p>
+      <For each={PREVIEWS}>
+        {(f) => (
+          <div class="row preview-row">
+            <span class="preview-tx">
+              <b><Icon name={f.icon} size={13} /> {f.name}</b>
+              <span class="note">{f.about}</span>
+            </span>
+            <span class="set-seg" role="radiogroup" aria-label={f.name}>
+              <For each={[[false, "Off"], [true, "On"]] as const}>
+                {([on, label]) => (
+                  <button type="button" role="radio" aria-checked={previewOn(f.id) === on} onClick={() => setPreview(f.id, on)}>
+                    {label}
+                  </button>
+                )}
+              </For>
+            </span>
+          </div>
+        )}
+      </For>
+    </>
+  );
 }
 
 /** The sidebar button and the palette: open on the last page, or close. */
@@ -410,7 +447,7 @@ export function SettingsDialog() {
               <button type="button" class="x" title="Close (Esc)" aria-label="Close" onClick={closeSettings}>×</button>
             </header>
             <nav aria-label="Settings pages">
-              <For each={PAGES}>
+              <For each={PAGES.filter((o) => shown(o.page))}>
                 {(o) => (
                   <button type="button" aria-current={p() === o.page ? "page" : undefined} onClick={() => setPage(o.page)}>
                     <Icon name={o.icon} size={14} />
@@ -426,12 +463,14 @@ export function SettingsDialog() {
               <Show when={p() === "agents"}><AgentsPage /></Show>
               <Show when={p() === "files"}><FilesPage /></Show>
               <Show when={p() === "git"}><GitPage /></Show>
+              <Show when={p() === "sandbox" && shown("sandbox")}><SandboxPage /></Show>
               <Show when={p() === "signals"}><SignalsPage /></Show>
               <Show when={p() === "browser"}><BrowserPage /></Show>
               <Show when={p() === "remote"}><RemotePage /></Show>
               <Show when={p() === "cli"}><CliPage /></Show>
               <Show when={p() === "hotkeys"}><HotkeysPage /></Show>
               <Show when={p() === "backup"}><BackupPage /></Show>
+              <Show when={p() === "preview"}><PreviewPage /></Show>
             </section>
           </div>
         </div>
