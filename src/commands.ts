@@ -195,6 +195,8 @@ export function commands(): Command[] {
 
   add({ id: "settings", group: "App", title: "Settings", hint: "opening files, windows, hotkeys", icon: "settings", run: () => toggleSettings() });
   add({ id: "open-project", group: "Project", title: "Open project", hint: "or add an environment", icon: "folder-open", keys: capsOf("open-project"), run: () => openProjectDialog() });
+  add({ id: "new-folder-project", group: "Project", title: "New folder as a project", hint: "make a folder and open it", icon: "folder-plus", run: () => openProjectDialog(undefined, "new") });
+  add({ id: "clone-project", group: "Project", title: "Clone a repository", hint: "git clone and open it", icon: "git-branch", run: () => openProjectDialog(undefined, "clone") });
   if (p && app.projects.length > 1) {
     add({ id: "project-prev", group: "Project", title: "Previous project", icon: "chevron-up", keys: capsOf("project-prev"), run: () => stepProject(p, -1) });
     add({ id: "project-next", group: "Project", title: "Next project", icon: "chevron-down", keys: capsOf("project-next"), run: () => stepProject(p, 1) });
