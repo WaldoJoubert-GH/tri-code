@@ -21,6 +21,7 @@ import { dropProject } from "./Sidebar";
 import { folderStatus, gitOf, peekStatus } from "./git";
 import { ask, flash } from "./ui";
 import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "./leftovers";
+import { ensureSandbox, newSandboxName, relativeGitdir, removeSandbox, sandboxOf } from "./sandbox";
 
 /** One entry of `git worktree list`. */
 export type GitWorktree = { path: string; branch: string | null; main: boolean };
@@ -244,8 +245,10 @@ export const setupFor = (repo: Project, branch: string, script: string, prefix =
 /** Make a Worktree of `repo` on `branch` (from `base` if new) and switch to it. In the new checkout,
  *  `setup` gets a window of its own and the focus, which closes once it succeeds (setup.ts); each of
  *  `open` opens beside it. They start together: nothing waits for the setup to finish. `background`
- *  leaves the view where it is. Returns the Worktree and its setup window. */
-export async function createWorktree(repo: Project, branch: string, opts: { base: string; issue?: string; setup?: string; open: Agent[]; background?: boolean }): Promise<{ project: string; setup?: string }> {
+ *  leaves the view where it is. `sandbox` makes it a Sandboxed Worktree (sandbox.ts): its sandbox is
+ *  made in the background and its agent windows wait for it; the rest runs here as always. Returns
+ *  the Worktree and its setup window. */
+export async function createWorktree(repo: Project, branch: string, opts: { base: string; issue?: string; setup?: string; open: Agent[]; background?: boolean; sandbox?: boolean }): Promise<{ project: string; setup?: string }> {
   const taken = worktreesOf(repo.id).find((w) => w.branch === branch);
   if (taken) {
     if (!opts.background) {
@@ -262,8 +265,19 @@ export async function createWorktree(repo: Project, branch: string, opts: { base
   } else {
     copy = { repos: await copyFolder(repo, dir, branch, kind.repos) };
   }
-  const id = addWorktree(repo.id, { path: dir, branch, issue: opts.issue, ...(copy ? { copy } : {}) }, !opts.background);
+  // A sandbox's git reads the worktree's pointer to the repo: a relative one reads the same in there.
+  // A copy has one per nested repo.
+  let sandbox: string | undefined;
+  if (opts.sandbox && (!copy || copy.repos.length)) {
+    for (const d of copy ? copy.repos.map((r) => join(dir, r)) : [dir]) {
+      await relativeGitdir(repo.host, d).catch((e) => flash(`git in the sandbox may not work${copy ? ` in ${d}` : ""}: ${e}`));
+    }
+    sandbox = await newSandboxName(repo, dir);
+  }
+  const id = addWorktree(repo.id, { path: dir, branch, issue: opts.issue, ...(copy ? { copy } : {}), ...(sandbox ? { sandbox } : {}) }, !opts.background);
   const p = projectById(id);
+  // Started now, so the download is under way while the setup runs; agent windows wait on it.
+  if (p && sandbox) void ensureSandbox(p).catch((e) => flash(`sandbox for ${branch}: ${e}`));
   let setup: string | undefined;
   if (p) {
     const lines = setupFor(repo, branch, opts.setup ?? "");
@@ -275,7 +289,7 @@ export async function createWorktree(repo: Project, branch: string, opts: { base
     for (const a of opts.open) launchAgent(p, a);
     if (setup && !opts.background) focusTab(p.id, setup);
   }
-  flash(`${copy ? "copy" : "worktree"} ${branch} · ${dir}`);
+  flash(`${sandbox ? "sandboxed " : ""}${copy ? "copy" : "worktree"} ${branch} · ${dir}`);
   void loadWorktrees(repo);
   return { project: id, setup };
 }
@@ -323,6 +337,7 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
   }
   const what = [
     p.tabs.length ? `close its ${p.tabs.length} window${p.tabs.length > 1 ? "s" : ""}` : "",
+    sandboxOf(p) ? `remove its sandbox and what was installed in it` : "",
     ch.changed.length ? `copy ${ch.changed.length} file${ch.changed.length > 1 ? "s" : ""} back to ${repo.name}:${listed8(ch.changed)}\n` : "",
     ch.deleted.length ? `delete ${ch.deleted.length} file${ch.deleted.length > 1 ? "s" : ""} the copy deleted:${listed8(ch.deleted)}\n` : "",
     repos.length ? `remove the worktrees of ${repos.join(", ")} and delete branches ${branches.join(", ")} where merged` : "",
@@ -340,6 +355,9 @@ async function finishCopy(p: Project, repo: Project): Promise<void> {
   if (app.activeProject === p.id) setApp("activeProject", repo.id);
   dropProject(p);
   await endHolders(p, held.end);
+  // The sandbox has the copy and the repos' .git mounted: it goes before their worktrees do.
+  // With the preview off it is cleaned up all the same, without a word: nothing showed it.
+  if (p.sandbox) await removeSandbox(p.host, p.sandbox).catch((e) => sandboxOf(p) && flash(`couldn't remove sandbox ${p.sandbox}: ${e}. Settings › Sandbox lists it.`));
   await new Promise((r) => setTimeout(r, 300));
   const kept: string[] = [];
   for (const r of repos) {
@@ -398,6 +416,7 @@ export async function removeWorktree(p: Project): Promise<void> {
   const what = [
     p.tabs.length ? `close its ${p.tabs.length} window${p.tabs.length > 1 ? "s" : ""}` : "",
     held.end.length ? `end ${held.end.length} left running there` : "",
+    sandboxOf(p) ? `remove its sandbox and what was installed in it` : "",
     `delete ${p.path}`,
     dirty ? `throw away ${dirty} uncommitted change${dirty > 1 ? "s" : ""}` : "",
   ].filter(Boolean).join(", ");
@@ -410,6 +429,9 @@ export async function removeWorktree(p: Project): Promise<void> {
   if (app.activeProject === p.id) setApp("activeProject", repo.id);
   dropProject(p);
   await endHolders(p, held.end);
+  // The sandbox has the folder mounted: it goes first, or the folder may not delete.
+  // With the preview off it is cleaned up all the same, without a word: nothing showed it.
+  if (p.sandbox) await removeSandbox(p.host, p.sandbox).catch((e) => sandboxOf(p) && flash(`couldn't remove sandbox ${p.sandbox}: ${e}. Settings › Sandbox lists it.`));
   // Windows will not delete a folder a closing terminal still has open.
   await new Promise((r) => setTimeout(r, 300));
   try {

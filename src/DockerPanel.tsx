@@ -8,8 +8,10 @@ import { type Project, type Tab, isRemote } from "./state";
 import { type Stop, containerAction, followEvents, followLogs, forwardPort, forwardedPorts, listContainers, portKey } from "./docker";
 import {
   type Container, type Level, type LogLine, type Port, type Stack, clockOf, containerOfPrefix, failureOf, groupStacks, isAlive, isUp, localAddr, matchesFind, needsLook, opensPage,
-  parseEvent, parseLogLine, phaseText, phaseTone, portUrl, rowName, stoppedCleanly, withLevel,
+  parseEvent, parseLogLine, phaseText, phaseTone, portUrl, rowName, sandboxStack, stoppedCleanly, withLevel,
 } from "./dockerdata";
+import { isRunning, listBoxes, sandboxOf, sbxReady, startSandbox, stopSandbox } from "./sandbox";
+import { sandboxPreview } from "./preview";
 import { openUrlInProject } from "./browsers";
 import { copyText } from "./clipboard";
 import { Icon } from "./lucide";
@@ -20,6 +22,8 @@ const TAIL = 500;
 const BUFFER = 5000;
 const SLOW_POLL = 30_000;
 const RETRY = 10_000;
+/** A sandbox's daemon has no events stream here, so while one is listed the window polls this often. */
+const SANDBOX_POLL = 10_000;
 const COLORS = ["--p-ocean", "--p-moss", "--p-plum", "--p-marigold", "--p-terracotta", "--p-slate"];
 
 type Sel = { kind: "stack" | "container"; name: string };
@@ -54,6 +58,10 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
   const p = () => props.project;
   const [v, setV] = createStore(viewOf(props.tab.id));
   const [containers, setContainers] = createSignal<Container[]>([]);
+  /** Docker Sandboxes, each a group of what runs inside it: this worktree's, or every one with All on host. */
+  const [boxStacks, setBoxStacks] = createSignal<Stack[]>([]);
+  /** The host's containers and every listed sandbox's, for finding one by name. */
+  const allContainers = createMemo(() => [...containers(), ...boxStacks().flatMap((s) => s.containers)]);
   const [roots, setRoots] = createSignal<string[]>([]);
   const [loaded, setLoaded] = createSignal(false);
   const [failure, setFailure] = createSignal<string | null>(null);
@@ -73,30 +81,35 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
   let streaming = false;
   let lastList = "";
 
-  const stacks = createMemo(() => groupStacks(containers(), roots()));
+  // This worktree's sandbox first, then the host's stacks, then other sandboxes.
+  const stacks = createMemo(() => [...boxStacks().filter((s) => s.mine), ...groupStacks(containers(), roots()), ...boxStacks().filter((s) => !s.mine)]);
   const shownStacks = createMemo(() => stacks().filter((s) => v.scope === "all" || s.mine));
   const shown = (s: Stack) => s.containers.filter((c) => v.showStopped || !stoppedCleanly(c));
   // The search only narrows the rows. What's selected, its logs and a stack's counts and buttons
   // all stay as they are, so typing doesn't switch streams and Stop still means the whole stack.
   const listed = (s: Stack) => shown(s).filter((c) => matchesFind(c, v.find));
-  const listedStacks = createMemo(() => shownStacks().filter((s) => listed(s).length));
+  /** A sandbox stays listed with nothing running in it, so it can be seen and started. */
+  const boxMatches = (s: Stack) => !!s.sandbox && (v.showStopped || isRunning(s.sandbox.status)) && s.sandbox.name.toLowerCase().includes(v.find.trim().toLowerCase());
+  const listedStacks = createMemo(() => shownStacks().filter((s) => listed(s).length || boxMatches(s)));
   const stackId = (s: Stack) => s.name ?? "";
+  /** A stack row picks its compose logs: a sandbox's only when everything in it is one compose project. */
+  const pickable = (s: Stack) => !!s.name && (!s.sandbox || !!s.compose);
   const isShut = (s: Stack) => !v.find.trim() && v.shut.includes(stackId(s));
   const selStack = () => (v.sel?.kind === "stack" ? stacks().find((s) => s.name === v.sel!.name) : undefined);
-  const selContainer = () => (v.sel?.kind === "container" ? containers().find((c) => c.name === v.sel!.name) : undefined);
+  const selContainer = () => (v.sel?.kind === "container" ? allContainers().find((c) => c.name === v.sel!.name) : undefined);
   const isSel = (kind: Sel["kind"], name: string | undefined) => v.sel?.kind === kind && v.sel.name === name;
   const othersCount = () => stacks().filter((s) => !s.mine).reduce((n, s) => n + s.containers.filter((c) => !stoppedCleanly(c)).length, 0);
 
   /** Everything that can stay selected, search or no search. */
   const flat = (): Sel[] =>
     shownStacks().flatMap((s) => [
-      ...(s.name ? [{ kind: "stack", name: s.name } as Sel] : []),
+      ...(pickable(s) ? [{ kind: "stack", name: s.name } as Sel] : []),
       ...(v.shut.includes(stackId(s)) ? [] : shown(s).map((c) => ({ kind: "container", name: c.name }) as Sel)),
     ]);
   /** The rows on screen in order, for j and k. */
   const listedRows = (): Sel[] =>
     listedStacks().flatMap((s) => [
-      ...(s.name ? [{ kind: "stack", name: s.name } as Sel] : []),
+      ...(pickable(s) ? [{ kind: "stack", name: s.name } as Sel] : []),
       ...(isShut(s) ? [] : listed(s).map((c) => ({ kind: "container", name: c.name }) as Sel)),
     ]);
 
@@ -105,7 +118,7 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
     if (!loaded()) return;
     const list = flat();
     const inFold = () => {
-      const c = v.sel?.kind === "container" ? containers().find((x) => x.name === v.sel!.name) : undefined;
+      const c = v.sel?.kind === "container" ? allContainers().find((x) => x.name === v.sel!.name) : undefined;
       return !!c && shownStacks().some((s) => s.containers.includes(c)) && (v.showStopped || !stoppedCleanly(c));
     };
     if (v.sel && (list.some((x) => sameSel(x, v.sel)) || inFold())) return;
@@ -114,9 +127,34 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
 
   // ── the list ───────────────────────────────────────────────────────
 
+  let lastBoxes = "";
+
+  /** The sandboxes to list and what runs in each running one. A stopped one isn't asked: that would start it. */
+  async function refreshBoxes() {
+    // A remote host's sandboxes are its own sbx's. Not asked over ssh on every refresh unless this
+    // worktree has one there or that sbx is known to be set up.
+    // None with the Sandboxed Worktrees preview off.
+    const own = sandboxOf(p());
+    if (!sandboxPreview() || (!own && isRemote(p()) && !sbxReady(p().host))) return void setBoxStacks([]);
+    const boxes = await listBoxes(p().host).catch(() => []);
+    const wanted = boxes.filter((b) => v.scope === "all" || b.name === own);
+    const next = await Promise.all(wanted.map(async (b) => {
+      const list = isRunning(b.status) ? await listContainers(p().host, p().path, b.name).then((r) => r.list, () => []) : [];
+      return sandboxStack(b, list, b.name === own);
+    }));
+    if (!alive) return;
+    const text = JSON.stringify(next);
+    if (text !== lastBoxes) {
+      lastBoxes = text;
+      setBoxStacks(next);
+    }
+  }
+
   async function refresh() {
     clearTimeout(refreshTimer);
     let wait = SLOW_POLL;
+    await refreshBoxes();
+    if (boxStacks().length) wait = SANDBOX_POLL;
     try {
       const r = await listContainers(p().host, p().path);
       if (!alive) return;
@@ -139,7 +177,7 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
         setFailure(String(e));
         setLoaded(true);
       });
-      wait = RETRY;
+      wait = Math.min(wait, RETRY);
     }
     if (alive) refreshTimer = setTimeout(refresh, wait);
   }
@@ -178,7 +216,7 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
   const lastLevel = new Map<string, Level>();
 
   const colorOf = (name: string | undefined) => {
-    const i = containers().findIndex((c) => c.name === name);
+    const i = allContainers().findIndex((c) => c.name === name);
     return `var(${COLORS[(i < 0 ? 5 : i) % COLORS.length]})`;
   };
   const composeMode = () => v.sel?.kind === "stack";
@@ -186,7 +224,7 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
   function isVisible(r: Row): boolean {
     if (composeMode() && r.source) {
       if (v.muted.includes(r.source)) return false;
-      const c = containers().find((x) => x.name === r.source);
+      const c = allContainers().find((x) => x.name === r.source);
       if (c && stoppedCleanly(c) && !v.showStopped) return false;
     }
     if (r.mark) return !v.warnOnly && !v.query;
@@ -214,7 +252,7 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
 
   function rowEl(r: Row): HTMLElement {
     const el = document.createElement("div");
-    const label = composeMode() ? containers().find((c) => c.name === r.source) : undefined;
+    const label = composeMode() ? allContainers().find((c) => c.name === r.source) : undefined;
     const name = label ? rowName(label) : r.prefix;
     if (r.mark) {
       el.className = "dk-ln dk-mark";
@@ -280,7 +318,8 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
     for (const text of raw) {
       const parsed = parseLogLine(text, compose);
       if (dropUntil && parsed.stamp && parsed.stamp <= dropUntil) continue;
-      const source = compose ? containerOfPrefix(parsed.prefix, containers())?.name : v.sel?.name;
+      // A sandbox's compose prefixes name its own containers, not the host's.
+      const source = compose ? containerOfPrefix(parsed.prefix, selStack()?.containers ?? containers())?.name : v.sel?.name;
       const key = source ?? parsed.prefix ?? "";
       const row: Row = { ...withLevel(parsed, lastLevel.get(key)), source };
       lastLevel.set(key, row.level);
@@ -291,7 +330,7 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
   }
 
   function addMark(container: string, text: string) {
-    const belongs = v.sel?.kind === "stack" ? containers().some((c) => c.name === container && c.stack === v.sel!.name) : v.sel?.name === container;
+    const belongs = v.sel?.kind === "stack" ? !!selStack()?.containers.some((c) => c.name === container) : v.sel?.name === container;
     if (belongs) appendRows([{ text, level: "info", mark: true, source: container, stamp: new Date().toISOString() }]);
   }
 
@@ -301,14 +340,18 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
     if (!sel) return;
     streaming = true;
     dropUntil = since;
-    const target = sel.kind === "stack" ? { stack: sel.name } : { container: sel.name };
+    // In a sandbox, docker there knows them by their own names.
+    const st = sel.kind === "stack" ? selStack() : undefined;
+    const c = sel.kind === "container" ? selContainer() : undefined;
+    const sandbox = st?.sandbox?.name ?? c?.sandbox;
+    const target = sel.kind === "stack" ? { stack: st?.compose ?? sel.name } : { container: c?.raw ?? sel.name };
     stopLogs = followLogs(p().host, target, since ? 0 : TAIL, since, onLines, (code) => {
       streaming = false;
       stopLogs = undefined;
       // docker logs ends when its container stops, which is nothing to report.
       if (code > 0) appendRows([{ text: `logs ended (exit ${code})`, level: "info", mark: true, stamp: new Date().toISOString() }]);
       if (!rows.length) renderRows();
-    });
+    }, sandbox);
   }
 
   /** docker logs ends with its container: once that's back up, carry on from the last line. */
@@ -371,17 +414,40 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
 
   const busyFor = (c: Container) => busy()[`c:${c.name}`] ?? (c.stack ? busy()[`s:${c.stack}`] : undefined);
 
-  /** Stopping what belongs to another project asks first; this project's is one click, and Start undoes it. */
-  async function act(action: "start" | "stop", target: { stack: string } | { container: string }, mine: boolean) {
+  /** Stopping what belongs to another project asks first; this project's is one click, and Start undoes it.
+   *  A sandbox's stacks and containers go to docker in that sandbox, by its own names. */
+  async function act(action: "start" | "stop", target: { stack: string } | { container: string }, mine: boolean, sandbox?: string) {
     const name = "stack" in target ? target.stack : target.container;
     const key = "stack" in target ? `s:${name}` : `c:${name}`;
     if (busy()[key]) return;
     if (action === "stop" && !mine && !(await ask(`Stop ${name}? It isn't part of ${p().name}.`))) return;
     setBusy((b) => ({ ...b, [key]: action }));
     try {
-      await containerAction(p().host, action, target);
+      if (sandbox) {
+        const st = stacks().find((s) => s.name === name);
+        const c = allContainers().find((x) => x.name === name);
+        await containerAction(p().host, action, "stack" in target ? { stack: st?.compose ?? name } : { container: c?.raw ?? name }, sandbox);
+      } else {
+        await containerAction(p().host, action, target);
+      }
     } catch (e) {
       flash(`couldn't ${action} ${name}: ${e}`);
+    }
+    if (alive) await refresh();
+    setBusy(({ [key]: _, ...rest }) => rest);
+  }
+
+  /** Start or stop a Docker Sandbox itself. Another worktree's asks before it stops. */
+  async function actBox(s: Stack, action: "start" | "stop") {
+    const name = s.sandbox!.name;
+    const key = `b:${name}`;
+    if (busy()[key]) return;
+    if (action === "stop" && !s.mine && !(await ask(`Stop sandbox ${name}? It isn't ${p().name}'s; its agents stop with it.`))) return;
+    setBusy((b) => ({ ...b, [key]: action }));
+    try {
+      await (action === "stop" ? stopSandbox(p().host, name) : startSandbox(p().host, name));
+    } catch (e) {
+      flash(`couldn't ${action} sandbox ${name}: ${e}`);
     }
     if (alive) await refresh();
     setBusy(({ [key]: _, ...rest }) => rest);
@@ -447,6 +513,9 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
     }
   };
 
+  // All on host lists every sandbox; This project only this worktree's.
+  createEffect(on(() => v.scope, () => void refreshBoxes(), { defer: true }));
+
   onMount(() => {
     window.addEventListener("keydown", onKey);
     void forwardedPorts(props.tab.id).then((f) => alive && setForwarded(f));
@@ -495,7 +564,11 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
       <div class="dk-ports">
         <For each={cp.c.ports}>
           {(port) => (
-            <Show when={port.host} fallback={
+            // Published inside a sandbox is published in its VM: this machine reaches it once sbx publishes it too.
+            <Show when={port.host && !cp.c.sandbox} fallback={
+              cp.c.sandbox ? (
+                <span class="dk-port dk-int" title={`Inside sandbox ${cp.c.sandbox}. To reach it here: sbx ports ${cp.c.sandbox} --publish ${port.host ?? port.cont}`}>{port.host ?? port.cont}{port.proto === "tcp" ? "" : `/${port.proto}`}</span>
+              ) :
               <span class="dk-port dk-int" title="Exposed inside the Docker network, not published to the host">{port.cont}{port.proto === "tcp" ? "" : `/${port.proto}`}</span>
             }>
               {(_) => {
@@ -547,20 +620,55 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
           const up = () => s.containers.filter(isUp).length;
           const total = () => shown(s).length;
           const stackBusy = () => !!s.name && !!busy()[`s:${s.name}`];
+          const box = s.sandbox;
+          const boxBusy = () => (box ? busy()[`b:${box.name}`] : undefined);
           return (
             <tbody>
-              <tr class="dk-stack" classList={{ "dk-on": !!s.name && isSel("stack", s.name) }} onClick={() => s.name && select({ kind: "stack", name: s.name })}>
+              <tr class="dk-stack" classList={{ "dk-on": !!s.name && isSel("stack", s.name) }} onClick={() => pickable(s) && select({ kind: "stack", name: s.name! })}>
                 <td colspan="6">
                   <div class="dk-sh" classList={{ "dk-shut": shut() }}>
-                    <button class="dk-chev" aria-label={`${shut() ? "Unfold" : "Fold"} ${s.name ?? "other containers"}`} onClick={(e) => { e.stopPropagation(); toggleIn("shut", stackId(s)); }}><Icon name="chevron-down" size={14} /></button>
-                    <Icon name={s.name ? "layers" : "box"} size={13} />
-                    <span>{s.name ?? "Not in a stack"}</span>
-                    <span class="dk-meta">{s.name ? `${up()}/${total()} up` : s.containers.length}</span>
-                    <Show when={s.name}>
+                    <button class="dk-chev" aria-label={`${shut() ? "Unfold" : "Fold"} ${box?.name ?? s.name ?? "other containers"}`} onClick={(e) => { e.stopPropagation(); toggleIn("shut", stackId(s)); }}><Icon name="chevron-down" size={14} /></button>
+                    <Show
+                      when={box}
+                      fallback={
+                        <>
+                          <Icon name={s.name ? "layers" : "box"} size={13} />
+                          <span>{s.name ?? "Not in a stack"}</span>
+                          <span class="dk-meta">{s.name ? `${up()}/${total()} up` : s.containers.length}</span>
+                        </>
+                      }
+                    >
+                      {(b) => (
+                        <>
+                          <span class="dk-sbx" title="A Docker Sandbox: a VM with its own Docker, running this worktree's agent"><Icon name="shield" size={13} /></span>
+                          <span title={b().name}>{b().name}</span>
+                          <span class="dk-meta">
+                            {boxBusy() ? (boxBusy() === "stop" ? "stopping…" : "starting…") : isRunning(b().status) ? `sandbox · ${total() ? `${up()}/${total()} up` : "nothing in its Docker"}` : `sandbox · ${b().status || "stopped"}`}
+                          </span>
+                        </>
+                      )}
+                    </Show>
+                    <Show when={box || s.name}>
                       <span class="dk-grow" />
-                      <span class="dk-meta">compose logs</span>
-                      <Show when={shown(s).some((c) => !isAlive(c))}><ActionButton action="start" name={s.name!} disabled={stackBusy()} onClick={() => void act("start", { stack: s.name! }, s.mine)} /></Show>
-                      <Show when={s.containers.some(isAlive)}><ActionButton action="stop" name={s.name!} disabled={stackBusy()} onClick={() => void act("stop", { stack: s.name! }, s.mine)} /></Show>
+                      <Show when={pickable(s)}><span class="dk-meta">compose logs</span></Show>
+                      <Show
+                        when={box}
+                        fallback={
+                          <>
+                            <Show when={shown(s).some((c) => !isAlive(c))}><ActionButton action="start" name={s.name!} disabled={stackBusy()} onClick={() => void act("start", { stack: s.name! }, s.mine)} /></Show>
+                            <Show when={s.containers.some(isAlive)}><ActionButton action="stop" name={s.name!} disabled={stackBusy()} onClick={() => void act("stop", { stack: s.name! }, s.mine)} /></Show>
+                          </>
+                        }
+                      >
+                        {(b) => (
+                          <ActionButton
+                            action={isRunning(b().status) ? "stop" : "start"}
+                            name={`sandbox ${b().name}`}
+                            disabled={!!boxBusy()}
+                            onClick={() => void actBox(s, isRunning(b().status) ? "stop" : "start")}
+                          />
+                        )}
+                      </Show>
                     </Show>
                   </div>
                 </td>
@@ -575,7 +683,7 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
                       <td class="dk-img dk-col-img" title={c.image}>{c.image}</td>
                       <td class="dk-up dk-col-up">{c.up}</td>
                       <td class="dk-col-act">
-                        <ActionButton action={isAlive(c) ? "stop" : "start"} name={rowName(c)} disabled={!!busyFor(c)} onClick={() => void act(isAlive(c) ? "stop" : "start", { container: c.name }, s.mine)} />
+                        <ActionButton action={isAlive(c) ? "stop" : "start"} name={rowName(c)} disabled={!!busyFor(c)} onClick={() => void act(isAlive(c) ? "stop" : "start", { container: c.name }, s.mine, c.sandbox)} />
                       </td>
                     </tr>
                   )}
@@ -599,8 +707,8 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
               <Show when={selContainer()}>{(c) => <StateCell c={c()} />}</Show>
             </>
           }>
-            <Icon name="layers" size={13} />
-            <span class="dk-scope-n">{v.sel?.name}</span>
+            <Icon name={selStack()?.sandbox ? "shield" : "layers"} size={13} />
+            <span class="dk-scope-n">{selStack()?.sandbox ? `${selStack()!.sandbox!.name} › ${selStack()!.compose}` : v.sel?.name}</span>
             <span class="dk-tag">compose logs</span>
           </Show>
         </div>
@@ -694,7 +802,8 @@ export default function DockerPanel(props: { project: Project; tab: Tab; focused
         </Show>
       </div>
       <Show when={loaded()} fallback={<div class="dk-msg"><p>Asking docker…</p></div>}>
-        <Show when={!failure()} fallback={<FailurePage err={failure()!} />}>
+        {/* No docker here doesn't hide the sandboxes: each has its own. */}
+        <Show when={!failure() || boxStacks().length} fallback={<FailurePage err={failure()!} />}>
           <Show when={shownStacks().length} fallback={<NothingPage />}>
             <div class="dk-body">
               <div class="dk-list" ref={rowsEl} style={{ "max-height": `min(${v.top}px, calc(100% - 130px))` }}>

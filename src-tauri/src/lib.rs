@@ -26,6 +26,7 @@ pub mod ptyd;
 mod push;
 mod remote;
 mod resume;
+mod sbx;
 mod spawn;
 mod store;
 mod tour;
@@ -290,6 +291,11 @@ pub fn run() {
             docker::docker_stop,
             docker::docker_forward,
             docker::docker_unforward,
+            sbx::sbx_where,
+            sbx::sbx_cli,
+            sbx::sandbox_gitdir_relative,
+            sbx::sandbox_git_identity,
+            sbx::sbx_remote_shims,
             monitor::monitor_start,
             monitor::monitor_stop,
             monitor::monitor_end,

@@ -29,6 +29,10 @@ export type Container = {
   number?: string;
   /** The folder it was composed from. */
   dir?: string;
+  /** Inside this Docker Sandbox's own daemon: `name` is then `<sandbox>/<raw>`, unique across daemons,
+   *  and `raw` is what docker in the sandbox calls it. */
+  sandbox?: string;
+  raw?: string;
 };
 
 export type Stack = {
@@ -37,7 +41,21 @@ export type Stack = {
   containers: Container[];
   /** Started from the project's folder, or one under it. */
   mine: boolean;
+  /** A Docker Sandbox, listed as one group of what runs inside it (sandbox.ts); `name` is `sbx:<name>`. */
+  sandbox?: { name: string; status: string };
+  /** A sandbox's compose project, when everything in it is one: its compose logs. */
+  compose?: string;
 };
+
+/** A Docker Sandbox as one group: what its daemon runs, each container named apart from the host's. */
+export function sandboxStack(box: { name: string; status: string }, list: Container[], mine: boolean): Stack {
+  const containers = list
+    .map((c) => ({ ...c, name: `${box.name}/${c.name}`, raw: c.name, sandbox: box.name }))
+    .sort((a, b) => runRank(a) - runRank(b) || (a.service ?? a.name).localeCompare(b.service ?? b.name));
+  const stacks = new Set(containers.map((c) => c.stack));
+  const compose = stacks.size === 1 ? [...stacks][0] : undefined;
+  return { name: `sbx:${box.name}`, containers, mine, sandbox: box, ...(compose ? { compose } : {}) };
+}
 
 /** docker's `Labels`: `a=1,b=2`. A value can hold a comma, so a part with no `=` belongs to the one before. */
 export function parseLabels(text: string): Record<string, string> {
