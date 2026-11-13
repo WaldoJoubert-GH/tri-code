@@ -1,0 +1,30 @@
+/* Settings › Sandbox (SandboxSettings.tsx): bordered lists of keys, network rules and sandboxes. */
+.sbx-list { display: grid; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.sbx-item { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 10px; font-size: 12.5px; }
+.sbx-item + .sbx-item { border-top: 1px solid var(--line); }
+.sbx-item .grow { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.sbx-item .grow > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sbx-item .sub { color: var(--muted); font-size: 11.5px; }
+.sbx-item code { font: 12px var(--mono); }
+.sbx-item .sbx-none { color: var(--muted); font-style: italic; }
+.sbx-tag { flex: none; font: 11px var(--mono); padding: 1px 6px; border-radius: 8px; background: var(--raised); color: var(--muted); }
+.sbx-tag.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.sbx-tag.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.sbx-x { flex: none; width: 22px; height: 22px; border-radius: 4px; color: var(--muted); }
+.sbx-x:hover:not(:disabled) { background: var(--hover); color: var(--bad); }
+.sbx-add { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+.sbx-host { margin-left: auto; max-width: 60%; }
+.sbx-host, .sbx-add select, .sbx-add input {
+  height: 26px; min-width: 0; padding: 0 6px; font: 12px var(--ui); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; outline: none; user-select: text;
+}
+.sbx-add input { flex: 1; font-family: var(--mono); }
+.sbx-host:focus, .sbx-add select:focus, .sbx-add input:focus { border-color: var(--accent); }
+.sbx-err { margin: 6px 0 0; color: var(--bad); font: 11.5px var(--mono); white-space: pre-wrap; user-select: text; }
+.sbx-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
+.sbx-folders { display: flex; align-items: flex-start; gap: 10px; }
+.sbx-folders textarea {
+  flex: 1; min-height: 52px; resize: vertical; font: 12px var(--mono); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; outline: none; user-select: text;
+}
+.sbx-folders textarea:focus { border-color: var(--accent); }

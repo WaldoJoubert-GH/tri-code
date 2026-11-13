@@ -444,7 +444,7 @@ export default function MonitorPanel(props: { project: Project; tab: Tab; focuse
   );
 
   return (
-    <div class="mn" ref={rootEl}>
+    <div class="mn-root" ref={rootEl}>
       <Header />
       <Show when={snap()} fallback={failure() ? <FailurePage err={failure()!} /> : <div class="mn-msg"><p class="mn-dim">{v.paused ? "Paused." : "Sampling…"}</p></div>}>
         {(s) => (

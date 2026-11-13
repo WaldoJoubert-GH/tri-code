@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 
 use base64::Engine;
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri::ipc::{Channel, InvokeResponseBody};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
@@ -442,18 +442,40 @@ fn start_session(
     }
     let mut spec = spec;
     let mut env: Vec<(String, String)> = vec![("TERM".into(), "xterm-256color".into()), ("COLORTERM".into(), "truecolor".into())];
-    if local && let Some(cmd) = spec.cmd.take() {
+    // In a sandbox the agent's hooks and conversations are the VM's, not this machine's: the
+    // command runs as typed (sbx.rs).
+    let sandboxed = spec.sandbox.as_deref().is_some_and(|n| !n.is_empty());
+    if local && !sandboxed && let Some(cmd) = spec.cmd.take() {
         let launch = resume::launch(app, &cmd, spec.resume.as_ref());
         env.extend(launch.env);
         spec.cmd = Some(launch.cmd);
     }
-    // `tri` works in tri-code's own terminals as soon as it is installed: the terminal host keeps
-    // the PATH it started with, from before the install.
-    if local && let Some(bin) = crate::cli::terminal_bin(app) {
-        let sep = if cfg!(windows) { ";" } else { ":" };
+    // `tri` and `sbx` work in tri-code's own terminals as soon as they are installed: the terminal
+    // host keeps the PATH it started with, from before the install.
+    // A Sandboxed Worktree's other terminals: claude typed there runs in its sandbox. Its launcher
+    // goes first on PATH, ahead of the claude installed here.
+    let shim = match spec.sandbox_shim.as_deref().filter(|n| local && !sandboxed && !n.is_empty()) {
+        Some(name) => {
+            let dir = app.path().app_data_dir().ok().and_then(|d| crate::sbx::shim_dir(&d));
+            if dir.is_some() {
+                env.push(("TRI_SANDBOX".into(), name.to_string()));
+                env.push(("TRI_SBX".into(), crate::sbx::exe().map(|p| p.display().to_string()).unwrap_or_else(|| "sbx".into())));
+            }
+            dir
+        }
+        None => None,
+    };
+    if local {
         let path = std::env::var("PATH").unwrap_or_default();
-        if !crate::cli::path_has(&path, &bin) {
-            env.push(("PATH".into(), format!("{}{sep}{path}", bin.display())));
+        let add: Vec<String> = [shim, crate::cli::terminal_bin(app), crate::sbx::bin_dir()]
+            .into_iter()
+            .flatten()
+            .filter(|d| !crate::cli::path_has(&path, d))
+            .map(|d| d.display().to_string())
+            .collect();
+        if !add.is_empty() {
+            let sep = if cfg!(windows) { ";" } else { ":" };
+            env.push(("PATH".into(), format!("{}{sep}{path}", add.join(sep))));
         }
     }
     let prog = spawn::build(&spec);

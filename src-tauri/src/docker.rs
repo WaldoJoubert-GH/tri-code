@@ -60,6 +60,32 @@ fn local_command(args: &[&str]) -> Command {
     cmd
 }
 
+/// docker in a Docker Sandbox (sbx.rs): its own daemon, reached through `sbx exec` on the host the
+/// sandbox is on.
+fn sandbox_command(host: &str, sandbox: &str, args: &[&str]) -> Result<Command, String> {
+    if !is_local(host) {
+        crate::envssh::check(host)?;
+        let words: Vec<String> = ["exec", sandbox, "docker"].iter().chain(args).map(|a| sq(a)).collect();
+        let script = format!("exec \"${{SHELL:-/bin/sh}}\" -lc {}", sq(&format!("exec sbx {}", words.join(" "))));
+        return Ok(remote::command(host, &script));
+    }
+    let exe = crate::sbx::exe().ok_or("sbx: not installed")?;
+    let mut cmd = Command::new(exe);
+    cmd.args(["exec", sandbox, "docker"]).args(args);
+    hide_window(&mut cmd);
+    Ok(cmd)
+}
+
+/// A one-shot command to completion. Errors carry stderr.
+fn run_command(mut cmd: Command, what: &str) -> Result<String, String> {
+    let output = cmd.stdin(Stdio::null()).output().map_err(spawn_error)?;
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if err.is_empty() { format!("docker {what}: {}", output.status) } else { err });
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
 fn spawn_error(e: std::io::Error) -> String {
     if e.kind() == ErrorKind::NotFound { "docker: command not found".into() } else { format!("docker: {e}") }
 }
@@ -105,9 +131,14 @@ fn local_dirs(path: &str) -> Vec<String> {
     dirs
 }
 
+/// The containers on the host, or with `sandbox` the ones inside that Docker Sandbox (which are all
+/// its worktree's, so no folders to match).
 #[tauri::command]
-pub async fn docker_ps(host: String, path: String) -> Result<Ps, String> {
+pub async fn docker_ps(host: String, path: String, sandbox: Option<String>) -> Result<Ps, String> {
     blocking(move || {
+        if let Some(sb) = sandbox.filter(|s| !s.is_empty()) {
+            return Ok(Ps { dirs: vec![], out: run_command(sandbox_command(&host, &sb, &ps_args())?, "ps")? });
+        }
         if !is_local(&host) {
             return Ok(split_ps(&remote::run(&host, &ps_script(&path))?));
         }
@@ -118,12 +149,7 @@ pub async fn docker_ps(host: String, path: String) -> Result<Ps, String> {
 
 /// docker on this machine, to completion. Errors carry stderr.
 fn run_local(args: &[&str]) -> Result<String, String> {
-    let output = local_command(args).stdin(Stdio::null()).output().map_err(spawn_error)?;
-    if !output.status.success() {
-        let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(if err.is_empty() { format!("docker {}: {}", args.first().unwrap_or(&""), output.status) } else { err });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    run_command(local_command(args), args.first().unwrap_or(&""))
 }
 
 /// `docker compose -p <stack> start` needs no compose file and keeps the stack's start order.
@@ -140,11 +166,13 @@ fn action_args(action: &str, stack: Option<&str>, container: Option<&str>) -> Re
 
 /// Start or stop a stack or a container. Stopping can take a while: docker waits for it to exit.
 #[tauri::command]
-pub async fn docker_action(host: String, action: String, stack: Option<String>, container: Option<String>) -> Result<(), String> {
+pub async fn docker_action(host: String, action: String, stack: Option<String>, container: Option<String>, sandbox: Option<String>) -> Result<(), String> {
     let args = action_args(&action, stack.as_deref(), container.as_deref())?;
     blocking(move || {
         let args: Vec<&str> = args.iter().map(String::as_str).collect();
-        if is_local(&host) {
+        if let Some(sb) = sandbox.filter(|s| !s.is_empty()) {
+            run_command(sandbox_command(&host, &sb, &args)?, &action)?;
+        } else if is_local(&host) {
             run_local(&args)?;
         } else {
             remote::run(&host, &format!("exec {}", login(&args)))?;
@@ -295,12 +323,17 @@ pub async fn docker_logs(
     container: Option<String>,
     tail: u32,
     since: Option<String>,
+    sandbox: Option<String>,
     on_lines: Channel<Vec<String>>,
     on_exit: Channel<i32>,
 ) -> Result<u64, String> {
     let args = logs_args(stack.as_deref(), container.as_deref(), tail, since.as_deref())?;
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
-    start(stream_command(&host, &args)?, on_lines, on_exit)
+    let cmd = match sandbox.filter(|s| !s.is_empty()) {
+        Some(sb) => sandbox_command(&host, &sb, &args)?,
+        None => stream_command(&host, &args)?,
+    };
+    start(cmd, on_lines, on_exit)
 }
 
 /// The container events that can change what the window shows. Health checks run as execs, so

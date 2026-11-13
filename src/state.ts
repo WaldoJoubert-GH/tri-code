@@ -239,6 +239,9 @@ export type Project = {
   /** A Worktree of a folder that is not a git repo: a copy of the folder. `repos` are the repos
    *  nested in it, each added back as a git worktree on `branch` (see worktrees.ts). */
   copy?: { repos: string[] };
+  /** A Sandboxed Worktree only: its Docker Sandbox's name. Every terminal of the Worktree runs in it
+   *  (sbx.rs), and removing the Worktree removes it (sandbox.ts). */
+  sandbox?: string;
   /** A repo project only: the script New worktree runs once in each new checkout (install, copy
    *  `.env`), kept from the last time so the next one starts with it. */
   setup?: string;
@@ -347,6 +350,12 @@ export type Settings = {
   fontMono?: string;
   /** Keycaps in the project's accent colour (look.ts). Unset is the neutral keycap. */
   accentKeys?: boolean;
+  /** Settings › Sandbox. `byDefault: false` starts New worktree's Sandbox toggle off; `folders` are
+   *  mounted into every new sandbox besides its worktree and the repo's .git (`:ro` read only, `{repo}`
+   *  the repo's folder). */
+  sandbox?: { byDefault?: false; folders?: string[] };
+  /** Settings › Preview: the preview features turned on, by id (preview.ts). Unset is all off. */
+  preview?: Partial<Record<string, true>>;
 };
 
 export type GitColor = "add" | "del" | "mod" | "ren";
@@ -454,7 +463,7 @@ export function addSampleProject(path: string): string {
 }
 
 /** Add a Worktree under `parentId` and, unless `activate` is false, make it active. Returns its id. */
-export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string; copy?: { repos: string[] } }, activate = true): string {
+export function addWorktree(parentId: string, w: { path: string; branch: string; issue?: string; copy?: { repos: string[] }; sandbox?: string }, activate = true): string {
   const id = newId();
   setApp(produce((s) => {
     const parent = s.projects.find((p) => p.id === parentId);
@@ -468,6 +477,7 @@ export function addWorktree(parentId: string, w: { path: string; branch: string;
       id, name: w.branch, host: parent.host, path: w.path, tabs: [], ws: 0,
       spaces: Array.from({ length: SPACES }, newSpace), accent, bg: "none", dim: 0, favs: [...parent.favs],
       parent: parentId, branch: w.branch, ...(w.issue ? { issue: w.issue } : {}), ...(w.copy ? { copy: w.copy } : {}),
+      ...(w.sandbox ? { sandbox: w.sandbox } : {}),
     });
     if (activate) s.activeProject = id;
   }));
@@ -1043,6 +1053,33 @@ export function setAgentSetup(agent: "claude" | "pi", answer: "installed" | "nev
   }));
 }
 
+/** Turn a preview feature on or off (Settings › Preview); off is kept as unset. */
+export function setPreview(id: string, on: boolean) {
+  setApp(produce((s) => {
+    const cur = { ...(s.settings.preview ?? {}) };
+    if (on) cur[id] = true;
+    else delete cur[id];
+    s.settings.preview = Object.keys(cur).length ? cur : undefined;
+  }));
+}
+
+/** Change Settings › Sandbox; an emptied list of folders is dropped. */
+export function setSandboxSettings(patch: { byDefault?: boolean; folders?: string[] }) {
+  setApp(produce((s) => {
+    const cur = { ...(s.settings.sandbox ?? {}) };
+    if (patch.byDefault !== undefined) {
+      if (patch.byDefault) delete cur.byDefault;
+      else cur.byDefault = false;
+    }
+    if (patch.folders !== undefined) {
+      const clean = [...new Set(patch.folders.map((f) => f.trim()).filter(Boolean))];
+      if (clean.length) cur.folders = clean;
+      else delete cur.folders;
+    }
+    s.settings.sandbox = Object.keys(cur).length ? cur : undefined;
+  }));
+}
+
 export function setSettings(patch: Partial<Settings>) {
   setApp(produce((s) => Object.assign(s.settings, patch)));
 }
@@ -1202,7 +1239,7 @@ export function migrate(raw: any): Persisted {
       ...(p.fx ? { fx: p.fx } : {}),
       ...(p.clear ? { clear: p.clear } : {}),
       favs: p.favs ?? [], diffMode: p.diffMode, icon: p.icon, notify: p.notify, profile: p.profile,
-      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.title ? { title: p.title } : {}), ...(p.copy ? { copy: p.copy } : {}) } : {}),
+      ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.title ? { title: p.title } : {}), ...(p.copy ? { copy: p.copy } : {}), ...(p.sandbox ? { sandbox: p.sandbox } : {}) } : {}),
       ...(p.setup ? { setup: p.setup } : {}),
       ...(p.branchPrefix ? { branchPrefix: p.branchPrefix } : {}),
       ...(p.sample ? { sample: true } : {}),

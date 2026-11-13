@@ -61,6 +61,9 @@
 .bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
 .bar button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); line-height: 1; flex: none; }
 .bar button:hover { background: var(--hover); color: var(--text); }
+/* A Sandboxed Worktree's terminal, left of – ▢ ×: green while its agent runs in the sandbox, faint on its other terminals */
+.bar .sbx-win { display: inline-grid; place-items: center; width: 18px; height: 22px; flex: none; color: var(--muted); opacity: .55; }
+.bar .sbx-win.on { color: var(--ok); opacity: 1; }
 /* Hold Hints (src/hints.ts, Keys.tsx): while the Hotkey Modifier is held each icon turns into its key,
    in the same box. The focused window's – ▢ × do the same. */
 .bar .ctl.hk { width: auto; min-width: 22px; padding: 0 1px; display: inline-flex; align-items: center; justify-content: center; }

@@ -18,6 +18,7 @@ import { fwdOfPage, heldBy } from "./tunnels";
 import { RemoteStart, TunnelBar, TunnelChip, TunnelHeld } from "./tunnelui";
 import { Icon } from "./lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
+import { runsInSandbox, sandboxOf } from "./sandbox";
 import IssuesPanel from "./IssuesPanel";
 import { dirtyCount, dropEditor } from "./files";
 
@@ -523,6 +524,20 @@ export default function Canvas(props: { project: Project }) {
           </Show>
           <Show when={targetInBar && target()}>
             {(t) => <span class="dh" aria-hidden="true"><For each={t().focus}>{(k) => <HintCaps id={k} />}</For>focus</span>}
+          </Show>
+          {/* A Sandboxed Worktree's terminal: its agent runs in the sandbox; a shell's claude would. */}
+          <Show when={tab.kind === "term" && sandboxOf(props.project)}>
+            <span
+              class="sbx-win"
+              classList={{ on: runsInSandbox(props.project, tab.cmd ?? "") }}
+              title={
+                runsInSandbox(props.project, tab.cmd ?? "")
+                  ? `Sandboxed: this agent runs in ${sandboxOf(props.project)}, a VM that sees only this worktree`
+                  : `This runs ${isRemote(props.project) ? `on ${props.project.host}` : "here"}; claude typed in it runs in sandbox ${sandboxOf(props.project)}`
+              }
+            >
+              <Icon name="shield" size={12} />
+            </span>
           </Show>
           <button
             class="ctl mn"

@@ -27,6 +27,7 @@ import { envLocked, lockEnv } from "./envlock";
 import { settingsOpen, toggleSettings } from "./Settings";
 import { LeftoverCount } from "./LeftoversPopover";
 import { endLeftover, staleCheckouts } from "./leftovers";
+import { sandboxOf } from "./sandbox";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
 const FULL = 220;
@@ -229,6 +230,7 @@ export default function Sidebar() {
         style={{ "--wa": w.accent }}
         title={[
           ...labelOf(w).tip, shelf ? `${repo().name} · ${envName(repo().host)}` : "", w.path,
+          sandboxOf(w) ? `sandboxed: its terminals run in ${sandboxOf(w)}` : "",
           `${w.tabs.length ? `${w.tabs.length} window${w.tabs.length === 1 ? "" : "s"}` : ""}`, sigSummary(w),
         ].filter(Boolean).join("\n")}
         onClick={() => {
@@ -245,6 +247,10 @@ export default function Sidebar() {
             <Show when={labelOf(w).mark}>
               {(m) => <span class={`mark ${m()}`} title={m() === "named" ? "Named" : "Repos are on different branches"}>{m() === "named" ? "◆" : "≠"}</span>}
             </Show>
+            {/* The collapsed rail has no room for the row's shield: it rides the tile's corner there. */}
+            <Show when={sandboxOf(w)}>
+              <span class="sbx-badge" aria-label="Sandboxed"><Icon name="shield" size={8} /></span>
+            </Show>
           </HoldFace>
         </span>
         <Show when={ownBadge(w)}>
@@ -255,6 +261,9 @@ export default function Sidebar() {
           <span class="sub">{shelvedRepo ? labelOf(w).text : repo().name}{isLocalHost(repo().host) ? "" : ` · ${envName(repo().host)}`}</span>
         </Show>
         <Show when={!shelf}><LeftoverCount place={w.id} /></Show>
+        <Show when={sandboxOf(w)}>
+          <span class="sbx-mark" aria-label="Sandboxed"><Icon name="shield" size={11} /></span>
+        </Show>
         <Show when={locked()} fallback={<span class="count">{w.tabs.length || ""}</span>}>
           <span class="lk" title={`${envName(repo().host)} is locked`}><Icon name="lock" size={11} /></span>
         </Show>

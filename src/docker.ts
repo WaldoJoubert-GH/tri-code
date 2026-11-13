@@ -13,14 +13,15 @@ export function openDockerPanel(project: Project): string {
   return id;
 }
 
-export async function listContainers(host: string, path: string) {
-  const r = await invoke<{ dirs: string[]; out: string }>("docker_ps", { host, path });
+/** The host's containers, or with `sandbox` those inside that Docker Sandbox. */
+export async function listContainers(host: string, path: string, sandbox?: string) {
+  const r = await invoke<{ dirs: string[]; out: string }>("docker_ps", { host, path, sandbox: sandbox ?? null });
   return { roots: r.dirs, list: parseContainers(r.out) };
 }
 
-/** Start or stop a stack or a container. Resolves once docker has finished. */
-export async function containerAction(host: string, action: "start" | "stop", target: { stack: string } | { container: string }): Promise<void> {
-  await invoke("docker_action", { host, action, ...target });
+/** Start or stop a stack or a container (in `sandbox`'s daemon, if given). Resolves once docker has finished. */
+export async function containerAction(host: string, action: "start" | "stop", target: { stack: string } | { container: string }, sandbox?: string): Promise<void> {
+  await invoke("docker_action", { host, action, ...target, sandbox: sandbox ?? null });
 }
 
 /** What a stream's owner calls to end it. Safe before the stream has started, and twice. */
@@ -47,8 +48,8 @@ function follow(command: string, args: Record<string, unknown>, onLines: (lines:
 }
 
 /** Follow a stack's compose logs or a container's own. `since` picks up where an ended stream left off. */
-export function followLogs(host: string, target: { stack: string } | { container: string }, tail: number, since: string | undefined, onLines: (lines: string[]) => void, onExit: (code: number) => void): Stop {
-  return follow("docker_logs", { host, ...target, tail, since }, onLines, onExit);
+export function followLogs(host: string, target: { stack: string } | { container: string }, tail: number, since: string | undefined, onLines: (lines: string[]) => void, onExit: (code: number) => void, sandbox?: string): Stop {
+  return follow("docker_logs", { host, ...target, tail, since, sandbox: sandbox ?? null }, onLines, onExit);
 }
 
 export function followEvents(host: string, onLines: (lines: string[]) => void, onExit: (code: number) => void): Stop {

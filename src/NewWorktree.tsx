@@ -11,6 +11,9 @@ import { SETUP_VARS } from "./setup";
 import { dev, inProgress, slugOf } from "./issues";
 import { gitOf } from "./git";
 import { Icon } from "./lucide";
+import { sandboxPreview } from "./preview";
+import { canSandbox, hostKey, mountsFor, refreshSbx, sandboxByDefault, sandboxFolders, sbxReady, sbxState, setSandboxHost } from "./sandbox";
+import { openSettings } from "./Settings";
 
 export function NewWorktreeDialog() {
   return (
@@ -63,16 +66,33 @@ export function NewWorktreeDialog() {
           const k = kinds[repo.id];
           return k && !k.git ? k.repos : null;
         };
+        // The Sandbox toggle: a git repo, or a folder with repos in it, with sbx set up on its host
+        // (this machine or the ssh host it is on; Settings › Sandbox).
+        // Only while the Sandboxed Worktrees preview is on (Settings › Preview).
+        const host = repo.host;
+        const remoteHost = hostKey(host) !== "local";
+        if (sandboxPreview()) void refreshSbx(host);
+        const [boxed, setBoxed] = createSignal(sandboxByDefault());
+        const sandboxable = () => sandboxPreview() && canSandbox(repo, kinds[repo.id]);
+        /** sbx isn't usable (as opposed to still being checked). */
+        const sbxDown = () => !["checking", "ready"].includes(sbxState(host).state);
+        const sandboxed = () => sandboxable() && !sbxDown() && boxed();
+        const setUpSandbox = () => { setSandboxHost(hostKey(host)); closeNewWorktree(); openSettings("sandbox"); };
 
         const create = async () => {
           if (!branch() || busy()) return;
           setBusy(true);
           setError("");
           try {
+            // Asked for a sandbox: never make the worktree without one because the check hadn't finished.
+            if (sandboxed() && !sbxReady(host) && (await refreshSbx(host)).state !== "ready") {
+              setError(`Docker Sandboxes isn't ready${remoteHost ? ` on ${host}` : ""}, so nothing was made. Set it up in Settings › Sandbox, or turn Sandbox off.`);
+              return;
+            }
             setWorktreeSetup(repo.id, setup());
             // Saved first: the new folder is named without it.
             if (!picked()) setBranchPrefix(repo.id, cleanPrefix(prefix()));
-            await createWorktree(repo, branch(), { base: base(), issue: issue(), setup: setup(), open: opening() });
+            await createWorktree(repo, branch(), { base: base(), issue: issue(), setup: setup(), open: opening(), sandbox: sandboxed() });
             closeNewWorktree();
           } catch (e) {
             setError(String(e));
@@ -195,6 +215,42 @@ export function NewWorktreeDialog() {
                     )}
                   </For>
                 </div>
+                <Show when={sandboxable()}>
+                  <button
+                    type="button"
+                    class="sbx-toggle"
+                    role="switch"
+                    aria-checked={sandboxed()}
+                    disabled={sbxDown()}
+                    onClick={() => setBoxed(!boxed())}
+                  >
+                    <span class="tx">
+                      <b><Icon name="shield" size={13} /> Sandbox</b>
+                      <Show
+                        when={!sbxDown()}
+                        fallback={
+                          <span>
+                            {sbxState(host).state === "unreachable" ? `Couldn't reach ${host} to check Docker Sandboxes.` : `Docker Sandboxes isn't set up on ${remoteHost ? host : "this machine"}.`}{" "}
+                            <a onClick={(e) => { e.stopPropagation(); setUpSandbox(); }}>Set it up →</a>
+                          </span>
+                        }
+                      >
+                        <span>
+                          {boxed()
+                            ? `Its agents run in their own VM${remoteHost ? ` on ${host}` : ""} and see only this worktree; the rest runs ${remoteHost ? "there" : "here"}.`
+                            : `Its agents run on ${remoteHost ? host : "this machine"}, with your access.`}
+                        </span>
+                        <Show when={boxed() && sbxReady(host) && !sbxState(host).signIn}>
+                          <span>
+                            claude isn't signed in for sandboxes yet.{" "}
+                            <a onClick={(e) => { e.stopPropagation(); setUpSandbox(); }}>Sign in once →</a>
+                          </span>
+                        </Show>
+                      </Show>
+                    </span>
+                    <span class={`sbx-sw ${sandboxed() ? "on" : ""}`} />
+                  </button>
+                </Show>
                 <div class="where">
                   <Show when={kinds[repo.id]} fallback={<span>checking {repo.path}…</span>}>
                     <Show
@@ -221,6 +277,11 @@ export function NewWorktreeDialog() {
                         </>
                       )}
                     </Show>
+                  </Show>
+                  <Show when={sandboxed()}>
+                    <span class="then">
+                      and in the background its sandbox: sbx create claude {worktreeDir(repo, branch() || "<branch>", dirPrefix())} {mountsFor(repo.path, sandboxFolders(), nested() ?? undefined).join(" ")}
+                    </span>
                   </Show>
                   <Show when={setup().trim()}>
                     <span class="then">then runs setup: {setupFor(repo, branch() || "<branch>", setup(), dirPrefix()).join(" && ")}</span>

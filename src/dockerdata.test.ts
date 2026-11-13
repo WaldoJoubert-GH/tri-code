@@ -1,9 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import {
-  containerOfPrefix, failureOf, groupStacks, isInside, levelOf, localAddr, matchesFind, opensPage, parseContainers, parseEvent, parseLabels, parseLogLine, parsePorts, phaseOf, phaseText, portUrl, rowName, stoppedCleanly, stripAnsi, tunnelTarget, withLevel,
+  containerOfPrefix, failureOf, groupStacks, isInside, levelOf, localAddr, matchesFind, opensPage, parseContainers, parseEvent, parseLabels, parseLogLine, parsePorts, phaseOf, phaseText, portUrl, rowName, sandboxStack, stoppedCleanly, stripAnsi, tunnelTarget, withLevel,
 } from "./dockerdata";
 
 const row = (o: Record<string, string>) => JSON.stringify({ ID: "abc", Names: "n", Image: "img", State: "running", Status: "Up 2 hours", Ports: "", Labels: "", ...o });
+
+describe("sandboxStack", () => {
+  const box = { name: "tri-app-x", status: "running" };
+  test("a sandbox's containers are named apart from the host's and keep their own names for docker there", () => {
+    const s = sandboxStack(box, parseContainers(row({ Names: "db", Labels: "com.docker.compose.project=app,com.docker.compose.service=db" })), true);
+    expect(s.name).toBe("sbx:tri-app-x");
+    expect(s.containers[0]).toMatchObject({ name: "tri-app-x/db", raw: "db", sandbox: "tri-app-x", service: "db" });
+    expect(s.compose).toBe("app");
+    expect(s.mine).toBe(true);
+  });
+
+  test("compose logs only when everything in it is one compose project", () => {
+    const two = parseContainers([row({ Names: "a", Labels: "com.docker.compose.project=app" }), row({ Names: "b" })].join("\n"));
+    expect(sandboxStack(box, two, false).compose).toBeUndefined();
+    expect(sandboxStack({ name: "tri-y", status: "stopped" }, [], false)).toMatchObject({ containers: [], sandbox: { name: "tri-y", status: "stopped" } });
+  });
+});
 
 describe("parseLabels", () => {
   test("splits on commas and keeps a comma inside a value", () => {
