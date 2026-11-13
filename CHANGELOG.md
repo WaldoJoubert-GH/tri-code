@@ -2,6 +2,13 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.51 — 2026-11-13
+
+- The Monitor Window (Alt+M) shows what a project's host is doing: CPU, memory, network and disks over a live process list that can be sorted, shown as a tree, or narrowed to the project's own processes. Over ssh it reads the host's /proc through one open connection. Ending a process ends its whole tree, and checks first that the pid still belongs to the process shown. ([#61](https://github.com/WaldoJoubert-GH/tri-code/pull/61))
+- Open project gains New folder and Clone tabs (Ctrl+1-3). New folder makes a folder, optionally with git init, and opens it; Clone runs git clone with its progress shown and opens the result. Both work locally and over ssh, and a clone keeps running if the dialog is closed. The folder picker remembers where it was per Environment. ([#63](https://github.com/WaldoJoubert-GH/tri-code/pull/63))
+- Settings › Windows can show, auto-hide or hide the sidebar's Environment headers. With them hidden, an Environment's actions move into its projects' right-click menu, and tiles of an Environment with a PIN Lock show a lock that can be clicked to lock it now. ([#64](https://github.com/WaldoJoubert-GH/tri-code/pull/64))
+- Preview: Sandboxed Worktrees run a worktree's agents in a Docker Sandbox, a microVM that sees only its checkout, its repo's .git and the folders added in Settings › Sandbox. Turn it on in Settings › Preview. ([#62](https://github.com/WaldoJoubert-GH/tri-code/pull/62))
+
 ## 0.1.50 — 2026-11-11
 
 - CSV, TSV and Excel or OpenDocument workbooks open as tables. A CSV gets a Table mode in the Editor Window, and "Open in Database" opens any of them in a Database Window, with Data, Query and Pending Edits working as on a database. Apply writes a CSV back with its own delimiter, line endings and BOM, leaving untouched rows as they were, and won't overwrite a file changed on disk. Workbooks are read-only. Over ssh the file is read on the project's host. ([#59](https://github.com/WaldoJoubert-GH/tri-code/pull/59))
