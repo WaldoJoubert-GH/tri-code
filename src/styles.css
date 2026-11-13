@@ -778,6 +778,37 @@ canvas.bg { display: block; width: 100%; height: 100%; }
 .picker .pfoot .here { flex: 1; min-width: 0; font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .picker .keys { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 8px 6px; color: var(--muted); font-size: 11px; }
 
+/* Open project's tabs: Open | New folder | Clone */
+.open-dlg .seg { display: flex; gap: 2px; padding: 2px; align-self: flex-start; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.open-dlg .seg button { display: flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 4px; color: var(--muted); }
+.open-dlg .seg button:hover { color: var(--text); }
+.open-dlg .seg button[aria-selected="true"] { background: var(--raised); color: var(--text); }
+.open-dlg .field { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 6px 8px; }
+.open-dlg .field label { font-size: 11px; color: var(--muted); }
+.open-dlg .field input { font-family: var(--mono); }
+.open-dlg .pane > .mt { padding: 2px 0 0; }
+.open-dlg .pane > .note.err { padding: 0; font-size: 12px; color: var(--bad); white-space: pre-wrap; }
+.picker .pfoot .dest { flex: 1; min-width: 0; display: flex; gap: 8px; font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.picker .pfoot .dest .path { min-width: 0; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.picker .pfoot .dest b { color: var(--accent); font-weight: 600; }
+.picker .pfoot .dest .warn { flex: none; color: var(--warn); }
+.picker .pfoot .chk { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); white-space: nowrap; cursor: pointer; }
+.clone-run { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.clone-run .cr-h { display: flex; align-items: center; gap: 7px; font: 12px var(--mono); }
+.clone-run .cr-h .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clone-run .cr-h .r { margin-left: auto; color: var(--muted); }
+.clone-run.failed .cr-h .r { color: var(--bad); }
+.clone-run .dest { font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clone-run .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.clone-run .bar i { display: block; height: 100%; background: var(--accent); transition: width .15s; }
+.clone-run.failed .bar i { background: var(--bad); }
+.clone-run .phase { min-height: 14px; font-size: 11px; color: var(--muted); }
+.clone-run .log { flex: 1; min-height: 0; margin: 0; overflow: auto; font: 11px/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; word-break: break-all; }
+.clone-run .cr-f { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.clone-run .cr-f .hint { margin-right: auto; font-size: 11px; color: var(--muted); }
+.clone-run .ghost { padding: 4px 12px; border-radius: 4px; border: 1px solid var(--line); }
+.clone-run .ghost:hover { border-color: var(--accent); }
+
 /* The Environment dialog: New environment and Edit environment */
 .env-dlg { display: flex; flex-direction: column; width: min(480px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow); }
 .env-dlg > header { display: flex; align-items: center; justify-content: space-between; flex: none; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }

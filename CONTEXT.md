@@ -69,7 +69,7 @@ _Avoid_: Password, vault.
 _Avoid_: Host group, machine, server.
 
 **Open Project Dialog**:
-The `Alt+O` dialog: Environments on the left (with "New environment", which opens the Environment dialog over it and comes back to what it added), a Folder Picker on the right. Opening a folder that is already a project focuses it.
+The `Alt+O` dialog: Environments on the left (with "New environment", which opens the Environment dialog over it and comes back to what it added), and three tabs on the right (`Ctrl+1–3`): **Open**, a Folder Picker; **New folder**, a name and the picker for where it goes, optionally `git init`; **Clone**, a repository URL (the folder name follows it until typed over) and the picker for where it goes, with git's progress shown as it runs. Each makes the folder on the selected Environment and opens it as a project. A clone carries on if the dialog is closed and opens when done; cancelling one removes its half-made folder. Opening a folder that is already a project focuses it. Chosen from design/open-project.html (variant A).
 _Avoid_: Add project form, folder browser.
 
 **Tour**:
