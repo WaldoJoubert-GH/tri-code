@@ -934,7 +934,7 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
   .bg { transition: none; }
 }
 
-/* Tour (src/Tour.tsx, design/onboarding.html variant D): a spotlight over the app and a card
+/* Tour (src/Tour.tsx, design/tour.html): a spotlight over the app and a card
    beside it. Under the popovers (10000) and dialogs (9999), so the ones a stop opens stay usable;
    the spotlight lets clicks through, so you can try each stop while it is up. */
 .tour-spot {
@@ -954,12 +954,25 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .tour-card .try { margin: 0 0 10px; padding: 7px 9px; border-radius: 6px; font-size: 12px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .tour-card .try.did { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
 .tour-card .row, .tour-end .row { display: flex; align-items: center; gap: 6px; }
-.tour-card .dots { display: flex; gap: 4px; margin-right: auto; }
-.tour-card .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
-.tour-card .dots i.on { background: var(--accent); }
+.tour-card .grow, .tour-end .grow { flex: 1; }
+.tour-rail { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 8px; }
+.tour-rail button { height: 4px; padding: 0; border: 0; border-radius: 2px; background: var(--raised); cursor: pointer; }
+.tour-rail button.past { background: color-mix(in srgb, var(--accent) 45%, var(--raised)); }
+.tour-rail button.on { background: var(--accent); }
+.tour-card .try { line-height: 1.9; }
+.tour-key { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; vertical-align: baseline; }
+.tour-key > span:not(.keycaps) { text-decoration: underline; text-underline-offset: 2px; }
+.tour-key:hover kbd { border-color: var(--accent); }
+.tour-picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 12px; }
+.tour-picks button { display: grid; gap: 2px; text-align: left; padding: 10px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.tour-picks button:hover { border-color: var(--accent); }
+.tour-picks b { font-size: 13px; }
+.tour-picks span { font-size: 11.5px; color: var(--muted); }
+.tour-later { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.tour-later b { color: var(--text); font-weight: 600; }
 .tour-card .quiet, .tour-end .quiet { border-color: transparent; background: none; color: var(--muted); }
 .tour-card .quiet:hover, .tour-end .quiet:hover { color: var(--text); }
-.tour-end { width: min(460px, calc(100% - 32px)); padding: 20px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow); }
+.tour-end { width: min(520px, calc(100% - 32px)); padding: 20px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px -20px var(--shadow); }
 .tour-end h3 { margin: 0 0 6px; font-size: 16px; }
 .tour-end .row { justify-content: flex-end; }
 .project .sample { font: 10px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }

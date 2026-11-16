@@ -208,7 +208,7 @@ export function commands(): Command[] {
   add({ id: "dnd", group: "Signals", title: app.notify.dnd ? "Turn off Do not disturb" : "Do not disturb", hint: "badges only", icon: app.notify.dnd ? "bell" : "bell-off", run: toggleDnd });
   add({ id: "sidebar", group: "App", title: app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar", icon: "panel-left-close", keys: capsOf("sidebar"), run: toggleSidebar });
   add({ id: "welcome", group: "App", title: "Set up tri-code", hint: "agents, signals, machines", icon: "rocket", run: () => openWelcome() });
-  add({ id: "tour", group: "App", title: "Take the tour", hint: "a sample project and eight stops", icon: "map", run: () => void startTour() });
+  add({ id: "tour", group: "App", title: "Take the tour", hint: "a sample project and six stops", icon: "map", run: () => void startTour() });
   add({ id: "help", group: "App", title: "Hotkeys", icon: "keyboard", keys: capsOf("help"), run: () => openSettings("hotkeys") });
   add({ id: "config-export", group: "App", title: "Export configuration…", hint: "preferences, commands, environments, projects", icon: "archive", run: () => void exportConfig(SECTIONS.map((s) => s.id)) });
   add({ id: "config-import", group: "App", title: "Import configuration…", hint: "from an exported file, with a preview", icon: "archive-restore", run: () => { openSettings("backup"); void chooseImport(); } });

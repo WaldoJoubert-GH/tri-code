@@ -238,6 +238,12 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
+/** Run a Keymap action as its key would, for the active project: the tour's keys can be clicked. */
+export function runHotkey(id: string): boolean {
+  const p = activeProject();
+  return runAnywhere(id) || (!!p && run(id, p, focusedTab(p)));
+}
+
 let installed = false;
 
 /** The modifier came up: whatever the hold drew goes away. */

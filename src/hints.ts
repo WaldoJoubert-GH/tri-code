@@ -79,3 +79,13 @@ export function hintUp(): void {
   setShown(false);
   setMenuShown(false);
 }
+
+/** Draw the hints for `ms` without a key held: the tour's "show me" for people who'd rather click. */
+export function flashHints(ms: number): void {
+  if (down) return;
+  clearTimeout(timer);
+  setShown(true);
+  timer = setTimeout(() => {
+    if (!down) setShown(false);
+  }, ms);
+}
