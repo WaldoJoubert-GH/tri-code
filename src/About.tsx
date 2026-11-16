@@ -11,7 +11,11 @@ import "./files.css";
 export const [aboutOpen, setAboutOpen] = createSignal(false);
 
 /** The release sections only; the intro is for whoever edits the file. */
-const releases = renderMarkdown(changelog.slice(changelog.indexOf("\n## ") + 1));
+const sections = changelog.slice(changelog.indexOf("\n## ") + 1).split(/\n(?=## )/);
+/** How many releases show before "Load more". */
+const SHOWN = 4;
+const latest = renderMarkdown(sections.slice(0, SHOWN).join("\n"));
+const older = sections.length > SHOWN ? renderMarkdown(sections.slice(SHOWN).join("\n")) : "";
 
 function statusText() {
   if (import.meta.env.DEV) return "Dev build: updates are off";
@@ -29,6 +33,7 @@ function statusText() {
 
 export function AboutDialog() {
   const busy = () => ["checking", "downloading"].includes(updateStatus().kind);
+  const [showOlder, setShowOlder] = createSignal(false);
   return (
     <Show when={aboutOpen()}>
       <div class="dialog-scrim" onClick={(e) => e.target === e.currentTarget && setAboutOpen(false)}>
@@ -50,7 +55,17 @@ export function AboutDialog() {
               {(u) => <button class="primary" onClick={installUpdate}>↻ Restart to update · {u().version}</button>}
             </Show>
           </div>
-          <div class="md" innerHTML={releases} />
+          <div class="log">
+            <div class="md" innerHTML={latest} />
+            <Show when={older}>
+              <Show
+                when={showOlder()}
+                fallback={<button class="more" onClick={() => setShowOlder(true)}>Load more</button>}
+              >
+                <div class="md" innerHTML={older} />
+              </Show>
+            </Show>
+          </div>
         </div>
       </div>
     </Show>
