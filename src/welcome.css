@@ -1,0 +1,124 @@
+/* The Welcome window (Welcome.tsx), from design/new-user.html (variant A). Under the dialogs it opens
+   (Add environment, z-index 9999), over everything else. */
+.wel-scrim { position: fixed; inset: 0; z-index: 9900; display: grid; place-items: center; padding: 24px; background: var(--scrim); }
+.wel {
+  width: min(880px, 100%); height: min(620px, 100%); display: grid; grid-template-columns: 210px 1fr; grid-template-rows: 1fr auto;
+  overflow: hidden; background: var(--bg-solid); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 30px 80px -20px var(--shadow);
+  user-select: text; outline: none;
+}
+.wel code, .wel-list code { font: 12px var(--mono); }
+.wel h2 { margin: 0 0 4px; font-size: 18px; font-weight: 650; letter-spacing: -.01em; }
+.wel h3 { margin: 20px 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.wel-lede { margin: 0 0 14px; color: var(--muted); max-width: 62ch; }
+.wel-note { color: var(--muted); }
+.wel-warn { color: var(--warn); }
+.wel-err { color: var(--bad); margin: 8px 0 0; white-space: pre-wrap; }
+.wel-grow { flex: 1; min-width: 0; }
+.wel-row { display: flex; align-items: center; gap: 8px; }
+.wel-foot-note { margin: 12px 0 0; }
+.wel-dim { opacity: .5; pointer-events: none; }
+
+/* rail */
+.wel-rail { grid-row: 1 / 3; display: flex; flex-direction: column; gap: 2px; padding: 18px 10px; background: var(--panel-solid); border-right: 1px solid var(--line); }
+.wel-brand { display: flex; align-items: center; gap: 8px; padding: 0 8px 16px; font-weight: 650; }
+.wel-step { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; text-align: left; color: var(--muted); }
+.wel-step:hover { background: var(--hover); color: var(--text); }
+.wel-step[aria-current="step"] { background: var(--bg-solid); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+.wel-num { width: 20px; height: 20px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--bg-solid); font: 600 10.5px var(--mono); }
+.wel-step.done .wel-num { background: var(--ok); border-color: var(--ok); color: var(--bg-solid); }
+.wel-step[aria-current="step"] .wel-num { border-color: var(--accent); color: var(--accent); background: var(--bg-solid); }
+.wel-rail-foot { margin: auto 0 0; padding: 8px; color: var(--muted); font-size: 11.5px; }
+
+.wel-main { overflow-y: auto; padding: 24px 28px 20px; min-height: 0; }
+.wel-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.wel-hint { margin-right: auto; color: var(--muted); font-size: 11.5px; display: flex; align-items: center; gap: 4px; }
+
+/* buttons and controls */
+.wel-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-solid); white-space: nowrap; }
+.wel-btn:hover:not(:disabled) { background: var(--hover); }
+.wel-btn:disabled { opacity: .5; cursor: default; }
+.wel-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg-solid); font-weight: 600; }
+.wel-btn.primary:hover:not(:disabled) { background: color-mix(in oklab, var(--accent) 88%, var(--text)); }
+.wel-btn.quiet { border-color: transparent; background: none; color: var(--muted); }
+.wel-btn.quiet:hover { color: var(--text); background: var(--hover); }
+.wel-btn.sm { height: 24px; padding: 0 8px; font-size: 12px; }
+.wel-link { padding: 0; color: var(--accent); }
+.wel-link:hover { text-decoration: underline; }
+.wel-input { height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg-solid); color: var(--text); font: 12px var(--ui); min-width: 0; }
+input.wel-input { font-family: var(--mono); }
+.wel-input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+.wel-check { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.wel-check input { margin: 2px 0 0; accent-color: var(--accent); }
+.wel-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 10px; flex: none; font-size: 11.5px; white-space: nowrap; background: var(--raised); color: var(--muted); }
+.wel-chip.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.wel-spin { width: 9px; height: 9px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: wel-spin .7s linear infinite; }
+@keyframes wel-spin { to { transform: rotate(1turn); } }
+.wel-switch { position: relative; width: 30px; height: 17px; flex: none; border-radius: 9px; background: var(--raised); border: 1px solid var(--line); transition: background .15s; }
+.wel-switch::after { content: ""; position: absolute; top: 1px; left: 1px; width: 13px; height: 13px; border-radius: 50%; background: var(--bg-solid); box-shadow: 0 1px 2px var(--shadow); transition: transform .15s; }
+.wel-switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.wel-switch[aria-checked="true"]::after { transform: translateX(13px); }
+
+/* option cards */
+.wel-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.wel-opt { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-solid); }
+.wel-opt:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.wel-opt[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.wel-opt b { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.wel-opt small { color: var(--muted); }
+
+/* agent and machine rows */
+.wel-list { display: flex; flex-direction: column; gap: 8px; }
+.wel-agent { border: 1px solid var(--line); border-radius: 8px; background: var(--bg-solid); }
+.wel-agent.on { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.wel-agent-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; }
+.wel-ico { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-solid); }
+.wel-name { display: block; font-weight: 600; }
+.wel-name code { margin-left: 6px; font-weight: 400; color: var(--muted); }
+.wel-sub { display: block; color: var(--muted); font-size: 12px; }
+.wel-agent-body { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px 52px; border-top: 1px dashed var(--line); }
+.wel-install, .wel-banner { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-solid); }
+.wel-install code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; }
+.wel-banner { margin-bottom: 10px; border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.wel-banner > svg { color: var(--warn); flex: none; }
+.wel-add { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; text-align: left; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; }
+.wel-add:hover { color: var(--text); border-color: var(--accent); }
+.wel-own { display: grid; grid-template-columns: 1.6fr 1fr auto auto; gap: 6px; padding: 8px 10px; }
+
+/* signals */
+.wel-preview { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-solid); }
+.wel-winbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-solid); }
+.wel-sig { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; justify-self: start; white-space: nowrap; }
+.wel-sig::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.wel-sig.blocked { color: var(--state-blocked); background: color-mix(in srgb, var(--state-blocked) 16%, transparent); }
+.wel-sig.done { color: var(--state-done); background: color-mix(in srgb, var(--state-done) 14%, transparent); }
+.wel-sig.error { color: var(--state-error); background: color-mix(in srgb, var(--state-error) 14%, transparent); }
+.wel-toast { display: flex; align-items: flex-start; gap: 10px; align-self: flex-end; max-width: 320px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-solid); box-shadow: 0 6px 18px -8px var(--shadow); }
+.wel-toast small { display: block; color: var(--muted); }
+.wel-sounds { display: grid; grid-template-columns: 110px minmax(0, 220px) auto; justify-content: start; gap: 6px 10px; align-items: center; }
+.wel-vol { margin: 12px 0 10px; }
+.wel-vol input { flex: 1; max-width: 340px; accent-color: var(--accent); }
+
+/* first project */
+.wel-starts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.wel-start { display: flex; flex-direction: column; gap: 6px; min-height: 132px; padding: 14px; text-align: left; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-solid); }
+.wel-start:hover { border-color: var(--accent); }
+.wel-start .wel-ico { margin-bottom: 4px; }
+.wel-start small { color: var(--muted); }
+.wel-start-foot { margin-top: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11.5px; }
+.wel-rec { color: var(--accent); font-weight: 600; font-size: 11px; }
+.wel-sum { border: 1px solid var(--line); border-radius: 8px; background: var(--bg-solid); }
+.wel-sum-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+.wel-sum-row + .wel-sum-row { border-top: 1px solid var(--line); }
+.wel-sum-k { width: 110px; flex: none; color: var(--muted); }
+.wel-later { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.wel-later > div { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-solid); }
+.wel-later > div > svg { flex: none; margin-top: 2px; }
+.wel-later small { display: block; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .wel { grid-template-columns: 1fr; }
+  .wel-rail { display: none; }
+  .wel-opts, .wel-starts, .wel-later { grid-template-columns: 1fr; }
+  .wel-agent-body { padding-left: 12px; }
+  .wel-own { grid-template-columns: 1fr; }
+}

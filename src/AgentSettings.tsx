@@ -1,8 +1,11 @@
-// Settings › Agents: whether Claude and pi have agent windows set up, read from their own configs on each
-// open, with the action that fits: install, update the path, remove, or ask again after Don't ask again.
+// Settings › Agents: what's in the + menu (the Welcome window's switches, looked up on PATH on each open),
+// and whether Claude and pi have agent windows set up, read from their own configs, with the action that
+// fits: install, update the path, remove, or ask again after Don't ask again.
 
 import { For, Show, onMount } from "solid-js";
 import { app } from "./state";
+import { PlusMenuList, lookForAgents } from "./Welcome";
+import { Caps } from "./Keys";
 import {
   AGENT_KEYS,
   AGENT_NAMES,
@@ -10,7 +13,6 @@ import {
   type SetupState,
   askAgain,
   installAgent,
-  refreshSetup,
   removeAgent,
   setupBusy,
   setupError,
@@ -68,9 +70,13 @@ function AgentRow(props: { agent: AgentKey }) {
 }
 
 export function AgentsPage() {
-  onMount(() => void refreshSetup(true));
+  // Looks on PATH too, and reads the agent-windows state.
+  onMount(() => void lookForAgents());
   return (
     <>
+      <h4>In the + menu</h4>
+      <PlusMenuList />
+      <p class="note">Icons, hotkeys, scopes and sounds for each are in the commands window, <Caps id="agents" />.</p>
       <h4>Agent windows</h4>
       <p class="note">
         An agent in a project's terminal can open, read and close that project's windows, such as a dev server. Setting it up registers a server with the agent's own config. Only Commands with <b>Agent</b> switched on in the Commands window can be opened.

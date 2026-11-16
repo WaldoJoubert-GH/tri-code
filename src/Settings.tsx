@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource, createSignal } from "solid-js";
-import { AgentState, DRAFT_COMMAND, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
@@ -19,8 +19,11 @@ import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
 import { SandboxPage } from "./SandboxSettings";
 import { PREVIEWS, previewOn, sandboxPreview } from "./preview";
+import { SignalsForm } from "./SignalSettings";
+import { openEnvDialog } from "./EnvDialog";
+import { openWelcome } from "./Welcome";
 
-export type SettingsPage = "appearance" | "windows" | "agents" | "files" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview";
+export type SettingsPage = "appearance" | "windows" | "agents" | "environments" | "files" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview";
 
 /** Pages that belong to a preview feature: listed only while it is on. */
 const shown = (p: SettingsPage) => p !== "sandbox" || sandboxPreview();
@@ -29,6 +32,7 @@ const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "appearance", name: "Appearance", icon: "palette" },
   { page: "windows", name: "Windows", icon: "layout-panel-left" },
   { page: "agents", name: "Agents", icon: "bot" },
+  { page: "environments", name: "Environments", icon: "server" },
   { page: "files", name: "Files", icon: "folder-search" },
   { page: "git", name: "Git", icon: "git-branch" },
   { page: "sandbox", name: "Sandbox", icon: "shield" },
@@ -245,6 +249,28 @@ function signalThemeColor(key: AgentState) {
   return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888";
 }
 
+/** Settings › Environments: the machines projects run on, as the Welcome window's Machines step. */
+function EnvironmentsPage() {
+  return (
+    <>
+      <h4>Environments</h4>
+      <For each={app.environments}>
+        {(h) => (
+          <div class="row env-row">
+            <Icon name={envIcon(h)} size={14} />
+            <span class="env-tx"><b>{envName(h)}</b>{isLocalHost(h) ? "this computer" : `over ssh · ${h}`}</span>
+            <button type="button" class="set-btn" onClick={() => openEnvDialog(h)}>Edit…</button>
+          </div>
+        )}
+      </For>
+      <div class="row">
+        <button type="button" class="set-btn" onClick={() => openEnvDialog()}><Icon name="plus" size={12} />Add an ssh host</button>
+      </div>
+      <p class="note">Projects are grouped by Environment in the sidebar. A host needs ssh that logs in with a key, and ideally shpool. To remove one, right-click its header in the sidebar.</p>
+    </>
+  );
+}
+
 function SignalsPage() {
   // Applied at once, so the picker reads the theme's colour again straight after a reset.
   const pick = (key: AgentState, color: string | undefined) =>
@@ -254,6 +280,7 @@ function SignalsPage() {
     });
   return (
     <>
+      <div class="set-signals"><SignalsForm /></div>
       <h4>Colours</h4>
       <For each={SIGNAL_COLORS}>
         {(s) => (
@@ -470,11 +497,16 @@ export function SettingsDialog() {
                   </button>
                 )}
               </For>
+              <button type="button" class="rerun" title="The first-launch setup: theme, agents, signals, environments" onClick={() => { closeSettings(); openWelcome(); }}>
+                <Icon name="rocket" size={14} />
+                Set up tri-code…
+              </button>
             </nav>
             <section class="settings-page">
               <Show when={p() === "appearance"}><AppearancePage /></Show>
               <Show when={p() === "windows"}><WindowsPage /></Show>
               <Show when={p() === "agents"}><AgentsPage /></Show>
+              <Show when={p() === "environments"}><EnvironmentsPage /></Show>
               <Show when={p() === "files"}><FilesPage /></Show>
               <Show when={p() === "git"}><GitPage /></Show>
               <Show when={p() === "sandbox" && shown("sandbox")}><SandboxPage /></Show>

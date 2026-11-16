@@ -208,6 +208,7 @@ pub fn run() {
             agent_setup::agent_setup_status,
             agent_setup::agent_setup_install,
             agent_setup::agent_setup_remove,
+            agent_setup::commands_present,
             cli::cli_take,
             cli::cli_status,
             cli::cli_install,
