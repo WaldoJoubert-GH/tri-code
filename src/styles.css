@@ -980,6 +980,22 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg nav button:hover { background: var(--hover); color: var(--text); }
 .settings-dlg nav button[aria-current="page"] { background: var(--raised); color: var(--text); }
 .settings-dlg nav .keycaps { margin-left: auto; }
+.settings-dlg nav .rerun { margin-top: auto; border-top: 1px solid var(--line); border-radius: 0 0 5px 5px; padding-top: 9px; }
+.settings-dlg .set-btn { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border: 1px solid var(--line); border-radius: 5px; color: var(--text); font-size: 12px; white-space: nowrap; }
+.settings-dlg .set-btn:hover { background: var(--hover); }
+.settings-dlg .env-row .env-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.settings-dlg .env-row .env-tx b { color: var(--text); font-weight: 600; }
+/* The app-wide SignalsForm (also the status line's bell popover), on Settings › Signals */
+.set-signals { display: flex; flex-direction: column; gap: 8px; }
+.set-signals > h4:first-child { margin-top: 0; }
+.set-signals .sgrid { max-width: 420px; }
+.set-signals .seg.wide { margin: 0; align-self: flex-start; }
+.set-signals .seg.wide button { padding: 3px 12px; }
+.set-signals .chk { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.set-signals .chk input { margin: 0; accent-color: var(--accent); }
+.set-signals .row input[type="range"] { flex: 1; max-width: 260px; accent-color: var(--accent); }
+.set-signals .snote { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); font-style: italic; }
+.set-signals .snote code { font: 11px var(--mono); color: var(--text); font-style: normal; }
 .settings-dlg .settings-page { min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
 .settings-dlg h4 { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
 .settings-page > h4:first-child, .hk-page > h4:first-child { margin-top: 0; }
@@ -1114,6 +1130,7 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
   .settings-dlg { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
   .settings-dlg nav { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
   .settings-dlg nav .keycaps { display: none; }
+  .settings-dlg nav .rerun { margin: 0 0 0 auto; border-top: 0; padding-top: 6px; border-radius: 5px; }
 }
 /* Settings › Hotkeys (HotkeySettings.tsx) */
 .hk-mods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

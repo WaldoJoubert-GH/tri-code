@@ -43,6 +43,7 @@ import { ProfileMenu, profileMenuOpen } from "./profiles";
 import { DownloadMenu, downloadMenuOpen } from "./downloads";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./Tour";
+import { Welcome, openWelcome } from "./Welcome";
 import { applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
 import { applyLook, themeOf } from "./look";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
@@ -96,8 +97,10 @@ export default function App() {
     setReady(true);
     startUpdateChecks();
     watchLeftovers();
-    // A first launch (or one that quit mid-tour) opens the tour's sample project.
-    if (!app.toured) void startTour();
+    // A first launch opens the Welcome window, which offers the tour at its end; one that quit
+    // mid-tour opens the tour's sample project again.
+    if (!app.welcomed) openWelcome();
+    else if (!app.toured) void startTour();
   });
   persistChanges(ready);
   createEffect(on(ready, (r) => r && startPhoneSync(), { defer: true }));
@@ -215,6 +218,7 @@ export default function App() {
       <LeftoversPopover />
       <IconPicker />
       <Tour />
+      <Welcome />
     </div>
   );
 }

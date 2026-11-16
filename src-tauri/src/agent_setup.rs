@@ -5,6 +5,7 @@
 //! remove run the agent's own CLI with the server's path from the app. Nothing typed on screen
 //! ends up in a command line.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -203,6 +204,29 @@ pub async fn agent_setup_status(app: AppHandle) -> Result<Setup, String> {
     tauri::async_runtime::spawn_blocking(move || status(&app)).await.map_err(|e| e.to_string())?
 }
 
+/// Whether `cmd` is a bare command name, safe to put in a shell line: no paths, spaces or quoting.
+fn plain_command(cmd: &str) -> bool {
+    !cmd.is_empty() && cmd.len() <= 64 && cmd.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+}
+
+/// Which of `cmds` are on PATH, as the login shell finds them (the Welcome window's agent list).
+/// Each is looked up at once, so a slow login shell costs one wait, not one per command. A name
+/// that isn't a plain command is reported missing without running anything.
+fn commands_on_path(cmds: Vec<String>) -> HashMap<String, bool> {
+    std::thread::scope(|s| {
+        let jobs: Vec<_> = cmds
+            .iter()
+            .map(|c| s.spawn(move || (c.clone(), plain_command(c) && present(c))))
+            .collect();
+        jobs.into_iter().filter_map(|j| j.join().ok()).collect()
+    })
+}
+
+#[tauri::command]
+pub async fn commands_present(cmds: Vec<String>) -> Result<HashMap<String, bool>, String> {
+    tauri::async_runtime::spawn_blocking(move || commands_on_path(cmds)).await.map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn agent_setup_install(app: AppHandle, agent: String) -> Result<(), String> {
     let agent = agent_of(&agent)?;
@@ -223,6 +247,16 @@ mod tests {
 
     fn config(path: &str) -> String {
         serde_json::json!({ "mcpServers": { "tri-code": { "command": "node", "args": [path] } } }).to_string()
+    }
+
+    #[test]
+    fn only_bare_command_names_are_looked_up() {
+        for ok in ["claude", "pi", "lazygit", "gemini-cli", "python3.12", "my_tool"] {
+            assert!(plain_command(ok), "{ok}");
+        }
+        for bad in ["", "rm -rf", "a;b", "$(x)", "../bin/x", "C:\\x", "a&b", "`x`"] {
+            assert!(!plain_command(bad), "{bad}");
+        }
     }
 
     #[test]

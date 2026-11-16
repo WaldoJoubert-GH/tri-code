@@ -299,6 +299,8 @@ export type Persisted = {
   notify: NotifySettings;
   /** The tour was finished or skipped, so a launch with no projects no longer starts it. */
   toured: boolean;
+  /** The Welcome window (Welcome.tsx) was finished or skipped, so a launch no longer opens it. */
+  welcomed: boolean;
   /** App-wide settings (the Settings button at the foot of the sidebar). */
   settings: Settings;
   /** The answer to "install agent windows for this agent?" (agentsetup.ts): `installed`, or `never`
@@ -391,7 +393,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], pinned: [], recent: [], agents: defaultAgents(), profiles: defaultProfiles(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, settings: defaultSettings() });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], pinned: [], recent: [], agents: defaultAgents(), profiles: defaultProfiles(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, welcomed: false, settings: defaultSettings() });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -1274,6 +1276,8 @@ export function migrate(raw: any): Persisted {
     notify: { ...defaultNotify(), ...raw.notify },
     // Anyone with a state file from before the tour already knows their way around.
     toured: raw.toured ?? true,
+    // Nor does anyone who set tri-code up before the Welcome window existed.
+    welcomed: raw.welcomed ?? true,
     // `fileOpen` chose how a file window opened the next file; the editor's preview tab replaced it.
     settings: (({ fileOpen: _, ...rest }) => ({ ...defaultSettings(), ...rest }))(raw.settings ?? {}),
   };
@@ -1286,6 +1290,10 @@ export async function loadState() {
 
 export function setToured() {
   setApp("toured", true);
+}
+
+export function setWelcomed() {
+  setApp("welcomed", true);
 }
 
 /** Debounced save on any change. Call inside a component, after loadState. */
