@@ -1,16 +1,19 @@
-// The tour (design/onboarding.html, variant D): a sample project already at work, and a
-// spotlight that walks through eight stops. A stop can ask you to try something, and ticks
-// once you have. Starts on a first launch; Alt+X › Take the tour replays it.
+// The tour (design/tour.html): a sample project already at work, and a spotlight that walks through
+// six stops. Each stop asks for one thing, ticks once you've done it and moves on by itself; its keys
+// can be clicked as well as pressed. The Welcome window offers it last; Alt+X › Take the tour replays it.
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, JSX, Show, createEffect, createSignal, on, onCleanup } from "solid-js";
-import { Project, Tab, addSampleProject, app, goSpace, live, setApp, setToured } from "./state";
-import { paletteOpen } from "./Palette";
+import { Project, Tab, addSampleProject, app, goSpace, live, setApp, setToured, worktreesOf } from "./state";
 import { openProjectDialog } from "./OpenProject";
 import { dropProject } from "./Sidebar";
 import { askDemo } from "./terms";
 import { flash } from "./ui";
-import { Caps, Key, KeyList } from "./Keys";
+import { Caps, Key } from "./Keys";
+import { flashHints, hintsShown } from "./hints";
+import { runHotkey } from "./hotkeys";
+import { tabMenuOpen, toggleTabMenu } from "./tabs";
+import { modLabel } from "./modkey";
 
 const [step, setStep] = createSignal(0);
 /** "tour" while walking the stops, "end" for the closing card. */
@@ -19,14 +22,18 @@ export const tourOpen = () => mode() !== null;
 
 const sample = () => app.projects.find((p) => p.sample);
 const demoTab = (p: Project, kind: Tab["demo"]) => p.tabs.find((t) => t.demo === kind);
+const piAgent = (p: Project) => live[demoTab(p, "pi")?.id ?? ""]?.agent;
+/** Windows other than terminals and the editor: git, browser, database, docker, monitor, issues, commands. */
+const tools = (p: Project) => p.tabs.filter((t) => t.kind !== "term" && t.kind !== "editor").length;
 
 /** What the try-it checks compare against: the project as it was when the stop came up. */
-type Base = { terms: number; files: string; accent: string; pi?: number };
+type Base = { terms: number; files: string; tools: number; worktrees: number; pi?: number };
 const baseOf = (p: Project): Base => ({
   terms: p.tabs.filter((t) => t.kind === "term").length,
   files: p.tabs.filter((t) => t.kind === "editor").map((t) => t.path).join("|"),
-  accent: p.accent,
-  pi: live[demoTab(p, "pi")?.id ?? ""]?.agent?.at,
+  tools: tools(p),
+  worktrees: worktreesOf(p.id).length,
+  pi: piAgent(p)?.at,
 });
 
 type Stop = {
@@ -38,60 +45,85 @@ type Stop = {
   avoid?: string;
   title: string;
   body: () => JSX.Element;
-  try?: { label: () => JSX.Element; done: (p: Project, base: Base) => boolean };
+  /** The one thing to do, and when it counts as done. */
+  try: { label: (p: Project) => JSX.Element; done: (p: Project, base: Base) => boolean };
+  /** Runs as the stop comes up. Returns a cleanup. */
+  enter?: (p: Project) => (() => void) | void;
 };
 
-const K = (props: { k: string[] }) => <KeyList keys={props.k} />;
+/** An action's key as a button: clicking it does what pressing it does. */
+const Do = (props: { id: string; label?: string }) => (
+  <button class="tour-key" title="Click to do the same" onClick={() => runHotkey(props.id)}>
+    <Caps id={props.id} />
+    <Show when={props.label}><span>{props.label}</span></Show>
+  </button>
+);
 
 const STOPS: Stop[] = [
   {
-    target: () => "aside", side: "right", title: "Projects, grouped by machine",
-    body: () => <>Every folder you open sits under its environment: <b>local</b>, or a server you reach over ssh. Agents keep running when you switch to another project, and a dot on its icon tells you when one wants you.</>,
-  },
-  {
-    target: () => "#spaces", side: "below", title: "Four workspaces per project",
-    body: () => <>Each is a canvas of its own windows. Here claude, a dev server and the editor are on 1, and pi is waiting on 2.</>,
-    try: { label: () => <>Press <Caps id="ws-2" /> to look, then <Caps id="ws-1" /> to come back</>, done: (p) => p.ws !== 0 },
-  },
-  {
-    target: () => ".top .tabs", side: "below", title: "Windows tile themselves",
-    body: () => <>The tabs are this workspace's windows. <b>+</b> adds claude, pi, a shell, a browser, the editor, git or issues, and the canvas makes room. No dragging needed.</>,
-    try: { label: () => <>Click <b>+</b> and open a shell</>, done: (p, b) => p.tabs.filter((t) => t.kind === "term").length > b.terms },
-  },
-  {
-    target: () => "#where", side: "below", avoid: ".gtf", title: "Find any file",
-    body: () => <>Click the project path, or press <Caps id="go-to-file" />, and type a few letters of a file name. <K k={["Enter"]} /> opens it in the editor; <K k={["Shift", "Enter"]} /> types <code>@path</code> into the agent instead.</>,
-    try: { label: () => <>Press <Caps id="go-to-file" /> and open <code>Settings.tsx</code></>, done: (p, b) => p.tabs.filter((t) => t.kind === "editor").map((t) => t.path).join("|") !== b.files },
-  },
-  {
-    target: (p) => `.win[data-tab="${demoTab(p, "claude")?.id}"] .bar`, side: "below", title: "Agents say what they're doing",
-    body: () => <>claude and pi report when they're working, need you, are done or fail. It shows in the title bar, on the window's tab, its workspace number and the project's icon. Nothing to set up.</>,
-  },
-  {
-    target: () => ".status .sigs", side: "above", title: "Never miss one waiting on you",
-    body: () => <>The status line counts agents across every project. When one you aren't looking at needs you, tri-code plays a sound and shows a notification, and <Caps id="next-signal" /> takes you to it.</>,
+    target: () => "aside", side: "right", title: "Your projects, by machine",
+    body: () => <>Each folder sits under the machine it's on: <b>local</b>, or a server you reach over ssh. Agents keep running when you switch away or close tri-code, and a dot on a project tells you when one wants you.</>,
     try: {
-      label: () => (
-        <>
-          <button class="g-btn" onClick={() => { const t = sample() && demoTab(sample()!, "pi"); if (t) askDemo(t.id); }}>Make pi ask</button>{" "}
-          then press <Caps id="next-signal" /> and answer <Key k="y" />
-        </>
-      ),
-      done: (p, b) => {
-        const a = live[demoTab(p, "pi")?.id ?? ""]?.agent;
-        return !!a && a.at !== b.pi && a.state !== "blocked";
-      },
+      label: () => <>Hold <Key k={modLabel()} />, or <button class="tour-key" onClick={() => flashHints(1600)}><span>show me</span></button>. Every icon turns into its key, so there's nothing to learn first.</>,
+      done: () => hintsShown(),
     },
   },
   {
-    target: () => "#themeBtn", side: "below", avoid: ".pop", title: "Make each project yours",
-    body: () => <>Name, icon, accent colour and background, per project, so you can tell them apart at a glance. tri-code starts with the project's own logo when it finds one.</>,
-    try: { label: () => <>Press <Caps id="appearance" /> and pick an accent colour</>, done: (p, b) => p.accent !== b.accent },
+    target: () => ".top .tabs", side: "below", title: "Windows tile themselves",
+    body: () => <>Each project has four workspaces, each a canvas of its own windows. claude, a dev server and the editor are on 1; pi is on 2. Open a window and the others make room.</>,
+    try: { label: () => <>Open a shell: <Do id="term-like" /></>, done: (p, b) => p.tabs.filter((t) => t.kind === "term").length > b.terms },
   },
   {
-    target: () => "#palBtn", side: "below", avoid: ".pal", title: "Everything has a name",
-    body: () => <><Caps id="palette" /> runs any command by name: new windows, layouts, projects, worktrees, this tour. <Caps id="help" /> lists every key.</>,
-    try: { label: () => <>Press <Caps id="palette" /></>, done: () => paletteOpen() },
+    target: () => "#where", side: "below", avoid: ".pal", title: "One box for commands and files",
+    body: () => <><Caps id="palette" /> or a click on the path opens it. Commands come first, then files. <Key k="Enter" /> opens a file in the editor; <Key k="Shift" /><Key k="Enter" /> types <code>@path</code> into the agent instead.</>,
+    try: {
+      label: () => <>Press <Do id="palette" />, type <code>sett</code> and press <Key k="Enter" /></>,
+      done: (p, b) => p.tabs.filter((t) => t.kind === "editor").map((t) => t.path).join("|") !== b.files,
+    },
+  },
+  {
+    target: (p) => {
+      const pi = demoTab(p, "pi");
+      return pi && piAgent(p)?.state === "blocked" && pi.space === p.ws ? `.win[data-tab="${pi.id}"] .bar` : ".status .sigs";
+    },
+    side: "above", title: "Agents tell you when they need you",
+    body: () => <>claude and pi say when they're working, waiting, done or failed: on the tab, the workspace, the project and the status line. When one you aren't watching needs you, you hear it and get a notification.</>,
+    try: {
+      label: (p) => {
+        const pi = demoTab(p, "pi");
+        if (piAgent(p)?.state !== "blocked") return <>Watch the status line: pi is about to ask you something.</>;
+        if (pi && pi.space === p.ws) return <>Answer it: press <Key k="y" /></>;
+        return <>pi is asking on workspace {(pi?.space ?? 1) + 1}. Jump to it: <Do id="next-signal" /></>;
+      },
+      done: (p, b) => {
+        const a = piAgent(p);
+        return !!a && a.at !== b.pi && a.state !== "blocked";
+      },
+    },
+    enter: (p) => {
+      const t = window.setTimeout(() => {
+        const pi = demoTab(p, "pi");
+        if (pi && piAgent(p)?.state !== "blocked") askDemo(pi.id);
+      }, 1500);
+      return () => clearTimeout(t);
+    },
+  },
+  {
+    target: () => ".tab-add", side: "right", avoid: ".tabmenu", title: "A window for every job",
+    body: () => <><b>+</b> lists every kind of window with its key: the editor, git with its diffs, a browser, your databases, docker, the machine's monitor, issues. Agents can open them too, through tri-code's MCP server.</>,
+    try: { label: () => <>Open any one from the menu, or git: <Do id="git" /></>, done: (p, b) => tools(p) > b.tools },
+    enter: (p) => {
+      const t = window.setTimeout(() => {
+        const add = document.querySelector<HTMLElement>(".tab-add");
+        if (add && !tabMenuOpen()) toggleTabMenu(add, p.id);
+      }, 250);
+      return () => clearTimeout(t);
+    },
+  },
+  {
+    target: (p) => `.project[data-drop="${p.id}"]`, side: "right", title: "One task, one worktree",
+    body: () => <><Caps id="new-worktree" /> makes a branch in its own folder, with its own windows and accent, right under its project. Give an agent a task there and keep working here. Finish it from git once it's merged.</>,
+    try: { label: () => <>Make one: <Do id="new-worktree" /></>, done: (p, b) => worktreesOf(p.id).length > b.worktrees },
   },
 ];
 
@@ -124,24 +156,49 @@ function close() {
   setMode(null);
 }
 
+/** Close the sample project and the worktrees made in it during the tour. Their folders stay, as any project's do. */
+function dropSample() {
+  const p = sample();
+  if (!p) return;
+  worktreesOf(p.id).forEach(dropProject);
+  dropProject(p);
+}
+
 export function Tour() {
   let spot!: HTMLDivElement;
   let card: HTMLDivElement | undefined;
   const [base, setBase] = createSignal<Base | null>(null);
   const [did, setDid] = createSignal(false);
   const stop = () => STOPS[step()];
-  const here = () => sample()?.id === app.activeProject;
+  const next = () => (step() < STOPS.length - 1 ? setStep(step() + 1) : finish());
+  /** The tour runs in the sample project, or in a worktree made from it. */
+  const here = () => {
+    const p = sample();
+    return !!p && (app.activeProject === p.id || worktreesOf(p.id).some((w) => w.id === app.activeProject));
+  };
 
-  // A fresh baseline for each stop; the tick latches once its check passes.
+  // A fresh baseline for each stop, and whatever the stop opens; the tick latches once its check passes.
   createEffect(on([step, mode], () => {
     const p = sample();
     setDid(false);
     setBase(p ? baseOf(p) : null);
+    if (mode() !== "tour" || !p) return;
+    const undo = stop().enter?.(p);
+    if (undo) onCleanup(undo);
   }));
   createEffect(() => {
     const p = sample(), b = base(), t = stop().try;
-    if (mode() === "tour" && p && b && t && !did() && t.done(p, b)) setDid(true);
+    if (mode() === "tour" && p && b && !did() && t.done(p, b)) setDid(true);
   });
+  // Done: show the tick for a moment, then move on. Next still works for anyone reading ahead.
+  createEffect(on(did, (d) => {
+    if (!d) return;
+    const at = step();
+    const t = window.setTimeout(() => {
+      if (mode() === "tour" && step() === at) next();
+    }, 1200);
+    onCleanup(() => clearTimeout(t));
+  }));
   // Closing the sample project ends the tour.
   createEffect(() => {
     if (tourOpen() && !sample()) close();
@@ -163,12 +220,13 @@ export function Tour() {
     }
     Object.assign(spot.style, { display: "", left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
     let x = r.left, y = r.bottom + 14;
-    if (stop().side === "right") [x, y] = [r.right + 16, r.top + 48];
+    if (stop().side === "right") [x, y] = [r.right + 16, r.top + 30];
     else if (stop().side === "above") y = r.top - ch - 14;
     const a = stop().avoid && document.querySelector(stop().avoid!)?.getBoundingClientRect();
-    if (a) {
-      // Beside the popover if there is room on its left, else under it.
-      if (a.left - cw - 14 > 12) [x, y] = [a.left - cw - 14, a.top];
+    if (a && a.width) {
+      // Beside the popover if there is room on its right, else its left, else under it.
+      if (a.right + cw + 14 < W - 12) [x, y] = [a.right + 14, a.top];
+      else if (a.left - cw - 14 > 12) [x, y] = [a.left - cw - 14, a.top];
       else y = a.bottom + 14;
     }
     card.style.left = `${Math.max(12, Math.min(W - cw - 12, x))}px`;
@@ -180,7 +238,10 @@ export function Tour() {
   });
   onCleanup(() => cancelAnimationFrame(raf));
 
-  const next = () => (step() < STOPS.length - 1 ? setStep(step() + 1) : finish());
+  const openAs = (tab: "open" | "new" | "clone") => {
+    setMode(null);
+    openProjectDialog(undefined, tab);
+  };
 
   return (
     <>
@@ -200,17 +261,18 @@ export function Tour() {
               </>
             }
           >
+            <div class="tour-rail">
+              <For each={STOPS}>
+                {(s, i) => <button classList={{ on: i() === step(), past: i() < step() }} title={s.title} aria-label={`Stop ${i() + 1}: ${s.title}`} onClick={() => setStep(i())} />}
+              </For>
+            </div>
             <div class="tn">{step() + 1} of {STOPS.length}</div>
             <h4>{stop().title}</h4>
             <p>{stop().body()}</p>
-            <Show when={stop().try}>
-              {(t) => <div class="try" classList={{ did: did() }}>{did() ? "✓ That's it." : <>Try it: {t().label()}</>}</div>}
-            </Show>
+            <div class="try" classList={{ did: did() }}>{did() ? "✓ That's it" : <>Try it: {stop().try.label(sample()!)}</>}</div>
             <div class="row">
-              <span class="dots">
-                <For each={STOPS}>{(_, i) => <i classList={{ on: i() === step() }} />}</For>
-              </span>
               <button class="g-btn quiet" onClick={finish}>Skip tour</button>
+              <span class="grow" />
               <Show when={step() > 0}>
                 <button class="g-btn" onClick={() => setStep(step() - 1)}>Back</button>
               </Show>
@@ -223,14 +285,22 @@ export function Tour() {
         <div class="dialog-scrim">
           <div class="tour-end" role="dialog" aria-label="Tour finished">
             <h3>Now open your own</h3>
-            <p>
-              Pick a folder on this computer or on a server you reach over ssh. The <b>tour</b> project stays in the
-              sidebar until you close it; <Caps id="palette" /> › Take the tour replays this.
-            </p>
+            <p>Any folder on this computer or on a server you reach over ssh. The <b>tour</b> project stays in the sidebar until you close it.</p>
+            <div class="tour-picks">
+              <button onClick={() => openAs("open")}><b>Open a folder</b><span>One you already have</span></button>
+              <button onClick={() => openAs("new")}><b>New folder</b><span>Start fresh, with git init</span></button>
+              <button onClick={() => openAs("clone")}><b>Clone a repo</b><span>From a git URL or GitHub</span></button>
+            </div>
+            <ul class="tour-later">
+              <li><Caps id="appearance" /> <b>Appearance</b> · name, icon, accent, backdrop and transparency for each project</li>
+              <li><code>tri .</code> · opens the folder you're in from any terminal (Settings › Command line)</li>
+              <li><b>Your phone</b> · watch and answer agents over Tailscale (Settings › Remote)</li>
+              <li><Caps id="palette" /> › <b>Take the tour</b> · replays this</li>
+            </ul>
             <div class="row">
-              <button class="g-btn quiet" onClick={() => { const p = sample(); setMode(null); if (p) dropProject(p); }}>Close the tour project</button>
+              <button class="g-btn quiet" onClick={() => { setMode(null); dropSample(); }}>Close the tour project</button>
+              <span class="grow" />
               <button class="g-btn" onClick={() => void startTour()}>Replay</button>
-              <button class="g-btn primary" onClick={() => { setMode(null); openProjectDialog(); }}>Open project <Caps id="open-project" /></button>
             </div>
           </div>
         </div>
@@ -238,4 +308,3 @@ export function Tour() {
     </>
   );
 }
-

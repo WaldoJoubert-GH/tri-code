@@ -454,7 +454,7 @@ function ProjectStep() {
         <button type="button" class="wel-start" onClick={() => closeWelcome("tour")}>
           <span class="wel-ico"><Icon name="compass" size={16} /></span>
           <b>Take the tour</b>
-          <small>A sample project with recorded agents. Eight stops, a couple of minutes. Nothing runs.</small>
+          <small>A sample project with recorded agents. Six stops, a couple of minutes. Nothing runs.</small>
           <span class="wel-start-foot"><span class="wel-rec">Recommended the first time</span></span>
         </button>
       </div>
