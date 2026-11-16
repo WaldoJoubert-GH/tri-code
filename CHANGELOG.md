@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.52 — 2026-11-16
+
+- A Welcome window opens on first launch in place of the tour. Five steps set the theme and Hotkey Modifier, the Commands the New Window Menu offers (each checked on PATH, with its install line when missing), signal alerts and sounds, Environments, and a first project or the tour. Each choice is saved as it is made, so closing early keeps what was chosen. Reopen it from Alt+X › Set up tri-code or from Settings, which gains an Environments page and the signals form. ([#65](https://github.com/WaldoJoubert-GH/tri-code/pull/65))
+- The Tour has six stops instead of eight. Each asks for one thing, ticks when it is done and moves on by itself, with a progress rail and keys that can be clicked as well as pressed. The Sample Project is now a git repo with one commit and an uncommitted file for the git window to show, and closing the tour closes the Worktrees made during it. ([#66](https://github.com/WaldoJoubert-GH/tri-code/pull/66))
+- The About dialog shows the four latest releases, with Load more for the older ones.
+
 ## 0.1.51 — 2026-11-13
 
 - The Monitor Window (Alt+M) shows what a project's host is doing: CPU, memory, network and disks over a live process list that can be sorted, shown as a tree, or narrowed to the project's own processes. Over ssh it reads the host's /proc through one open connection. Ending a process ends its whole tree, and checks first that the pid still belongs to the process shown. ([#61](https://github.com/WaldoJoubert-GH/tri-code/pull/61))
