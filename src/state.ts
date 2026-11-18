@@ -248,6 +248,9 @@ export type Project = {
   /** A repo project only: what New worktree starts each new branch with (`waldo/`), kept from the
    *  last time. Its Worktrees' folders and sidebar labels leave it out. */
   branchPrefix?: string;
+  /** A repo project only: the ignored files New worktree copies into each new checkout (`ticked`),
+   *  out of those it listed then (`known`), so a file added since can start as its default (worktrees.ts). */
+  copyIgnored?: { ticked: string[]; known: string[] };
   /** The tour's sample project: its terminals are scripted, and it can be closed with nothing lost. */
   sample?: boolean;
 };
@@ -507,6 +510,14 @@ export function setBranchPrefix(projectId: string, prefix: string) {
   edit(projectId, (p) => {
     if (prefix) p.branchPrefix = prefix;
     else delete p.branchPrefix;
+  });
+}
+
+/** The ignored files New worktree copied for this repo, out of those it listed. */
+export function setCopyIgnored(projectId: string, ticked: string[], known: string[]) {
+  edit(projectId, (p) => {
+    if (known.length) p.copyIgnored = { ticked, known };
+    else delete p.copyIgnored;
   });
 }
 
@@ -1265,6 +1276,7 @@ export function migrate(raw: any): Persisted {
       ...(p.parent ? { parent: p.parent, branch: p.branch, issue: p.issue, ...(p.title ? { title: p.title } : {}), ...(p.copy ? { copy: p.copy } : {}), ...(p.sandbox ? { sandbox: p.sandbox } : {}) } : {}),
       ...(p.setup ? { setup: p.setup } : {}),
       ...(p.branchPrefix ? { branchPrefix: p.branchPrefix } : {}),
+      ...(p.copyIgnored ? { copyIgnored: p.copyIgnored } : {}),
       ...(p.sample ? { sample: true } : {}),
     };
   });

@@ -18,6 +18,7 @@ mod forward;
 mod fs;
 mod git;
 mod grammars;
+mod ignored;
 mod github;
 mod leftovers;
 mod passwords;
@@ -226,6 +227,8 @@ pub fn run() {
             grammars::grammar_remove,
             folders::folder_repos,
             folders::folder_copy,
+            ignored::ignored_files,
+            ignored::ignored_copy,
             folders::folder_changes,
             folders::folder_finish,
             folders::worktree_dir_delete,

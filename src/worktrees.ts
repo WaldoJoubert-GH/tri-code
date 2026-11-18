@@ -22,6 +22,7 @@ import { folderStatus, gitOf, peekStatus } from "./git";
 import { ask, flash } from "./ui";
 import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "./leftovers";
 import { ensureSandbox, newSandboxName, relativeGitdir, removeSandbox, sandboxOf } from "./sandbox";
+import type { IgnoredFile } from "./ignored";
 
 /** One entry of `git worktree list`. */
 export type GitWorktree = { path: string; branch: string | null; main: boolean };
@@ -228,9 +229,21 @@ async function fetchBranches(repo: Project): Promise<void> {
   }
 }
 
+/** Each repo project's ignored files New worktree offers to copy (ignored.rs), by its id; undefined
+ *  while they are being listed. Runtime only. */
+export const [ignored, setIgnored] = createStore<Record<string, IgnoredFile[] | undefined>>({});
+
+/** List them again: one added or deleted since the last time shows. A folder that isn't a repo has none. */
+async function loadIgnored(repo: Project): Promise<void> {
+  setIgnored(repo.id, undefined);
+  const files = await invoke<IgnoredFile[]>("ignored_files", { host: repo.host, path: repo.path }).catch((): IgnoredFile[] => []);
+  setIgnored(repo.id, files);
+}
+
 export function openNewWorktree(p: Project) {
   const repo = repoOf(p);
   void adoptWorktrees(repo).catch(() => {});
+  void loadIgnored(repo);
   void fetchBranches(repo);
   setNewWorktreeFor(repo.id);
 }
@@ -242,13 +255,14 @@ export const closeNewWorktree = () => setNewWorktreeFor(null);
 export const setupFor = (repo: Project, branch: string, script: string, prefix = repo.branchPrefix) =>
   setupLines(script, { repo: repo.path, worktree: worktreeDir(repo, branch, prefix), branch });
 
-/** Make a Worktree of `repo` on `branch` (from `base` if new) and switch to it. In the new checkout,
+/** Make a Worktree of `repo` on `branch` (from `base` if new) and switch to it. `copy` is the repo's
+ *  ignored files (relative paths) to copy into the new checkout first. In the new checkout,
  *  `setup` gets a window of its own and the focus, which closes once it succeeds (setup.ts); each of
  *  `open` opens beside it. They start together: nothing waits for the setup to finish. `background`
  *  leaves the view where it is. `sandbox` makes it a Sandboxed Worktree (sandbox.ts): its sandbox is
  *  made in the background and its agent windows wait for it; the rest runs here as always. Returns
  *  the Worktree and its setup window. */
-export async function createWorktree(repo: Project, branch: string, opts: { base: string; issue?: string; setup?: string; open: Agent[]; background?: boolean; sandbox?: boolean }): Promise<{ project: string; setup?: string }> {
+export async function createWorktree(repo: Project, branch: string, opts: { base: string; issue?: string; setup?: string; copy?: string[]; open: Agent[]; background?: boolean; sandbox?: boolean }): Promise<{ project: string; setup?: string }> {
   const taken = worktreesOf(repo.id).find((w) => w.branch === branch);
   if (taken) {
     if (!opts.background) {
@@ -262,6 +276,10 @@ export async function createWorktree(repo: Project, branch: string, opts: { base
   let copy: { repos: string[] } | undefined;
   if (kind.git) {
     await invoke("git_worktree_add", { host: repo.host, path: repo.path, dir, branch, base: opts.base });
+    // Before the setup starts, which may need `.env`. The worktree is made either way.
+    if (opts.copy?.length) {
+      await invoke("ignored_copy", { host: repo.host, src: repo.path, dest: dir, files: opts.copy }).catch((e) => flash(`copying ignored files into ${branch}: ${e}`));
+    }
   } else {
     copy = { repos: await copyFolder(repo, dir, branch, kind.repos) };
   }
