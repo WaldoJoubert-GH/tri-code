@@ -2,7 +2,7 @@
 // tri-code's CSS variables (so it follows light / dark and the project accent with no JS),
 // languages loaded per file type, and the line ending, BOM and indent a file is saved back with.
 
-import { EditorState, type Extension, RangeSet, type StateCommand, StateEffect, StateField, Text } from "@codemirror/state";
+import { Compartment, EditorState, type Extension, RangeSet, type StateCommand, StateEffect, StateField, Text, type TransactionSpec } from "@codemirror/state";
 import {
   EditorView, GutterMarker, crosshairCursor, drawSelection, dropCursor, gutter, highlightActiveLine, highlightActiveLineGutter,
   type Command, highlightSpecialChars, keymap, lineNumbers, rectangularSelection,
@@ -22,6 +22,8 @@ import { copyText, readText } from "./clipboard";
 import { isMac } from "./modkey";
 import { keysOf, sameChord, setEditorKeys, textPress } from "./keymap";
 import type { Chord } from "./state";
+import { type Lang, langById, langOfName } from "./grammars";
+import { isInstalled, loadInstalled, overrideOf } from "./langs";
 
 /** The look: plain CSS with tri-code's variables, so every editor follows the theme and accent. */
 export const theme = EditorView.theme({
@@ -119,6 +121,9 @@ export const highlight = HighlightStyle.define([
   { tag: [t.link, t.url], color: "var(--accent)", textDecoration: "underline" },
   { tag: [t.meta, t.processingInstruction], color: "var(--muted)" },
   { tag: t.invalid, color: "var(--bad)" },
+  { tag: t.inserted, color: "var(--ok)" },
+  { tag: t.deleted, color: "var(--bad)" },
+  { tag: t.changed, color: "var(--warn)" },
 ]);
 
 /** A legacy (CodeMirror 5) mode as a language: highlighting only. */
@@ -132,7 +137,7 @@ const LANGS: LanguageDescription[] = [
   LanguageDescription.of({ name: "JSX", extensions: ["jsx"], load: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true })) }),
   LanguageDescription.of({ name: "JSON", extensions: ["json", "jsonc", "json5"], filename: /^\.(babelrc|prettierrc|eslintrc)$/, load: () => import("@codemirror/lang-json").then((m) => m.json()) }),
   LanguageDescription.of({ name: "CSS", extensions: ["css", "scss", "less"], load: () => import("@codemirror/lang-css").then((m) => m.css()) }),
-  LanguageDescription.of({ name: "HTML", extensions: ["html", "htm", "vue", "svelte"], load: () => import("@codemirror/lang-html").then((m) => m.html()) }),
+  LanguageDescription.of({ name: "HTML", extensions: ["html", "htm"], load: () => import("@codemirror/lang-html").then((m) => m.html()) }),
   LanguageDescription.of({ name: "XML", extensions: ["xml", "svg", "plist", "xaml", "csproj"], load: () => import("@codemirror/lang-xml").then((m) => m.xml()) }),
   LanguageDescription.of({ name: "Markdown", extensions: ["md", "markdown", "mdx"], load: () => import("@codemirror/lang-markdown").then((m) => m.markdown()) }),
   LanguageDescription.of({ name: "Rust", extensions: ["rs"], load: () => import("@codemirror/lang-rust").then((m) => m.rust()) }),
@@ -156,8 +161,77 @@ const LANGS: LanguageDescription[] = [
 
 const baseName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
-/** The language a file is shown with, if tri-code knows one. */
-export const languageOf = (path: string) => LanguageDescription.matchFilename(LANGS, baseName(path));
+/** The languages tri-code ships, for the status bar's language picker. */
+export const BUILTIN: readonly LanguageDescription[] = LANGS;
+
+const builtinOf = (path: string) => LanguageDescription.matchFilename(LANGS, baseName(path));
+const builtinNamed = (name: string) => LANGS.find((l) => l.name === name);
+
+/** Grammar Catalog languages shown as HTML until their own grammar is installed. */
+const AS_HTML = new Set(["vue", "svelte", "astro", "php", "erb", "twig", "handlebars", "liquid", "jinja", "blade"]);
+
+/** The Grammar Catalog language tri-code can install for a file it ships no language for. */
+export const offerFor = (path: string): Lang | undefined => (builtinOf(path) ? undefined : langOfName(baseName(path)));
+
+/** A language a file can be shown in: `b:<name>` one tri-code ships, `t:<id>` an installed grammar,
+ *  "" plain text. */
+export type LangKey = string;
+
+const usable = (k: LangKey) => k === "" || (k.startsWith("b:") ? !!builtinNamed(k.slice(2)) : isInstalled(k.slice(2)));
+
+/** The language a file is shown in: the one picked in the status bar, else the one tri-code ships,
+ *  else its installed grammar, else HTML for a template language, else plain text. Reactive: it
+ *  changes when a grammar is installed or removed. */
+export function languageKey(path: string): LangKey {
+  const picked = overrideOf(path);
+  return picked !== undefined && usable(picked) ? picked : autoKey(path);
+}
+
+/** The language a file gets when none is picked for it. */
+export function autoKey(path: string): LangKey {
+  const b = builtinOf(path);
+  if (b) return `b:${b.name}`;
+  const t = langOfName(baseName(path));
+  if (t && isInstalled(t.id)) return `t:${t.id}`;
+  if (t && AS_HTML.has(t.id)) return "b:HTML";
+  return "";
+}
+
+export const languageName = (key: LangKey) =>
+  !key ? "Plain text" : key.startsWith("b:") ? key.slice(2) : (langById(key.slice(2))?.name ?? key.slice(2));
+
+/** A language key's CodeMirror extension; nothing for plain text, or if it can't be loaded. */
+function loadKey(key: LangKey): Promise<Extension> {
+  const lang = key.startsWith("t:") ? langById(key.slice(2)) : undefined;
+  const p: Promise<Extension> = key.startsWith("b:")
+    ? (builtinNamed(key.slice(2))?.load() ?? Promise.resolve([]))
+    : lang
+      ? import("./textmate").then((m) => m.textmateLanguage(lang))
+      : Promise.resolve([]);
+  return p.catch((e) => (console.warn(`language ${key}:`, e), []));
+}
+
+const langSlot = new Compartment();
+const setLangKey = StateEffect.define<LangKey>();
+const langKeyField = StateField.define<LangKey>({
+  create: () => "",
+  update(v, tr) {
+    for (const e of tr.effects) if (e.is(setLangKey)) return e.value;
+    return v;
+  },
+});
+
+/** The language key a file's editor state is showing. */
+export const keyOfState = (s: EditorState): LangKey => s.field(langKeyField, false) ?? "";
+
+/** What switches `state` to the language its file should be shown in now (an install, a removal, a
+ *  pick in the status bar), or null if it already is. */
+export async function relanguage(path: string, state: EditorState): Promise<TransactionSpec | null> {
+  const key = languageKey(path);
+  if (keyOfState(state) === key) return null;
+  const ext = await loadKey(key);
+  return { effects: [langSlot.reconfigure(ext), setLangKey.of(key)] };
+}
 
 /** A file's text as the editor holds it, and what to put back on save. */
 export type Body = { doc: Text; eol: "\n" | "\r\n"; bom: boolean; indent: string };
@@ -325,8 +399,10 @@ export type Setup = {
 
 /** A new editor state for a file: its text, its language once loaded, and every built-in feature. */
 export async function createState(s: Setup): Promise<EditorState> {
-  const lang = await languageOf(s.path)?.load().catch(() => undefined);
-  return EditorState.create({ doc: s.body.doc, extensions: [extensions(s), lang ?? []] });
+  await loadInstalled();
+  const key = languageKey(s.path);
+  const lang = await loadKey(key);
+  return EditorState.create({ doc: s.body.doc, extensions: [extensions(s), langSlot.of(lang), langKeyField.init(() => key)] });
 }
 
 function extensions(s: Setup): Extension {

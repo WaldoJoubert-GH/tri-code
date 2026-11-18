@@ -18,7 +18,10 @@ import {
   CHANGED, type Doc, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
   markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor, watchFiles,
 } from "./files";
-import { createState, editorMenu, fromBody, indentText, languageOf, showChanges, toBody } from "./cm";
+import { createState, editorMenu, fromBody, indentText, keyOfState, languageKey, languageName, offerFor, relanguage, showChanges, toBody } from "./cm";
+import { downloadSize, kb } from "./grammars";
+import { installError, installLang, installedGrammars, installing, isInstalled, neverSuggest, notNow, offering, setNever } from "./langs";
+import LangPicker from "./LangPicker";
 import { type CtxItem, openCtxMenu } from "./ctxmenu";
 import { copyText } from "./clipboard";
 import FileTree, { FileIcon, MARK_TITLE } from "./FileList";
@@ -217,6 +220,41 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   };
 
   onMount(() => onCleanup(watchFiles(props.project)));
+
+  // A grammar installed or removed, or a language picked in the status bar: show each open file in
+  // the language it should have now. Also after a doc is built (rev), in case that raced an install.
+  createEffect(() => {
+    rev();
+    for (const f of files()) {
+      const d = mine.get(f);
+      if (!d || keyOfState(d.state) === languageKey(f)) continue;
+      void relanguage(f, d.state).then((spec) => {
+        const now = mine.get(f);
+        if (!spec || !now || keyOfState(now.state) === languageKey(f)) return;
+        if (view && view.state === now.state) {
+          view.dispatch(spec);
+          now.state = view.state;
+        } else now.state = now.state.update(spec).state;
+        setRev((n) => n + 1);
+      });
+    }
+  });
+
+  // ---- grammars: the banner offering one for the shown file, and the status bar's language picker
+
+  /** The Grammar Catalog language the banner offers for the shown file, or the one installing. */
+  const offer = createMemo(() => {
+    const f = path();
+    if (!f || media() || book() || !text()?.file || text()!.file!.binary) return undefined;
+    const l = offerFor(f);
+    return l && (offering(l.id) || installing()?.id === l.id) ? l : undefined;
+  });
+  /** A grammar the status bar mentions for the shown file, even after the banner was closed. */
+  const hint = () => {
+    const l = path() ? offerFor(path()) : undefined;
+    return l && !isInstalled(l.id) && !neverSuggest(l.id) && !languageKey(path()).startsWith("t:") ? l : undefined;
+  };
+  const [picking, setPicking] = createSignal<HTMLElement | null>(null);
 
   // Drop the docs of files closed out of the window.
   createEffect(() => {
@@ -734,6 +772,43 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
             <button title={isDirty(path()) ? "Reload (discards changes)" : "Reload"} onClick={reload}>⟳</button>
           </div>
         </Show>
+        <Show when={offer()}>
+          {(l) => (
+            <div class="gbanner" role="status">
+              <Show
+                when={installing()?.id === l().id && installing()}
+                fallback={
+                  <>
+                    <Show
+                      when={installError()?.id === l().id}
+                      fallback={
+                        <span class="gmsg">
+                          <b>{l().name}</b> highlighting is available for this file.
+                          <span class="gsrc"> TextMate grammar · {kb(downloadSize(l().id, installedGrammars()))}</span>
+                        </span>
+                      }
+                    >
+                      <span class="gmsg bad" title={installError()!.msg}>Couldn't install {l().name}: {installError()!.msg.split("\n")[0]}</span>
+                    </Show>
+                    <button class="gprimary" onClick={() => void installLang(l().id)}>
+                      {installError()?.id === l().id ? "Try again" : `Install ${l().name}`}
+                    </button>
+                    <button onClick={() => notNow(l().id)} title="Hide this until tri-code restarts">Not now</button>
+                    <button onClick={() => setNever(l().id, true)} title="Settings › Languages can undo this">Don't suggest {l().name}</button>
+                  </>
+                }
+              >
+                {(p) => (
+                  <span class="gprog">
+                    Installing {l().name}…
+                    <span class="gbar"><i style={{ width: `${Math.round((p().done / p().total) * 100)}%` }} /></span>
+                    {kb(p().done)} / {kb(p().total)}
+                  </span>
+                )}
+              </Show>
+            </div>
+          )}
+        </Show>
         <div class="edbody">
           <div class="cmhost" ref={host} style={{ display: showingEditor() ? undefined : "none" }} onContextMenu={onEditorMenu} />
           {other()}
@@ -757,7 +832,20 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
                 </>
               )}
             </Show>
-            <span>{languageOf(path())?.name ?? "Plain text"}</span>
+            <button
+              type="button"
+              class="elang"
+              title="Select the language this file is shown in"
+              aria-haspopup="dialog"
+              aria-expanded={!!picking()}
+              onClick={(e) => setPicking(picking() ? null : e.currentTarget)}
+            >
+              {languageName(languageKey(path()))}
+              <Show when={hint()}>{(l) => <span class="ehint"> · {l().name} available</span>}</Show>
+            </button>
+            <Show when={picking()} keyed>
+              {(a) => <LangPicker path={path()} anchor={a} onClose={() => setPicking(null)} />}
+            </Show>
             <span class="sp" />
             <Show when={text()?.file}>
               {(f) => <span classList={{ warn: f().truncated }}>{bytes(f().size)}{f().truncated ? " · truncated, read-only" : ""}</span>}
