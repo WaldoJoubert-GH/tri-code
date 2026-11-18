@@ -36,7 +36,7 @@ export type Agent = {
   profile?: string;
   /** Unset: offered in every project. */
   scope?: Scope;
-  /** Signal sounds of its own (a built-in name or "off"); a missing one plays the project's. */
+  /** Signal sounds of its own (a sound id as in NotifySettings, never "custom"); a missing one plays the project's. */
   sounds?: Partial<Record<SoundEvent, string>>;
   /** Agents in its project's terminals may open it as a window (the Agent toggle; agentwin.ts). Terminal Commands only. */
   agentRun?: boolean;
@@ -256,8 +256,14 @@ export type Project = {
 export type SoundEvent = "blocked" | "done" | "error";
 /** When a signal plays its sound and shows a desktop notification: only while you aren't looking at that window, always, or never (badges only). */
 export type AlertMode = "away" | "always" | "badge";
-/** A sound per signal: a built-in name (see SOUNDS in signals.ts), "off", or "custom" for a project's uploaded file. */
-export type NotifySettings = Record<SoundEvent, string> & { alert: AlertMode; desktop: boolean; volume: number; dnd: boolean };
+/** An uploaded file in My sounds, stored as `my_<id>` (bg.rs); any signal anywhere can play it. */
+export type MySound = { id: string; name: string };
+/**
+ * A sound per signal: a built-in name (see SOUNDS in signals.ts), `system:<name>` for one of the OS's
+ * alert sounds, `mine:<id>` for one of My sounds, "off", or (a project's, from before My sounds)
+ * "custom" for the file uploaded to that project.
+ */
+export type NotifySettings = Record<SoundEvent, string> & { alert: AlertMode; desktop: boolean; volume: number; dnd: boolean; mine: MySound[] };
 export type ProjectNotify = Partial<Record<SoundEvent, string>> & {
   alert?: AlertMode;
   desktop?: boolean;
@@ -265,7 +271,7 @@ export type ProjectNotify = Partial<Record<SoundEvent, string>> & {
   files?: Partial<Record<SoundEvent, string>>;
 };
 
-const defaultNotify = (): NotifySettings => ({ blocked: "chime", done: "soft", error: "knock", alert: "away", desktop: true, volume: 70, dnd: false });
+export const defaultNotify = (): NotifySettings => ({ blocked: "chime", done: "soft", error: "knock", alert: "away", desktop: true, volume: 70, dnd: false, mine: [] });
 
 export type EnvStyle = { name?: string; icon?: string };
 /** ssh options an ssh destination alone can't carry (`-i`, `-p`, `-o`); passed on every ssh call to that host. */

@@ -70,7 +70,7 @@ pub async fn icon_delete(app: AppHandle, project_id: String) -> Result<(), Strin
     delete(image_file(&app, "icons", &project_id)?)
 }
 
-/// A project's uploaded sound for one agent signal. `key` is `<project_id>-<event>`.
+/// An uploaded signal sound: a project's own (`<project_id>-<event>`) or one of My sounds (`my_<id>`, no dash, so it never meets a project key).
 #[tauri::command]
 pub async fn sound_save(app: AppHandle, key: String, data_url: String) -> Result<(), String> {
     save(image_file(&app, "sounds", &key)?, data_url)

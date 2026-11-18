@@ -9,7 +9,7 @@ import { type ConfigFile, type ImportPlan, type Section, SECTIONS, applyImport, 
 import { app, newId, setApp } from "./state";
 import { setBgImage } from "./Appearance";
 import { loadIcons } from "./icons";
-import { reloadSounds } from "./signals";
+import { reloadSound } from "./signals";
 import { appVersion } from "./updater";
 import { flash } from "./ui";
 
@@ -72,7 +72,7 @@ async function runImport() {
     for (const w of writes) await invoke(SAVE[w.kind], { ...arg(w.kind, w.key), dataUrl: w.dataUrl });
     for (const w of writes) {
       if (w.kind === "bg") await setBgImage(w.key, w.dataUrl);
-      if (w.kind === "sound") reloadSounds(w.key.slice(0, w.key.lastIndexOf("-")));
+      if (w.kind === "sound") reloadSound(w.key);
     }
     loadIcons();
     setPending(null);
@@ -131,7 +131,7 @@ export function BackupPage() {
       </div>
       <p class="note">
         One JSON file with your preferences, hotkeys, commands, browser profiles, environments and projects, with their uploaded
-        backgrounds, icons and sounds. Window layouts, Worktrees, PIN locks, phone pairing and browser cookies stay on this machine.
+        backgrounds, icons and sounds, and My sounds with Preferences. Window layouts, Worktrees, PIN locks, phone pairing and browser cookies stay on this machine.
       </p>
       <h4>Import</h4>
       <Show when={!pending()}>

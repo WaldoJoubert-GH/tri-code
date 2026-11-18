@@ -6,8 +6,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isPermissionGranted, onAction, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { createSignal } from "solid-js";
+import { produce } from "solid-js/store";
 import {
-  AgentState, AlertMode, Project, SoundEvent, Tab, agentOf, app, focusTab, live, projectById, repoOf, setNotify, setProjectNotify, space, tabName,
+  AgentState, AlertMode, Project, SoundEvent, Tab, agentOf, app, defaultNotify, focusTab, live, newId, projectById, repoOf, setApp, setNotify, space, tabName,
 } from "./state";
 import { flash } from "./ui";
 import { keyOf } from "./keymap";
@@ -60,17 +62,52 @@ export const desktopFor = (p: Project) => repoOf(p).notify?.desktop ?? app.notif
 
 let ctx: AudioContext | undefined;
 
-/** Play a built-in sound, or an uploaded one when `id` is "custom". */
-export function playSound(id: string, custom?: string) {
+/** Loaded audio files as blob: URLs, by `system:<name>` or the bg.rs key of an uploaded file. */
+const loaded = new Map<string, Promise<string | undefined>>();
+
+function loadUrl(key: string, load: () => Promise<string | null>): Promise<string | undefined> {
+  let p = loaded.get(key);
+  if (!p) {
+    p = load()
+      .then(async (dataUrl) => (dataUrl ? URL.createObjectURL(await (await fetch(dataUrl)).blob()) : undefined))
+      .catch((e) => {
+        console.warn(`sound ${key} failed to load:`, e);
+        loaded.delete(key);
+        return undefined;
+      });
+    loaded.set(key, p);
+  }
+  return p;
+}
+
+const fileUrl = (key: string) => loadUrl(key, () => invoke<string | null>("sound_load", { key }));
+const mineKey = (id: string) => `my_${id}`;
+
+/** Drop the loaded copy of an uploaded file, so the next play reads it again (an import replaced it). */
+export function reloadSound(key: string) {
+  const p = loaded.get(key);
+  loaded.delete(key);
+  void p?.then((u) => u && URL.revokeObjectURL(u));
+}
+
+async function playUrl(url: Promise<string | undefined>, vol: number) {
+  const u = await url;
+  if (!u) return;
+  const a = new Audio(u);
+  a.volume = vol;
+  a.play().catch((e) => console.warn("sound failed:", e));
+}
+
+/**
+ * Play a sound by its id (see NotifySettings): built-ins are synthesized, system sounds and My
+ * sounds are files loaded on first use. "custom", a project's own upload, needs that file's `custom` URL.
+ */
+export function playSound(id: string, custom?: Promise<string | undefined>) {
   if (!id || id === "off") return;
   const vol = app.notify.volume / 100;
-  if (id === "custom") {
-    if (!custom) return;
-    const a = new Audio(custom);
-    a.volume = vol;
-    a.play().catch((e) => console.warn("sound failed:", e));
-    return;
-  }
+  if (id === "custom") return void (custom && playUrl(custom, vol));
+  if (id.startsWith("system:")) return void playUrl(loadUrl(id, () => invoke<string | null>("system_sound_load", { name: id.slice(7) })), vol);
+  if (id.startsWith("mine:")) return void playUrl(fileUrl(mineKey(id.slice(5))), vol);
   const s = SOUNDS[id];
   if (!s) return;
   ctx ??= new AudioContext();
@@ -89,68 +126,101 @@ export function playSound(id: string, custom?: string) {
   }
 }
 
-/** Uploaded sounds by `<project id>-<event>`, as blob: URLs; loaded on first use. */
-const customSounds = new Map<string, string>();
+/** A project's own upload from before My sounds, by `<project id>-<event>`. */
 const soundKey = (projectId: string, ev: SoundEvent) => `${projectId}-${ev}`;
-
-async function customSound(projectId: string, ev: SoundEvent): Promise<string | undefined> {
-  const key = soundKey(projectId, ev);
-  if (customSounds.has(key)) return customSounds.get(key);
-  try {
-    const dataUrl = await invoke<string | null>("sound_load", { key });
-    if (!dataUrl) return undefined;
-    const url = URL.createObjectURL(await (await fetch(dataUrl)).blob());
-    customSounds.set(key, url);
-    return url;
-  } catch (e) {
-    console.warn("sound_load failed:", e);
-    return undefined;
-  }
-}
 
 /** Play the sound a project gives a signal, or the one window `t`'s command has of its own. */
 export async function playFor(p: Project, ev: SoundEvent, t?: Tab) {
-  const id = (t && agentOf(t)?.sounds?.[ev]) || soundFor(p, ev);
-  playSound(id, id === "custom" ? await customSound(repoOf(p).id, ev) : undefined);
+  let id = (t && agentOf(t)?.sounds?.[ev]) || soundFor(p, ev);
+  // One of My sounds that is gone (a configuration imported without it) plays the app-wide sound, or tri-code's.
+  const gone = (x: string) => x.startsWith("mine:") && !app.notify.mine.some((m) => `mine:${m.id}` === x);
+  if (gone(id)) id = gone(app.notify[ev]) ? defaultNotify()[ev] : app.notify[ev];
+  playSound(id, id === "custom" ? fileUrl(soundKey(repoOf(p).id, ev)) : undefined);
 }
 
-/** Store an uploaded audio file as the project's sound for a signal. */
-export function uploadSound(p: Project, ev: SoundEvent, file: File) {
-  const r = new FileReader();
-  r.onload = async () => {
-    try {
-      await invoke("sound_save", { key: soundKey(p.id, ev), dataUrl: String(r.result) });
-    } catch (e) {
-      flash(`couldn't save sound: ${e}`);
-      return;
-    }
-    const old = customSounds.get(soundKey(p.id, ev));
-    if (old) URL.revokeObjectURL(old);
-    customSounds.set(soundKey(p.id, ev), URL.createObjectURL(file));
-    setProjectNotify(p.id, { [ev]: "custom", files: { ...p.notify?.files, [ev]: file.name } });
-    void playFor(p, ev);
-    flash(`${p.name}: ${file.name} plays for ${SIG_TEXT[ev]}`);
-  };
-  r.readAsDataURL(file);
+/** The OS's alert sounds by name (syssounds.rs), asked for once, when a sound picker first shows. */
+const [systemList, setSystemList] = createSignal<string[]>([]);
+let systemAsked = false;
+export function loadSystemSounds() {
+  if (systemAsked) return;
+  systemAsked = true;
+  invoke<string[]>("system_sounds").then(setSystemList, (e) => console.warn("system_sounds failed:", e));
+}
+export const systemSounds = systemList;
+/** What the picker calls the system's sounds. */
+export const SYSTEM_NAME = /Mac/.test(navigator.userAgent) ? "macOS" : /Windows/.test(navigator.userAgent) ? "Windows" : "Linux";
+
+/** A sound's name for pickers and tooltips. `p` and `ev` name a project's own upload ("custom"). */
+export function soundName(id: string | undefined, p?: Project, ev?: SoundEvent): string {
+  if (!id || id === "off") return "Off";
+  if (id.startsWith("system:")) return id.slice(7);
+  if (id.startsWith("mine:")) return app.notify.mine.find((m) => m.id === id.slice(5))?.name ?? "Missing sound";
+  if (id === "custom") return (p && ev && repoOf(p).notify?.files?.[ev]) || "Your sound";
+  return SOUNDS[id]?.name ?? id;
 }
 
-/** Forget the loaded copies of a project's uploaded sounds, so the next play reads the files again (an import replaced them). */
-export function reloadSounds(projectId: string) {
-  for (const [ev] of EVENTS) {
-    const key = soundKey(projectId, ev);
-    const url = customSounds.get(key);
-    if (url) URL.revokeObjectURL(url);
-    customSounds.delete(key);
+/** Larger files are songs, not signals; and they travel inside exported configurations. */
+export const MY_SOUND_MAX = 2 * 1024 * 1024;
+const AUDIO_EXT = /\.(aiff?|caf|wav|mp3|m4a|aac|ogg|oga|opus|flac|webm)$/i;
+
+/** Add an audio file to My sounds. Returns its sound id, or undefined (after saying why) when it can't. */
+export async function addMySound(file: File): Promise<string | undefined> {
+  if (!file.type.startsWith("audio/") && !AUDIO_EXT.test(file.name)) {
+    flash(`${file.name} isn't an audio file`);
+    return undefined;
   }
+  if (file.size > MY_SOUND_MAX) {
+    flash(`${file.name} is over 2 MB; pick a short sound`);
+    return undefined;
+  }
+  const id = newId();
+  try {
+    const dataUrl = await new Promise<string>((ok, fail) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result));
+      r.onerror = () => fail(r.error);
+      r.readAsDataURL(file);
+    });
+    await invoke("sound_save", { key: mineKey(id), dataUrl });
+  } catch (e) {
+    flash(`couldn't save sound: ${e}`);
+    return undefined;
+  }
+  loaded.set(mineKey(id), Promise.resolve(URL.createObjectURL(file)));
+  setNotify({ mine: [...app.notify.mine, { id, name: file.name.replace(/\.[^.]+$/, "") || file.name }] });
+  return `mine:${id}`;
 }
 
-/** Drop a project's uploaded sounds (project removed). */
+/** Remove one of My sounds. Signals that played it go back to the default: tri-code's for the app, the project's for a project or command. */
+export function removeMySound(id: string) {
+  const ref = `mine:${id}`, def = defaultNotify();
+  const name = soundName(ref);
+  let used = false;
+  setApp(produce((s) => {
+    s.notify.mine = s.notify.mine.filter((m) => m.id !== id);
+    for (const [ev] of EVENTS) {
+      if (s.notify[ev] === ref) {
+        s.notify[ev] = def[ev];
+        used = true;
+      }
+      for (const o of [...s.projects.map((p) => p.notify), ...s.agents.map((a) => a.sounds)]) {
+        if (o?.[ev] !== ref) continue;
+        delete o[ev];
+        used = true;
+      }
+    }
+    for (const a of s.agents) if (a.sounds && !Object.keys(a.sounds).length) delete a.sounds;
+  }));
+  reloadSound(mineKey(id));
+  invoke("sound_delete", { key: mineKey(id) }).catch((e) => console.warn("sound_delete failed:", e));
+  flash(used ? `removed ${name}; the signals that played it are back to their defaults` : `removed ${name}`);
+}
+
+/** Drop a project's own uploaded sounds (project removed). */
 export function forgetSounds(projectId: string) {
   for (const [ev] of EVENTS) {
     const key = soundKey(projectId, ev);
-    const url = customSounds.get(key);
-    if (url) URL.revokeObjectURL(url);
-    customSounds.delete(key);
+    reloadSound(key);
     invoke("sound_delete", { key }).catch((e) => console.warn("sound_delete failed:", e));
   }
 }

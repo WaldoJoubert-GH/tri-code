@@ -171,3 +171,30 @@ describe("import", () => {
     expect(JSON.stringify({ p: s.projects.map((p) => p.id), a: s.agents.map((a) => a.id), e: s.environments })).toBe(once);
   });
 });
+
+describe("My sounds", () => {
+  const source = state({
+    notify: { done: "mine:tada", error: "mine:gone", blocked: "system:Glass", mine: [{ id: "tada", name: "tada" }, { id: "gone", name: "gone" }] },
+  });
+  const file = () => parseConfig(JSON.stringify(buildExport(source, ["preferences"], { "sound/my_tada": "data:tada" }, "0.1.53")));
+
+  test("travel with Preferences, not with Projects", () => {
+    expect(assetKeys(source, ["preferences"]).map((a) => `${a.kind}/${a.key}`)).toEqual(["sound/my_tada", "sound/my_gone"]);
+    expect(assetKeys(source, ["projects"])).toEqual([]);
+    expect(file().assets).toEqual({ "sound/my_tada": "data:tada" });
+  });
+
+  test("merge by id on import; one whose file is missing is left out and its signal plays the default", () => {
+    const s = state({ notify: { mine: [{ id: "keep", name: "keep" }] } });
+    const writes = applyImport(s, file(), ["preferences"], ids);
+    expect(s.notify.mine.map((m) => m.id)).toEqual(["keep", "tada"]);
+    expect(writes).toEqual([{ kind: "sound", key: "my_tada", dataUrl: "data:tada" }]);
+    expect(s.notify.done).toBe("mine:tada");
+    expect(s.notify.error).toBe("knock");
+    expect(s.notify.blocked).toBe("system:Glass");
+  });
+
+  test("an older state file has none", () => {
+    expect(state({ notify: { done: "ping" } }).notify.mine).toEqual([]);
+  });
+});

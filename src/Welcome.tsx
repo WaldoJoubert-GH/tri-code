@@ -15,7 +15,8 @@ import { type Known, KNOWN, NODE_INSTALL, commandOf, foundOf, lookups, ownComman
 import { installAgent, refreshSetup, setupBusy, setupError, setupStatus } from "./agentsetup";
 import { looksLikeUrl } from "./agents";
 import { themeOf } from "./look";
-import { EVENTS, SOUNDS, playSound } from "./signals";
+import { EVENTS, playSound } from "./signals";
+import { SoundSelect } from "./SoundSelect";
 import { openEnvDialog } from "./EnvDialog";
 import { openProjectDialog } from "./OpenProject";
 import { startTour } from "./Tour";
@@ -356,10 +357,7 @@ function SignalsStep() {
             {([ev, label]: [SoundEvent, string]) => (
               <>
                 <span class={`wel-sig ${ev}`}>{label}</span>
-                <select class="wel-input" value={n()[ev]} aria-label={`${label} sound`} onChange={(e) => { setNotify({ [ev]: e.currentTarget.value }); playSound(e.currentTarget.value); }}>
-                  <For each={Object.entries(SOUNDS)}>{([id, s]) => <option value={id} selected={n()[ev] === id}>{s.name}</option>}</For>
-                  <option value="off" selected={n()[ev] === "off"}>Off</option>
-                </select>
+                <SoundSelect class="wel-input" value={n()[ev]} label={`${label} sound`} onPick={(v) => { setNotify({ [ev]: v }); playSound(v); }} />
                 <button type="button" class="wel-btn sm" aria-label={`Play ${label}`} disabled={n()[ev] === "off"} onClick={() => playSound(n()[ev])}><Icon name="play" size={12} /></button>
               </>
             )}
