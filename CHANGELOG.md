@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.53 — 2026-11-18
+
+- The Editor Window highlights languages tri-code doesn't ship by installing their TextMate grammar. A banner offers the grammar when a file has no built-in language, the status bar's language picker can switch a file's language, and Settings › Languages lists, installs and removes grammars. Each grammar downloads once, is checked against its hash, and works offline and in ssh projects afterwards. ([#67](https://github.com/WaldoJoubert-GH/tri-code/pull/67))
+- Signal sound pickers offer the system's own alert sounds and My sounds alongside the built-ins. My sounds are audio files of up to 2 MB, uploaded once for use in any project or Command, and they travel with exported Preferences. Removing one resets the signals that played it to their defaults. ([#68](https://github.com/WaldoJoubert-GH/tri-code/pull/68))
+- New worktree lists the repo's ignored `.env` files, local databases, `.dev` configs and data files, and copies the ticked ones into the new checkout before setup runs. Ticks are remembered per repo, a new `.env` file starts ticked, and an agent's `create_worktree` copies the same files. The dialog shows what Create will do, step by step. ([#69](https://github.com/WaldoJoubert-GH/tri-code/pull/69))
+
 ## 0.1.52 — 2026-11-16
 
 - A Welcome window opens on first launch in place of the tour. Five steps set the theme and Hotkey Modifier, the Commands the New Window Menu offers (each checked on PATH, with its install line when missing), signal alerts and sounds, Environments, and a first project or the tour. Each choice is saved as it is made, so closing early keeps what was chosen. Reopen it from Alt+X › Set up tri-code or from Settings, which gains an Environments page and the signals form. ([#65](https://github.com/WaldoJoubert-GH/tri-code/pull/65))
