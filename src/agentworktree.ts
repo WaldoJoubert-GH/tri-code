@@ -25,7 +25,7 @@ async function follow(project: string, tab: string, name: string): Promise<{ pat
   if (!branch) throw new Error("that name has nothing a branch can use");
 
   const watching = app.activeProject === project;
-  const made = await createWorktree(repo, branch, { base: gitOf(repo.id).status?.base ?? "main", setup: repo.setup, open: [], background: true });
+  const made = await createWorktree(repo, branch, { base: gitOf(repo.id).status?.base ?? "main", setup: repo.setup, copy: repo.copyIgnored?.ticked, open: [], background: true });
   const to = projectById(made.project);
   if (!to) throw new Error("the worktree was made but tri-code lost it");
   // Already there (it asked for the Worktree it is in): nothing has to follow.

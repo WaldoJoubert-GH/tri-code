@@ -17,7 +17,7 @@ use crate::remote;
 use crate::spawn::{expand_home, remote_path, sq};
 
 /// Folders a copy skips wherever they are: dependencies and build output, rebuilt in the copy.
-const HEAVY: &[&str] = &["node_modules", "target", ".venv", "venv", "__pycache__", ".next", ".turbo", ".gradle", ".git"];
+pub(crate) const HEAVY: &[&str] = &["node_modules", "target", ".venv", "venv", "__pycache__", ".next", ".turbo", ".gradle", ".git"];
 /// How deep `folder_repos` looks for nested repos.
 const REPO_DEPTH: usize = 4;
 

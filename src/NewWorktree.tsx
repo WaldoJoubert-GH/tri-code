@@ -1,12 +1,15 @@
 // The New Worktree dialog (Alt+W): a branch name, an existing branch (local, or only on a remote),
 // or an In Progress issue to name it after, a setup script to run once in the new checkout (kept per
-// repo) and the Commands to open there. Creating it runs `git worktree add` on the project's host (or,
-// for a folder that isn't a repo, copies it) and switches to the Worktree.
-// Chosen from design/worktree-commands.html (variant D).
+// repo), the repo's ignored files to copy in (ticks kept per repo) and the Commands to open there.
+// Creating it runs `git worktree add` on the project's host (or, for a folder that isn't a repo,
+// copies it) and switches to the Worktree. What Create will do is listed step by step on the right.
+// Chosen from design/worktree-commands.html (variant D); the ignored files and the column from
+// design/worktree-gitignore.html (variant B).
 
-import { For, Show, createSignal } from "solid-js";
-import { app, projectById, setBranchPrefix, setWorktreeSetup, worktreeAgent, worktreesOf } from "./state";
-import { branches, cleanPrefix, closeNewWorktree, createWorktree, fetching, issueBranch, kinds, listed, newWorktreeFor, setupFor, toBranch, worktreeDir } from "./worktrees";
+import { For, Show, createEffect, createSignal, on } from "solid-js";
+import { app, projectById, setBranchPrefix, setCopyIgnored, setWorktreeSetup, worktreeAgent, worktreesOf } from "./state";
+import { branches, cleanPrefix, closeNewWorktree, createWorktree, fetching, ignored, issueBranch, kinds, listed, newWorktreeFor, setupFor, toBranch, worktreeDir } from "./worktrees";
+import { BIG, fileSize, filterIgnored, splitPath, startingTicks } from "./ignored";
 import { SETUP_VARS } from "./setup";
 import { dev, inProgress, slugOf } from "./issues";
 import { gitOf } from "./git";
@@ -36,6 +39,27 @@ export function NewWorktreeDialog() {
         const toggleOpen = (id: string) => setOpen((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
         /** The picked Commands, in the + menu's order. */
         const opening = () => app.agents.filter((a) => open().includes(a.id));
+        // The ignored files to copy: ticked as last time once they are listed (ignored.ts).
+        const [ticked, setTicked] = createSignal<Set<string>>(new Set());
+        const [query, setQuery] = createSignal("");
+        const [onlyTicked, setOnlyTicked] = createSignal(false);
+        const files = () => ignored[repo.id];
+        createEffect(on(files, (f) => f && setTicked(new Set(startingTicks(f, repo.copyIgnored)))));
+        const shownFiles = () => filterIgnored(files() ?? [], query(), ticked(), onlyTicked());
+        /** The ticked files, in the listed order. */
+        const copying = () => (files() ?? []).filter((f) => ticked().has(f.path));
+        const toggleFile = (path: string) => setTicked((t) => {
+          const n = new Set(t);
+          if (!n.delete(path)) n.add(path);
+          return n;
+        });
+        /** All / none of the files shown, so a search then all ticks just those. */
+        const allShown = () => shownFiles().length > 0 && shownFiles().every((f) => ticked().has(f.path));
+        const tickShown = () => setTicked((t) => {
+          const n = new Set(t), off = allShown();
+          for (const f of shownFiles()) off ? n.delete(f.path) : n.add(f.path);
+          return n;
+        });
         const [busy, setBusy] = createSignal(false);
         const [error, setError] = createSignal("");
         /** An existing branch picked below: its name is used as it is, not through toBranch. */
@@ -92,7 +116,10 @@ export function NewWorktreeDialog() {
             setWorktreeSetup(repo.id, setup());
             // Saved first: the new folder is named without it.
             if (!picked()) setBranchPrefix(repo.id, cleanPrefix(prefix()));
-            await createWorktree(repo, branch(), { base: base(), issue: issue(), setup: setup(), open: opening(), sandbox: sandboxed() });
+            const f = files();
+            const copy = f && !nested() ? copying().map((x) => x.path) : undefined;
+            if (f && copy) setCopyIgnored(repo.id, copy, f.map((x) => x.path));
+            await createWorktree(repo, branch(), { base: base(), issue: issue(), setup: setup(), copy, open: opening(), sandbox: sandboxed() });
             closeNewWorktree();
           } catch (e) {
             setError(String(e));
@@ -103,193 +130,275 @@ export function NewWorktreeDialog() {
 
         return (
           <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && closeNewWorktree()}>
-            <div class="wt-dlg" role="dialog" aria-label="New worktree">
+            <div class="wt-dlg wide" role="dialog" aria-label="New worktree">
               <header>
                 <span><Icon name="git-branch-plus" size={14} /> New worktree · {repo.name}</span>
                 <button type="button" title="Close (Esc)" aria-label="Close" onClick={closeNewWorktree}>×</button>
               </header>
-              <div class="body">
-                <div class="joined">
-                  <input
-                    class="pre"
-                    value={prefix()}
-                    placeholder="prefix/"
+              <div class="cols">
+                <div class="body">
+                  <div class="joined">
+                    <input
+                      class="pre"
+                      value={prefix()}
+                      placeholder="prefix/"
+                      spellcheck={false}
+                      autocomplete="off"
+                      disabled={!!picked()}
+                      style={{ width: `${Math.min(18, Math.max(7, prefix().length + 2))}ch` }}
+                      title={picked() ? "An existing branch is used as it is" : `Every new branch in ${repo.name} starts with this; saved when you press Create`}
+                      aria-label="Branch prefix"
+                      onInput={(e) => setPrefix(e.currentTarget.value)}
+                      onKeyDown={keys}
+                    />
+                    <input
+                      class="nm"
+                      value={name()}
+                      placeholder="branch name"
+                      spellcheck={false}
+                      autocomplete="off"
+                      aria-label="Branch name"
+                      ref={(el) => requestAnimationFrame(() => el.focus())}
+                      onInput={(e) => { setName(e.currentTarget.value); setIssue(undefined); setPicked(undefined); }}
+                      onKeyDown={keys}
+                    />
+                  </div>
+                  <Show when={!nested() && (existing().length || fetching() === repo.id)}>
+                    <div class="mt">or check out an existing branch<Show when={fetching() === repo.id}> · fetching…</Show></div>
+                    <div class="issues">
+                      <For each={existing()}>
+                        {(b) => (
+                          <button
+                            type="button"
+                            class="chip"
+                            classList={{ on: picked() === b.name }}
+                            title={b.remote ? `only on ${b.remote}: makes a local ${b.name} tracking ${b.remote}/${b.name}` : b.name}
+                            onClick={() => { setName(b.name); setPicked(b.name); setIssue(undefined); }}
+                          >
+                            <b>{b.name}</b>{b.remote ? ` ${b.remote}` : ""}
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  <Show when={issues().length}>
+                    <div class="mt">or name it after an In Progress issue</div>
+                    <div class="issues">
+                      <For each={issues()}>
+                        {(i) => {
+                          const slug = slugOf(dev[repo.id], i);
+                          return (
+                            <button
+                              type="button"
+                              class="chip"
+                              classList={{ on: issue() === slug }}
+                              title={i.title}
+                              onClick={() => { setName(issueBranch(slug, i.title)); setIssue(slug); setPicked(undefined); }}
+                            >
+                              <b>{slug}</b> {i.title}
+                            </button>
+                          );
+                        }}
+                      </For>
+                    </div>
+                  </Show>
+                  <div class="mt">Setup <span class="r">runs once, in its own window; closes when done</span></div>
+                  <textarea
+                    class="setup"
+                    ref={setupEl}
+                    value={setup()}
+                    placeholder={"bun install"}
                     spellcheck={false}
-                    autocomplete="off"
-                    disabled={!!picked()}
-                    style={{ width: `${Math.min(18, Math.max(7, prefix().length + 2))}ch` }}
-                    title={picked() ? "An existing branch is used as it is" : `Every new branch in ${repo.name} starts with this; saved when you press Create`}
-                    aria-label="Branch prefix"
-                    onInput={(e) => setPrefix(e.currentTarget.value)}
-                    onKeyDown={keys}
+                    rows={3}
+                    onInput={(e) => setSetup(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void create();
+                      else if (e.key === "Escape") closeNewWorktree();
+                      e.stopPropagation();
+                    }}
                   />
-                  <input
-                    class="nm"
-                    value={name()}
-                    placeholder="branch name"
-                    spellcheck={false}
-                    autocomplete="off"
-                    aria-label="Branch name"
-                    ref={(el) => requestAnimationFrame(() => el.focus())}
-                    onInput={(e) => { setName(e.currentTarget.value); setIssue(undefined); setPicked(undefined); }}
-                    onKeyDown={keys}
-                  />
-                </div>
-                <Show when={!nested() && (existing().length || fetching() === repo.id)}>
-                  <div class="mt">or check out an existing branch<Show when={fetching() === repo.id}> · fetching…</Show></div>
-                  <div class="issues">
-                    <For each={existing()}>
-                      {(b) => (
-                        <button
-                          type="button"
-                          class="chip"
-                          classList={{ on: picked() === b.name }}
-                          title={b.remote ? `only on ${b.remote}: makes a local ${b.name} tracking ${b.remote}/${b.name}` : b.name}
-                          onClick={() => { setName(b.name); setPicked(b.name); setIssue(undefined); }}
-                        >
-                          <b>{b.name}</b>{b.remote ? ` ${b.remote}` : ""}
+                  <div class="vars">
+                    <For each={SETUP_VARS}>
+                      {(v) => (
+                        <button type="button" class="chip" title={`${v.hint}: insert at the cursor`} onClick={() => insertVar(v.name)}>
+                          <b>{`{${v.name}}`}</b> {v.hint}
                         </button>
                       )}
                     </For>
                   </div>
-                </Show>
-                <Show when={issues().length}>
-                  <div class="mt">or name it after an In Progress issue</div>
-                  <div class="issues">
-                    <For each={issues()}>
-                      {(i) => {
-                        const slug = slugOf(dev[repo.id], i);
-                        return (
-                          <button
-                            type="button"
-                            class="chip"
-                            classList={{ on: issue() === slug }}
-                            title={i.title}
-                            onClick={() => { setName(issueBranch(slug, i.title)); setIssue(slug); setPicked(undefined); }}
-                          >
-                            <b>{slug}</b> {i.title}
-                          </button>
-                        );
-                      }}
-                    </For>
-                  </div>
-                </Show>
-                <div class="mt">Setup <span class="r">runs once, in its own window; closes when done</span></div>
-                <textarea
-                  class="setup"
-                  ref={setupEl}
-                  value={setup()}
-                  placeholder={"bun install\ncp {repo}/.env .env"}
-                  spellcheck={false}
-                  rows={3}
-                  onInput={(e) => setSetup(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void create();
-                    else if (e.key === "Escape") closeNewWorktree();
-                    e.stopPropagation();
-                  }}
-                />
-                <div class="vars">
-                  <For each={SETUP_VARS}>
-                    {(v) => (
-                      <button type="button" class="chip" title={`${v.hint}: insert at the cursor`} onClick={() => insertVar(v.name)}>
-                        <b>{`{${v.name}}`}</b> {v.hint}
-                      </button>
-                    )}
-                  </For>
-                </div>
-                <div class="mt">and open</div>
-                <div class="issues">
-                  <For each={app.agents}>
-                    {(a) => (
-                      <button
-                        type="button"
-                        class="chip"
-                        classList={{ on: open().includes(a.id) }}
-                        aria-pressed={open().includes(a.id)}
-                        title={a.url ?? (a.command || "login shell")}
-                        onClick={() => toggleOpen(a.id)}
-                      >
-                        <b>{a.name || "untitled"}</b>
-                      </button>
-                    )}
-                  </For>
-                </div>
-                <Show when={sandboxable()}>
-                  <button
-                    type="button"
-                    class="sbx-toggle"
-                    role="switch"
-                    aria-checked={sandboxed()}
-                    disabled={sbxDown()}
-                    onClick={() => setBoxed(!boxed())}
-                  >
-                    <span class="tx">
-                      <b><Icon name="shield" size={13} /> Sandbox</b>
-                      <Show
-                        when={!sbxDown()}
-                        fallback={
-                          <span>
-                            {sbxState(host).state === "unreachable" ? `Couldn't reach ${host} to check Docker Sandboxes.` : `Docker Sandboxes isn't set up on ${remoteHost ? host : "this machine"}.`}{" "}
-                            <a onClick={(e) => { e.stopPropagation(); setUpSandbox(); }}>Set it up →</a>
-                          </span>
-                        }
-                      >
-                        <span>
-                          {boxed()
-                            ? `Its agents run in their own VM${remoteHost ? ` on ${host}` : ""} and see only this worktree; the rest runs ${remoteHost ? "there" : "here"}.`
-                            : `Its agents run on ${remoteHost ? host : "this machine"}, with your access.`}
-                        </span>
-                        <Show when={boxed() && sbxReady(host) && !sbxState(host).signIn}>
-                          <span>
-                            claude isn't signed in for sandboxes yet.{" "}
-                            <a onClick={(e) => { e.stopPropagation(); setUpSandbox(); }}>Sign in once →</a>
-                          </span>
+                  <Show when={kinds[repo.id]?.git}>
+                    <div class="mt">
+                      and copy
+                      <span class="r">
+                        <Show when={files()} fallback="listing ignored files…">
+                          {(f) => (
+                            <Show when={f().length} fallback={`no ignored .env, database or data files in ${repo.name}`}>
+                              {ticked().size} of {f().length} ignored files ·{" "}
+                              <button type="button" class="link" disabled={!shownFiles().length} onClick={tickShown}>{allShown() ? "none" : "all"}</button>
+                            </Show>
+                          )}
                         </Show>
-                      </Show>
-                    </span>
-                    <span class={`sbx-sw ${sandboxed() ? "on" : ""}`} />
-                  </button>
-                </Show>
-                <div class="where">
-                  <Show when={kinds[repo.id]} fallback={<span>checking {repo.path}…</span>}>
-                    <Show
-                      when={nested()}
-                      fallback={
-                        <span>
-                          {(() => {
-                            const b = branch() || "<branch>";
-                            const dir = worktreeDir(repo, b, dirPrefix());
-                            const f = found();
-                            if (!f) return `git worktree add -b ${b} ${dir} ${base()}`;
-                            return f.remote ? `git worktree add --track -b ${b} ${dir} ${f.remote}/${b}` : `git worktree add ${dir} ${b}`;
-                          })()}
-                        </span>
-                      }
-                    >
-                      {(repos) => (
-                        <>
-                          <span>not a git repo: copy {repo.path} → {worktreeDir(repo, branch() || "<branch>", dirPrefix())}</span>
-                          <Show when={repos().length}>
-                            <span>{repos().join(", ")}: git worktree add -b {branch() || "<branch>"}</span>
-                          </Show>
-                          <span>skips node_modules, target, .venv and other build folders: install again in the copy</span>
-                        </>
-                      )}
+                      </span>
+                    </div>
+                    <Show when={files()?.length}>
+                      <div class="ign">
+                        <Show when={files()!.length > 6}>
+                          <div class="find">
+                            <Icon name="search" size={12} />
+                            <input
+                              value={query()}
+                              placeholder={`filter ${files()!.length} files`}
+                              spellcheck={false}
+                              autocomplete="off"
+                              aria-label="Filter ignored files"
+                              onInput={(e) => setQuery(e.currentTarget.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape" && query()) setQuery("");
+                                else if (e.key === "Escape") closeNewWorktree();
+                                e.stopPropagation();
+                              }}
+                            />
+                            <button type="button" class="ticked" aria-pressed={onlyTicked()} title="Show only ticked files" onClick={() => setOnlyTicked(!onlyTicked())}>ticked</button>
+                          </div>
+                        </Show>
+                        <div class="scroll">
+                          <div class="issues">
+                            <For each={shownFiles()} fallback={<span class="none">{onlyTicked() && !query() ? "Nothing ticked." : `Nothing matches “${query()}”.`}</span>}>
+                              {(f) => (
+                                <button
+                                  type="button"
+                                  class="chip"
+                                  classList={{ on: ticked().has(f.path) }}
+                                  aria-pressed={ticked().has(f.path)}
+                                  title={`${f.path} · ${fileSize(f.size)}`}
+                                  onClick={() => toggleFile(f.path)}
+                                >
+                                  <b><i>{splitPath(f.path).dir}</i>{splitPath(f.path).name}</b>
+                                  <Show when={f.size > BIG}> <span class="big">{fileSize(f.size)}</span></Show>
+                                </button>
+                              )}
+                            </For>
+                          </div>
+                        </div>
+                      </div>
                     </Show>
                   </Show>
-                  <Show when={sandboxed()}>
-                    <span class="then">
-                      and in the background its sandbox: sbx create claude {worktreeDir(repo, branch() || "<branch>", dirPrefix())} {mountsFor(repo.path, sandboxFolders(), nested() ?? undefined).join(" ")}
-                    </span>
+                  <div class="mt">and open</div>
+                  <div class="issues">
+                    <For each={app.agents}>
+                      {(a) => (
+                        <button
+                          type="button"
+                          class="chip"
+                          classList={{ on: open().includes(a.id) }}
+                          aria-pressed={open().includes(a.id)}
+                          title={a.url ?? (a.command || "login shell")}
+                          onClick={() => toggleOpen(a.id)}
+                        >
+                          <b>{a.name || "untitled"}</b>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                  <Show when={sandboxable()}>
+                    <button
+                      type="button"
+                      class="sbx-toggle"
+                      role="switch"
+                      aria-checked={sandboxed()}
+                      disabled={sbxDown()}
+                      onClick={() => setBoxed(!boxed())}
+                    >
+                      <span class="tx">
+                        <b><Icon name="shield" size={13} /> Sandbox</b>
+                        <Show
+                          when={!sbxDown()}
+                          fallback={
+                            <span>
+                              {sbxState(host).state === "unreachable" ? `Couldn't reach ${host} to check Docker Sandboxes.` : `Docker Sandboxes isn't set up on ${remoteHost ? host : "this machine"}.`}{" "}
+                              <a onClick={(e) => { e.stopPropagation(); setUpSandbox(); }}>Set it up →</a>
+                            </span>
+                          }
+                        >
+                          <span>
+                            {boxed()
+                              ? `Its agents run in their own VM${remoteHost ? ` on ${host}` : ""} and see only this worktree; the rest runs ${remoteHost ? "there" : "here"}.`
+                              : `Its agents run on ${remoteHost ? host : "this machine"}, with your access.`}
+                          </span>
+                          <Show when={boxed() && sbxReady(host) && !sbxState(host).signIn}>
+                            <span>
+                              claude isn't signed in for sandboxes yet.{" "}
+                              <a onClick={(e) => { e.stopPropagation(); setUpSandbox(); }}>Sign in once →</a>
+                            </span>
+                          </Show>
+                        </Show>
+                      </span>
+                      <span class={`sbx-sw ${sandboxed() ? "on" : ""}`} />
+                    </button>
                   </Show>
-                  <Show when={setup().trim()}>
-                    <span class="then">then runs setup: {setupFor(repo, branch() || "<branch>", setup(), dirPrefix()).join(" && ")}</span>
-                  </Show>
-                  <span class="then">{opening().length ? `then opens: ${opening().map((a) => a.name || "untitled").join(", ")}` : "then opens nothing"}</span>
+                  <Show when={taken()}><div class="note">{branch()} already has a worktree; Create switches to it.</div></Show>
+                  <Show when={error()}><div class="note bad">{error()}</div></Show>
                 </div>
-                <Show when={taken()}><div class="note">{branch()} already has a worktree; Create switches to it.</div></Show>
-                <Show when={error()}><div class="note bad">{error()}</div></Show>
+                <div class="side">
+                  <div class="mt">Create will</div>
+                  <ol class="steps">
+                    <li class="on">
+                      <b>{nested() ? "Copy the folder" : "Check out"}</b>
+                      <Show when={kinds[repo.id]} fallback={<span>checking {repo.path}…</span>}>
+                        <Show
+                          when={nested()}
+                          fallback={
+                            <span class="cmd">
+                              {(() => {
+                                const b = branch() || "<branch>";
+                                const dir = worktreeDir(repo, b, dirPrefix());
+                                const f = found();
+                                if (!f) return `git worktree add -b ${b} ${dir} ${base()}`;
+                                return f.remote ? `git worktree add --track -b ${b} ${dir} ${f.remote}/${b}` : `git worktree add ${dir} ${b}`;
+                              })()}
+                            </span>
+                          }
+                        >
+                          {(repos) => (
+                            <>
+                              <span class="cmd">{repo.path} → {worktreeDir(repo, branch() || "<branch>", dirPrefix())}</span>
+                              <Show when={repos().length}>
+                                <span class="cmd">{repos().join(", ")}: git worktree add -b {branch() || "<branch>"}</span>
+                              </Show>
+                              <span>skips node_modules, target, .venv and other build folders: install again in the copy</span>
+                            </>
+                          )}
+                        </Show>
+                      </Show>
+                    </li>
+                    <Show when={kinds[repo.id]?.git && files()?.length}>
+                      <li classList={{ on: copying().length > 0 }}>
+                        <b>Copy from {repo.name}</b>
+                        <Show when={copying().length} fallback={<span class="cmd">nothing ticked</span>}>
+                          <ul>
+                            <For each={copying().slice(0, 8)}>{(f) => <li>{f.path}</li>}</For>
+                          </ul>
+                          <Show when={copying().length > 8}><span>…and {copying().length - 8} more</span></Show>
+                          <span>{copying().length} {copying().length === 1 ? "file" : "files"} · {fileSize(copying().reduce((n, f) => n + f.size, 0))}</span>
+                        </Show>
+                      </li>
+                    </Show>
+                    <Show when={sandboxed()}>
+                      <li class="on">
+                        <b>Make its sandbox, in the background</b>
+                        <span class="cmd">sbx create claude {worktreeDir(repo, branch() || "<branch>", dirPrefix())} {mountsFor(repo.path, sandboxFolders(), nested() ?? undefined).join(" ")}</span>
+                      </li>
+                    </Show>
+                    <li classList={{ on: !!setup().trim() }}>
+                      <b>Run setup</b>
+                      <span class="cmd">{setup().trim() ? setupFor(repo, branch() || "<branch>", setup(), dirPrefix()).join(" && ") : "nothing"}</span>
+                    </li>
+                    <li classList={{ on: opening().length > 0 }}>
+                      <b>Open</b>
+                      <span class="cmd">{opening().length ? opening().map((a) => a.name || "untitled").join(", ") : "nothing"}</span>
+                    </li>
+                  </ol>
+                </div>
               </div>
               <footer>
                 <button type="button" onClick={closeNewWorktree}>Cancel</button>
