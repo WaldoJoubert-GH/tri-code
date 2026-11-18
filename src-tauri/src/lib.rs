@@ -17,6 +17,7 @@ mod fonts;
 mod forward;
 mod fs;
 mod git;
+mod grammars;
 mod github;
 mod leftovers;
 mod passwords;
@@ -218,6 +219,10 @@ pub fn run() {
             newfolder::git_clone,
             newfolder::git_clone_cancel,
             fonts::font_list,
+            grammars::grammar_list,
+            grammars::grammar_read,
+            grammars::grammar_install,
+            grammars::grammar_remove,
             folders::folder_repos,
             folders::folder_copy,
             folders::folder_changes,

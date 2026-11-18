@@ -361,6 +361,9 @@ export type Settings = {
   sandbox?: { byDefault?: false; folders?: string[] };
   /** Settings › Preview: the preview features turned on, by id (preview.ts). Unset is all off. */
   preview?: Partial<Record<string, true>>;
+  /** Settings › Languages (langs.ts): `suggest: false` stops the editor offering grammars; `never`
+   *  lists the languages (Grammar Catalog ids) it no longer offers. */
+  grammars?: { suggest?: false; never?: string[] };
 };
 
 export type GitColor = "add" | "del" | "mod" | "ren";

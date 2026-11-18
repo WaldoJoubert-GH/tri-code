@@ -8,6 +8,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "bun test ./src/",
+    "grammars": "bun scripts/grammar-catalog.ts",
     "tauri": "tauri"
   },
   "license": "MIT",
@@ -45,10 +46,13 @@
     "dompurify": "^3.4.17",
     "lucide": "^1.59.0",
     "marked": "^18.1.1",
-    "solid-js": "^1.9.3"
+    "solid-js": "^1.9.3",
+    "vscode-oniguruma": "2.0.1",
+    "vscode-textmate": "9.3.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "tm-grammars": "1.32.22",
     "typescript": "~6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12"

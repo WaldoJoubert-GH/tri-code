@@ -1044,6 +1044,24 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .set-seg button { padding: 3px 10px; font-size: 12px; color: var(--muted); }
 .settings-dlg .set-seg button + button { border-left: 1px solid var(--line); }
 .settings-dlg .set-seg button[aria-checked="true"] { background: var(--raised); color: var(--text); }
+/* Settings › Languages (LangSettings.tsx) */
+.settings-dlg .lang-list { display: flex; flex-direction: column; }
+.settings-dlg .lang-row { padding: 3px 0; }
+.settings-dlg .lang-row + .lang-row { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.settings-dlg .lang-tx { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.settings-dlg .lang-tx b { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 500; white-space: nowrap; }
+.settings-dlg .lang-ty { min-width: 0; font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-dlg .lang-size { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; }
+.settings-dlg .lang-pill { font-size: 10px; font-weight: 400; padding: 0 5px; border-radius: 8px; color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); }
+.settings-dlg .lang-row .set-btn { min-width: 64px; justify-content: center; }
+.settings-dlg .lang-row .set-btn:disabled { opacity: .45; cursor: default; }
+.settings-dlg .lang-q {
+  width: 100%; margin: 0 0 4px; padding: 5px 8px; font: 12px var(--ui); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; outline: none; user-select: text;
+}
+.settings-dlg .lang-q:focus { border-color: var(--accent); }
+.settings-dlg .lang-err { margin: 6px 0 0; color: var(--bad); font-size: 11.5px; white-space: pre-wrap; user-select: text; }
+.settings-dlg .lang-builtin { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 /* Settings › Appearance */
 .settings-dlg .theme-seg button { display: inline-flex; align-items: center; gap: 6px; }
 .settings-dlg .font-row .lbl { width: 92px; flex: none; }

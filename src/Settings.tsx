@@ -18,12 +18,13 @@ import { AgentsPage } from "./AgentSettings";
 import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
 import { SandboxPage } from "./SandboxSettings";
+import { LanguagesPage } from "./LangSettings";
 import { PREVIEWS, previewOn, sandboxPreview } from "./preview";
 import { SignalsForm } from "./SignalSettings";
 import { openEnvDialog } from "./EnvDialog";
 import { openWelcome } from "./Welcome";
 
-export type SettingsPage = "appearance" | "windows" | "agents" | "environments" | "files" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview";
+export type SettingsPage = "appearance" | "windows" | "agents" | "environments" | "files" | "languages" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview";
 
 /** Pages that belong to a preview feature: listed only while it is on. */
 const shown = (p: SettingsPage) => p !== "sandbox" || sandboxPreview();
@@ -34,6 +35,7 @@ const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "agents", name: "Agents", icon: "bot" },
   { page: "environments", name: "Environments", icon: "server" },
   { page: "files", name: "Files", icon: "folder-search" },
+  { page: "languages", name: "Languages", icon: "code" },
   { page: "git", name: "Git", icon: "git-branch" },
   { page: "sandbox", name: "Sandbox", icon: "shield" },
   { page: "signals", name: "Signals", icon: "bell" },
@@ -508,6 +510,7 @@ export function SettingsDialog() {
               <Show when={p() === "agents"}><AgentsPage /></Show>
               <Show when={p() === "environments"}><EnvironmentsPage /></Show>
               <Show when={p() === "files"}><FilesPage /></Show>
+              <Show when={p() === "languages"}><LanguagesPage /></Show>
               <Show when={p() === "git"}><GitPage /></Show>
               <Show when={p() === "sandbox" && shown("sandbox")}><SandboxPage /></Show>
               <Show when={p() === "signals"}><SignalsPage /></Show>
