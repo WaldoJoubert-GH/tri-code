@@ -4,14 +4,14 @@
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { AlertMode, Project, SoundEvent, app, setNotify, setProjectNotify } from "./state";
-import { EVENTS, SOUNDS, desktopFor, playFor, playSound, uploadSound } from "./signals";
+import { EVENTS, addMySound, desktopFor, playFor, playSound, removeMySound, soundName } from "./signals";
+import { SoundSelect } from "./SoundSelect";
 import { Icon } from "./lucide";
 
 export function SignalsForm(props: { project?: Project }) {
   const p = () => props.project;
   const n = () => p()?.notify ?? {};
-  let fileEl: HTMLInputElement | undefined;
-  let uploadFor: SoundEvent | null = null;
+  let addEl: HTMLInputElement | undefined;
 
   const value = (ev: SoundEvent) => (p() ? n()[ev] ?? "default" : app.notify[ev]);
   const play = (ev: SoundEvent) => {
@@ -19,24 +19,12 @@ export function SignalsForm(props: { project?: Project }) {
     if (proj) void playFor(proj, ev);
     else playSound(app.notify[ev]);
   };
-  const choose = (ev: SoundEvent, v: string, el: HTMLSelectElement) => {
+  const choose = (ev: SoundEvent, v: string) => {
     const proj = p();
-    if (v === "upload") {
-      el.value = value(ev);
-      uploadFor = ev;
-      return fileEl?.click();
-    }
     if (proj) setProjectNotify(proj.id, { [ev]: v === "default" ? undefined : v });
     else setNotify({ [ev]: v });
     play(ev);
   };
-  const options = (ev: SoundEvent) => [
-    ...(p() ? [["default", `Default · ${SOUNDS[app.notify[ev]]?.name ?? "Off"}`]] : []),
-    ...Object.entries(SOUNDS).map(([k, s]) => [k, s.name]),
-    ...(p() && n()[ev] === "custom" ? [["custom", n().files?.[ev] ?? "Your sound"]] : []),
-    ["off", "Off"],
-    ...(p() ? [["upload", "Upload a sound…"]] : []),
-  ];
 
   const alerts = (): [AlertMode | "default", string][] => [
     ...(p() ? [["default", "Default"] as [AlertMode | "default", string]] : []),
@@ -65,9 +53,14 @@ export function SignalsForm(props: { project?: Project }) {
           {([ev, label]) => (
             <>
               <span class={`lbl s-${ev}`}><span class={`sg s-${ev}`} />{label}</span>
-              <select aria-label={`Sound for ${label.toLowerCase()}`} onChange={(e) => choose(ev, e.currentTarget.value, e.currentTarget)}>
-                <For each={options(ev)}>{([k, name]) => <option value={k} selected={k === value(ev)}>{name}</option>}</For>
-              </select>
+              <SoundSelect
+                label={`Sound for ${label.toLowerCase()}`}
+                value={value(ev)}
+                lead={p() ? [["default", `Default · ${soundName(app.notify[ev])}`]] : undefined}
+                project={p()}
+                ev={ev}
+                onPick={(v) => choose(ev, v)}
+              />
               <button type="button" class="play" title="Play" aria-label={`Play the ${label.toLowerCase()} sound`} onClick={() => play(ev)}>
                 <Icon name="play" size={12} />
               </button>
@@ -75,16 +68,31 @@ export function SignalsForm(props: { project?: Project }) {
           )}
         </For>
       </div>
+      <h4>My sounds <span class="muted">· every project can use them</span></h4>
+      <div class="mysnd">
+        <For each={app.notify.mine}>
+          {(m) => (
+            <span class="msnd">
+              <button type="button" class="nm" title="Play" onClick={() => playSound(`mine:${m.id}`)}>
+                <Icon name="play" size={10} />{m.name}
+              </button>
+              <button type="button" class="rm" title="Remove" aria-label={`Remove ${m.name}`} onClick={() => removeMySound(m.id)}>
+                <Icon name="x" size={11} />
+              </button>
+            </span>
+          )}
+        </For>
+        <button type="button" class="madd" onClick={() => addEl?.click()}><Icon name="plus" size={11} />Add a sound</button>
+      </div>
       <input
-        ref={fileEl}
+        ref={addEl}
         type="file"
         accept="audio/*"
         hidden
         onChange={(e) => {
           const f = e.currentTarget.files?.[0];
           e.currentTarget.value = "";
-          const proj = p();
-          if (f && proj && uploadFor) uploadSound(proj, uploadFor, f);
+          if (f) void addMySound(f).then((id) => id && playSound(id));
         }}
       />
       <h4>Alert</h4>

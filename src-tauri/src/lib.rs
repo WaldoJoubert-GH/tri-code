@@ -30,6 +30,7 @@ mod resume;
 mod sbx;
 mod spawn;
 mod store;
+mod syssounds;
 mod tour;
 mod usage;
 
@@ -367,6 +368,8 @@ pub fn run() {
             bg::sound_save,
             bg::sound_load,
             bg::sound_delete,
+            syssounds::system_sounds,
+            syssounds::system_sound_load,
             usage::claude_usage,
             usage::command_code_usage,
             phone::phone_start,

@@ -18,7 +18,8 @@ import {
   sameScope, scopeIcon, scopeLabel, setRecording, urlProblem,
 } from "./agents";
 import { normalizeUrl } from "./browsers";
-import { EVENTS, SOUNDS, playFor, playSound, soundFor } from "./signals";
+import { EVENTS, playFor, playSound, soundFor, soundName } from "./signals";
+import { SoundSelect } from "./SoundSelect";
 import { Icon, toggleIconPicker } from "./lucide";
 import { flash, showToast } from "./ui";
 import { modDown, modLabel } from "./modkey";
@@ -155,7 +156,6 @@ function TargetField(props: { agent: Agent }) {
 /** The scope or sound popover: which command, and the button it hangs under. */
 type Pop = { kind: "scope" | "sound"; id: string; anchor: HTMLElement };
 
-const soundName = (id: string) => (id === "off" ? "off" : id === "custom" ? "uploaded" : SOUNDS[id]?.name ?? id);
 const projectsOn = (host: string) => app.projects.filter((p) => !p.parent && !p.sample && p.host === host).length;
 const scopeProjects = () => app.projects.filter((p) => !p.parent && !p.sample);
 
@@ -201,11 +201,13 @@ function SoundPicker(props: { agent: Agent; project: Project }) {
         {([ev, label]) => (
           <div class="snd">
             <label>{label}</label>
-            <select classList={{ own: !!own(ev) }} value={own(ev) ?? ""} onChange={(e) => set(ev, e.currentTarget.value)}>
-              <option value="">{props.project.name}'s ({soundName(soundFor(props.project, ev))})</option>
-              <option value="off">Off</option>
-              <For each={Object.entries(SOUNDS)}>{([id, s]) => <option value={id}>{s.name}</option>}</For>
-            </select>
+            <SoundSelect
+              class={own(ev) ? "own" : undefined}
+              label={`${label} sound`}
+              value={own(ev) ?? ""}
+              lead={[["", `${props.project.name}'s (${soundName(soundFor(props.project, ev), props.project, ev)})`]]}
+              onPick={(v) => set(ev, v)}
+            />
             <button title="Play" onClick={() => play(ev)}><Icon name="play" size={12} /></button>
           </div>
         )}
@@ -228,7 +230,7 @@ function SoundButton(props: { agent: Agent; project: Project; onOpen: (el: HTMLE
   const mine = () => props.agent.sounds;
   const allOff = () => EVENTS.every(([ev]) => (mine()?.[ev] ?? soundFor(props.project, ev)) === "off");
   const title = () =>
-    EVENTS.map(([ev, label]) => `${label}: ${soundName(mine()?.[ev] ?? soundFor(props.project, ev))}${mine()?.[ev] ? "" : ` (${props.project.name}'s)`}`).join("\n")
+    EVENTS.map(([ev, label]) => `${label}: ${soundName(mine()?.[ev] ?? soundFor(props.project, ev), props.project, ev)}${mine()?.[ev] ? "" : ` (${props.project.name}'s)`}`).join("\n")
     + "\nClick to change";
   return (
     <button

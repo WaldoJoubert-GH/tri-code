@@ -5,8 +5,8 @@
 // (phone.json holds secrets), browser data (cookies, passwords), Worktrees and the Sample Project
 // (their folders are this machine's), window layouts and runtime state (recent, pinned, tour).
 
-import type { Agent, Fav, Persisted, Profile, Project, SoundEvent } from "./state";
-import { migrate } from "./state";
+import type { Agent, Fav, NotifySettings, Persisted, Profile, Project, SoundEvent } from "./state";
+import { defaultNotify, migrate } from "./state";
 
 export const CONFIG_FORMAT = "tri-code-config";
 export const CONFIG_VERSION = 1;
@@ -59,9 +59,14 @@ export function assetsOf(p: Pick<Project, "id" | "bg" | "icon" | "notify">): Ass
   return out;
 }
 
+/** My sounds' files, which travel with Preferences. */
+const mineAssets = (n: Pick<NotifySettings, "mine"> | undefined): AssetRef[] => (n?.mine ?? []).map((m) => ({ kind: "sound", key: `my_${m.id}` }));
+
 /** The assets an export of `sections` needs loaded from disk. */
-export const assetKeys = (s: Persisted, sections: Section[]): AssetRef[] =>
-  sections.includes("projects") ? exportable(s).flatMap(assetsOf) : [];
+export const assetKeys = (s: Persisted, sections: Section[]): AssetRef[] => [
+  ...(sections.includes("preferences") ? mineAssets(s.notify) : []),
+  ...(sections.includes("projects") ? exportable(s).flatMap(assetsOf) : []),
+];
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -86,7 +91,7 @@ export function buildExport(s: Persisted, sections: Section[], assets: Record<st
       ...(has("environments") ? { environments: clone({ environments: s.environments, envStyles: s.envStyles, envSsh: s.envSsh }) } : {}),
       ...(has("projects") ? { projects: projects.map(projectConfig) } : {}),
     },
-    assets: Object.fromEntries(projects.flatMap(assetsOf).map(assetName).filter((k) => assets[k]).map((k) => [k, assets[k]])),
+    assets: Object.fromEntries(assetKeys(s, sections).map(assetName).filter((k) => assets[k]).map((k) => [k, assets[k]])),
   };
 }
 
@@ -215,7 +220,15 @@ export function applyImport(s: Persisted, f: ConfigFile, picks: Section[], newId
   if (on("preferences")) {
     const pr = sec.preferences!;
     s.settings = migrate({ settings: mergeSettings(s.settings, pr.settings ?? {}) }).settings;
-    s.notify = { ...s.notify, ...pr.notify };
+    // My sounds merge by id; one whose file the export lacks is left out, and signals set to it play the default.
+    const mine = (pr.notify?.mine ?? []).filter((m) => f.assets[assetName({ kind: "sound", key: `my_${m.id}` })]);
+    for (const a of mineAssets({ mine })) writes.push({ ...a, dataUrl: f.assets[assetName(a)] });
+    const notify = { ...s.notify, ...pr.notify, mine: mergeById(s.notify.mine ?? [], mine) };
+    const def = defaultNotify();
+    for (const ev of EVENTS) {
+      if (notify[ev]?.startsWith("mine:") && !notify.mine.some((m) => `mine:${m.id}` === notify[ev])) notify[ev] = def[ev];
+    }
+    s.notify = notify;
     if (typeof pr.gap === "number") s.gap = pr.gap;
   }
 
