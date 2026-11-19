@@ -2,6 +2,14 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.54 — 2026-11-19
+
+- Browser windows gain a Debug Menu. DevTools opens for every page, and on Windows the menu also shows console errors, counted on its button and sendable to an agent, with Disable cache, network throttling and Clear site data for the page's origin. Page Profiles let each page in a window use its own Browser Profile, and Remote Debugging gives a non-default Browser Profile a DevTools port on 127.0.0.1 so tools such as Playwright or Chrome DevTools MCP can drive its signed-in pages. ([#70](https://github.com/WaldoJoubert-GH/tri-code/pull/70))
+- The sidebar shows what this computer is playing above Settings, with play, pause, skip and seek. The rail shows the artwork in a progress ring, a popover lists other players, and play/pause and next/previous are hotkey actions and Palette entries. Settings › Windows › Media turns it off. Windows only for now. ([#73](https://github.com/WaldoJoubert-GH/tri-code/pull/73))
+- Alt+A and Alt+Shift+A start the first two Commands (claude and pi), unless they already have hotkeys or the chord is taken. A key you remove stays removed.
+- On Windows, Alt+Space reaches tri-code instead of opening the window menu, so it can be bound in Settings › Hotkeys.
+- The Command Palette opens with Alt+X only; Alt+T no longer opens it.
+
 ## 0.1.53 — 2026-11-18
 
 - The Editor Window highlights languages tri-code doesn't ship by installing their TextMate grammar. A banner offers the grammar when a file has no built-in language, the status bar's language picker can switch a file's language, and Settings › Languages lists, installs and removes grammars. Each grammar downloads once, is checked against its hash, and works offline and in ssh projects afterwards. ([#67](https://github.com/WaldoJoubert-GH/tri-code/pull/67))
