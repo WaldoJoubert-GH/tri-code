@@ -49,7 +49,6 @@ export const ACTIONS: Action[] = [
   { id: "browser", group: "Windows and links", desc: "New browser window", def: [k("KeyB")] },
   { id: "issues", group: "Windows and links", desc: "Issues", def: [k("KeyI")] },
   { id: "files", group: "Windows and links", desc: "Editor", def: [k("KeyE")] },
-  { id: "go-to-file", group: "Windows and links", desc: "Command palette (a second key for it)", def: [k("KeyT")] },
   { id: "git", group: "Windows and links", desc: "Git", def: [k("KeyC")] },
   { id: "db", group: "Windows and links", desc: "Database: the latest database window, or a new one", def: [sh("KeyD")] },
   { id: "docker", group: "Windows and links", desc: "Docker", def: [k("KeyY")] },

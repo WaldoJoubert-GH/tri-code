@@ -735,8 +735,8 @@ textarea.finput { resize: vertical; min-height: 74px; }
 @container (max-width: 1275px) { .prog button + button, .prog .pt, .prog .pe { display: none; } }
 .status .timer { flex: none; color: var(--muted); font: 11px var(--mono); }
 .status .timer b { color: var(--accent); font-weight: 600; }
-/* Running Entry marker */
-.rec { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; animation: syncp 1s ease-in-out infinite alternate; }
+/* Running Entry marker. Only the <i>: Settings › Hotkeys and the commands window mark a key being recorded with .rec too. */
+i.rec { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; animation: syncp 1s ease-in-out infinite alternate; }
 
 /* Muted inline text inside the issue detail. */
 .c-m { color: var(--muted); }

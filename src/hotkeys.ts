@@ -3,6 +3,7 @@
 // terminal input keep reaching xterm. Listens in the capture phase so handled keys never reach
 // the terminal.
 
+import { listen } from "@tauri-apps/api/event";
 import { Project, Tab, activeProject, addTab, canvasTabs, focusedTab, setRatio, space } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
@@ -97,9 +98,6 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
       return true;
     case "files":
       openEditor(p);
-      return true;
-    case "go-to-file":
-      togglePalette();
       return true;
     case "git":
       openGitPanel(p);
@@ -264,10 +262,36 @@ function onKeyUp(e: KeyboardEvent) {
   if (isHintModifier(e)) hintUp();
 }
 
+/** When Alt+Space last arrived, by either road, so the other road's copy is dropped. */
+const altSpaceAt = { real: 0, relayed: 0 };
+const SAME_PRESS_MS = 250;
+const isAltSpace = (e: KeyboardEvent) => e.code === "Space" && e.altKey && !e.metaKey;
+
+/** WebView2 gives Alt+Space to Windows (the window menu), not the page; altspace.rs takes it back
+ *  and emits `alt-space`. Replayed as a keydown, it reaches the hotkeys and the key recorders. */
+function relayAltSpace(p: { shift: boolean; ctrl: boolean }) {
+  if (Date.now() - altSpaceAt.real < SAME_PRESS_MS) return;
+  altSpaceAt.relayed = Date.now();
+  const init = { code: "Space", key: " ", altKey: true, shiftKey: p.shift, ctrlKey: p.ctrl, bubbles: true, cancelable: true };
+  (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", init));
+}
+
+/** A real Alt+Space keydown right after the relayed one is the same press: drop it. */
+function dedupeAltSpace(e: KeyboardEvent) {
+  if (!e.isTrusted || !isAltSpace(e)) return;
+  if (Date.now() - altSpaceAt.relayed < SAME_PRESS_MS) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  } else altSpaceAt.real = Date.now();
+}
+
 /** Register the window keydown listener once (called from App's onMount). */
 export function installHotkeys() {
   if (installed) return;
   installed = true;
+  // First, so a duplicate never reaches onKey or a key recorder.
+  window.addEventListener("keydown", dedupeAltSpace, { capture: true });
+  if ("__TAURI_INTERNALS__" in window) void listen<{ shift: boolean; ctrl: boolean }>("alt-space", (e) => relayAltSpace(e.payload));
   window.addEventListener("keydown", onKey, { capture: true });
   window.addEventListener("keyup", onKeyUp, { capture: true });
   // Alt+Tab and the rest take the keyup to another window; leaving the app must not leave hints up.

@@ -1,4 +1,4 @@
-// Command Palette (Alt+X, Alt+T, or a click on the project path in the toolbar): one box that
+// Command Palette (Alt+X, or a click on the project path in the toolbar): one box that
 // runs any command by name and finds the project's files. The empty box lists recent picks, then
 // every command by group. Typing fuzzy-matches command titles (and, failing that, the muted hint:
 // a window's process title or a project's path) and the file index (git ls-files, or a walk when

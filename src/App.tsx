@@ -283,16 +283,16 @@ function Toolbar() {
       <button
         class="where"
         id="where"
-        title={where() ? `${where()} · ${withKey("Go to file", "go-to-file")}` : ""}
+        title={where() ? `${where()} · ${withKey("Go to file", "palette")}` : ""}
         aria-haspopup="dialog"
         aria-expanded={paletteOpen()}
         disabled={!activeProject()}
         onClick={togglePalette}
       >
         <Show when={activeProject()}>
-          <HoldFace id="go-to-file"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg></HoldFace>
+          <HoldFace id="palette"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg></HoldFace>
           <span class="wp"><bdi>{where()}</bdi></span>
-          <Caps id="go-to-file" class="hover-caps" />
+          <Caps id="palette" class="hover-caps" />
         </Show>
       </button>
       <InProgressChips />

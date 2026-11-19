@@ -630,7 +630,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   /** What shows instead of the editor: a note, a preview or media; null when the editor shows. */
   const other = createMemo<JSX.Element | null>(() => {
     if (!path()) {
-      const k = capsOf("go-to-file");
+      const k = capsOf("palette");
       return (
         <div class="fempty">
           <p>No file open.</p>

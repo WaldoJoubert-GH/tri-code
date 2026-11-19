@@ -207,6 +207,8 @@ pub fn run() {
                 main
             };
             let _main = window.add_child(main, LogicalPosition::new(0.0, 0.0), size)?;
+            #[cfg(windows)]
+            altspace::forward(app.handle(), &_main);
             #[cfg(target_os = "linux")]
             if !browser_gtk::framed() {
                 browser_gtk::install(&_main)?;
