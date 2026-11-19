@@ -21,6 +21,7 @@ mod grammars;
 mod ignored;
 mod github;
 mod leftovers;
+mod media;
 mod passwords;
 mod phone;
 mod plane;
@@ -205,6 +206,9 @@ pub fn run() {
             leftovers::leftovers_end,
             leftovers::leftovers_remote,
             leftovers::leftovers_checkouts,
+            media::media_watch,
+            media::media_unwatch,
+            media::media_control,
             agent_windows::agent_allowed,
             agent_windows::agent_open_failed,
             agent_windows::agent_worktree_made,
@@ -398,6 +402,7 @@ pub fn run() {
                 db::close_all();
                 docker::close_all();
                 monitor::close_all();
+                media::media_unwatch();
                 forward::close_all();
             }
         });

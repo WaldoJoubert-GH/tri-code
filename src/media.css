@@ -1,0 +1,102 @@
+/* Media Controls (MediaDock.tsx): the sidebar card, its rail ring and the popover. */
+
+.mglyph { fill: currentColor; flex: none; }
+.mart { flex: none; display: block; object-fit: cover; border-radius: 5px; background: var(--raised); }
+.mart.none {
+  display: grid; place-items: center; color: color-mix(in srgb, #fff 85%, transparent);
+  background: linear-gradient(135deg, hsl(var(--h) 55% 52%), hsl(calc(var(--h) + 60) 50% 38%));
+}
+
+/* An equalizer while playing, flat while paused */
+.meq { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 10px; height: 9px; flex: none; }
+.meq i { width: 2px; height: 30%; border-radius: 1px; background: var(--accent); }
+.media.playing .meq i, .media-pop .meq i { animation: meq 900ms ease-in-out infinite; }
+.meq i:nth-child(2) { animation-delay: -300ms !important; animation-duration: 700ms !important; }
+.meq i:nth-child(3) { animation-delay: -600ms !important; animation-duration: 1100ms !important; }
+@keyframes meq { 0%, 100% { height: 25%; } 50% { height: 100%; } }
+
+.mbtn { display: grid; place-items: center; width: 26px; height: 24px; border-radius: 5px; color: var(--muted); flex: none; }
+.mbtn:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.mbtn:disabled { opacity: .35; cursor: default; }
+.mbtn.play { color: var(--text); }
+.mbtn.play.big { width: 36px; height: 36px; border-radius: 50%; background: var(--text); color: var(--panel-solid); }
+.mbtn.play.big:hover { background: var(--text); color: var(--panel-solid); transform: scale(1.05); }
+
+.mbar { position: relative; height: 3px; border-radius: 2px; background: var(--raised); }
+.mbar.seekable { cursor: pointer; }
+/* a taller hit area than the line it draws */
+.mbar.seekable::before { content: ""; position: absolute; inset: -6px 0; }
+.mbar > i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--text); opacity: .75; }
+.mbar > b { position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--text); opacity: 0; transition: opacity 120ms; }
+.mbar.seekable:hover > i { background: var(--accent); opacity: 1; }
+.mbar.seekable:hover > b { opacity: 1; }
+.mbar.unknown > i, .mbar.unknown > b { display: none; }
+.mtimes { display: flex; justify-content: space-between; margin-top: 3px; font: 10px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.msrc { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font: 10.5px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The card: above Settings, in the sticky foot, so it stays put however long the list is */
+.media { margin-bottom: 6px; }
+.media-dock {
+  position: relative; display: flex; flex-direction: column; gap: 7px; padding: 8px;
+  border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--bg-solid) 70%, var(--panel-solid));
+}
+.media-dock .row { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 0; text-align: left; border-radius: 5px; }
+.media-dock .row .mart { width: 36px; height: 36px; }
+.media-dock .w, .media-pop .w { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.media-dock .ttl, .media-pop .ttl { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-dock .sub, .media-pop .sub { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-dock .row:hover .ttl { color: var(--accent); }
+.media-dock .mctl { display: flex; align-items: center; gap: 0; }
+.media-dock .msrc { flex: 1; }
+.media-dock .x { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 4px; color: var(--muted); opacity: 0; z-index: 1; }
+.media-dock:hover .x, .media-dock .x:focus-visible { opacity: 1; }
+.media-dock .x:hover { background: var(--hover); color: var(--text); }
+
+/* The rail: the artwork in a ring that fills with the track */
+.media-ring {
+  display: none; position: relative; width: 34px; height: 34px; margin: 2px auto 0; border-radius: 50%; cursor: pointer;
+  background: conic-gradient(var(--accent) var(--p, 0%), var(--raised) 0);
+}
+/* An explicit size: inset alone doesn't stretch an <img>, which keeps the thumbnail's own size */
+.media-ring .mart { position: absolute; top: 3px; left: 3px; width: calc(100% - 6px); height: calc(100% - 6px); border-radius: 50%; }
+.media.playing .media-ring .mart { animation: mspin 10s linear infinite; }
+@keyframes mspin { to { transform: rotate(360deg); } }
+.media-ring .ov { position: absolute; inset: 3px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity 120ms; }
+.media-ring:hover .ov, .media:not(.playing) .media-ring .ov { opacity: 1; }
+.media-ring .more { position: absolute; right: -5px; bottom: -4px; width: 17px; height: 17px; display: grid; place-items: center; border-radius: 50%; background: var(--panel-solid); border: 1px solid var(--line); }
+.media-ring .more:hover { border-color: var(--accent); }
+.media-ring .more .meq { width: 8px; height: 7px; }
+.rail:not(.peek) .media-dock { display: none; }
+.rail:not(.peek) .media-ring { display: block; }
+.rail:not(.peek) .media { padding-top: 6px; border-top: 1px solid var(--line); }
+
+/* The popover beside the sidebar */
+.pop.media-pop { width: 300px; padding: 12px; gap: 10px; outline: none; }
+.media-pop .hero { display: flex; gap: 12px; min-width: 0; }
+.media-pop .mart.big { width: 76px; height: 76px; border-radius: 7px; box-shadow: 0 8px 20px -10px var(--shadow); }
+.media-pop .mart.big.none svg { width: 26px; height: 26px; }
+.media-pop .meta { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
+.media-pop .meta b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-pop .meta span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-pop .meta .alb { font-size: 11.5px; opacity: .8; }
+.media-pop .meta .msrc { margin-bottom: 2px; }
+.media-pop .mbar { height: 4px; }
+.media-pop .mctl.center { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.media-pop .mctl.center .mbtn:not(.big) { width: 30px; height: 30px; }
+.media-pop .mctl.center .mbtn:not(.big) svg { width: 15px; height: 15px; }
+.media-pop .others { border-top: 1px solid var(--line); margin: 0 -12px; padding: 6px 6px 0; }
+.media-pop .others h4 { margin: 2px 6px 4px; }
+.media-pop .other { display: flex; align-items: center; gap: 4px; }
+.media-pop .pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 4px 6px; border-radius: 5px; text-align: left; }
+.media-pop .pick:hover { background: var(--hover); }
+.media-pop .pick .mart { width: 24px; height: 24px; border-radius: 4px; }
+.media-pop .pick .mart.none svg { width: 11px; height: 11px; }
+.media-pop .pick .ttl { font-size: 12px; font-weight: 500; }
+.media-pop .pick .sub { font-size: 10.5px; font-family: var(--mono); }
+.media-pop .pf { margin: 0 -12px -12px; padding: 7px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; display: flex; align-items: center; gap: 5px; }
+.media-pop .pf .keycaps + .keycaps { margin-left: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .meq i, .media.playing .media-ring .mart { animation: none !important; }
+  .meq i { height: 60%; }
+}

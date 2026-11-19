@@ -342,6 +342,8 @@ export type Settings = {
   draftCommands?: Partial<Record<DraftKind, string>>;
   /** false hides Claude's session and weekly usage in the status line (and stops fetching it). Unset shows it. */
   claudeUsage?: boolean;
+  /** false turns off Media Controls (media.ts): the sidebar card, its hotkeys, and watching what plays. Unset is on. */
+  media?: boolean;
   /** The sidebar's Environment headers: "hide" never shows them, "auto" only once there are two
    *  Environments or more. Unset always shows them. Chosen from design/env-headers.html (variant D). */
   envHeaders?: "auto" | "hide";
@@ -868,6 +870,11 @@ export function setEnvHeaders(v: "show" | "auto" | "hide") {
 /** Whether the sidebar leaves out its Environment headers just now. */
 export const envHeadersHidden = () =>
   app.settings.envHeaders === "hide" || (app.settings.envHeaders === "auto" && app.environments.length < 2);
+
+/** Turn Media Controls on or off; on is kept as unset. */
+export function setMedia(on: boolean) {
+  setApp("settings", "media", on ? undefined : false);
+}
 
 /** Show or hide Claude's usage in the status line. */
 export function setClaudeUsage(on: boolean) {
