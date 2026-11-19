@@ -56,6 +56,9 @@ export type Profile = {
   autofill?: false;
   /** false stops offering to save passwords. Unset is on. */
   passwords?: false;
+  /** Remote debugging: agents (Playwright, Chrome DevTools MCP) attach to this profile's pages over
+   *  the DevTools protocol on 127.0.0.1 at this port. WebView2 only, never the default profile. Unset is off. */
+  debugPort?: number;
 };
 
 export const PROFILE_COLORS = ["ocean", "marigold", "terracotta", "moss", "plum", "slate"];
@@ -80,6 +83,8 @@ export type Page = {
   opener?: string;
   /** In a remote project: `localhost` and `file:` mean this machine, not the remote (Alt+Enter). */
   here?: true;
+  /** A Browser Profile of its own; read only while its window's `profileScope` is "page". Unset is the window's. */
+  profile?: string;
 };
 
 /** A window on the canvas. Terminals run a PTY; browsers are native child webviews;
@@ -97,6 +102,8 @@ export type Tab = {
   page?: string;
   /** Browser tabs only: a Browser Profile other than the project's. */
   profile?: string;
+  /** Browser tabs only: "page" lets each Page pick its own profile (Page Profiles). Unset: the pages share the window's. */
+  profileScope?: "page";
   /** Editor tabs only: the file shown, one of `files` (unset when none is open). */
   path?: string;
   /** Editor tabs only: the open files, in tab order. */
@@ -358,6 +365,10 @@ export type Settings = {
   remote?: { push?: Partial<Record<SoundEvent, boolean>> };
   /** The Browser Profile of projects that haven't picked one. Unset is DEFAULT_PROFILE. */
   profile?: string;
+  /** Browser windows start with Page Profiles on (each page picks its own). Unset: one profile per window. */
+  pageProfiles?: true;
+  /** Shows the Debug Menu's bug button in browser windows' nav bars. Unset hides it; F12 opens DevTools anyway. */
+  debugMenu?: true;
   /** Light or dark whatever the OS says (look.ts). Unset follows the OS. */
   theme?: "light" | "dark";
   /** The font of menus, panels and labels, by family (look.ts). Unset is the default. */
@@ -633,7 +644,7 @@ export function addTab(projectId: string, kind: TabKind, opts: { url?: string; p
     const a = opts.agent;
     const tab: Tab = {
       id, kind, space: p.ws,
-      ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}), ...(a?.profile ? { profile: a.profile } : {}) } : {}),
+      ...(kind === "browser" ? { ...newPages(opts.url ?? ""), ...(a ? { agent: a.id, name: a.name } : {}), ...(a?.profile ? { profile: a.profile } : {}), ...(app.settings.pageProfiles ? { profileScope: "page" as const } : {}) } : {}),
       ...(kind === "editor" && opts.path ? { path: opts.path, files: [opts.path] } : {}),
       ...(kind === "db" && opts.db ? { db: opts.db } : {}),
       ...(kind === "term" ? { agent: a?.id, name: a?.name ?? "shell", cmd: a?.command ?? "", ...(opts.by ? { by: opts.by } : {}), ...(opts.once ? { once: true as const } : {}) } : {}),
@@ -1010,7 +1021,9 @@ export function addPage(projectId: string, tabId: string, url: string, opts: { o
     let at = opts.opener ? pages.findIndex((x) => x.id === opts.opener) : -1;
     if (at < 0) at = pages.length - 1;
     else while (pages[at + 1]?.opener === opts.opener) at++;
-    pages.splice(at + 1, 0, { id, url, ...(opts.opener ? { opener: opts.opener } : {}) });
+    // Page Profiles: a page opened from another keeps its profile, so a sign-in it starts goes on working.
+    const from = t.profileScope === "page" ? pages.find((x) => x.id === (opts.opener ?? t.page))?.profile : undefined;
+    pages.splice(at + 1, 0, { id, url, ...(opts.opener ? { opener: opts.opener } : {}), ...(from ? { profile: from } : {}) });
     if (opts.show || !t.page) t.page = id;
   });
   return id;
@@ -1180,6 +1193,10 @@ export const projectProfile = (p: Project): Profile =>
 /** The Browser Profile a browser window uses: its own pick, else its project's. */
 export const tabProfile = (p: Project, t: Tab): Profile => profileById(t.profile) ?? projectProfile(p);
 
+/** The Browser Profile a page's webview uses: its own pick when its window has Page Profiles on, else the window's. */
+export const pageProfile = (p: Project, t: Tab, pg: Page | undefined): Profile =>
+  (t.profileScope === "page" && pg ? profileById(pg.profile) : undefined) ?? tabProfile(p, t);
+
 /** Add a profile with the next unused colour; returns its id. */
 export function addProfile(): string {
   const id = newId();
@@ -1211,7 +1228,10 @@ export function removeProfile(id: string) {
     for (const a of s.agents) if (a.profile === id) delete a.profile;
     for (const p of s.projects) {
       if (p.profile === id) delete p.profile;
-      for (const t of p.tabs) if (t.profile === id) delete t.profile;
+      for (const t of p.tabs) {
+        if (t.profile === id) delete t.profile;
+        for (const pg of t.pages ?? []) if (pg.profile === id) delete pg.profile;
+      }
     }
   }));
 }
@@ -1230,16 +1250,40 @@ export function setProjectProfile(projectId: string, id: string) {
     for (const q of s.projects) {
       if (q.id !== p.id && q.parent !== p.id) continue;
       if (q !== p) delete q.profile;
-      for (const t of q.tabs) if (t.profile === id) delete t.profile;
+      for (const t of q.tabs) {
+        if (t.profile === id) delete t.profile;
+        // A page that picked the profile its window now uses anyway follows the window again.
+        if (!t.profile) for (const pg of t.pages ?? []) if (pg.profile === id) delete pg.profile;
+      }
     }
   });
 }
 
-/** A window's profile; undefined goes back to the project's. */
+/** A window's profile; undefined goes back to the project's. Its pages that picked it drop their pick. */
 export function setTabProfile(projectId: string, tabId: string, id: string | undefined) {
   editTab(projectId, tabId, (t) => {
     if (id) t.profile = id;
     else delete t.profile;
+    for (const pg of t.pages ?? []) if (pg.profile === id) delete pg.profile;
+  });
+}
+
+/** One page's profile (Page Profiles); undefined goes back to the window's. */
+export function setPageProfile(projectId: string, tabId: string, pageId: string, id: string | undefined) {
+  editTab(projectId, tabId, (t) => {
+    const pg = t.pages?.find((x) => x.id === pageId);
+    if (!pg) return;
+    if (id) pg.profile = id;
+    else delete pg.profile;
+  });
+}
+
+/** Page Profiles on or off for a window. Off, every page goes back to the window's profile. */
+export function setProfileScope(projectId: string, tabId: string, perPage: boolean) {
+  editTab(projectId, tabId, (t) => {
+    if (perPage) return void (t.profileScope = "page");
+    delete t.profileScope;
+    for (const pg of t.pages ?? []) delete pg.profile;
   });
 }
 

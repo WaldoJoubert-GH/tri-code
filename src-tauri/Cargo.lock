@@ -6040,6 +6040,7 @@ dependencies = [
  "fontdb",
  "futures-util",
  "getrandom 0.2.17",
+ "gtk",
  "hmac 0.12.1",
  "mongodb",
  "objc2",

@@ -42,6 +42,7 @@ import { openExternal, openExternalIn, openUrlInProject, setBrowsersOverlaid, se
 import { FavPopover, favEditOpen } from "./favs";
 import { TunnelPopover, tunnelPopOpen } from "./tunnelui";
 import { ProfileMenu, profileMenuOpen } from "./profiles";
+import { DebugMenu, debugMenuOpen } from "./debugmenu";
 import { DownloadMenu, downloadMenuOpen } from "./downloads";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./Tour";
@@ -167,7 +168,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || tunnelPopOpen() || profileMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen() || mediaPopOpen()));
+  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || tunnelPopOpen() || profileMenuOpen() || debugMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen() || mediaPopOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   // The backdrop and Transparency are the active project's repo's.
@@ -208,6 +209,7 @@ export default function App() {
       <FavPopover />
       <TunnelPopover />
       <ProfileMenu />
+      <DebugMenu />
       <DownloadMenu />
       <Palette />
       <OpenProjectDialog />

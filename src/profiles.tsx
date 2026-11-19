@@ -5,10 +5,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createResource, createSignal, onCleanup, onMount } from "solid-js";
 import {
-  DEFAULT_PROFILE, PROFILE_COLORS, Profile, addProfile, app, projectById, projectProfile, removeProfile, setDefaultProfile,
-  setProjectProfile, setTabProfile, tabName, tabProfile, updateProfile,
+  DEFAULT_PROFILE, PROFILE_COLORS, Profile, activePage, addProfile, app, pageProfile, projectById, projectProfile, removeProfile,
+  setDefaultProfile, setPageProfile, setProfileScope, setProjectProfile, setSettings, setTabProfile, tabName, tabProfile, updateProfile,
 } from "./state";
-import { applyProfileAutofill, leaveProfile, nativeBrowsers, profilesSupported } from "./browsers";
+import { applyProfileAutofill, browserInfo, debugSupport, leaveProfile, nativeBrowsers, profilesSupported } from "./browsers";
+import { freePort, setDebugPort } from "./debugmenu";
 import { isMac } from "./modkey";
 import { Icon, toggleIconPicker } from "./lucide";
 import { openSettings } from "./Settings";
@@ -34,7 +35,7 @@ function usage(id: string) {
   let projects = 0, windows = 0;
   for (const p of app.projects) {
     if (p.profile === id) projects++;
-    for (const t of p.tabs) if (t.kind === "browser" && tabProfile(p, t).id === id) windows++;
+    for (const t of p.tabs) if (t.kind === "browser" && (t.pages ?? []).some((pg) => pageProfile(p, t, pg).id === id)) windows++;
   }
   return { projects, windows };
 }
@@ -95,45 +96,109 @@ export function ProfileMenu() {
           {(project) => (
             <Show when={project.tabs.find((t) => t.id === m.tabId)} keyed>
               {(tab) => {
-                const cur = () => tabProfile(project, tab);
+                const perPage = () => tab.profileScope === "page";
+                const page = () => activePage(tab);
+                const win = () => tabProfile(project, tab);
+                const cur = () => pageProfile(project, tab, page());
                 const def = () => projectProfile(project);
+                /** Pages use more than one profile, so turning Page Profiles off would move some. */
+                const mixed = () => new Set((tab.pages ?? []).map((pg) => pageProfile(project, tab, pg).id)).size > 1;
+                const [confirming, setConfirming] = createSignal(false);
+                const pageName = () => (page() && browserInfo[page()!.id]?.title) || "this page";
                 const pick = (p: Profile) => {
                   closeProfileMenu();
                   if (p.id === cur().id) return;
+                  if (perPage() && page()) {
+                    setPageProfile(project.id, tab.id, page()!.id, p.id === win().id ? undefined : p.id);
+                    return flash(`${pageName()} reopens in ${p.name}`);
+                  }
                   setTabProfile(project.id, tab.id, p.id === def().id ? undefined : p.id);
                   flash(`${tabName(tab)} reopens in ${p.name}`);
+                };
+                const scope = (on: boolean) => {
+                  if (on === perPage()) return setConfirming(false);
+                  if (on) {
+                    setProfileScope(project.id, tab.id, true);
+                    return flash(`each page of ${tabName(tab)} can pick its own profile`);
+                  }
+                  if (mixed() && !confirming()) return setConfirming(true);
+                  setConfirming(false);
+                  setProfileScope(project.id, tab.id, false);
+                  flash(`${tabName(tab)}'s pages share ${win().name}`);
                 };
                 const manage = () => {
                   closeProfileMenu();
                   openSettings("browser");
                 };
+                const sub = () =>
+                  perPage()
+                    ? cur().id === win().id ? "this page · same as the window" : `this page · the window uses ${win().name}`
+                    : cur().id === def().id ? `${project.name}'s profile` : `this window · ${project.name} uses ${def().name}`;
                 return (
                   <div class="profmenu" role="menu" aria-label="Browser profile" ref={(el) => requestAnimationFrame(() => place(el, m.anchor))}>
+                    <div class="pm-scope">
+                      <span>Profile for</span>
+                      <span class="pm-seg" role="radiogroup" aria-label="Profile applies to">
+                        <button role="radio" aria-checked={!perPage()} onClick={() => scope(false)}>
+                          <Icon name="app-window" size={12} /> This window
+                        </button>
+                        <button role="radio" aria-checked={perPage()} onClick={() => scope(true)}>
+                          <Icon name="layers" size={12} /> Each page
+                        </button>
+                      </span>
+                    </div>
+                    <Show when={confirming()}>
+                      <div class="pm-confirm">
+                        Pages here use different profiles. Reopen all {tab.pages?.length} in <b>{win().name}</b>?
+                        <span>
+                          <button class="primary" onClick={() => scope(false)}>Reopen in {win().name}</button>
+                          <button onClick={() => setConfirming(false)}>Cancel</button>
+                        </span>
+                      </div>
+                    </Show>
                     <div class="pm-cur">
                       <ProfileAvatar profile={cur()} size={30} />
                       <div>
                         <b>{cur().name}</b>
-                        <small>{cur().id === def().id ? `${project.name}'s profile` : `this window · ${project.name} uses ${def().name}`}</small>
+                        <small>{sub()}</small>
                       </div>
                     </div>
-                    <div class="mt">Open this window in</div>
+                    <div class="mt">{perPage() ? "Open this page in" : "Open this window in"}</div>
                     <For each={app.profiles}>
                       {(p) => (
                         <button role="menuitemradio" aria-checked={p.id === cur().id} onClick={() => pick(p)}>
                           <ProfileAvatar profile={p} />
                           <span>{p.name}</span>
+                          <Show when={debugSupport().protocol && p.id !== DEFAULT_PROFILE && p.debugPort}>
+                            <small class="pm-port" title="Remote debugging is on for this profile">:{p.debugPort}</small>
+                          </Show>
                           <Show when={p.id === cur().id}><Icon name="check" size={13} class="pm-check" /></Show>
                         </button>
                       )}
                     </For>
                     <div class="msep" />
+                    <Show when={perPage() && cur().id !== win().id}>
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          closeProfileMenu();
+                          const p = cur();
+                          setTabProfile(project.id, tab.id, p.id === def().id ? undefined : p.id);
+                          for (const pg of tab.pages ?? []) setPageProfile(project.id, tab.id, pg.id, undefined);
+                          flash(`every page of ${tabName(tab)} reopens in ${p.name}`);
+                        }}
+                      >
+                        <Icon name="layers" size={13} /> Use {cur().name} for every page here
+                      </button>
+                    </Show>
                     <Show when={cur().id !== def().id}>
                       <button
                         role="menuitem"
                         onClick={() => {
                           closeProfileMenu();
-                          setProjectProfile(project.id, cur().id);
-                          flash(`${project.name}'s browser windows open in ${cur().name}`);
+                          const p = cur();
+                          setProjectProfile(project.id, p.id);
+                          flash(`${project.name}'s browser windows open in ${p.name}`);
                         }}
                       >
                         <Icon name="pin" size={13} /> Use {cur().name} for {project.name}
@@ -207,6 +272,40 @@ function SavedLogins(props: { profile: Profile }) {
   );
 }
 
+/** Remote debugging for one profile: a switch and its port. Changing either reopens its pages. */
+function DebugPort(props: { profile: Profile }) {
+  const p = () => props.profile;
+  const commit = (el: HTMLInputElement) => {
+    const n = Number(el.value);
+    const taken = app.profiles.some((q) => q.id !== p().id && q.debugPort === n);
+    if (!Number.isInteger(n) || n < 1024 || n > 65535 || taken) {
+      el.value = String(p().debugPort);
+      return flash(taken ? `another profile uses port ${n}` : "pick a port from 1024 to 65535");
+    }
+    if (n !== p().debugPort) setDebugPort(p().id, p().name, n);
+  };
+  return (
+    <span class="pf-debug">
+      <Toggle
+        on={!!p().debugPort}
+        label="Remote debugging"
+        title="Agents (Playwright, Chrome DevTools MCP) can drive this profile's pages, signed in, over the DevTools protocol on 127.0.0.1. Its pages reopen."
+        onChange={(on) => setDebugPort(p().id, p().name, on ? freePort(app) : undefined)}
+      />
+      <Show when={p().debugPort}>
+        <input
+          class="pf-port"
+          inputmode="numeric"
+          aria-label={`${p().name}'s remote debugging port`}
+          value={p().debugPort}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          onBlur={(e) => commit(e.currentTarget)}
+        />
+      </Show>
+    </span>
+  );
+}
+
 function ProfileRow(props: { profile: Profile; focus: boolean }) {
   const p = () => props.profile;
   const [confirming, setConfirming] = createSignal(false);
@@ -268,12 +367,20 @@ function ProfileRow(props: { profile: Profile; focus: boolean }) {
               onChange={(on) => setAutofill({ autofill: on ? undefined : false })}
             />
           </Show>
+          <Show when={debugSupport().protocol && p().id !== DEFAULT_PROFILE}>
+            <DebugPort profile={p()} />
+          </Show>
           <span class="pf-used">
             {[used().projects && plural(used().projects, "project"), used().windows && plural(used().windows, "window")].filter(Boolean).join(" · ") || "unused"}
           </span>
         </div>
         <Show when={isMac && p().passwords !== false}>
           <SavedLogins profile={p()} />
+        </Show>
+        <Show when={debugSupport().protocol && p().debugPort}>
+          <div class="pf-warn">
+            <Icon name="triangle-alert" size={12} /> Any program on this computer can control {p().name}'s signed-in pages while this is on.
+          </div>
         </Show>
         <Show when={confirming()}>
           <div class="pf-confirm">
@@ -313,11 +420,32 @@ export function BrowserPage() {
           <p class="note">
             {nativeBrowsers
               ? "Browser profiles need macOS 14 or later, the first version whose web view can keep their sign-ins apart. Every browser window uses one set of cookies here."
-              : "Browser windows on Linux show pages in a frame of tri-code's own window, which can't keep sign-ins apart, so there are no profiles here."}
+              : "Browser windows show pages in a frame of tri-code's own window (TRICODE_FRAMED_BROWSERS is set), which can't keep sign-ins apart, so there are no profiles here."}
           </p>
         </>
       }
     >
+      <h4>Windows</h4>
+      <div class="pf-opts">
+        <Toggle
+          on={!!app.settings.pageProfiles}
+          label="New windows give each page its own profile"
+          title="Off: a window's pages share one profile. Any window can change this from the avatar in its address bar."
+          onChange={(on) => setSettings({ pageProfiles: on ? true : undefined })}
+        />
+        <Show when={debugSupport().devtools}>
+          <Toggle
+            on={!!app.settings.debugMenu}
+            label="Show the debug menu"
+            title={
+              debugSupport().protocol
+                ? "A bug button in each browser window's address bar: DevTools, console errors, cache, throttling, site data and remote debugging. F12 opens DevTools with it off."
+                : "A bug button in each browser window's address bar that opens the Web Inspector. Right-click › Inspect Element does too."
+            }
+            onChange={(on) => setSettings({ debugMenu: on ? true : undefined })}
+          />
+        </Show>
+      </div>
       <h4>Profiles</h4>
       <div class="pf-list">
         <For each={app.profiles}>{(p) => <ProfileRow profile={p} focus={fresh() === p.id} />}</For>
@@ -328,7 +456,7 @@ export function BrowserPage() {
       <p class="note">
         Each profile keeps its own cookies, sign-ins, saved passwords, autofill and history, so a project can stay signed in as a
         different person. A project's browser windows open in its profile (the avatar in a browser window's address bar changes it, for
-        the project or one window); web apps can pick one in the commands window. Personal keeps the browser data from before profiles.
+        the project, one window, or one page once the window's menu is set to Each page); web apps can pick one in the commands window. Personal keeps the browser data from before profiles.
         {isMac ? " On macOS tri-code saves passwords itself, in your Keychain; macOS's web view can't fill other forms." : ""}
       </p>
     </Show>
