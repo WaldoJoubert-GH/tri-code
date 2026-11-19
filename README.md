@@ -4,6 +4,9 @@
 
 tri-code is a minimal agent development environment. The left sidebar lists projects grouped by host (`local` or an ssh destination). Each project has terminal tabs that run an agent: `claude` (Claude Code), `pi`, a plain shell, or any terminal app you add. Local tabs run in a local PTY. Remote tabs run the system `ssh` client and attach to a persistent session on the remote host, so agents survive network drops and app restarts. The app is built with Tauri v2 (Rust), SolidJS, and xterm.js. Projects and tabs are saved to `state.json` in the Tauri app config directory.
 
+> [!WARNING]
+> **tri-code is in alpha.** Expect bugs and rough edges, and expect things to change between releases. Day-to-day development and testing happen on Windows; macOS and Linux are not actively tested yet, so feedback from those platforms is especially valuable. If something breaks or feels wrong, please [open an issue](https://github.com/WaldoJoubert-GH/tri-code/issues).
+
 ![claude at work in a pinned worktree, beside the git window with a split diff and a shell](docs/screenshots/hero.png)
 
 ▶ [Watch the 40-second demo](docs/screenshots/demo.mp4)
