@@ -10,6 +10,9 @@ export const isMac = /Mac/i.test(navigator.userAgent);
 /** The Meta key's name on this OS. */
 export const metaName = isMac ? "Cmd" : /Windows/i.test(navigator.userAgent) ? "Win" : "Super";
 
+/** The text chords' modifier as printed: Cmd on a Mac (where Ctrl works too), Ctrl elsewhere. */
+export const ctrlName = isMac ? "Cmd" : "Ctrl";
+
 /** The modifier as printed: Alt, or Cmd / Win / Super. */
 export const modLabel = () => (app.settings.modKey === "meta" ? metaName : "Alt");
 

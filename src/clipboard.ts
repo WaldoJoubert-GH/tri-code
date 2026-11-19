@@ -55,7 +55,7 @@ function selectedText(el: HTMLElement | null): string {
 }
 
 /**
- * Ctrl+C / Ctrl+V for everything that is not a terminal: the URL bar, project
+ * Ctrl+C / Ctrl+X / Ctrl+V (Cmd on a Mac) for everything that is not a terminal: the URL bar, project
  * inputs, and selectable overlays. Terminals run their own handler (terms.ts)
  * because xterm keeps its buffer out of the DOM.
  */
@@ -72,6 +72,15 @@ export function installClipboardFallback(): void {
       if (text) {
         e.preventDefault();
         copyText(text);
+      }
+    } else if (isKey("cut", e) && editable(target)) {
+      // macOS only cuts through the Edit menu, which a webview doesn't always reach; do it here.
+      const text = selectedText(target);
+      const locked = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement ? target.readOnly || target.disabled : false;
+      if (text && !locked) {
+        e.preventDefault();
+        copyText(text);
+        document.execCommand("delete"); // keeps the field's undo and fires its input event
       }
     } else if (isKey("paste", e) && editable(target)) {
       e.preventDefault();

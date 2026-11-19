@@ -65,6 +65,7 @@ export const ACTIONS: Action[] = [
   { id: "unfold-recursive", group: "Editor", desc: "Unfold the block at the cursor and every block inside it", def: vs("BracketRight"), text: true, seq: true },
   { id: "fold-all", group: "Editor", desc: "Fold every top-level block", def: vs("Digit0"), text: true, seq: true },
   { id: "unfold-all", group: "Editor", desc: "Unfold everything", def: vs("KeyJ"), text: true, seq: true },
+  { id: "cut", group: "Text", desc: "Cut the selection in a text field or the editor", def: tx("KeyX"), text: true },
   { id: "copy", group: "Text", desc: "Copy the selection (sends it on to the app when nothing is selected)", def: tx("KeyC"), text: true },
   { id: "paste", group: "Text", desc: "Paste into the focused window", def: tx("KeyV"), text: true },
   { id: "favourite", group: "Text", desc: "Favourite the browser's page", def: tx("KeyD"), text: true },

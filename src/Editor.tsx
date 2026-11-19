@@ -40,6 +40,7 @@ import { BookView, CsvTable } from "./SheetView";
 import { openSheetDb } from "./db";
 import { redo, undo } from "@codemirror/commands";
 import "./files.css";
+import { ctrlName } from "./modkey";
 
 /** What Preview shows: rendered Markdown, HTML or SVG, or a CSV as a table (Table mode). */
 type Preview = "md" | "html" | "svg" | "csv";
@@ -767,7 +768,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
               </button>
             </Show>
             <Show when={isDirty(path())}>
-              <button class="fsave" title="Save (Ctrl+S)" onClick={() => void save(path())}>Save</button>
+              <button class="fsave" title={`Save (${ctrlName}+S)`} onClick={() => void save(path())}>Save</button>
             </Show>
             <button title={isDirty(path()) ? "Reload (discards changes)" : "Reload"} onClick={reload}>⟳</button>
           </div>

@@ -883,7 +883,7 @@ function IssueModal(props: {
           </div>
         </div>
         <div class="mfoot">
-          <span class="grow"><Key k="Ctrl" /><Key k="Enter" /> {props.editing ? "save" : "create"} · <Key k="Esc" /> cancel</span>
+          <span class="grow"><Key k="Mod" /><Key k="Enter" /> {props.editing ? "save" : "create"} · <Key k="Esc" /> cancel</span>
           <button type="button" class="btn" onClick={props.onClose}>Cancel</button>
           <button type="submit" class="btn primary" disabled={!title().trim() || busy()}>{props.editing ? "Save" : "Create issue"}</button>
         </div>
@@ -1346,10 +1346,10 @@ function Detail(props: {
                 </div>
               </Show>
               <div class="cbar">
-                <Show when={i().source === "plane"} fallback={<span class="grow">posts to GitHub through gh · <Key k="Ctrl" /><Key k="Enter" /> posts</span>}>
+                <Show when={i().source === "plane"} fallback={<span class="grow">posts to GitHub through gh · <Key k="Mod" /><Key k="Enter" /> posts</span>}>
                   <button class="ib" title="Attach images" onClick={props.onAttach}><Icon name="image-plus" size={15} /></button>
                   <input class="cfile" type="file" accept="image/*" multiple hidden ref={props.fileRef} onChange={props.onFile} />
-                  <span class="grow">images upload to Plane · <Key k="Ctrl" /><Key k="Enter" /> posts</span>
+                  <span class="grow">images upload to Plane · <Key k="Mod" /><Key k="Enter" /> posts</span>
                 </Show>
                 <button class="post" disabled={!draft().text.trim() && !draft().images.length} onClick={props.onPost}>Comment</button>
               </div>

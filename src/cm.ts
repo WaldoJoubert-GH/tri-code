@@ -20,7 +20,7 @@ import type { ChangeMarks } from "./diff";
 import type { CtxItem } from "./ctxmenu";
 import { copyText, readText } from "./clipboard";
 import { isMac } from "./modkey";
-import { keysOf, sameChord, setEditorKeys, textPress } from "./keymap";
+import { isKey, keysOf, sameChord, setEditorKeys, textPress } from "./keymap";
 import type { Chord } from "./state";
 import { type Lang, langById, langOfName } from "./grammars";
 import { isInstalled, loadInstalled, overrideOf } from "./langs";
@@ -349,6 +349,15 @@ function editorKey(e: KeyboardEvent): boolean {
 
 setEditorKeys(editorKey);
 
+/** Cut the selection to the clipboard. False with nothing selected or a read-only file. */
+function cut(view: EditorView): boolean {
+  const { state } = view;
+  if (state.readOnly || state.selection.ranges.every((r) => r.empty)) return false;
+  copyText(state.selection.ranges.filter((r) => !r.empty).map((r) => state.sliceDoc(r.from, r.to)).join(state.lineBreak));
+  view.dispatch(state.replaceSelection(""), { userEvent: "delete.cut", scrollIntoView: true });
+  return true;
+}
+
 const key = (k: string) => (isMac ? k.replace(/Ctrl\+/, "Cmd+").replace(/Alt\+/, "Opt+") : k);
 
 /** The editor's right-click menu, like VS Code's. A click outside the selection moves the cursor
@@ -363,11 +372,7 @@ export function editorMenu(view: EditorView, e: MouseEvent): CtxItem[] {
   const picked = () => state.selection.ranges.filter((r) => !r.empty).map((r) => state.sliceDoc(r.from, r.to)).join(state.lineBreak);
   const run = (c: Command) => () => (c(view), view.focus());
   return [
-    { label: "Cut", kbd: key("Ctrl+X"), disabled: ro || empty, run: () => {
-      copyText(picked());
-      view.dispatch(view.state.replaceSelection(""), { userEvent: "delete.cut", scrollIntoView: true });
-      view.focus();
-    } },
+    { label: "Cut", kbd: key("Ctrl+X"), disabled: ro || empty, run: () => (cut(view), view.focus()) },
     { label: "Copy", kbd: key("Ctrl+C"), disabled: empty, run: () => (copyText(picked()), view.focus()) },
     { label: "Paste", kbd: key("Ctrl+V"), disabled: ro, run: () => void readText().then((t) => {
       if (t) view.dispatch(view.state.replaceSelection(t), { userEvent: "input.paste", scrollIntoView: true });
@@ -447,6 +452,8 @@ function extensions(s: Setup): Extension {
       ...completionKeymap,
       indentWithTab,
     ]),
+    // The Keymap's Cut (Cmd+X on a Mac, where the webview may never see the Edit menu's cut).
+    EditorView.domEventHandlers({ keydown: (e, view) => isKey("cut", e) && cut(view) && (e.preventDefault(), true) }),
     EditorView.updateListener.of((u) => {
       if (u.docChanged || u.selectionSet) s.onUpdate(u.state, u.docChanged);
     }),

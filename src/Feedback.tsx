@@ -9,7 +9,7 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
 import { openExternal } from "./browsers";
 import { appVersion } from "./updater";
-import { showToast } from "./ui";
+import { flash, showToast } from "./ui";
 import { KeyText } from "./Keys";
 
 const REPO = "WaldoJoubert-GH/tri-code";
@@ -83,10 +83,12 @@ export function FeedbackPopover() {
     el.querySelector<HTMLInputElement>("input")?.focus();
   };
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      void send();
-    }
+    if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || e.altKey || e.isComposing) return;
+    e.preventDefault();
+    if (form.title.trim()) return void send();
+    // Nothing to file without a title: say so, rather than ignore the key.
+    (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>("input")?.focus();
+    flash("add a title to send");
   };
 
   return (
@@ -115,7 +117,7 @@ export function FeedbackPopover() {
           <div class="foot">
             <span>Files a GitHub issue as you, via gh</span>
             <button type="button" class="primary" disabled={!form.title.trim() || sending()} onClick={() => void send()}>
-              {sending() ? "Sending…" : "Send"} <KeyText text="Ctrl+⏎" />
+              {sending() ? "Sending…" : "Send"} <KeyText text="Mod+⏎" />
             </button>
           </div>
         </div>

@@ -114,7 +114,7 @@ export function StartPage(props: { favs: Fav[]; onOpen: (url: string) => void })
         fallback={
           <>
             <b>New browser window</b>
-            <span>Type an address above, or <Key k="Ctrl" /> + click a link in a terminal. Star a page (☆ or <KeyText text="Ctrl+D" />) to keep it here.</span>
+            <span>Type an address above, or <Key k="Mod" /> + click a link in a terminal. Star a page (☆ or <KeyText text="Mod+D" />) to keep it here.</span>
           </>
         }
       >
@@ -130,7 +130,7 @@ export function StartPage(props: { favs: Fav[]; onOpen: (url: string) => void })
             )}
           </For>
         </div>
-        <span>Type an address above, or <Key k="Ctrl" /> + click a link in a terminal.</span>
+        <span>Type an address above, or <Key k="Mod" /> + click a link in a terminal.</span>
       </Show>
     </div>
   );

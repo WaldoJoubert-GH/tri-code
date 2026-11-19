@@ -5,6 +5,7 @@
 import { For, type JSX, Show } from "solid-js";
 import { THEN, capsOf, hintKeys, splitKeys } from "./keymap";
 import { hintsShown } from "./hints";
+import { ctrlName } from "./modkey";
 
 const SHIFT = { label: "Shift", d: "M12 3l9 10h-5v8H8v-8H3z" };
 const ENTER = { label: "Enter", d: "M20 5v6a3 3 0 0 1-3 3H5M10 9l-5 5 5 5" };
@@ -12,12 +13,13 @@ const BACKSPACE = { label: "Backspace", d: "M21 5H8l-6 7 6 7h13zM12 9l6 6M18 9l-
 /** The keys a keyboard marks with a symbol, drawn as that symbol. */
 const KEY_ICONS: Record<string, typeof SHIFT> = { Shift: SHIFT, Enter: ENTER, "↵": ENTER, "⏎": ENTER, Backspace: BACKSPACE, "⌫": BACKSPACE };
 
-/** One keycap. A letter prints as the keyboard prints it, in capitals. */
+/** One keycap. A letter prints as the keyboard prints it, in capitals; "Mod" prints as Cmd on a Mac, Ctrl elsewhere. */
 export const Key = (props: { k: string; big?: boolean }) => {
   const icon = () => KEY_ICONS[props.k];
+  const k = () => (props.k === "Mod" ? ctrlName : props.k);
   return (
     <kbd classList={{ big: props.big }}>
-      <Show when={icon()} fallback={/^[a-z]$/.test(props.k) ? props.k.toUpperCase() : props.k}>
+      <Show when={icon()} fallback={/^[a-z]$/.test(k()) ? k().toUpperCase() : k()}>
         {(i) => <svg viewBox="0 0 24 24" role="img" aria-label={i().label}><path d={i().d} /></svg>}
       </Show>
     </kbd>

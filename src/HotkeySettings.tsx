@@ -270,8 +270,8 @@ export function HotkeysPage() {
       </For>
       <h4>Mouse</h4>
       <dl class="hk-list">
-        <dt><Key k="Ctrl" /> + click link</dt><dd>Open it in this project's browser window</dd>
-        <dt><Key k="Ctrl" /><Key k="Shift" /> + click link</dt><dd>Open it in the system browser</dd>
+        <dt><Key k="Mod" /> + click link</dt><dd>Open it in this project's browser window</dd>
+        <dt><Key k="Mod" /><Key k="Shift" /> + click link</dt><dd>Open it in the system browser</dd>
         <dt><Key k="Shift" /> + drag</dt><dd>Select text in claude, pi or any app that captures the mouse</dd>
       </dl>
     </div>

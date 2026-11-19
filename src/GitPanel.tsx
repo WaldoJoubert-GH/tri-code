@@ -26,6 +26,7 @@ import { flash } from "./ui";
 import { withKey } from "./keymap";
 import { HoldKey, KeyText } from "./Keys";
 import "./git.css";
+import { ctrlName } from "./modkey";
 
 function BranchIcon(): JSX.Element {
   return (
@@ -168,7 +169,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
   const onBase = () => !!s() && s()!.branch === s()!.base;
 
   const onMsgKey = (e: KeyboardEvent) => {
-    if (e.key === "Enter" && e.ctrlKey) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.altKey) {
       e.preventDefault();
       void commit(p(), e.shiftKey ? "push" : null);
     }
@@ -935,7 +936,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               <textarea
                 class="g-in g-msg"
                 classList={{ ghost: g().msgAi, tall: !!g().msg }}
-                placeholder={`Message${nestedRepo() ? ` for ${repoName()}` : ""} (Ctrl+Enter commits, Ctrl+Shift+Enter also pushes)`}
+                placeholder={`Message${nestedRepo() ? ` for ${repoName()}` : ""} (${ctrlName}+Enter commits, ${ctrlName}+Shift+Enter also pushes)`}
                 value={g().msg}
                 onInput={(e) => setField(p(), "msg", e.currentTarget.value)}
                 onKeyDown={onMsgKey}
@@ -954,9 +955,9 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                   <button class="g-btn primary more" disabled={!ready()} aria-haspopup="menu" onClick={() => setMenu(!menu())}>▾</button>
                   <Show when={menu()}>
                     <div class="g-menu" role="menu">
-                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p(), "push"); }}>Commit &amp; push<KeyText text="Ctrl+Shift+↵" /></button>
+                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p(), "push"); }}>Commit &amp; push<KeyText text="Mod+Shift+↵" /></button>
                       <button role="menuitem" disabled={onBase()} onClick={() => { setMenu(false); void commit(p(), "pr"); }}>Commit, push &amp; open PR…</button>
-                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p()); }}>Commit<KeyText text="Ctrl+↵" /></button>
+                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p()); }}>Commit<KeyText text="Mod+↵" /></button>
                     </div>
                   </Show>
                 </span>

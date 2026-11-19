@@ -23,6 +23,7 @@ import { highlight, theme } from "./cm";
 import { ask, flash } from "./ui";
 import "./db.css";
 import { Key, KeyText } from "./Keys";
+import { ctrlName } from "./modkey";
 
 const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", sqlite: "SQLITE", mongo: "MONGO" };
 const KIND_NAME: Record<DbKind, string> = { postgres: "PostgreSQL", sqlite: "SQLite", mongo: "MongoDB" };
@@ -642,10 +643,10 @@ function DataView(props: { project: Project; tab: Tab; conn: DbConn; win: Win | 
             {(err) => <span class="db-grow mono">{err()}</span>}
           </Show>
           <span class="db-grow" />
-          <button class="db-btn db-ghost" onClick={() => undo(id)}>Undo <KeyText text="Ctrl+Z" /></button>
+          <button class="db-btn db-ghost" onClick={() => undo(id)}>Undo <KeyText text="Mod+Z" /></button>
           <button class="db-btn" onClick={() => discard(id)}>Discard</button>
           <button class="db-btn" classList={{ "db-pri": props.conn.tag !== "prod", "db-danger": props.conn.tag === "prod" }} disabled={!count()} onClick={() => review(props.project, id)}>
-            Review &amp; apply <KeyText text="Ctrl+S" />
+            Review &amp; apply <KeyText text="Mod+S" />
           </button>
         </div>
       </Show>
@@ -727,8 +728,8 @@ function Review(props: { project: Project; tabId: string; conn: DbConn; review: 
 // ── Query ───────────────────────────────────────────────────────────
 
 const STARTER: Record<DbKind, (obj?: string) => string> = {
-  postgres: (o) => `-- Ctrl+Enter runs, Esc cancels\nSELECT *\n  FROM ${o ?? "users"}\n LIMIT 100;\n`,
-  sqlite: (o) => `-- Ctrl+Enter runs, Esc cancels\nSELECT *\n  FROM ${o ?? "sqlite_master"}\n LIMIT 100;\n`,
+  postgres: (o) => `-- ${ctrlName}+Enter runs, Esc cancels\nSELECT *\n  FROM ${o ?? "users"}\n LIMIT 100;\n`,
+  sqlite: (o) => `-- ${ctrlName}+Enter runs, Esc cancels\nSELECT *\n  FROM ${o ?? "sqlite_master"}\n LIMIT 100;\n`,
   mongo: (o) => `{\n  "find": "${o ?? "collection"}",\n  "filter": {},\n  "limit": 50\n}\n`,
 };
 
@@ -790,7 +791,7 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
     <div class="db-qv">
       <div class="db-ed" ref={host} />
       <div class="db-qbar">
-        <button class="db-btn db-pri" disabled={w()?.running} onClick={run}><Icon name="play" size={12} />Run <KeyText text="Ctrl+Enter" /></button>
+        <button class="db-btn db-pri" disabled={w()?.running} onClick={run}><Icon name="play" size={12} />Run <KeyText text="Mod+Enter" /></button>
         <Show when={w()?.running}>
           <button class="db-btn" onClick={() => cancelQuery(id)}>Cancel <Key k="Esc" /></button>
           <span class="muted"><Icon name="loader" size={12} class="spin" /> running…</span>

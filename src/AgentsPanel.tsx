@@ -22,7 +22,7 @@ import { EVENTS, playFor, playSound, soundFor, soundName } from "./signals";
 import { SoundSelect } from "./SoundSelect";
 import { Icon, toggleIconPicker } from "./lucide";
 import { flash, showToast } from "./ui";
-import { modDown, modLabel } from "./modkey";
+import { ctrlName, modDown, modLabel } from "./modkey";
 import "./agents.css";
 import { KeyList } from "./Keys";
 
@@ -488,7 +488,7 @@ export default function AgentsPanel(props: { project: Project }) {
                   <button title={`Open ${a.name || "one"} in ${props.project.name}`} onClick={() => launchAgent(props.project, a)}>
                     <Icon name="play" size={13} />
                   </button>
-                  <button title="Duplicate (Ctrl+D)" onClick={() => duplicate(a)}>
+                  <button title={`Duplicate (${ctrlName}+D)`} onClick={() => duplicate(a)}>
                     <Icon name="copy" size={13} />
                   </button>
                   <button title="Delete" onClick={() => remove(a)}>

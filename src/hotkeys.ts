@@ -53,6 +53,15 @@ function textChord(e: KeyboardEvent, f: Tab | undefined): boolean {
   return field || !!window.getSelection()?.toString() || (!!f && hasSelection(f.id));
 }
 
+/** A text field (not a terminal's), popover or dialog keeps Cmd+Enter: it sends, runs or commits.
+ *  Ctrl+Enter never reaches the Keymap in Cmd mode, so Cmd must not be stolen for New shell either. */
+function fieldEnter(e: KeyboardEvent): boolean {
+  if (!e.metaKey || (e.code !== "Enter" && e.code !== "NumpadEnter")) return false;
+  const el = document.activeElement as HTMLElement | null;
+  if (!el || el.closest(".xterm")) return false;
+  return !!el.closest(".pop, [role=dialog]") || el.isContentEditable || el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && !["button", "checkbox", "radio"].includes(el.type));
+}
+
 /** Run one Keymap action for the active project. Returns false to let the key through. */
 function run(id: string, p: Project, f: Tab | undefined): boolean {
   const [verb, arg] = id.split("-");
@@ -231,7 +240,7 @@ function onKey(e: KeyboardEvent) {
 
   const p = activeProject();
   const f = p && focusedTab(p);
-  if (textChord(e, f)) return;
+  if (textChord(e, f) || fieldEnter(e)) return;
   const id = actionFor(e);
   // The focused editor's own actions (fold recursively and the rest) come before window hotkeys.
   let done = editorKey(e);
