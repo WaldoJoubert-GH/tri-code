@@ -4,7 +4,7 @@
 
 import {
   GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, app, focusTab, focusedTab, goSpace, isPinned, isRemote, live,
-  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, space, tabIcon, tabName, toggleMono, togglePin,
+  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, setMedia, space, tabIcon, tabName, toggleMono, togglePin,
 } from "./state";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { requestClose } from "./Canvas";
@@ -32,12 +32,13 @@ import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updat
 import { startTour } from "./Tour";
 import { openWelcome } from "./Welcome";
 import { flash } from "./ui";
+import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./media";
 
 export type Command = {
   /** Stable across openings, so the palette can remember recent picks. */
   id: string;
   title: string;
-  group: "New" | "Window" | "Layout" | "Project" | "Signals" | "Go to window" | "Switch project" | "App";
+  group: "New" | "Window" | "Layout" | "Project" | "Signals" | "Media" | "Go to window" | "Switch project" | "App";
   /** The chord that also runs it, as <kbd> labels. */
   keys?: string[];
   /** Muted text after the title: a workspace, a process title, a host. */
@@ -206,6 +207,13 @@ export function commands(): Command[] {
   if (p) add({ id: "signals", group: "Signals", title: `Signals and sounds for ${p.name}`, hint: "a sound per signal, when to alert", icon: "bell", run: () => openAppearance(null, p.id, "signals") });
   add({ id: "bell", group: "Signals", title: "Signals and sounds for every project", icon: "bell-dot", run: () => toggleSignals() });
   add({ id: "dnd", group: "Signals", title: app.notify.dnd ? "Turn off Do not disturb" : "Do not disturb", hint: "badges only", icon: app.notify.dnd ? "bell" : "bell-off", run: toggleDnd });
+  const m = mediaOn() && currentMedia();
+  if (m) {
+    add({ id: "media-play", group: "Media", title: m.playing ? "Pause" : "Play", hint: `${m.title} · ${m.app}`, icon: m.playing ? "pause" : "play", keys: capsOf("media-play"), run: mediaPlayPause });
+    if (m.canNext) add({ id: "media-next", group: "Media", title: "Next track", hint: m.app, icon: "skip-forward", keys: capsOf("media-next"), run: () => mediaSkip("next") });
+    if (m.canPrev) add({ id: "media-prev", group: "Media", title: "Previous track", hint: m.app, icon: "skip-back", keys: capsOf("media-prev"), run: () => mediaSkip("prev") });
+  }
+  add({ id: "media-toggle", group: "Media", title: mediaOn() ? "Turn off media controls" : "Turn on media controls", hint: "the sidebar card and its hotkeys", icon: "music", run: () => setMedia(!mediaOn()) });
   add({ id: "sidebar", group: "App", title: app.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar", icon: "panel-left-close", keys: capsOf("sidebar"), run: toggleSidebar });
   add({ id: "welcome", group: "App", title: "Set up tri-code", hint: "agents, signals, machines", icon: "rocket", run: () => openWelcome() });
   add({ id: "tour", group: "App", title: "Take the tour", hint: "a sample project and six stops", icon: "map", run: () => void startTour() });

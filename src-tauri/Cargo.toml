@@ -73,6 +73,8 @@ strip = true
 webview2-com = "0.39"
 windows-core = "0.62"
 windows-registry = "0.6"
+# Media Controls (media.rs): the system media sessions. Same version as webview2-com's.
+windows = { version = "0.62", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams"] }
 
 # Browser Profiles on macOS: WKWebView can't save passwords, so passwords.rs does, in the
 # Keychain. Same versions as wry's.

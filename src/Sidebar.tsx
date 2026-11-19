@@ -28,6 +28,8 @@ import { settingsOpen, toggleSettings } from "./Settings";
 import { LeftoverCount } from "./LeftoversPopover";
 import { endLeftover, staleCheckouts } from "./leftovers";
 import { sandboxOf } from "./sandbox";
+import { MediaDock } from "./MediaDock";
+import { mediaPopOpen } from "./media";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
 const FULL = 220;
@@ -39,7 +41,7 @@ const [peek, setPeek] = createSignal(false);
 export const sidebarPeek = peek;
 /** Something opened from the peeked list (appearance, icon picker, a rename) holds it open until it closes. */
 const [renaming, setRenaming] = createSignal<string | null>(null);
-const held = () => appearanceOpen() || iconPickerOpen() || settingsOpen() || envDialogOpen() || renaming() !== null;
+const held = () => appearanceOpen() || iconPickerOpen() || settingsOpen() || envDialogOpen() || mediaPopOpen() || renaming() !== null;
 
 // Press and drag a project row to move it within its environment. Pointer events rather than HTML5
 // drag and drop, so a press that barely moves is still a click and the rail works the same way.
@@ -571,6 +573,8 @@ export default function Sidebar() {
         </button>
       </div>
       <div class="side-foot">
+        {/* The rail's media ring is its own zone: over it, the list does not peek, so a click plays or pauses. */}
+        <MediaDock onRing={(inside) => setHover(!inside)} />
         <button class="add" id="settingsBtn" title="Settings" aria-expanded={settingsOpen()} aria-haspopup="dialog" onClick={toggleSettings}>
           <span class="glyph"><Icon name="settings" size={15} /></span><span class="label">Settings</span>
         </button>

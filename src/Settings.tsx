@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource, createSignal } from "solid-js";
-import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setMedia, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
@@ -424,6 +424,22 @@ function WindowsPage() {
         </span>
       </div>
       <p class="note">Hidden, the projects run on as one list, still grouped by Environment. Right-click a project for its Environment, and a lock on its icon shows when it has a PIN. An Environment with no projects shows only in Open project.</p>
+      <h4>Media</h4>
+      <div class="row">
+        Media controls
+        <span class="set-seg" role="radiogroup" aria-label="Media controls">
+          <For each={[[true, "On"], [false, "Off"]] as const}>
+            {([on, label]) => (
+              <button type="button" role="radio" aria-checked={(app.settings.media !== false) === on} onClick={() => setMedia(on)}>
+                {label}
+              </button>
+            )}
+          </For>
+        </span>
+      </div>
+      <p class="note">
+        What this computer is playing (Spotify, a browser tab, anything in Windows' media flyout; MPRIS players through playerctl on Linux) shows above Settings in the sidebar, with play, pause, skip and seek. Hidden while nothing plays. <Caps id="media-play" /> plays or pauses, <Caps id="media-next" /> and <Caps id="media-prev" /> skip (Hotkeys changes them). Off, nothing is watched. Not on macOS yet.
+      </p>
       <h4>Status line</h4>
       <div class="row">
         Claude usage

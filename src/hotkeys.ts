@@ -35,6 +35,7 @@ import { nextSignal } from "./signals";
 import { closeSignals, signalsOpen } from "./SignalSettings";
 import { closeFeedback, feedbackOpen } from "./Feedback";
 import { closeLeftovers, leftoversOpen } from "./leftovers";
+import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./media";
 import { flash } from "./ui";
 import { hasSelection } from "./terms";
 import { actionFor, editorKey } from "./keymap";
@@ -156,6 +157,15 @@ function run(id: string, p: Project, f: Tab | undefined): boolean {
     case "next-signal":
       nextSignal();
       return true;
+    case "media-play":
+      mediaPlayPause();
+      return true;
+    case "media-next":
+      mediaSkip("next");
+      return true;
+    case "media-prev":
+      mediaSkip("prev");
+      return true;
     case "new-worktree":
       if (newWorktreeOpen()) closeNewWorktree();
       else openNewWorktree(p);
@@ -203,6 +213,7 @@ function onKey(e: KeyboardEvent) {
     else if (openProjectOpen()) closeOpenProject();
     else if (welcomeOpen()) closeWelcome();
     else if (newWorktreeOpen()) closeNewWorktree();
+    else if (mediaPopOpen()) closeMediaPop();
     else if (appearanceOpen()) closeAppearance();
     else if (settingsOpen()) closeSettings();
     else if (signalsOpen()) closeSignals();

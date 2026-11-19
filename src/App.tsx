@@ -24,6 +24,8 @@ import { startCli } from "./cli";
 import { trackAgentFocus } from "./agenttarget";
 import { SetupBanner } from "./SetupBanner";
 import { phoneStatus, startPhoneSync } from "./phone";
+import { MediaPopover } from "./MediaDock";
+import { mediaPopOpen } from "./media";
 import { AppearancePopover, Backdrop, appearanceOpen, setBgImage, toggleAppearance } from "./Appearance";
 import { clearLook } from "./backdrop";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
@@ -166,7 +168,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || tunnelPopOpen() || profileMenuOpen() || debugMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen()));
+  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || tunnelPopOpen() || profileMenuOpen() || debugMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen() || mediaPopOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   // The backdrop and Transparency are the active project's repo's.
@@ -202,6 +204,7 @@ export default function App() {
       <TabMenu />
       <CtxMenu />
       <AppearancePopover />
+      <MediaPopover />
       <SettingsDialog />
       <FavPopover />
       <TunnelPopover />
