@@ -66,10 +66,13 @@ export const PROFILE_COLORS = ["ocean", "marigold", "terracotta", "moss", "plum"
 export const DEFAULT_PROFILE = "default";
 const defaultProfiles = (): Profile[] => [{ id: DEFAULT_PROFILE, name: "Personal", icon: "house", color: "ocean" }];
 
+/** The first two commands' hotkeys: Alt+A, then Alt+Shift+A (seedAgentKeys in agents.ts). */
+export const FIRST_AGENT_KEYS: Hotkey[] = [{ code: "KeyA" }, { code: "KeyA", shift: true }];
+
 /** What a new state.json starts with: the three terminals tri-code used to hard-code. */
 const defaultAgents = (): Agent[] => [
-  { id: "claude", name: "claude", command: "claude", icon: "asterisk" },
-  { id: "pi", name: "pi", command: "pi", icon: "pi" },
+  { id: "claude", name: "claude", command: "claude", icon: "asterisk", hotkey: { ...FIRST_AGENT_KEYS[0] } },
+  { id: "pi", name: "pi", command: "pi", icon: "pi", hotkey: { ...FIRST_AGENT_KEYS[1] } },
   { id: "shell", name: "shell", command: "", icon: "square-terminal" },
 ];
 
@@ -322,6 +325,8 @@ export type Persisted = {
   /** The answer to "install agent windows for this agent?" (agentsetup.ts): `installed`, or `never`
    *  for Don't ask again. Unset: not asked yet, or removed since. */
   agentSetup?: Partial<Record<"claude" | "pi", "installed" | "never">>;
+  /** The first two commands were given FIRST_AGENT_KEYS (once, so a key removed later stays removed). */
+  agentKeys?: true;
 };
 
 export type Settings = {
@@ -418,7 +423,7 @@ export const ACCENTS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#7dcfff", "
 
 const RECENT_MAX = 12;
 
-export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], pinned: [], recent: [], agents: defaultAgents(), profiles: defaultProfiles(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, welcomed: false, settings: defaultSettings() });
+export const [app, setApp] = createStore<Persisted>({ environments: ["local"], envStyles: {}, envSsh: {}, envLocks: {}, projects: [], pinned: [], recent: [], agents: defaultAgents(), agentKeys: true, profiles: defaultProfiles(), gap: 12, sidebarCollapsed: false, notify: defaultNotify(), toured: false, welcomed: false, settings: defaultSettings() });
 export const [live, setLive] = createStore<Record<string, Live>>({});
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
@@ -1342,6 +1347,8 @@ export function migrate(raw: any): Persisted {
     environments, envStyles: raw.envStyles ?? {}, envSsh: raw.envSsh ?? {}, envLocks: raw.envLocks ?? {}, projects, recent: raw.recent ?? [],
     pinned: (raw.pinned ?? []).filter((id: string) => projects.some((p) => p.id === id)),
     activeProject: raw.activeProject, agents: raw.agents ?? defaultAgents(),
+    // A state.json without commands starts with the defaults, which have their keys.
+    ...(raw.agentKeys || !raw.agents ? { agentKeys: true as const } : {}),
     // Browser data from before profiles stays in the default profile.
     profiles: raw.profiles?.some((p: Profile) => p.id === DEFAULT_PROFILE) ? raw.profiles : [...defaultProfiles(), ...(raw.profiles ?? [])],
     gap: raw.gap ?? 12, sidebarCollapsed: raw.sidebarCollapsed ?? false,
@@ -1358,6 +1365,10 @@ export function migrate(raw: any): Persisted {
 export async function loadState() {
   const json = await invoke<string | null>("state_load");
   if (json) setApp(migrate(JSON.parse(json)));
+}
+
+export function setAgentKeys() {
+  setApp("agentKeys", true);
 }
 
 export function setToured() {

@@ -37,6 +37,7 @@ import { WorktreeDialog } from "./WorktreeDialog";
 import { newWorktreeOpen } from "./worktrees";
 import { loadIcons } from "./icons";
 import { installHotkeys } from "./hotkeys";
+import { seedAgentKeys } from "./agentkeys";
 import { installClipboardFallback } from "./clipboard";
 import { openExternal, openExternalIn, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended } from "./browsers";
 import { FavPopover, favEditOpen } from "./favs";
@@ -82,6 +83,7 @@ export default function App() {
     // After a webview reload, browser webviews from the previous page are unreachable.
     await invoke("browser_close_all").catch((e) => console.warn("browser_close_all failed:", e));
     await loadState();
+    seedAgentKeys();
     // Terminals run on in the terminal host and tabs attach to them; one with no tab left has to go.
     const keep = app.projects.flatMap((p) => p.tabs.filter((t) => isTerminal(t) && !t.demo).map((t) => sessionName(p, t)));
     await invoke("pty_reap", { keep }).catch((e) => console.warn("pty_reap failed:", e));

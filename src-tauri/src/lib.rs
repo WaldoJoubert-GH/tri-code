@@ -1,5 +1,7 @@
 mod agent_setup;
 mod agent_windows;
+#[cfg(windows)]
+mod altspace;
 mod bg;
 mod browser;
 mod browser_debug;
@@ -188,6 +190,8 @@ pub fn run() {
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(640.0, 400.0)
                 .build()?;
+            #[cfg(windows)]
+            altspace::install(&window);
             let size = window.inner_size()?.to_logical::<f64>(window.scale_factor()?);
             // Without the native drop handler, HTML drag and drop works on Windows too: reordering
             // commands and favourites, dropping images on an issue.

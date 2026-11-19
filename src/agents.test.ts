@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { type Agent, type Project, app, setApp } from "./state";
 import { chordHolder, nameProblem, offeredIn, reaches, replaceNote, scopesOverlap } from "./scope";
+import { seedAgentKeys } from "./agentkeys";
 
 const project = (id: string, host: string, parent?: string) => ({ id, name: id, host, path: "~", tabs: [], ...(parent ? { parent } : {}) }) as unknown as Project;
 const A1 = () => ({ code: "Digit1" });
@@ -64,5 +65,34 @@ describe("names and hotkeys", () => {
     setApp("agents", (a) => a.id === "dev", "hotkey", { code: "Digit2" });
     setApp("agents", (a) => a.id === "logs", "hotkey", { code: "Digit2" });
     expect(chordHolder(byId("logs"))).toBeUndefined();
+  });
+});
+
+describe("first commands' keys", () => {
+  const AltA = { code: "KeyA" };
+  const AltShiftA = { code: "KeyA", shift: true };
+
+  test("the first command gets Alt+A and the second Alt+Shift+A, when they have no hotkey", () => {
+    setApp("agents", (a) => a.id === "claude", "hotkey", undefined);
+    setApp("agentKeys", undefined);
+    seedAgentKeys();
+    expect(byId("claude").hotkey).toEqual(AltA);
+    expect(byId("shell").hotkey).toEqual(AltShiftA);
+    expect(app.agentKeys).toBe(true);
+  });
+
+  test("a command keeps its own hotkey, and a chord another command holds isn't given twice", () => {
+    setApp("agents", (a) => a.id === "logs", "hotkey", AltShiftA);
+    setApp("agentKeys", undefined);
+    seedAgentKeys();
+    expect(byId("claude").hotkey).toEqual(A1());
+    expect(byId("shell").hotkey).toBeUndefined();
+  });
+
+  test("only once: a key removed afterwards stays removed", () => {
+    setApp("agentKeys", true);
+    setApp("agents", (a) => a.id === "claude", "hotkey", undefined);
+    seedAgentKeys();
+    expect(byId("claude").hotkey).toBeUndefined();
   });
 });
