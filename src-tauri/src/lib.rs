@@ -3,6 +3,8 @@ mod agent_windows;
 mod bg;
 mod browser;
 mod browser_debug;
+#[cfg(target_os = "linux")]
+mod browser_gtk;
 mod cli;
 mod db;
 mod devfs;
@@ -186,17 +188,24 @@ pub fn run() {
                 .min_inner_size(640.0, 400.0)
                 .build()?;
             let size = window.inner_size()?.to_logical::<f64>(window.scale_factor()?);
-            window.add_child(
-                // Without the native drop handler, HTML drag and drop works on Windows too: reordering
-                // commands and favourites, dropping images on an issue.
-                // The `devtools` feature is for browser windows (browser_debug.rs); the app's own DevTools stay in debug builds.
-                WebviewBuilder::new("main", WebviewUrl::App(Default::default()))
-                    .auto_resize()
-                    .disable_drag_drop_handler()
-                    .devtools(cfg!(debug_assertions)),
-                LogicalPosition::new(0.0, 0.0),
-                size,
-            )?;
+            // Without the native drop handler, HTML drag and drop works on Windows too: reordering
+            // commands and favourites, dropping images on an issue.
+            // The `devtools` feature is for browser windows (browser_debug.rs); the app's own DevTools stay in debug builds.
+            let main = WebviewBuilder::new("main", WebviewUrl::App(Default::default()))
+                .auto_resize()
+                .disable_drag_drop_handler()
+                .devtools(cfg!(debug_assertions));
+            #[cfg(target_os = "linux")]
+            let main = if browser_gtk::framed() {
+                main.initialization_script("window.__TRICODE_FRAMED_BROWSERS__ = true;")
+            } else {
+                main
+            };
+            let _main = window.add_child(main, LogicalPosition::new(0.0, 0.0), size)?;
+            #[cfg(target_os = "linux")]
+            if !browser_gtk::framed() {
+                browser_gtk::install(&_main)?;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

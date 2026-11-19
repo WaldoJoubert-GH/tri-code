@@ -658,7 +658,7 @@ export default function Canvas(props: { project: Project }) {
               <Show when={held()}>
                 {(f) => <TunnelHeld project={props.project} fwd={f()} url={url()} onHere={() => navigateBrowser(pageId(), url(), true)} />}
               </Show>
-              {/* Linux has no positionable native webviews, so the page is framed here instead. */}
+              {/* Framed mode (Linux with TRICODE_FRAMED_BROWSERS=1): the page is framed here instead. */}
               <Show when={!nativeBrowsers && url() && !held() ? `${pageId()}|${browserInfo[pageId()]?.rev ?? 0}|${browserInfo[pageId()]?.src ?? url()}` : false} keyed>
                 {(k) => <iframe class="frame" src={k.split("|").slice(2).join("|")} title={url()} />}
               </Show>

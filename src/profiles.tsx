@@ -420,7 +420,7 @@ export function BrowserPage() {
           <p class="note">
             {nativeBrowsers
               ? "Browser profiles need macOS 14 or later, the first version whose web view can keep their sign-ins apart. Every browser window uses one set of cookies here."
-              : "Browser windows on Linux show pages in a frame of tri-code's own window, which can't keep sign-ins apart, so there are no profiles here."}
+              : "Browser windows show pages in a frame of tri-code's own window (TRICODE_FRAMED_BROWSERS is set), which can't keep sign-ins apart, so there are no profiles here."}
           </p>
         </>
       }
