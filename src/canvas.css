@@ -147,6 +147,14 @@
 /* Downloads (src/downloads.tsx): the nav button with its progress ring, and the strip under the nav.
    The strip is a row of the window like .pwbar, so the page moves down rather than hiding it. */
 .nav .dlbtn { position: relative; display: grid; place-items: center; }
+/* The Debug Menu's bug button: a red count of console errors, a green dot while agents can attach */
+.nav .dbgbtn { position: relative; display: grid; place-items: center; }
+.nav .dbgbtn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+.dbgbtn .badge { position: absolute; top: -2px; right: -3px; min-width: 13px; height: 13px; padding: 0 3px; border-radius: 7px; background: var(--bad); color: #fff; font-size: 9px; font-weight: 700; line-height: 13px; text-align: center; font-variant-numeric: tabular-nums; pointer-events: none; }
+.dbgbtn .attach { position: absolute; bottom: 2px; right: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 2px var(--panel); pointer-events: none; }
+/* Page Profiles: a page tab's profile colour, and a dot for a background page with console errors */
+.ptab .pdot { width: 7px; height: 7px; border-radius: 50%; background: var(--pc); flex: none; }
+.ptab .perr { width: 5px; height: 5px; border-radius: 50%; background: var(--bad); flex: none; }
 .nav .dlbtn.running { color: var(--accent); }
 .dlbtn .ring { position: absolute; inset: 1px; width: 22px; height: 22px; transform: rotate(-90deg); pointer-events: none; }
 .dlbtn .ring circle { fill: none; stroke-width: 2; }

@@ -18,6 +18,7 @@ import { closeCtxMenu, ctxMenuOpen } from "./ctxmenu";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { closeTunnelPop, tunnelPopOpen } from "./tunnelui";
 import { closeProfileMenu, profileMenuOpen } from "./profiles";
+import { closeDebugMenu, debugMenuOpen } from "./debugmenu";
 import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
@@ -211,6 +212,7 @@ function onKey(e: KeyboardEvent) {
     else if (favEditOpen()) closeFavEdit();
     else if (tunnelPopOpen()) closeTunnelPop();
     else if (profileMenuOpen()) closeProfileMenu();
+    else if (debugMenuOpen()) closeDebugMenu();
     else if (downloadMenuOpen()) closeDownloadMenu();
     else return;
     e.preventDefault();

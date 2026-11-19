@@ -2,6 +2,7 @@ mod agent_setup;
 mod agent_windows;
 mod bg;
 mod browser;
+mod browser_debug;
 #[cfg(target_os = "linux")]
 mod browser_gtk;
 mod cli;
@@ -189,7 +190,11 @@ pub fn run() {
             let size = window.inner_size()?.to_logical::<f64>(window.scale_factor()?);
             // Without the native drop handler, HTML drag and drop works on Windows too: reordering
             // commands and favourites, dropping images on an issue.
-            let main = WebviewBuilder::new("main", WebviewUrl::App(Default::default())).auto_resize().disable_drag_drop_handler();
+            // The `devtools` feature is for browser windows (browser_debug.rs); the app's own DevTools stay in debug builds.
+            let main = WebviewBuilder::new("main", WebviewUrl::App(Default::default()))
+                .auto_resize()
+                .disable_drag_drop_handler()
+                .devtools(cfg!(debug_assertions));
             #[cfg(target_os = "linux")]
             let main = if browser_gtk::framed() {
                 main.initialization_script("window.__TRICODE_FRAMED_BROWSERS__ = true;")
@@ -372,6 +377,8 @@ pub fn run() {
             browser::browser_forward,
             browser::browser_reload,
             browser::browser_download,
+            browser_debug::browser_devtools,
+            browser_debug::browser_cdp,
             downloads::download_open,
             downloads::download_reveal,
             downloads::download_cancel,
