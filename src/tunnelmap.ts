@@ -76,19 +76,19 @@ export function fileUrlOf(path: string): string {
   return `file://${encodeURI(path.startsWith("/") ? path : `/${path}`)}`;
 }
 
-/** A TCP port something of the user's listens on, on the remote. */
+/** A TCP port something of the user's listens on, on the project's host. */
 export type Listener = { port: number; pid: number; name: string; args: string; http: boolean };
 
 const NOT_HTTP_NAME = /^(postgres|redis|mongo|mysql|mariadb|sshd|memcached|rabbitmq|beam\.smp|clickhouse)/i;
 
-/** Parse `remote_listening`: `ss -ltnpH` or `lsof` lines, then `ps` lines, each after its marker. */
+/** Parse `remote_listening`: `ss -ltnpH`, `lsof` or Windows' `port pid name` lines, then `ps` lines, each after its marker. */
 export function parseListening(out: string): Listener[] {
   const lines = out.split(/\r?\n/);
   const args = new Map<number, string>();
   const found: { port: number; pid: number; name: string }[] = [];
   let part = "";
   for (const line of lines) {
-    const m = /^<<(ss|lsof|ps)>>$/.exec(line.trim());
+    const m = /^<<(ss|lsof|win|ps)>>$/.exec(line.trim());
     if (m) {
       part = m[1];
       continue;
@@ -107,6 +107,9 @@ export function parseListening(out: string): Listener[] {
       const addr = f.find((x, i) => i > 1 && /:\d+$/.test(x));
       if (f[0] === "COMMAND" || !addr) continue;
       found.push({ port: Number(addr.slice(addr.lastIndexOf(":") + 1)), pid: Number(f[1]), name: f[0].replace(/\\x20/g, " ") });
+    } else if (part === "win") {
+      const w = /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line);
+      if (w) found.push({ port: Number(w[1]), pid: Number(w[2]), name: w[3].trim() });
     }
   }
   const byPort = new Map<number, Listener>();
@@ -114,5 +117,21 @@ export function parseListening(out: string): Listener[] {
     if (byPort.has(f.port)) continue;
     byPort.set(f.port, { ...f, args: args.get(f.pid) ?? f.name, http: !NOT_HTTP.has(f.port) && !NOT_HTTP_NAME.test(f.name) });
   }
-  return [...byPort.values()].sort((a, b) => a.port - b.port);
+  return [...byPort.values()].sort((a, b) => rank(a) - rank(b) || a.port - b.port);
+}
+
+/** What dev servers run as: a runtime, or a server binary of a framework. */
+const DEV_NAME = /^(node|nodejs|bun|deno|python[\d.]*|pythonw|ruby|php|java|go|dotnet|uvicorn|gunicorn|hypercorn|flask|rails|puma|hugo|caddy|nginx|httpd|esbuild|vite|next-server|wrangler|air|cargo)$/i;
+
+/** The program a process runs: its name, else the file its command line starts with. */
+const programs = (l: Listener) => {
+  const first = /^"([^"]+)"|^(\S+)/.exec(l.args);
+  const file = (first?.[1] ?? first?.[2] ?? "").split(/[\\/]/).pop() ?? "";
+  return [l.name, file].map((n) => n.replace(/\.exe$/i, ""));
+};
+
+/** Dev servers first, then the rest that speak HTTP, then what doesn't (databases and the like). */
+function rank(l: Listener): number {
+  if (!l.http) return 2;
+  return programs(l).some((n) => DEV_NAME.test(n)) ? 0 : 1;
 }

@@ -186,14 +186,64 @@ pub async fn forward_close(id: u64) -> Result<(), String> {
     Ok(())
 }
 
-/// What listens on `host`'s TCP ports, with the processes' command lines, for the start page to
-/// parse: `ss` where there is one, else `lsof` (macOS), then `ps`, each after a marker line.
+/// The Unix listing: `ss` where there is one, else `lsof` (macOS), then `ps`, each after a marker
+/// line. An app started from the Finder has a PATH without `/usr/sbin`, where macOS keeps `lsof`.
+const LISTENING_SH: &str = "PATH=\"$PATH:/usr/sbin:/sbin:/usr/bin:/bin\"; \
+    if command -v ss >/dev/null 2>&1; then echo '<<ss>>'; ss -ltnpH 2>/dev/null; \
+    else echo '<<lsof>>'; lsof -nP -iTCP -sTCP:LISTEN -a -u \"$(id -u)\" 2>/dev/null; fi; \
+    echo '<<ps>>'; ps -o pid=,args= -u \"$(id -u)\" 2>/dev/null; exit 0";
+
+/// The Windows listing: `port pid name` lines, then `pid command line`. "The user's own" is the
+/// processes in this login session, which leaves out services (session 0) and is far quicker than
+/// asking each process for its owner.
+#[cfg(windows)]
+const LISTENING_PS1: &str = r#"$ErrorActionPreference='SilentlyContinue'
+$s=(Get-Process -Id $PID).SessionId; $mine=@{}; $rows=@()
+foreach($l in netstat -ano -p TCP){
+  if($l -match '^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)'){
+    $port=$matches[1]; $id=[int]$matches[2]
+    if(-not $mine.ContainsKey($id)){ $p=Get-Process -Id $id; $mine[$id]=if($p -and $p.SessionId -eq $s){$p}else{$null} }
+    if($mine[$id]){ $rows+="$port $id $($mine[$id].ProcessName)" }
+  }
+}
+'<<win>>'; $rows
+'<<ps>>'
+$ids=@($mine.Keys | Where-Object { $mine[$_] })
+if($ids){ foreach($p in Get-CimInstance Win32_Process -Filter (($ids | ForEach-Object { "ProcessId=$_" }) -join ' OR ')){ "$($p.ProcessId) $(if($p.CommandLine){$p.CommandLine}else{$p.Name})" } }"#;
+
+/// What listens on this machine's TCP ports, for a local project's start page.
+fn local_listening() -> Result<String, String> {
+    #[cfg(windows)]
+    let mut cmd = {
+        use std::os::windows::process::CommandExt;
+        let mut c = std::process::Command::new("powershell.exe");
+        c.args(["-NoProfile", "-NonInteractive", "-Command", LISTENING_PS1]);
+        c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        c
+    };
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let mut c = std::process::Command::new("/bin/sh");
+        c.args(["-c", LISTENING_SH]);
+        c
+    };
+    let out = cmd.stdin(Stdio::null()).output().map_err(|e| e.to_string())?;
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// What listens on `host`'s TCP ports (this machine's for a local project), with the processes'
+/// command lines, for the start page to parse.
 #[tauri::command]
 pub async fn remote_listening(host: String) -> Result<String, String> {
-    const SCRIPT: &str = "if command -v ss >/dev/null 2>&1; then echo '<<ss>>'; ss -ltnpH 2>/dev/null; \
-        else echo '<<lsof>>'; lsof -nP -iTCP -sTCP:LISTEN -a -u \"$(id -u)\" 2>/dev/null; fi; \
-        echo '<<ps>>'; ps -o pid=,args= -u \"$(id -u)\" 2>/dev/null; exit 0";
-    tauri::async_runtime::spawn_blocking(move || remote::run(&host, SCRIPT)).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        if matches!(host.as_str(), "" | "local") {
+            local_listening()
+        } else {
+            remote::run(&host, LISTENING_SH)
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// End every forward as the app exits.

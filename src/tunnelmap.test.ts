@@ -81,4 +81,33 @@ describe("parseListening", () => {
     ].join("\n");
     expect(parseListening(out)).toEqual([{ port: 3000, pid: 48211, name: "node", args: "node server.js", http: true }]);
   });
+
+  test("lists dev servers first, then other HTTP, then what doesn't speak it", () => {
+    const out = [
+      "<<lsof>>",
+      "ControlCe   612 waldo   9u  IPv4 0x1      0t0  TCP *:5000 (LISTEN)",
+      "Spotify     700 waldo  50u  IPv4 0x2      0t0  TCP 127.0.0.1:4381 (LISTEN)",
+      "postgres    900 waldo   5u  IPv4 0x3      0t0  TCP 127.0.0.1:5432 (LISTEN)",
+      "node      48211 waldo  23u  IPv4 0x4      0t0  TCP 127.0.0.1:5173 (LISTEN)",
+      "Python    48300 waldo   3u  IPv4 0x5      0t0  TCP *:8000 (LISTEN)",
+      "<<ps>>",
+      "48300 /opt/homebrew/bin/python3.12 -m http.server",
+    ].join("\n");
+    expect(parseListening(out).map((l) => l.port)).toEqual([5173, 8000, 4381, 5000, 5432]);
+  });
+
+  test("reads Windows' port, pid and name lines", () => {
+    const out = [
+      "<<win>>",
+      "5173 9120 node",
+      "5173 9120 node",
+      "5432 812 postgres",
+      "<<ps>>",
+      '9120 "C:\\Program Files\\nodejs\\node.exe" node_modules/vite/bin/vite.js',
+    ].join("\r\n");
+    expect(parseListening(out)).toEqual([
+      { port: 5173, pid: 9120, name: "node", args: '"C:\\Program Files\\nodejs\\node.exe" node_modules/vite/bin/vite.js', http: true },
+      { port: 5432, pid: 812, name: "postgres", args: "postgres", http: false },
+    ]);
+  });
 });

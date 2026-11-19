@@ -188,15 +188,16 @@ function htmlFiles(files: string[]): string[] {
   return files.filter((f) => /\.html?$/i.test(f) && !/(^|\/)node_modules\//.test(f)).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).slice(0, HTML_MAX);
 }
 
-/** A new tab in a remote project: what listens on the remote, and the project's HTML files. */
+/** A new tab: what listens on the project's host, and in a remote project its HTML files. */
 export function RemoteStart(props: { project: Project; onOpen: (url: string) => void }) {
-  const env = () => envName(props.project.host);
+  const remote = () => isRemote(props.project);
+  const env = () => (remote() ? envName(props.project.host) : "this machine");
   const [ports, { refetch }] = createResource(
     () => props.project.host,
     async (host) => parseListening(await invoke<string>("remote_listening", { host })),
   );
   const [html] = createResource(
-    () => props.project,
+    () => remote() && props.project,
     async (p) => htmlFiles((await invoke<FileIndex>("project_files", { host: p.host, path: p.path, skip: skipFolders() })).files),
   );
   const openPort = (l: Listener) => {

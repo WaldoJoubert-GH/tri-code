@@ -651,9 +651,7 @@ export default function Canvas(props: { project: Project }) {
             <div class="page" ref={pageEl}>
               <Show when={blank()}>
                 <StartPage favs={props.project.favs} onOpen={open} />
-                <Show when={isRemote(props.project)}>
-                  <RemoteStart project={props.project} onOpen={open} />
-                </Show>
+                <RemoteStart project={props.project} onOpen={open} />
               </Show>
               <Show when={held()}>
                 {(f) => <TunnelHeld project={props.project} fwd={f()} url={url()} onHere={() => navigateBrowser(pageId(), url(), true)} />}
