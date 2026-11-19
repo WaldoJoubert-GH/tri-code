@@ -391,6 +391,50 @@ svg.lucide { flex: none; display: block; }
 .profmenu button span:not(.pav) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profmenu button[aria-checked="true"] { color: var(--text); }
 .profmenu .pm-check { color: var(--accent); }
+/* Page Profiles: the window/page switch at the top of the avatar menu */
+.profmenu { width: 280px; }
+.profmenu .pm-scope { display: flex; align-items: center; gap: 8px; padding: 6px 8px 8px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.profmenu .pm-scope > span:first-child { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.pm-seg, .dm-seg { margin-left: auto; display: inline-flex; padding: 2px; gap: 1px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.profmenu .pm-seg button, .dbgmenu .dm-seg button { width: auto; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; gap: 4px; white-space: nowrap; }
+.profmenu .pm-seg button[aria-checked="true"], .dbgmenu .dm-seg button[aria-checked="true"] { background: var(--raised); color: var(--text); }
+.profmenu .pm-confirm { display: grid; gap: 6px; padding: 6px 8px 8px; font-size: 12px; border-bottom: 1px solid var(--line); }
+.profmenu .pm-confirm span { display: flex; gap: 6px; }
+.profmenu .pm-confirm button { width: auto; padding: 3px 8px; border: 1px solid var(--line); }
+.profmenu .pm-confirm button.primary { color: var(--accent); border-color: var(--accent); }
+.profmenu button span:not(.pav) + .pm-port { flex: none; }
+.profmenu .pm-port { color: var(--muted); font: 11px var(--mono); }
+/* The Debug Menu under a browser window's bug button (src/debugmenu.tsx); shares the avatar menu's look */
+.dbgmenu {
+  position: fixed; z-index: 10000; width: 310px; max-width: calc(100vw - 16px); padding: 4px; display: grid;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px -12px var(--shadow); font-size: 12.5px;
+}
+.dbgmenu .pm-cur { display: flex; align-items: center; gap: 8px; padding: 6px 8px 8px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
+.dbgmenu .pm-cur div { display: grid; min-width: 0; line-height: 1.3; }
+.dbgmenu .pm-cur b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbgmenu .pm-cur small { color: var(--muted); font-size: 11.5px; }
+.dbgmenu .mt { padding: 5px 8px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.dbgmenu .msep { height: 1px; margin: 4px 2px; background: var(--line); }
+.dbgmenu > button, .dbgmenu .dm-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 5px; color: var(--muted); text-align: left; }
+.dbgmenu > button:hover { background: var(--hover); color: var(--text); }
+.dbgmenu > button > span, .dbgmenu .dm-row > span:not(.dm-seg) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbgmenu > button.danger:hover { color: var(--bad); }
+.dbgmenu .sw { flex: none !important; position: relative; width: 26px; height: 15px; border-radius: 999px; background: var(--raised); transition: background .15s; }
+.dbgmenu .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--bg); transition: left .15s; }
+.dbgmenu [aria-checked="true"] > .sw { background: var(--ok); }
+.dbgmenu [aria-checked="true"] > .sw::after { left: 13px; }
+.dbgmenu .dm-sub { padding: 0 8px 6px 29px; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.dbgmenu .dm-sub.flat { padding: 2px 8px 6px; }
+.dbgmenu .dm-sub a { color: var(--accent); }
+.dbgmenu .dm-errs { display: flex; align-items: center; gap: 8px; margin: 2px 2px 4px; padding: 6px 8px; border-radius: 6px; background: color-mix(in oklab, var(--bad) 12%, transparent); }
+.dbgmenu .dm-errs > svg { color: var(--bad); flex: none; }
+.dbgmenu .dm-errs b { color: var(--bad); font-variant-numeric: tabular-nums; }
+.dbgmenu .dm-errs button { margin-left: auto; padding: 2px 8px; border-radius: 4px; border: 1px solid color-mix(in oklab, var(--bad) 40%, var(--line)); font-size: 11.5px; white-space: nowrap; }
+.dbgmenu .dm-errs button:hover { background: var(--hover); }
+.dbgmenu .dm-cdp { display: flex; align-items: center; gap: 6px; margin: 0 8px 4px 29px; }
+.dbgmenu .dm-cdp code { flex: 1; min-width: 0; padding: 3px 6px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbgmenu .dm-cdp button { color: var(--muted); padding: 3px; border-radius: 4px; display: grid; }
+.dbgmenu .dm-cdp button:hover { background: var(--hover); color: var(--text); }
 /* The downloads list under a browser window's download button (src/downloads.tsx); rows share .dlbar's text styles in canvas.css */
 .dlmenu {
   position: fixed; z-index: 10000; width: 340px; max-width: calc(100vw - 16px); display: grid; font-size: 12px; overflow: hidden;
@@ -1140,6 +1184,10 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .pf-colors button { width: 16px; height: 16px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--bg); }
 .settings-dlg .pf-colors button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--c); }
 .settings-dlg .pf-used { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+.settings-dlg .pf-opts { display: grid; gap: 8px; margin-bottom: 14px; }
+.settings-dlg .pf-debug { display: inline-flex; align-items: center; gap: 8px; }
+.settings-dlg .pf-port { width: 64px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: 12px var(--mono); }
+.settings-dlg .pf-warn { display: flex; align-items: center; gap: 6px; color: var(--warn); font-size: 11.5px; }
 .settings-dlg .pf-side { display: flex; gap: 6px; align-items: center; }
 .settings-dlg .pf-btn { padding: 3px 9px; border: 1px solid var(--line); border-radius: 5px; font-size: 12px; color: var(--muted); }
 .settings-dlg .pf-btn:hover:not(:disabled) { background: var(--hover); color: var(--text); }

@@ -100,7 +100,7 @@ fn parse_url(url: &str) -> Result<Url, String> {
     Url::parse(url).map_err(|e| format!("invalid url {url}: {e}"))
 }
 
-fn find(app: &AppHandle, label: &str) -> Result<Webview, String> {
+pub(crate) fn find(app: &AppHandle, label: &str) -> Result<Webview, String> {
     app.get_webview(label).ok_or_else(|| format!("no browser {label}"))
 }
 
@@ -196,7 +196,8 @@ fn set_autofill(_webview: &Webview, _autofill: bool, _passwords: bool) -> Result
 
 /// Creates the browser webview, or navigates and repositions it if it exists. A `hidden` one
 /// loads behind the shown page (a background tab). `profile` is the Browser Profile whose data
-/// it uses (unset: the default); `autofill` and `passwords` are that profile's switches.
+/// it uses (unset: the default); `autofill` and `passwords` are that profile's switches, and
+/// `debug_port` its remote debugging port (WebView2, never the default profile).
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn browser_open(
@@ -211,6 +212,7 @@ pub async fn browser_open(
     profile: Option<String>,
     autofill: Option<bool>,
     passwords: Option<bool>,
+    debug_port: Option<u16>,
 ) -> Result<(), String> {
     let url = parse_url(&url)?;
     if let Some(webview) = app.get_webview(&label) {
@@ -301,7 +303,8 @@ pub async fn browser_open(
     let builder = crate::downloads::watch(builder, &app, &label);
     let profile = profile.unwrap_or_default();
     let (autofill, passwords) = (autofill.unwrap_or(true), passwords.unwrap_or(true));
-    let builder = builder.general_autofill_enabled(autofill);
+    // DevTools for every page (F12, the Debug Menu); the app's own webview keeps them for debug builds.
+    let builder = builder.general_autofill_enabled(autofill).devtools(true);
     let builder = match profile_dir(&app, &profile)? {
         Some(_) if !stores_supported() => return Err("browser profiles need macOS 14 or later".into()),
         #[cfg(target_os = "macos")]
@@ -310,12 +313,23 @@ pub async fn browser_open(
         Some(dir) => builder.data_directory(dir),
         None => builder,
     };
+    // The default profile shares its data folder, and so its browser process, with the app's own
+    // webview, whose arguments can't change: remote debugging is for the other profiles only.
+    #[cfg(windows)]
+    let builder = match debug_port {
+        Some(port) if profile_dir(&app, &profile)?.is_some() => builder.additional_browser_args(&crate::browser_debug::browser_args(port)),
+        _ => builder,
+    };
+    #[cfg(not(windows))]
+    let _ = debug_port;
     let webview = window
         .add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
     set_autofill(&webview, autofill, passwords)?;
     #[cfg(windows)]
     crate::downloads::watch(&app, &webview, &label)?;
+    #[cfg(windows)]
+    crate::browser_debug::watch_console(&app, &webview, &label)?;
     #[cfg(target_os = "macos")]
     crate::passwords::install(&app, &webview, &label, &profile, passwords)?;
     if hidden == Some(true) {

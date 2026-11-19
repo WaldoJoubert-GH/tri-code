@@ -2,6 +2,7 @@ mod agent_setup;
 mod agent_windows;
 mod bg;
 mod browser;
+mod browser_debug;
 mod cli;
 mod db;
 mod devfs;
@@ -188,7 +189,11 @@ pub fn run() {
             window.add_child(
                 // Without the native drop handler, HTML drag and drop works on Windows too: reordering
                 // commands and favourites, dropping images on an issue.
-                WebviewBuilder::new("main", WebviewUrl::App(Default::default())).auto_resize().disable_drag_drop_handler(),
+                // The `devtools` feature is for browser windows (browser_debug.rs); the app's own DevTools stay in debug builds.
+                WebviewBuilder::new("main", WebviewUrl::App(Default::default()))
+                    .auto_resize()
+                    .disable_drag_drop_handler()
+                    .devtools(cfg!(debug_assertions)),
                 LogicalPosition::new(0.0, 0.0),
                 size,
             )?;
@@ -363,6 +368,8 @@ pub fn run() {
             browser::browser_forward,
             browser::browser_reload,
             browser::browser_download,
+            browser_debug::browser_devtools,
+            browser_debug::browser_cdp,
             downloads::download_open,
             downloads::download_reveal,
             downloads::download_cancel,

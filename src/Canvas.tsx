@@ -2,7 +2,7 @@ import "./canvas.css";
 import { For, Show, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
 import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isRemote, isTerminal, live, projectById, removePage,
-  canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, tabProfile, toggleMono, visibleTabs,
+  canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, pageProfile, toggleMono, visibleTabs,
 } from "./state";
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
@@ -13,7 +13,9 @@ import { hintsShown } from "./hints";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
   addressToUrl, answerPassword, openExternalIn, passwordPrompts, pickElement, placeBrowser, profilesSupported, setBrowsersSuspended,
+  consoleErrors, debugPortOf, debugSupport, profilesKey,
 } from "./browsers";
+import { DebugButton } from "./debugmenu";
 import { fwdOfPage, heldBy } from "./tunnels";
 import { RemoteStart, TunnelBar, TunnelChip, TunnelHeld } from "./tunnelui";
 import { Icon } from "./lucide";
@@ -262,8 +264,10 @@ export default function Canvas(props: { project: Project }) {
     /** Browser windows: the shown page. Back, reload, the address and the star act on it. */
     const page = () => activePage(tab);
     const pageId = () => page()?.id ?? "";
-    /** Browser windows: the Browser Profile its webviews use; switching it remakes them. */
-    const profile = () => tabProfile(props.project, tab);
+    /** Browser windows: the shown page's Browser Profile (the window's, unless Page Profiles let it pick its own). */
+    const profile = () => pageProfile(props.project, tab, page());
+    /** Page Profiles are on and worth showing: each page tab carries its profile's colour. */
+    const pageDots = () => tab.profileScope === "page" && nativeBrowsers && profilesInUse();
     const url = () => browserInfo[pageId()]?.url ?? page()?.url ?? "";
     const pageTitle = (pg: Page) => browserInfo[pg.id]?.title || (pg.url ? pg.url.replace(/^https?:\/\//, "") : "New tab");
     /** The shown page's load line: on the nav row, or on the title bar when the nav row is hidden. */
@@ -319,7 +323,7 @@ export default function Canvas(props: { project: Project }) {
     });
 
     if (isBrowser) {
-      createEffect(on([rect, anyDrag, blank, pageId, buried, () => profile().id, () => !!held(), () => fwdOfPage(pageId())?.state], () => follow(), { defer: true }));
+      createEffect(on([rect, anyDrag, blank, pageId, buried, () => profilesKey(props.project, tab), () => !!held(), () => fwdOfPage(pageId())?.state], () => follow(), { defer: true }));
       // A blank page has nothing to do but take an address.
       createEffect(() => {
         if (focused() && blank() && !bare()) requestAnimationFrame(() => inputEl.focus());
@@ -499,11 +503,17 @@ export default function Canvas(props: { project: Project }) {
                     role="tab"
                     classList={{ on: pg.id === pageId() }}
                     aria-selected={pg.id === pageId()}
-                    title={browserInfo[pg.id]?.url || pg.url}
+                    title={`${browserInfo[pg.id]?.url || pg.url}${pageDots() ? ` · ${pageProfile(props.project, tab, pg).name}` : ""}`}
                     onClick={() => showPage(props.project.id, id, pg.id)}
                     onMouseDown={(e) => e.button === 1 && e.preventDefault()}
                     onAuxClick={(e) => e.button === 1 && closeTabPage(pg.id)}
                   >
+                    <Show when={pageDots()}>
+                      <i class="pdot" style={{ "--pc": profileColor(pageProfile(props.project, tab, pg)) }} />
+                    </Show>
+                    <Show when={(consoleErrors[pg.id]?.length ?? 0) > 0 && app.settings.debugMenu && pg.id !== pageId()}>
+                      <i class="perr" title={`${consoleErrors[pg.id]!.length} console errors`} />
+                    </Show>
                     <span>{pageTitle(pg)}</span>
                     <button title="Close tab" onClick={(e) => { e.stopPropagation(); closeTabPage(pg.id); }}>×</button>
                   </div>
@@ -601,11 +611,14 @@ export default function Canvas(props: { project: Project }) {
                   <Icon name="crosshair" size={14} />
                 </button>
               </Show>
+              <Show when={nativeBrowsers && app.settings.debugMenu && debugSupport().devtools}>
+                <DebugButton projectId={props.project.id} tabId={id} pageId={pageId()} port={debugPortOf(profile())} />
+              </Show>
               <Show when={nativeBrowsers && profilesSupported()}>
                 <button
                   class="avbtn"
                   aria-haspopup="menu"
-                  title={`Profile: ${profile().name} · cookies, sign-ins and autofill are this profile's`}
+                  title={`Profile: ${profile().name}${tab.profileScope === "page" ? " · this page" : ""} · cookies, sign-ins and autofill are this profile's`}
                   onClick={(e) => toggleProfileMenu(props.project.id, id, e.currentTarget)}
                 >
                   <ProfileAvatar profile={profile()} />
