@@ -104,6 +104,13 @@ fn find(app: &AppHandle, label: &str) -> Result<Webview, String> {
     app.get_webview(label).ok_or_else(|| format!("no browser {label}"))
 }
 
+/// On Linux Tauri ignores a child webview's bounds, so browser_gtk places it instead.
+#[cfg(target_os = "linux")]
+fn set_bounds(webview: &Webview, x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
+    crate::browser_gtk::place(webview, x, y, width, height)
+}
+
+#[cfg(not(target_os = "linux"))]
 fn set_bounds(webview: &Webview, x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
     webview.set_position(LogicalPosition::new(x, y)).map_err(|e| e.to_string())?;
     webview.set_size(LogicalSize::new(width, height)).map_err(|e| e.to_string())
@@ -313,6 +320,8 @@ pub async fn browser_open(
     let webview = window
         .add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    crate::browser_gtk::adopt(&webview, x, y, width, height)?;
     set_autofill(&webview, autofill, passwords)?;
     #[cfg(windows)]
     crate::downloads::watch(&app, &webview, &label)?;

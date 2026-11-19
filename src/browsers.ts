@@ -1,8 +1,8 @@
 // Browser windows are native child webviews drawn over a placeholder element, one webview per
 // page; only the window's shown page is visible. Everything here is keyed by page id.
 // Native views always paint above HTML, so they are hidden while overlays are open.
-// On Linux, Tauri packs child webviews into a GtkBox and ignores their bounds, so
-// there the canvas shows the page in an iframe instead ("framed" mode).
+// On Linux they are placed on a GtkOverlay (browser_gtk.rs). Started with
+// TRICODE_FRAMED_BROWSERS=1, Linux shows pages in an iframe instead ("framed" mode).
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -30,8 +30,8 @@ export type BrowserInfo = {
   /** framed mode: what the iframe loads when it differs from `url` (through a remote tunnel) */ src?: string;
 };
 
-/** False on Linux, where the canvas falls back to an iframe. */
-export const nativeBrowsers = !/Linux/i.test(navigator.userAgent) || /Android/i.test(navigator.userAgent);
+/** False when Linux was started with TRICODE_FRAMED_BROWSERS=1: the canvas then frames pages. */
+export const nativeBrowsers = !(window as { __TRICODE_FRAMED_BROWSERS__?: boolean }).__TRICODE_FRAMED_BROWSERS__;
 /** Framed mode keeps its own history, since a cross-origin iframe's history is not reachable. */
 const framedHistory = new Map<string, { list: string[]; i: number }>();
 export const [browserInfo, setBrowserInfo] = createStore<Record<string, BrowserInfo>>({});
