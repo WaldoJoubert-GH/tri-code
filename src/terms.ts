@@ -16,6 +16,7 @@ import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./clipboard";
 import { Demo, playDemo } from "./demo";
 import { isKey } from "./keymap";
+import { isMac } from "./modkey";
 import { rescanSoon } from "./leftovers";
 
 const SSH_CONNECTION_FAILED = 255;
@@ -137,11 +138,31 @@ class TermSession {
     });
     this.term.loadAddon(this.fit);
     // Plain clicks do nothing; Ctrl+click opens in the canvas, Ctrl+Shift+click in the system browser.
+    let hovered: string | undefined;
+    let openedAt = Number.NEGATIVE_INFINITY;
+    const open = (uri: string, external: boolean) => {
+      openedAt = performance.now();
+      linkHandler?.(uri, this.tab.id, external);
+    };
     this.term.loadAddon(new WebLinksAddon((event, uri) => {
       if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
-      linkHandler?.(uri, this.tab.id, event.shiftKey);
+      if (performance.now() - openedAt < 500) return; // already opened from the contextmenu below
+      open(uri, event.shiftKey);
+    }, {
+      hover: (_e, uri) => { hovered = uri; },
+      leave: () => { hovered = undefined; },
     }));
+    // macOS turns Ctrl+click into a right-click: the web view's context menu takes the
+    // mouseup, so xterm never activates the link. Open the hovered link from here instead.
+    if (isMac) {
+      this.el.addEventListener("contextmenu", (e) => {
+        if (!e.ctrlKey || !hovered) return;
+        e.preventDefault();
+        e.stopPropagation();
+        open(hovered, e.shiftKey);
+      }, { capture: true });
+    }
     this.term.open(this.el);
     this.installClipboard();
     this.installProgramStatus();
