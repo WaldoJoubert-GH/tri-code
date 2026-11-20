@@ -38,6 +38,10 @@
   content: ""; position: absolute; left: 2px; top: 2px; width: 6px; height: 3px;
   background: color-mix(in srgb, var(--muted) 55%, transparent); border-radius: 1px 1px 0 0;
 }
+/* Atom and Material (fileicons.ts): an SVG, no chip. Mono draws in currentColor. */
+.fic.svg { height: 16px; display: grid; place-items: center; background: none; color: var(--muted); }
+.fic.svg svg { display: block; }
+.ftabs .fic.svg svg { width: 14px; height: 14px; }
 
 .fnote { padding: 16px 14px; color: var(--muted); font-size: 12px; }
 .fnote.bad { color: var(--bad); white-space: pre-wrap; }
@@ -112,6 +116,10 @@
 .prow .ph { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11.5px; }
 .prow .ph b { font-weight: 600; }
 .prow .pk { flex: none; display: flex; gap: 3px; }
+/* A command's choices (File Icon Theme…): a sample of each beside its name. */
+.prow.choice .gn { min-width: 84px; }
+.pstrip, .pstrip-svg { flex: none; display: flex; align-items: center; gap: 4px; }
+.pstrip-svg svg { width: 14px; height: 14px; }
 
 /* Image, video and audio, centred and scaled down to fit. A checkerboard shows transparency. */
 .fmedia {
@@ -131,6 +139,11 @@
 .fthead button { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); text-transform: none; }
 .fthead button:hover { background: var(--hover); color: var(--text); }
 .frow.shown:not(.sel) .fname { color: var(--accent); }
+/* Git ignored (git.ts ignoredAt): the name muted and the icon dimmed, in every File Icon Theme.
+   Chosen from design/editor-icons.html ("Name and icon"). */
+.frow.ign .fname, .ftabs .ft.ign .ftn, .crumbs.ign .cpath .last { color: var(--muted); }
+.frow.ign.dir .fname { font-weight: 500; }
+.frow.ign .fic, .ftabs .ft.ign .fic { opacity: .5; }
 .frow.fdraft input, .frow .fren { flex: 1; min-width: 0; height: 20px; padding: 0 5px; border: 1px solid var(--accent); border-radius: 3px; background: var(--bg); color: var(--text); font: inherit; outline: none; }
 
 .ftabs { display: flex; flex: none; overflow-x: auto; scrollbar-width: none; background: var(--panel); border-bottom: 1px solid var(--line); min-height: 30px; }

@@ -25,7 +25,7 @@ import LangPicker from "./LangPicker";
 import { type CtxItem, openCtxMenu } from "./ctxmenu";
 import { copyText } from "./clipboard";
 import FileTree, { FileIcon, MARK_TITLE } from "./FileList";
-import { fileMarks, markAt, peekStatus } from "./git";
+import { fileMarks, ignoredAt, markAt, peekStatus } from "./git";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { openExternal, openUrlInProject } from "./browsers";
 import { capsOf, withKey } from "./keymap";
@@ -706,11 +706,11 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
             {(f) => (
               <span
                 class="ft"
-                classList={{ on: f === path(), pv: props.tab.preview === f }}
+                classList={{ on: f === path(), pv: props.tab.preview === f, ign: !markAt(marks(), f) && ignoredAt(marks(), f) }}
                 data-g={markAt(marks(), f)}
                 role="tab"
                 aria-selected={f === path()}
-                title={[f, markAt(marks(), f) && MARK_TITLE[markAt(marks(), f)!], props.tab.preview === f && "preview: double-click to keep"].filter(Boolean).join(" · ")}
+                title={[f, markAt(marks(), f) ? MARK_TITLE[markAt(marks(), f)!] : ignoredAt(marks(), f) && "ignored", props.tab.preview === f && "preview: double-click to keep"].filter(Boolean).join(" · ")}
                 onClick={() => pick(f)}
                 onDblClick={() => keepPreview(props.project, props.tab, f)}
                 onAuxClick={(e) => e.button === 1 && closeFile(f)}
@@ -731,7 +731,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
           </For>
         </div>
         <Show when={path()}>
-          <div class="crumbs">
+          <div class="crumbs" classList={{ ign: !markAt(marks(), path()) && ignoredAt(marks(), path()) }}>
             <span class="cpath" title={path()}>
               <For each={rel().split("/")}>
                 {(part, i) => (

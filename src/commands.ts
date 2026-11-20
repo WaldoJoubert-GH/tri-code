@@ -4,8 +4,9 @@
 
 import {
   GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, app, focusTab, focusedTab, goSpace, isPinned, isRemote, live,
-  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, setMedia, space, tabIcon, tabName, toggleMono, togglePin,
+  lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, setMedia, setSettings, space, tabIcon, tabName, toggleMono, togglePin,
 } from "./state";
+import { ICON_THEMES, type IconTheme, setPreviewTheme } from "./fileicons";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { requestClose } from "./Canvas";
 import { isMac } from "./modkey";
@@ -45,6 +46,24 @@ export type Command = {
   hint?: string;
   /** A lucide icon name, or a one-character glyph. */
   icon?: string;
+  run: () => void;
+  /** Instead of running, the palette lists these to pick from (a sub-picker, as VS Code's theme pickers). */
+  choices?: () => Choice[];
+  /** Called when the choices close, picked or not: undo what `preview` showed. */
+  leave?: () => void;
+};
+
+/** One entry of a Command's choices. */
+export type Choice = {
+  id: string;
+  title: string;
+  hint?: string;
+  /** The one in effect now: highlighted first and marked. */
+  current?: boolean;
+  /** Draws a sample of this File Icon Theme beside the title. */
+  iconTheme?: IconTheme;
+  /** Show it while highlighted, without keeping it. */
+  preview?: () => void;
   run: () => void;
 };
 
@@ -221,6 +240,20 @@ export function commands(): Command[] {
   add({ id: "config-export", group: "App", title: "Export configuration…", hint: "preferences, commands, environments, projects", icon: "archive", run: () => void exportConfig(SECTIONS.map((s) => s.id)) });
   add({ id: "config-import", group: "App", title: "Import configuration…", hint: "from an exported file, with a preview", icon: "archive-restore", run: () => { openSettings("backup"); void chooseImport(); } });
   add({ id: "theme-fonts", group: "App", title: "Theme and fonts", hint: "system, light or dark, interface and code fonts", icon: "palette", run: () => openSettings("appearance") });
+  add({
+    id: "file-icon-theme", group: "App", title: "File Icon Theme…", hint: "classic, atom, material or none", icon: "folder-tree",
+    run: () => openSettings("appearance"),
+    choices: () => ICON_THEMES.map((t) => ({
+      id: t.id, title: t.name, hint: t.blurb, iconTheme: t.id,
+      current: (app.settings.fileIcons ?? "classic") === t.id,
+      preview: () => setPreviewTheme(t.id),
+      run: () => {
+        setSettings({ fileIcons: t.id === "classic" ? undefined : t.id });
+        flash(`file icons: ${t.name}`);
+      },
+    })),
+    leave: () => setPreviewTheme(undefined),
+  });
   add({ id: "git-colors", group: "App", title: "Git colours", hint: "added, deleted, modified, diff highlight", icon: "palette", run: () => openSettings("git") });
   const u = updateReady();
   if (u) add({ id: "update", group: "App", title: `Restart to update to ${u.version}`, icon: "refresh-cw", run: installUpdate });

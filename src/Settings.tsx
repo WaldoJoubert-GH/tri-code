@@ -23,6 +23,9 @@ import { PREVIEWS, previewOn, sandboxPreview } from "./preview";
 import { SignalsForm } from "./SignalSettings";
 import { openEnvDialog } from "./EnvDialog";
 import { openWelcome } from "./Welcome";
+import { ICON_THEMES, type IconTheme } from "./fileicons";
+import { FileIcon } from "./FileList";
+import "./files.css";
 
 export type SettingsPage = "appearance" | "windows" | "agents" | "environments" | "files" | "languages" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview";
 
@@ -136,6 +139,72 @@ function FontRow(props: { kind: FontKind; name: string; fonts: string[] | null; 
   );
 }
 
+/** A two-or-more-way choice as a segmented control. */
+function Seg<T>(props: { label: string; value: T; items: readonly (readonly [T, string, string?])[]; set: (v: T) => void }) {
+  return (
+    <span class="set-seg" role="radiogroup" aria-label={props.label}>
+      <For each={props.items}>
+        {([v, name, title]) => (
+          <button type="button" role="radio" aria-checked={props.value === v} title={title} onClick={() => props.set(v)}>{name}</button>
+        )}
+      </For>
+    </span>
+  );
+}
+
+const ICON_SAMPLE: [string, boolean, boolean, number][] = [
+  ["src", true, true, 0], ["FileList.tsx", false, false, 1], ["files.css", false, false, 1], ["docs", true, false, 0],
+  ["node_modules", true, false, 0], ["Cargo.toml", false, false, 0], ["package.json", false, false, 0], ["README.md", false, false, 0],
+];
+
+function FileIconsSection() {
+  const theme = () => app.settings.fileIcons ?? "classic";
+  return (
+    <>
+      <h4>File icons</h4>
+      <div class="row">
+        Icon theme
+        <Seg<IconTheme> label="File icon theme" value={theme()} items={ICON_THEMES.map((t) => [t.id, t.name, t.blurb] as const)}
+          set={(v) => setSettings({ fileIcons: v === "classic" ? undefined : v })} />
+      </div>
+      <Show when={theme() === "atom" || theme() === "material"}>
+        <div class="row icon-opt">
+          Folders
+          <Seg label="Folders" value={!!app.settings.iconPlainFolders}
+            items={[[false, "By name", "src, docs, assets… each in its own colour and badge"], [true, "Plain", "Every folder the same grey"]]}
+            set={(v) => setSettings({ iconPlainFolders: v || undefined })} />
+        </div>
+      </Show>
+      <Show when={theme() === "atom"}>
+        <div class="row icon-opt">
+          Open folders
+          <Seg label="Open folders" value={!!app.settings.iconFilledOpen}
+            items={[[false, "Hollow", "Expanded folders as an outline"], [true, "Filled", "Expanded folders like closed ones"]]}
+            set={(v) => setSettings({ iconFilledOpen: v || undefined })} />
+        </div>
+        <div class="row icon-opt">
+          Colour
+          <Seg label="Icon colour" value={!!app.settings.iconMono}
+            items={[[false, "Coloured", "Each kind of file in its own colour"], [true, "Mono", "Every icon in the text colour"]]}
+            set={(v) => setSettings({ iconMono: v || undefined })} />
+        </div>
+      </Show>
+      <div class="icon-sample" aria-hidden="true">
+        <For each={ICON_SAMPLE}>
+          {([name, dir, open, depth]) => (
+            <div class="frow" classList={{ dir }} style={{ "padding-left": `${6 + depth * 12}px` }}>
+              <span class="fchev">{dir ? (open ? "▾" : "▸") : ""}</span>
+              <FileIcon name={name} dir={dir} open={open} />
+              <span class="fname">{name}</span>
+            </div>
+          )}
+        </For>
+      </div>
+      <p class="note">The editor's file tree, its tabs and Go to File. The palette's <b>File Icon Theme…</b> previews each one as you move through them.</p>
+    </>
+  );
+}
+
 function AppearancePage() {
   const [fonts] = createResource(() => invoke<{ all: string[]; mono: string[] }>("font_list").catch((e) => {
     console.warn("font_list failed:", e);
@@ -173,6 +242,7 @@ function AppearancePage() {
         <KeyList keys={["Shift", "W"]} class="key-sample" />
       </div>
       <p class="note">Every key the app draws, in hints, panels, dialogs and Settings.</p>
+      <FileIconsSection />
       <h4>Fonts</h4>
       <FontRow kind="ui" name="Interface" fonts={fonts()?.all ?? null} installed={fonts()?.all ?? null} />
       <FontRow kind="mono" name="Code" fonts={fonts()?.mono ?? null} installed={fonts()?.all ?? null} />
