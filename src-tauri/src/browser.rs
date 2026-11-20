@@ -25,25 +25,27 @@ struct OpenPayload {
 }
 
 #[derive(Clone, Serialize)]
-struct PickPayload {
-    label: String,
-    /// The selection described for the agent, ready to type.
-    text: String,
-    /// The agent window chosen in the composer (a tab id), or "" for the default.
-    to: String,
-    /// An agent to start first and type into ("claude", "pi"), or "".
-    new: String,
-}
-
-#[derive(Clone, Serialize)]
 struct TitlePayload {
     label: String,
     title: String,
 }
 
+#[derive(Clone, Serialize)]
+struct IconPayload {
+    label: String,
+    icon: String,
+}
+
+/// A site icon the app's own webview may load: http(s) or an inline image, nothing else.
+fn icon_ok(icon: &str) -> bool {
+    icon.starts_with("https://") || icon.starts_with("http://") || icon.starts_with("data:image/")
+}
+
 /// Ctrl/Cmd+click and middle-click reach on_new_window looking the same as target=_blank, so
 /// the page reports them as a navigation to this host instead, which on_navigation cancels:
-/// `/open?u=` for a background page, `/pick?d=&to=&new=` for a Select element result.
+/// `/open?u=` for a background page, `/pick?d=&to=&new=` for a Select element or Screenshot
+/// result (with `&shots=&vw=&k=` when it carries screenshots), `/capture?k=` for a snapshot
+/// (browser_shot.rs).
 const BG_HOST: &str = "tricode.invalid";
 
 /// Select element: dormant until browser_pick starts it.
@@ -61,6 +63,33 @@ const LINK_SCRIPT: &str = r#"(() => {
   };
   addEventListener("click", open, true);
   addEventListener("auxclick", open, true);
+})();"#;
+
+/// macOS and Linux: reports the icon a page declares as a BG_HOST navigation (`/favicon?u=`),
+/// once the page has loaded (a navigation started mid-load could stop it) and again when <head>
+/// changes it. WebView2 reports icons natively instead (watch_favicon). Top frame only.
+#[cfg(not(windows))]
+const FAVICON_SCRIPT: &str = r#"(() => {
+  if (window.top !== window) return;
+  let sent = "";
+  const size = (l) => parseInt(((l.sizes && l.sizes.value) || "").split(/x/i)[0]) || 0;
+  // An SVG first (sharp at any size), then the declared size nearest 32px; touch icons last.
+  const score = (l) => (/svg/i.test(l.type) ? 0 : 1 + Math.abs((size(l) || 32) - 32) + (/apple/i.test(l.rel) ? 1000 : 0));
+  const best = () => {
+    const links = [...document.querySelectorAll('link[rel~="icon" i], link[rel~="apple-touch-icon" i]')].filter((l) => l.href);
+    return links.sort((a, b) => score(a) - score(b))[0]?.href || "";
+  };
+  const report = () => {
+    const href = best();
+    if (!href || href === sent || href.length > 32768) return;
+    sent = href;
+    location.href = "https://tricode.invalid/favicon?u=" + encodeURIComponent(href);
+  };
+  const watch = () => {
+    report();
+    if (document.head) new MutationObserver(report).observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ["href", "rel"] });
+  };
+  document.readyState === "complete" ? watch() : addEventListener("load", watch, { once: true });
 })();"#;
 
 /// tauri-plugin-dialog without its init script, which replaces `alert` and `confirm` in every
@@ -201,6 +230,40 @@ fn set_autofill(_webview: &Webview, _autofill: bool, _passwords: bool) -> Result
     Ok(())
 }
 
+/// WebView2: reports the page's icon as `browser-icon` whenever it changes. The script that does
+/// this elsewhere would navigate the page, which can fire its beforeunload ("Leave site?").
+#[cfg(windows)]
+fn watch_favicon(app: &AppHandle, webview: &Webview, label: &str) -> Result<(), String> {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_15;
+    use webview2_com::{FaviconChangedEventHandler, take_pwstr};
+    use windows_core::{Interface, PWSTR};
+    let (app, label) = (app.clone(), label.to_string());
+    webview
+        .with_webview(move |pw| {
+            let hook = || -> windows_core::Result<()> {
+                // SAFETY: COM calls on the webview's own controller, on the thread with_webview runs us on.
+                let core = unsafe { pw.controller().CoreWebView2()?.cast::<ICoreWebView2_15>()? };
+                let handler = FaviconChangedEventHandler::create(Box::new(move |sender, _| {
+                    let Some(core) = sender.and_then(|s| s.cast::<ICoreWebView2_15>().ok()) else { return Ok(()) };
+                    let mut uri = PWSTR::null();
+                    unsafe { core.FaviconUri(&mut uri)? };
+                    let icon = take_pwstr(uri);
+                    // An empty URI (no icon yet) leaves the /favicon.ico guess in place.
+                    if icon_ok(&icon) {
+                        let _ = app.emit("browser-icon", IconPayload { label: label.clone(), icon });
+                    }
+                    Ok(())
+                }));
+                let mut token = 0i64;
+                unsafe { core.add_FaviconChanged(&handler, &mut token) }
+            };
+            if let Err(e) = hook() {
+                eprintln!("browser favicon hook failed: {e}");
+            }
+        })
+        .map_err(|e| e.to_string())
+}
+
 /// Creates the browser webview, or navigates and repositions it if it exists. A `hidden` one
 /// loads behind the shown page (a background tab). `profile` is the Browser Profile whose data
 /// it uses (unset: the default); `autofill` and `passwords` are that profile's switches, and
@@ -245,16 +308,38 @@ pub async fn browser_open(
             let param = |name: &str| {
                 url.query_pairs().find(|(k, _)| k == name).map(|(_, v)| v.into_owned())
             };
+            if url.path() == "/favicon" {
+                let icon = param("u").unwrap_or_default();
+                if icon_ok(&icon) {
+                    let _ = bg_app.emit("browser-icon", IconPayload { label: bg_label.clone(), icon });
+                }
+                return false;
+            }
+            if url.path() == "/capture" {
+                crate::browser_shot::on_capture(&bg_app, &bg_label, &param("k").unwrap_or_default());
+                return false;
+            }
             if url.path() == "/pick" {
-                let _ = bg_app.emit(
-                    "browser-pick",
-                    PickPayload {
-                        label: bg_label.clone(),
-                        text: param("d").unwrap_or_default(),
-                        to: param("to").unwrap_or_default(),
-                        new: param("new").unwrap_or_default(),
-                    },
-                );
+                let payload = crate::browser_shot::PickPayload {
+                    label: bg_label.clone(),
+                    text: param("d").unwrap_or_default(),
+                    to: param("to").unwrap_or_default(),
+                    new: param("new").unwrap_or_default(),
+                    images: Vec::new(),
+                    error: String::new(),
+                    copy: param("copy").is_some_and(|v| v == "1"),
+                    shot: param("shot").map(|v| v == "1"),
+                };
+                let rects = param("shots").and_then(|s| serde_json::from_str::<Vec<crate::browser_shot::Rect>>(&s).ok());
+                match rects.filter(|r| !r.is_empty()) {
+                    Some(rects) => {
+                        let vw = param("vw").and_then(|v| v.parse().ok()).unwrap_or(0.0);
+                        crate::browser_shot::on_send(&bg_app, &param("k").unwrap_or_default(), rects, vw, payload);
+                    }
+                    None => {
+                        let _ = bg_app.emit("browser-pick", payload);
+                    }
+                }
                 return false;
             }
             let target = param("u").and_then(|u| Url::parse(&u).ok());
@@ -307,7 +392,7 @@ pub async fn browser_open(
             let _ = title_app.emit("browser-title", TitlePayload { label: title_label.clone(), title });
         });
     #[cfg(not(windows))]
-    let builder = crate::downloads::watch(builder, &app, &label);
+    let builder = crate::downloads::watch(builder, &app, &label).initialization_script(FAVICON_SCRIPT);
     let profile = profile.unwrap_or_default();
     let (autofill, passwords) = (autofill.unwrap_or(true), passwords.unwrap_or(true));
     // DevTools for every page (F12, the Debug Menu); the app's own webview keeps them for debug builds.
@@ -339,6 +424,8 @@ pub async fn browser_open(
     crate::downloads::watch(&app, &webview, &label)?;
     #[cfg(windows)]
     crate::browser_debug::watch_console(&app, &webview, &label)?;
+    #[cfg(windows)]
+    watch_favicon(&app, &webview, &label)?;
     #[cfg(target_os = "macos")]
     crate::passwords::install(&app, &webview, &label, &profile, passwords)?;
     if hidden == Some(true) {
@@ -373,6 +460,7 @@ pub async fn browser_hide(app: AppHandle, label: String) -> Result<(), String> {
 /// Closes a browser webview. A missing one is not an error.
 #[tauri::command]
 pub async fn browser_close(app: AppHandle, label: String) -> Result<(), String> {
+    crate::browser_shot::forget(&label);
     #[cfg(target_os = "macos")]
     crate::passwords::unwatch(&label);
     match app.get_webview(&label) {
@@ -453,11 +541,15 @@ pub async fn browser_navigate(app: AppHandle, label: String, url: String) -> Res
     find(&app, &label)?.navigate(url).map_err(|e| e.to_string())
 }
 
-/// Starts Select element in a page and gives it the keyboard. `opts` goes to pick.js as it is:
-/// the accent, the agent windows the result can go to and the chosen one, and the agents it can start.
+/// Starts Select element, or Screenshot (`mode: "draw"`), in a page and gives it the keyboard.
+/// `opts` goes to pick.js as it is: the accent, the agent windows the result can go to and the
+/// chosen one, and the agents it can start; plus the session's token for screenshots.
 #[tauri::command]
-pub async fn browser_pick(app: AppHandle, label: String, opts: serde_json::Value) -> Result<(), String> {
+pub async fn browser_pick(app: AppHandle, label: String, mut opts: serde_json::Value) -> Result<(), String> {
     let webview = find(&app, &label)?;
+    if let Some(o) = opts.as_object_mut() {
+        o.insert("token".into(), crate::browser_shot::new_token(&label).into());
+    }
     webview
         .eval(format!("window.__tricodePick && window.__tricodePick({opts})"))
         .map_err(|e| e.to_string())?;

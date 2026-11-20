@@ -5,6 +5,7 @@ mod altspace;
 mod bg;
 mod browser;
 mod browser_debug;
+mod browser_shot;
 #[cfg(target_os = "linux")]
 mod browser_gtk;
 mod cli;
