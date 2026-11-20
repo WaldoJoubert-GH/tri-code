@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.56 — 2026-11-20
+
+- A project can link other folders to show beside its own. Each Linked Folder gets its own root in the Editor Window's tree and its files appear under its name in Go to File. A link can be read-only, left out of Go to File, renamed, reordered or unlinked, and unlinking never deletes the folder. Add one from the tree header, the Command Palette or the Welcome window; on an ssh project a link can point at a folder on this machine. Settings › Files turns the feature off. ([#82](https://github.com/WaldoJoubert-GH/tri-code/pull/82))
+- In a browser window, Select element's Screenshot switch attaches a cropped image of each selection, and a new Screenshot mode freezes the page to mark up with pen, arrow, box, numbered pins and text. Each pin adds a note line, and Send hands the marked-up image to the agent. ([#81](https://github.com/WaldoJoubert-GH/tri-code/pull/81))
+- Atom and Material file icon themes join Classic and None in Settings › Appearance › File icons, and File Icon Theme… in the Command Palette previews each as you move through them. The Editor Window's tree, tabs and Go to File dim files that `.gitignore` matches, unless they have changes. ([#80](https://github.com/WaldoJoubert-GH/tri-code/pull/80))
+
 ## 0.1.55 — 2026-11-20
 
 - On a Mac, Cmd+X cuts in text fields and the Editor, and Cmd+Enter in fields, popovers and dialogs sends, runs or commits again instead of opening a New shell. Shortcut hints read Cmd on a Mac and Ctrl elsewhere. ([#74](https://github.com/WaldoJoubert-GH/tri-code/issues/74))
