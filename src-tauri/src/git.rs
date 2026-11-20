@@ -51,6 +51,10 @@ pub struct Status {
     #[serde(rename = "defaultBase")]
     pub default_base: String,
     pub files: Vec<Change>,
+    /// Paths `.gitignore` matches, relative to the repo; a folder ends in `/` and stands for all it
+    /// holds (git doesn't list inside it). The editor mutes them.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ignored: Vec<String>,
     /// The last few commits on HEAD, newest first.
     pub commits: Vec<Commit>,
     /// A pull (or merge) stopped on a conflict: "rebase" or "merge".
@@ -198,7 +202,7 @@ fn split_multi(out: &str) -> Vec<Result<String, i32>> {
         .collect()
 }
 
-/// Parse `git status --porcelain=v2 --branch -z`.
+/// Parse `git status --porcelain=v2 --branch -z --ignored=matching`.
 fn parse_status(out: &str, s: &mut Status) {
     let mut it = out.split('\0');
     while let Some(rec) = it.next() {
@@ -214,6 +218,8 @@ fn parse_status(out: &str, s: &mut Status) {
                     s.behind = n.parse().unwrap_or(0);
                 }
             }
+        } else if let Some(p) = rec.strip_prefix("! ") {
+            s.ignored.push(p.into());
         } else if let Some(p) = rec.strip_prefix("? ") {
             s.files.push(Change { path: p.into(), x: "?".into(), y: "?".into(), index: None, work: None, orig: None });
         } else if rec.starts_with("1 ") || rec.starts_with("2 ") || rec.starts_with("u ") {
@@ -272,7 +278,8 @@ pub(crate) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, St
 }
 
 const STATUS_CMDS: &[&[&str]] = &[
-    &["status", "--porcelain=v2", "--branch", "-z"],
+    // `matching` lists an ignored folder once, as `dir/`, without walking into it.
+    &["status", "--porcelain=v2", "--branch", "-z", "--ignored=matching"],
     &["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
     &["log", "-n", "12", "--format=%H%x1f%s%x1f%cr"],
     &["rev-list", "HEAD", "--not", "--remotes", "-n", "200"],
@@ -1197,6 +1204,14 @@ mod tests {
             ("conflict.txt", "U", "U"),
             ("notes.md", "?", "?"),
         ]);
+    }
+
+    #[test]
+    fn status_lists_ignored_paths_apart_from_changes() {
+        let mut s = Status::default();
+        parse_status("? notes.md\0! node_modules/\0! src-tauri/target/\0! .env\0", &mut s);
+        assert_eq!(s.ignored, ["node_modules/", "src-tauri/target/", ".env"]);
+        assert_eq!(s.files.len(), 1);
     }
 
     #[test]

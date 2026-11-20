@@ -24,6 +24,8 @@ export type CommitDetail = {
 export type GitStatus = {
   branch: string | null; upstream: string | null; ahead: number; behind: number; base: string; defaultBase: string;
   files: Change[]; commits: Commit[]; op?: "rebase" | "merge";
+  /** Paths .gitignore matches, relative to the repo; a folder ends in "/" and covers all it holds. */
+  ignored?: string[];
 };
 export type Incoming = { sha: string; subject: string; when: string; author: string };
 /** `ref` is stash@{n}, which shifts; `sha` pins the entry. */
@@ -196,6 +198,8 @@ export type FileMarks = {
   dirs: Map<string, FileMark>;
   /** Untracked folders: everything under them is untracked. */
   untracked: string[];
+  /** Ignored files and folders by absolute path, no trailing "/": everything under a folder is ignored too. */
+  ignored: Set<string>;
 };
 
 const RANK: Record<FileMark, number> = { U: 0, A: 1, R: 2, D: 3, M: 4, C: 5 };
@@ -217,9 +221,11 @@ export function fileMarks(p: Project): FileMarks {
   const files = new Map<string, FileMark>();
   const dirs = new Map<string, FileMark>();
   const untracked: string[] = [];
+  const ignored = new Set<string>();
   const top = slashes(p.path);
   for (const r of repos) {
     const root = slashes(repoRoot(p, r.repo));
+    for (const i of r.status?.ignored ?? []) ignored.add(`${root}/${i.replace(/\/$/, "")}`);
     for (const c of r.status?.files ?? []) {
       const mark = markOf(c);
       const path = `${root}/${c.path.replace(/\/$/, "")}`;
@@ -232,7 +238,16 @@ export function fileMarks(p: Project): FileMarks {
       }
     }
   }
-  return { files, dirs, untracked };
+  return { files, dirs, untracked, ignored };
+}
+
+/** Whether .gitignore matches a tree row or tab path: it, or a folder it's in, is listed. A changed file never is. */
+export function ignoredAt(m: FileMarks, path: string): boolean {
+  if (!m.ignored.size) return false;
+  for (let p = slashes(path); p.includes("/"); p = p.slice(0, p.lastIndexOf("/"))) {
+    if (m.ignored.has(p)) return true;
+  }
+  return false;
 }
 
 /** The mark for a tree row or tab path, if it has one. */

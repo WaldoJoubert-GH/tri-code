@@ -1158,6 +1158,10 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .font-row .reset:hover:not(:disabled) { background: var(--hover); color: var(--text); }
 .settings-dlg .font-row .reset:disabled { opacity: .35; }
 .settings-dlg .font-missing { margin: 0 0 4px 102px; color: var(--warn); font-size: 11.5px; }
+.settings-dlg .icon-opt { padding-left: 12px; border-left: 2px solid var(--line); margin-left: 2px; }
+.settings-dlg .icon-sample { margin-top: 10px; padding: 4px 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); columns: 2; column-gap: 0; }
+.settings-dlg .icon-sample .frow { break-inside: avoid; }
+.settings-dlg .icon-sample .frow:hover { background: none; }
 .settings-dlg .font-sample { margin-top: 10px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); }
 .font-sample .ui { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--line); background: var(--panel); font: 13px var(--ui); }
 .font-sample .ui b { font-weight: 600; }

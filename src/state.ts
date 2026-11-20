@@ -382,6 +382,15 @@ export type Settings = {
   fontMono?: string;
   /** Keycaps in the project's accent colour (look.ts). Unset is the neutral keycap. */
   accentKeys?: boolean;
+  /** File Icon Theme of the editor's tree, tabs and Go to File (fileicons.ts). Unset is Classic, the
+   *  two-letter chips. Chosen from design/editor-icons.html. */
+  fileIcons?: "atom" | "material" | "none";
+  /** Atom and Material: every folder the same grey, not coloured and badged by name. */
+  iconPlainFolders?: true;
+  /** Atom: open folders filled like closed ones, not hollow. */
+  iconFilledOpen?: true;
+  /** Atom: icons in the text colour, not each kind's own. */
+  iconMono?: true;
   /** Settings › Sandbox. `byDefault: false` starts New worktree's Sandbox toggle off; `folders` are
    *  mounted into every new sandbox besides its worktree and the repo's .git (`:ro` read only, `{repo}`
    *  the repo's folder). */

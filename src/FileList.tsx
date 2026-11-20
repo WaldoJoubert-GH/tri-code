@@ -7,13 +7,14 @@
 // asks first, then sends the file or folder to the Recycle Bin, or removes it for good over ssh.
 // Rename (right-click, or F2) edits the name in place.
 
-import { For, Show, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js";
-import { type Project, isRemote } from "./state";
+import { For, Match, Show, Switch, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js";
+import { type Project, app, isRemote } from "./state";
+import { type IconOpts, type IconTheme, iconSvg, previewTheme } from "./fileicons";
 import { type OpenHow, createFile, deletePath, dirState, renamePath, loadDir, refreshDir, refreshProject } from "./files";
 import { openCtxMenu } from "./ctxmenu";
 import { copyText } from "./clipboard";
 import { ask, flash } from "./ui";
-import { type FileMark, fileMarks, markAt, peekStatus } from "./git";
+import { type FileMark, fileMarks, ignoredAt, markAt, peekStatus } from "./git";
 import "./files.css";
 
 /** `draft` is the New File box, in the folder `path`. */
@@ -35,12 +36,34 @@ export const MARK_TITLE: Record<FileMark, string> = {
   M: "modified", A: "added", U: "untracked", D: "deleted", R: "renamed", C: "conflict",
 };
 
-export function FileIcon(props: { name: string; dir: boolean }): JSX.Element {
-  if (props.dir) return <span class="fic dir" />;
-  const base = props.name.split("/").pop()!;
-  const ext = base.includes(".") ? base.split(".").pop()!.toLowerCase() : "";
-  const [label, color] = EXT[ext] ?? ["··", "#8a8f9c"];
-  return <span class="fic" style={{ "--fc": color }}>{label}</span>;
+/** The File Icon Theme drawn now: the palette's preview, else Settings › Appearance's. */
+export const iconTheme = (): IconTheme => previewTheme() ?? app.settings.fileIcons ?? "classic";
+export const iconOpts = (): IconOpts => ({
+  plainFolders: app.settings.iconPlainFolders, filledOpen: app.settings.iconFilledOpen, mono: app.settings.iconMono,
+});
+
+/** A file's or folder's icon in the File Icon Theme. `open` is an expanded folder, which some themes draw open. */
+export function FileIcon(props: { name: string; dir: boolean; open?: boolean }): JSX.Element {
+  return (
+    <Switch>
+      <Match when={iconTheme() === "none"}>{null}</Match>
+      <Match when={iconTheme() === "classic"}>
+        {(() => {
+          if (props.dir) return <span class="fic dir" />;
+          const base = props.name.split("/").pop()!;
+          const ext = base.includes(".") ? base.split(".").pop()!.toLowerCase() : "";
+          const [label, color] = EXT[ext] ?? ["··", "#8a8f9c"];
+          return <span class="fic" style={{ "--fc": color }}>{label}</span>;
+        })()}
+      </Match>
+      <Match when={true}>
+        <span
+          class="fic svg"
+          innerHTML={iconSvg(iconTheme(), props.name, props.dir, !!props.open, iconOpts())}
+        />
+      </Match>
+    </Switch>
+  );
 }
 
 export default function FileTree(props: {
@@ -60,6 +83,8 @@ export default function FileTree(props: {
 
   const marks = createMemo(() => fileMarks(props.project));
   const markOf = (r: Row) => markAt(marks(), r.path, r.dir);
+  /** Muted, name and icon: .gitignore matches it. A change wins (a folder of ignored files can hold a tracked one). */
+  const ignored = (r: Row) => !markOf(r) && ignoredAt(marks(), r.path);
   /** A folder that holds changes shows a dot; an untracked folder, like a file, shows its letter. */
   const letter = (r: Row) => (r.dir && !markAt(marks(), r.path) ? "•" : markOf(r) === "C" ? "!" : markOf(r));
   // The status line polls only the active project; read this one's status when the tree opens.
@@ -274,14 +299,14 @@ export default function FileTree(props: {
               <div
                 class="frow"
                 data-g={markOf(r)}
-                classList={{ sel: r.path === sel(), dir: r.dir, shown: r.path === props.shown }}
+                classList={{ sel: r.path === sel(), dir: r.dir, shown: r.path === props.shown, ign: ignored(r) }}
                 data-path={r.path}
                 data-dir={r.dir ? "1" : "0"}
-                title={markOf(r) ? `${r.name} · ${letter(r) === "•" ? "has changes" : MARK_TITLE[markOf(r)!]}` : undefined}
+                title={markOf(r) ? `${r.name} · ${letter(r) === "•" ? "has changes" : MARK_TITLE[markOf(r)!]}` : ignored(r) ? `${r.name} · ignored` : undefined}
                 style={{ "padding-left": `${6 + r.depth * 12}px` }}
               >
                 <span class="fchev">{r.dir ? (isOpen(r.path) ? "▾" : "▸") : ""}</span>
-                <FileIcon name={r.name} dir={r.dir} />
+                <FileIcon name={r.name} dir={r.dir} open={r.dir && isOpen(r.path)} />
                 <Show when={renaming() === r.path} fallback={<span class="fname">{r.name}</span>}>
                   <input
                     class="fren"

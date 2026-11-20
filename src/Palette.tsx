@@ -6,13 +6,14 @@
 // Enter runs the command or opens the file in the project's editor window.
 
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
+import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Command, commands } from "./commands";
+import { type Choice, type Command, commands } from "./commands";
 import { type Project, activeProject, focusTab, focusedTab, isRemote, skipFolders, space, tabName } from "./state";
 import { agentTarget } from "./agents";
 import { filesOf, openFile } from "./files";
-import { FileIcon } from "./FileList";
+import { FileIcon, iconOpts } from "./FileList";
+import { iconSvg } from "./fileicons";
 import { focusSession, sendText } from "./terms";
 import { flash } from "./ui";
 import { Icon } from "./lucide";
@@ -80,7 +81,9 @@ export function fuzzy(q: string, path: string): Match | null {
 
 type CmdRow = { kind: "cmd"; c: Command; m?: Match; recent?: boolean };
 type FileRow = { kind: "file"; path: string; dir: boolean; m?: Match; open: boolean; recent?: boolean };
-type Row = CmdRow | FileRow;
+/** An entry of a Command's choices, while the palette lists them. */
+type ChoiceRow = { kind: "choice"; ch: Choice; m?: Match };
+type Row = CmdRow | FileRow | ChoiceRow;
 /** One run of rows under a header ("" for none). */
 type Section = { head: string; rows: Row[] };
 type View = { browse?: string; sections: Section[] };
@@ -107,6 +110,8 @@ function Box(props: { project?: Project }) {
   const p = props.project;
   const [q, setQ] = createSignal("");
   const [hi, setHi] = createSignal(0);
+  /** The command whose choices are listed instead of commands and files. */
+  const [sub, setSub] = createSignal<Command | null>(null);
   let input!: HTMLInputElement;
   let listEl!: HTMLDivElement;
 
@@ -133,6 +138,16 @@ function Box(props: { project?: Project }) {
 
   const view = createMemo<View>(() => {
     const query = q(), opened = openPaths();
+    const s = sub();
+    if (s) {
+      const trimmed = query.trim(), list = s.choices!();
+      const rows = list.flatMap((ch): ChoiceRow[] => {
+        if (!trimmed) return [{ kind: "choice", ch }];
+        const m = fuzzy(trimmed, ch.title);
+        return m ? [{ kind: "choice", ch, m }] : [];
+      });
+      return { sections: [{ head: s.title.replace(/…$/, ""), rows }] };
+    }
     const file = (path: string, dir: boolean, m?: Match): FileRow => ({ kind: "file", path, dir, m, open: opened.has(path) });
 
     // "/" lists the project root; a known folder and "/" lists that folder
@@ -190,7 +205,10 @@ function Box(props: { project?: Project }) {
   });
   const rows = () => view().sections.flatMap((s) => s.rows);
 
-  createEffect(on(q, () => setHi(0)));
+  createEffect(on(q, () => setHi(sub() && !q().trim() ? Math.max(0, rows().findIndex((r) => r.kind === "choice" && r.ch.current)) : 0)));
+  // Choices preview as they're highlighted; closing the palette however it closes undoes the preview.
+  createEffect(on(hi, (i) => { const r = rows()[i]; if (r?.kind === "choice") r.ch.preview?.(); }));
+  onCleanup(() => sub()?.leave?.());
   createEffect(on(hi, (i) => listEl?.querySelector(`[data-k="${i}"]`)?.scrollIntoView({ block: "nearest" })));
 
   const setQuery = (v: string) => {
@@ -203,6 +221,23 @@ function Box(props: { project?: Project }) {
 
   function pick(r: Row | undefined, how: "reuse" | "new" | "agent" = "reuse") {
     if (!r) return;
+    if (r.kind === "choice") {
+      r.ch.run();
+      closePalette();
+      return;
+    }
+    if (r.kind === "cmd" && r.c.choices) {
+      recentCommands = [r.c.id, ...recentCommands.filter((id) => id !== r.c.id)].slice(0, 10);
+      batch(() => {
+        setSub(r.c);
+        input.value = "";
+        setQ("");
+      });
+      // Start on the one in effect, as VS Code's pickers do.
+      setHi(Math.max(0, rows().findIndex((x) => x.kind === "choice" && x.ch.current)));
+      input.focus();
+      return;
+    }
     if (r.kind === "cmd") {
       recentCommands = [r.c.id, ...recentCommands.filter((id) => id !== r.c.id)].slice(0, 10);
       closePalette();
@@ -238,6 +273,8 @@ function Box(props: { project?: Project }) {
     else if (e.key === "PageDown") setHi(Math.min(n - 1, hi() + 10));
     else if (e.key === "PageUp") setHi(Math.max(0, hi() - 10));
     else if (e.key === "Enter") pick(r, howOf(e));
+    // Backspace in an empty box leaves the choices for the command list
+    else if (e.key === "Backspace" && sub() && !input.value) { sub()!.leave?.(); setSub(null); setQ(""); }
     // Tab completes the highlighted file into the box; a folder then lists its contents
     else if (e.key === "Tab") { if (f) setQuery(f.dir ? `${f.path}/` : f.path); }
     else if (e.key === "ArrowRight" && atEnd && f?.dir) setQuery(`${f.path}/`);
@@ -315,6 +352,36 @@ function Box(props: { project?: Project }) {
     );
   };
 
+  const ChoiceItem = (rp: { r: ChoiceRow; k: number }) => {
+    const ch = rp.r.ch;
+    const sample = () => ch.iconTheme && ch.iconTheme !== "none" && ch.iconTheme !== "classic"
+      ? ["src", "App.tsx", "package.json", "README.md", "Cargo.toml"].map((n, i) => iconSvg(ch.iconTheme!, n, i === 0, false, iconOpts())).join("")
+      : "";
+    return (
+      <button
+        type="button"
+        class="grow prow choice"
+        classList={{ hi: rp.k === hi() }}
+        data-k={rp.k}
+        role="option"
+        aria-selected={rp.k === hi()}
+        onMouseMove={() => hi() !== rp.k && setHi(rp.k)}
+        onClick={() => pick(rp.r)}
+      >
+        <span class="gn"><Marked s={ch.title} idx={new Set(rp.r.m?.idx ?? [])} off={0} /></span>
+        <Show when={ch.iconTheme}>
+          <span class="pstrip">
+            <Show when={ch.iconTheme === "classic"} fallback={<span class="pstrip-svg" innerHTML={sample()} />}>
+              <FileIcon name="src" dir={true} /><FileIcon name="App.tsx" dir={false} /><FileIcon name="package.json" dir={false} /><FileIcon name="README.md" dir={false} />
+            </Show>
+          </span>
+        </Show>
+        <span class="ph">{ch.hint}</span>
+        <Show when={ch.current}><span class="gopen">current</span></Show>
+      </button>
+    );
+  };
+
   const hiFile = () => rows()[hi()]?.kind === "file";
 
   return (
@@ -325,7 +392,7 @@ function Box(props: { project?: Project }) {
           ref={(el) => { input = el; requestAnimationFrame(() => el.focus()); }}
           spellcheck={false}
           autocomplete="off"
-          placeholder={p ? `Run a command or search ${p.name} (/ browses folders)` : "Run a command"}
+          placeholder={sub() ? `${sub()!.title.replace(/…$/, "")}: ↑↓ to preview` : p ? `Run a command or search ${p.name} (/ browses folders)` : "Run a command"}
           aria-label="Search commands and files"
           onInput={(e) => setQ(e.currentTarget.value)}
           onKeyDown={onKey}
@@ -346,7 +413,7 @@ function Box(props: { project?: Project }) {
             return <div class="gnone">Nothing matches “{q().trim()}”{p && !state()?.index ? ` (${status()})` : ""}</div>;
           }
           // The empty box lists commands by group with a header each; search results say their group inline.
-          const grouped = !!q().trim() && v.browse === undefined;
+          const grouped = !!q().trim() && v.browse === undefined && !sub();
           const starts = v.sections.map((_, i) => v.sections.slice(0, i).reduce((n, s) => n + s.rows.length, 0));
           return (
             <For each={v.sections}>
@@ -356,7 +423,9 @@ function Box(props: { project?: Project }) {
                   <For each={s.rows}>
                     {(r, i) => (r.kind === "cmd"
                       ? <CmdItem r={r} k={starts[si()] + i()} group={grouped} />
-                      : <FileItem r={r} k={starts[si()] + i()} />)}
+                      : r.kind === "choice"
+                        ? <ChoiceItem r={r} k={starts[si()] + i()} />
+                        : <FileItem r={r} k={starts[si()] + i()} />)}
                   </For>
                 </>
               )}
@@ -365,13 +434,17 @@ function Box(props: { project?: Project }) {
         })()}
       </div>
       <div class="gfoot">
-        <span><Key k="Enter" /> {hiFile() ? "open" : "run"}</span>
+        <Show when={sub()} fallback={<span><Key k="Enter" /> {hiFile() ? "open" : "run"}</span>}>
+          <span><Key k="↑" /><Key k="↓" /> preview</span>
+          <span><Key k="Enter" /> keep</span>
+          <span><Key k="Backspace" /> back</span>
+        </Show>
         <Show when={hiFile()}>
           <span><Key k="Ctrl" /><Key k="Enter" /> new window</span>
           <span><Key k="Tab" /> complete</span>
           <Show when={agent()}>{(t) => <span><Key k="Shift" /><Key k="Enter" /> @ to {t().kind}</span>}</Show>
         </Show>
-        <span><Key k="Esc" /> close</span>
+        <span><Key k="Esc" /> {sub() ? "cancel" : "close"}</span>
         <span class="src" title="Files: git ls-files (tracked, new and ignored), minus the folders skipped in Settings › Files">{status()}</span>
       </div>
     </div>
