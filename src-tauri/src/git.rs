@@ -408,17 +408,15 @@ pub async fn project_files(host: String, path: String, skip: Option<Vec<String>>
     ];
     blocking(move || match multi(&host, &path, CMDS).ok().and_then(|r| r.into_iter().map(Result::ok).collect::<Option<Vec<_>>>()) {
         Some(outs) => {
-            let mut files: Vec<String> = outs[0].split('\0').filter(|f| !f.is_empty()).map(String::from).collect();
+            // git lists tracked and untracked files one by one, so the skip list applies to each
+            let kept = |f: &&str| !f.is_empty() && !crate::fs::under_skipped(&skip, f);
+            let mut files: Vec<String> = outs[0].split('\0').filter(kept).map(String::from).collect();
             // a conflicted file is listed once per merge stage
             files.dedup();
-            let (folded, ignored): (Vec<&str>, Vec<&str>) = outs[1].split('\0').filter(|f| !f.is_empty()).partition(|f| f.ends_with('/'));
+            let (folded, ignored): (Vec<&str>, Vec<&str>) = outs[1].split('\0').filter(kept).partition(|f| f.ends_with('/'));
             files.extend(ignored.into_iter().map(String::from));
-            let walk: Vec<String> = folded
-                .into_iter()
-                .map(|d| d.trim_end_matches('/'))
-                .filter(|d| !crate::fs::skipped(&skip, d.rsplit('/').next().unwrap_or(d)))
-                .map(String::from)
-                .collect();
+            // "dir/" splits as "dir" + "", so under_skipped above checked dir itself too
+            let walk: Vec<String> = folded.into_iter().map(|d| d.trim_end_matches('/').to_string()).collect();
             if !walk.is_empty() && files.len() <= INDEX_LIMIT {
                 // Git for Windows can list a folded folder's files as well, so drop repeats
                 let seen: std::collections::HashSet<String> = files.iter().cloned().collect();

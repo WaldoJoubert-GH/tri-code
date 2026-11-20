@@ -432,6 +432,14 @@ pub(crate) fn skipped(skip: &[String], name: &str) -> bool {
     name == ".git" || skip.iter().any(|s| s == name)
 }
 
+/// Whether the relative, `/`-separated file `rel` sits inside a folder that `skipped` leaves out,
+/// at any depth.
+pub(crate) fn under_skipped(skip: &[String], rel: &str) -> bool {
+    let mut dirs = rel.split('/');
+    dirs.next_back();
+    dirs.any(|d| skipped(skip, d))
+}
+
 /// Every file under `path` (relative, `/`-separated) for a project that is not a git repo, up to
 /// `limit`, not entering folders named in `skip`. The second value is true when the limit cut
 /// the walk short.
@@ -482,6 +490,23 @@ fn remote_walk_script(path: &str, dirs: &[String], skip: &[String], limit: usize
     let starts = dirs.iter().map(|d| if d.is_empty() { ".".to_string() } else { sq(&format!("./{d}")) }).collect::<Vec<_>>().join(" ");
     let inner = format!("cd {} || exit 1; find {starts} \\( {prune} \\) -prune -o \\( -type f -o -type l \\) -print 2>/dev/null | head -n {limit}", remote_path(path));
     format!("sh -c {}", sq(&inner))
+}
+
+#[cfg(test)]
+mod skip_tests {
+    use super::under_skipped;
+
+    #[test]
+    fn a_file_under_a_skipped_folder_at_any_depth_is_left_out() {
+        let skip = vec!["docs".to_string(), "node_modules".to_string()];
+        assert!(under_skipped(&skip, "docs/a.md"));
+        assert!(under_skipped(&skip, "web/node_modules/x/i.js"));
+        assert!(under_skipped(&skip, "docs/"));
+        assert!(under_skipped(&skip, ".git/config"));
+        assert!(!under_skipped(&skip, "docs"));
+        assert!(!under_skipped(&skip, "src/docs.rs"));
+        assert!(!under_skipped(&skip, "README.md"));
+    }
 }
 
 #[cfg(all(test, unix))]
