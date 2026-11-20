@@ -2,10 +2,12 @@
 // Listings and file bodies are cached by host + path and refreshed on demand.
 
 import { invoke } from "@tauri-apps/api/core";
+import { untrack } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { EditorState, Text } from "@codemirror/state";
 import type { Body } from "./cm";
 import { type Project, type Tab, addTab, focusTab, setEditorTab } from "./state";
+import { hostAt, rootsOf, within } from "./links";
 
 export type FsEntry = { name: string; dir: boolean; size: number };
 export type FsList = { path: string; entries: FsEntry[] };
@@ -25,11 +27,15 @@ const unkey = (k: string) => ({ host: k.slice(0, k.indexOf("\u0000")), path: k.s
 const full = (project: Project, path: string) => path || project.path;
 
 export function loadDir(project: Project, path: string): void {
-  const k = key(project.host, full(project, path));
-  const cur = dirs[k];
-  if (cur?.loading || cur?.list) return;
+  const at = full(project, path), host = hostAt(project, at);
+  const k = key(host, at);
+  // Not tracked: an effect that calls this would otherwise run again on the result, and a folder
+  // that can't be listed (a missing Linked Folder, an unreachable host) would be listed forever.
+  // Refresh lists it again.
+  const cur = untrack(() => dirs[k]);
+  if (cur?.loading || cur?.list || cur?.error) return;
   setDirs(k, { loading: true });
-  invoke<FsList>("list_files", { host: project.host, path: full(project, path) })
+  invoke<FsList>("list_files", { host, path: at })
     .then((list) => setDirs(k, { loading: false, list }))
     .catch((e) => setDirs(k, { loading: false, error: String(e) }));
 }
@@ -37,9 +43,10 @@ export function loadDir(project: Project, path: string): void {
 /** List a folder again. The old listing stays on screen until the new one is in, so the tree
  *  doesn't flicker. */
 export function refreshDir(project: Project, path: string): void {
-  const k = key(project.host, full(project, path));
+  const at = full(project, path), host = hostAt(project, at);
+  const k = key(host, at);
   setDirs(k, { loading: true, error: undefined });
-  invoke<FsList>("list_files", { host: project.host, path: full(project, path) })
+  invoke<FsList>("list_files", { host, path: at })
     .then((list) => setDirs(k, { loading: false, list }))
     .catch((e) => setDirs(k, { loading: false, error: String(e) }));
 }
@@ -48,16 +55,15 @@ export function refreshDir(project: Project, path: string): void {
  * Reload everything on disk for a project: every directory already listed in
  * the files window (not just the root) and every open `file` window. Without
  * this, `loadDir`'s cache kept expanded subdirectories stale until the whole
- * webview was reloaded — new and changed files never showed up.
+ * webview was reloaded — new and changed files never showed up. Linked Folders too.
  */
 export function refreshProject(project: Project): void {
-  const root = project.path;
-  const prefix = root.endsWith("/") ? root : `${root}/`;
-  const under = (path: string) => path === root || path.startsWith(prefix);
+  const roots = rootsOf(project);
+  const under = (host: string, path: string) => roots.some((r) => r.host === host && within(r.path, path));
 
   for (const k of Object.keys(dirs)) {
     const { host, path } = unkey(k);
-    if (host !== project.host || !under(path)) continue;
+    if (!under(host, path)) continue;
     refreshDir(project, path);
   }
 
@@ -66,26 +72,26 @@ export function refreshProject(project: Project): void {
   const shown = new Set(project.tabs.flatMap(filesOf));
   for (const k of Object.keys(texts)) {
     const { host, path } = unkey(k);
-    if (host !== project.host || !under(path) || shown.has(path)) continue;
+    if (!under(host, path) || shown.has(path)) continue;
     setTexts(produce((t) => { delete t[k]; }));
   }
   for (const path of shown) reloadText(project, path);
 }
 
 export function loadText(project: Project, path: string): void {
-  const k = key(project.host, path);
+  const host = hostAt(project, path), k = key(host, path);
   const cur = texts[k];
   if (cur?.loading || cur?.file) return;
   setTexts(k, { loading: true });
-  invoke<FsText>("read_file", { host: project.host, path })
+  invoke<FsText>("read_file", { host, path })
     .then((file) => setTexts(k, { loading: false, file }))
     .catch((e) => setTexts(k, { loading: false, error: String(e) }));
 }
 
 export function reloadText(project: Project, path: string): void {
-  const k = key(project.host, path);
+  const host = hostAt(project, path), k = key(host, path);
   setTexts(k, { loading: true, file: undefined, error: undefined });
-  invoke<FsText>("read_file", { host: project.host, path })
+  invoke<FsText>("read_file", { host, path })
     .then((file) => setTexts(k, { loading: false, file }))
     .catch((e) => setTexts(k, { loading: false, error: String(e) }));
 }
@@ -119,36 +125,46 @@ export function watchFiles(project: Project): () => void {
 async function poll(w: { project: Project; busy: boolean }) {
   if (w.busy || document.hidden) return;
   const p = w.project;
-  const root = p.path.replace(/[\\/]+$/, "");
-  const under = (path: string) => path === root || path.startsWith(`${root}/`);
+  const roots = rootsOf(p);
   const dirKeys = Object.keys(dirs).filter((k) => {
     const { host, path } = unkey(k);
-    return host === p.host && under(path) && dirs[k].list && !dirs[k].loading;
+    return roots.some((r) => r.host === host && within(r.path, path)) && dirs[k].list && !dirs[k].loading;
   });
   const fileKeys = [...new Set(p.tabs.flatMap(filesOf))]
-    .map((f) => key(p.host, f))
+    .map((f) => key(hostAt(p, f), f))
     .filter((k) => texts[k]?.file && !texts[k].loading);
-  const all = [...dirKeys, ...fileKeys];
-  if (!all.length) return;
+  if (!dirKeys.length && !fileKeys.length) return;
+  // One `stamps` call per host: a project's Linked Folders can be on this machine.
+  const byHost = new Map<string, string[]>();
+  for (const k of [...dirKeys, ...fileKeys]) {
+    const h = unkey(k).host;
+    byHost.set(h, [...(byHost.get(h) ?? []), k]);
+  }
+  const isDir = new Set(dirKeys);
   w.busy = true;
   try {
-    const got = await invoke<(string | null)[]>("stamps", { host: p.host, paths: all.map((k) => unkey(k).path) });
-    all.forEach((k, i) => {
-      const st = got[i];
-      if (i < dirKeys.length) {
-        const was = dirStamps.get(k);
-        if (st === null) return void dirStamps.delete(k);
-        dirStamps.set(k, st);
-        if (was !== undefined && was !== st) refreshDir(p, unkey(k).path);
-      } else if (st !== null && st !== texts[k]?.file?.stamp) {
-        const path = unkey(k).path;
-        invoke<FsText>("read_file", { host: p.host, path })
-          .then((file) => file.stamp !== texts[k]?.file?.stamp && setTexts(k, { loading: false, file }))
-          .catch(() => {});
+    await Promise.all([...byHost].map(async ([host, keys]) => {
+      let got: (string | null)[];
+      try {
+        got = await invoke<(string | null)[]>("stamps", { host, paths: keys.map((k) => unkey(k).path) });
+      } catch {
+        return; // unreachable host: try again next tick
       }
-    });
-  } catch {
-    // unreachable host: try again next tick
+      keys.forEach((k, i) => {
+        const st = got[i];
+        if (isDir.has(k)) {
+          const was = dirStamps.get(k);
+          if (st === null) return void dirStamps.delete(k);
+          dirStamps.set(k, st);
+          if (was !== undefined && was !== st) refreshDir(p, unkey(k).path);
+        } else if (st !== null && st !== texts[k]?.file?.stamp) {
+          const path = unkey(k).path;
+          invoke<FsText>("read_file", { host, path })
+            .then((file) => file.stamp !== texts[k]?.file?.stamp && setTexts(k, { loading: false, file }))
+            .catch(() => {});
+        }
+      });
+    }));
   } finally {
     w.busy = false;
   }
@@ -161,8 +177,9 @@ export const CHANGED = "changed on disk";
  *  `stamp` the text was read with, a file that changed since is left alone and this throws `CHANGED`;
  *  `null` overwrites whatever is there. */
 export async function saveText(project: Project, path: string, text: string, stamp: string | null): Promise<string> {
-  const next = await invoke<string>("write_file", { host: project.host, path, contents: text, stamp });
-  const k = key(project.host, path);
+  const host = hostAt(project, path);
+  const next = await invoke<string>("write_file", { host, path, contents: text, stamp });
+  const k = key(host, path);
   const file = texts[k]?.file;
   const size = new TextEncoder().encode(text).length;
   if (file) setTexts(k, "file", { ...file, text, size, stamp: next });
@@ -170,12 +187,12 @@ export async function saveText(project: Project, path: string, text: string, sta
 }
 
 /** Create an empty file (and the folders above it); throws when something is already there. */
-export const createFile = (project: Project, path: string) => invoke<void>("create_file", { host: project.host, path });
+export const createFile = (project: Project, path: string) => invoke<void>("create_file", { host: hostAt(project, path), path });
 
 /** Delete a file or folder: to the Recycle Bin / Trash locally, for good over ssh. Every editor
  *  closes the files that were in it. */
 export async function deletePath(project: Project, path: string): Promise<void> {
-  await invoke<void>("delete_path", { host: project.host, path });
+  await invoke<void>("delete_path", { host: hostAt(project, path), path });
   const gone = (f: string) => f === path || f.startsWith(`${path}/`);
   for (const t of project.tabs) for (const f of [...filesOf(t)]) if (gone(f)) closeFileInTab(project, t, f);
 }
@@ -185,7 +202,7 @@ export async function deletePath(project: Project, path: string): Promise<void> 
 export async function renamePath(project: Project, from: string, to: string): Promise<void> {
   const moved = (f: string) => (f === from ? to : f.startsWith(`${from}/`) ? to + f.slice(from.length) : null);
   if (project.tabs.some((t) => filesOf(t).some((f) => moved(f) && dirty[t.id]?.[f]))) throw "save or discard your edits first";
-  await invoke<void>("rename_path", { host: project.host, from, to });
+  await invoke<void>("rename_path", { host: hostAt(project, from), from, to });
   for (const t of project.tabs) {
     if (!filesOf(t).some(moved)) continue;
     const at = (f: string | undefined) => (f ? moved(f) ?? f : f);
@@ -194,7 +211,7 @@ export async function renamePath(project: Project, from: string, to: string): Pr
 }
 
 /** A repo image as a `data:` URL, for the Markdown preview. */
-export const loadImage = (project: Project, path: string) => invoke<string>("read_image", { host: project.host, path });
+export const loadImage = (project: Project, path: string) => invoke<string>("read_image", { host: hostAt(project, path), path });
 
 export type Media = "image" | "video" | "audio";
 
@@ -216,12 +233,15 @@ export function mediaType(path: string): [Media, string] | null {
 
 /** A media file as a blob URL; the caller revokes it. */
 export async function loadMedia(project: Project, path: string, mime: string): Promise<string> {
-  const buf = await invoke<ArrayBuffer>("read_media", { host: project.host, path });
+  const buf = await invoke<ArrayBuffer>("read_media", { host: hostAt(project, path), path });
   return URL.createObjectURL(new Blob([buf], { type: mime }));
 }
 
-export const dirState =(project: Project, path: string): DirState | undefined => dirs[key(project.host, full(project, path))];
-export const textState = (project: Project, path: string): TextState | undefined => texts[key(project.host, path)];
+export const dirState = (project: Project, path: string): DirState | undefined => {
+  const at = full(project, path);
+  return dirs[key(hostAt(project, at), at)];
+};
+export const textState = (project: Project, path: string): TextState | undefined => texts[key(hostAt(project, path), path)];
 
 /** Tabs, by id, ordered most recently used. Picks the editor a file opens in. */
 const lastUsed = new Map<string, number>();

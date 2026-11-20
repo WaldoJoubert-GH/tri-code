@@ -19,19 +19,29 @@ import { flash } from "./ui";
 import { Icon } from "./lucide";
 import "./files.css";
 import { Key, KeyList } from "./Keys";
+import { linkHost, linksOf, relIn, rootAt, within } from "./links";
 
 type FileIndex = { files: string[]; git: boolean; truncated: boolean };
 type IndexState = { loading: boolean; index?: FileIndex; error?: string };
 
-/** Indexes by project id. A reopen shows the last one while it refreshes. */
+/** Indexes by project id, and by `<project id>:<link id>` for its Linked Folders. A reopen shows
+ *  the last one while it refreshes. */
 const [indexes, setIndexes] = createStore<Record<string, IndexState>>({});
 
+/** The project's Linked Folders that Go to File searches. */
+const indexedLinks = (p: Project) => linksOf(p).filter((l) => !l.noIndex);
+
+function loadOne(k: string, host: string, path: string) {
+  if (indexes[k]?.loading) return;
+  setIndexes(k, { loading: true });
+  invoke<FileIndex>("project_files", { host, path, skip: skipFolders() })
+    .then((index) => setIndexes(k, { loading: false, index, error: undefined }))
+    .catch((e) => setIndexes(k, { loading: false, error: String(e) }));
+}
+
 function loadIndex(p: Project) {
-  if (indexes[p.id]?.loading) return;
-  setIndexes(p.id, { loading: true });
-  invoke<FileIndex>("project_files", { host: p.host, path: p.path, skip: skipFolders() })
-    .then((index) => setIndexes(p.id, { loading: false, index, error: undefined }))
-    .catch((e) => setIndexes(p.id, { loading: false, error: String(e) }));
+  loadOne(p.id, p.host, p.path);
+  for (const l of indexedLinks(p)) loadOne(`${p.id}:${l.id}`, linkHost(p, l), l.path);
 }
 
 const [open, setOpen] = createSignal(false);
@@ -51,9 +61,12 @@ let recentCommands: string[] = [];
 const recentFiles = new Map<string, string[]>();
 
 const join = (dir: string, name: string) => (dir.endsWith("/") ? dir + name : `${dir}/${name}`);
+/** A file as Go to File lists it: relative to the project, or `<link name>/…` in a Linked Folder. */
 const relTo = (p: Project, abs: string) => {
-  const root = p.path.endsWith("/") ? p.path : `${p.path}/`;
-  return abs.startsWith(root) ? abs.slice(root.length) : null;
+  const r = rootAt(p, abs);
+  if (!within(r.path, abs)) return null;
+  if (r.link && (r.link.noIndex || !linksOf(p).includes(r.link))) return null;
+  return r.link ? `${r.link.name}/${relIn(r.path, abs)}` : relIn(r.path, abs);
 };
 
 export type Match = { score: number; idx: number[] };
@@ -119,8 +132,26 @@ function Box(props: { project?: Project }) {
   const all = commands();
 
   const state = () => (p ? indexes[p.id] : undefined);
-  const files = () => state()?.index?.files ?? [];
+  const links = () => (p ? indexedLinks(p) : []);
+  /** Every listed file, as listed, to its full path. A Linked Folder's come under its name; the
+   *  project's own file wins a clash with one (a folder named like a link). */
+  const absOf = createMemo(() => {
+    const m = new Map<string, string>();
+    if (!p) return m;
+    for (const l of links()) {
+      for (const f of indexes[`${p.id}:${l.id}`]?.index?.files ?? []) m.set(`${l.name}/${f}`, join(l.path, f));
+    }
+    for (const f of state()?.index?.files ?? []) m.set(f, join(p.path, f));
+    return m;
+  });
+  const files = createMemo(() => [...absOf().keys()]);
   const fileSet = createMemo(() => new Set(files()));
+  /** The Linked Folder a listed path is in, if any. */
+  const linkOf = (rel: string) => {
+    const abs = absOf().get(rel);
+    const name = rel.includes("/") ? rel.slice(0, rel.indexOf("/")) : rel;
+    return links().find((l) => l.name === name && (abs === undefined ? !fileSet().has(rel) : within(l.path, abs)));
+  };
   const dirs = createMemo(() => {
     const out = new Set<string>();
     for (const f of files()) {
@@ -253,14 +284,17 @@ function Box(props: { project?: Project }) {
     if (r.dir) return setQuery(`${r.path}/`);
     recentFiles.set(p.id, [r.path, ...(recentFiles.get(p.id) ?? []).filter((x) => x !== r.path)].slice(0, 5));
     closePalette();
+    const abs = absOf().get(r.path) ?? join(p.path, r.path);
     if (how === "agent") {
       const t = agent();
       if (!t) return flash("open an agent window first (the + menu)");
-      sendText(t.id, `@${r.path} `);
+      // A Linked Folder is outside the agent's folder: it gets the full path.
+      const ref = linkOf(r.path) ? abs : r.path;
+      sendText(t.id, `@${ref} `);
       focusTab(p.id, t.id);
-      return flash(`typed @${r.path} into ${tabName(t)}, not sent`);
+      return flash(`typed @${ref} into ${tabName(t)}, not sent`);
     }
-    openFile(p, join(p.path, r.path), { from: focusedTab(p)?.id, beside: how === "new", preview: how !== "new" });
+    openFile(p, abs, { from: focusedTab(p)?.id, beside: how === "new", preview: how !== "new" });
   }
 
   const howOf = (e: KeyboardEvent | MouseEvent) => (e.ctrlKey || e.metaKey ? "new" : e.shiftKey ? "agent" : "reuse");
@@ -297,7 +331,9 @@ function Box(props: { project?: Project }) {
     if (s?.error && !s.index) return s.error;
     if (!s?.index) return "indexing…";
     const n = s.index.files.length.toLocaleString();
-    return `${all.length} commands · ${s.loading ? "refreshing · " : ""}${s.index.truncated ? "first " : ""}${n} files${s.index.git ? "" : " (not a git repo)"}${isRemote(p) ? ` on ${p.host}` : ""}`;
+    const ls = links().length;
+    const linked = ls ? ` + ${files().length - s.index.files.length} in ${ls} linked folder${ls > 1 ? "s" : ""}` : "";
+    return `${all.length} commands · ${s.loading ? "refreshing · " : ""}${s.index.truncated ? "first " : ""}${n} files${s.index.git ? "" : " (not a git repo)"}${isRemote(p) ? ` on ${p.host}` : ""}${linked}`;
   };
 
   const Marked = (mp: { s: string; idx: Set<number>; off: number }) => (
@@ -347,6 +383,13 @@ function Box(props: { project?: Project }) {
         <FileIcon name={rp.r.path} dir={rp.r.dir} />
         <span class="gn"><Marked s={rp.r.path.slice(base)} idx={idx} off={base} /></span>
         <span class="gd"><bdi><Marked s={dir} idx={idx} off={0} /></bdi></span>
+        <Show when={view().browse === undefined && linkOf(rp.r.path)}>
+          {(l) => (
+            <span class="glink" classList={{ here: !!l().local && !!p && isRemote(p) }} title={`Linked Folder ${l().path}${l().local ? " on this machine" : ""}`}>
+              {l().name}{l().local && p && isRemote(p) ? " · this machine" : ""}
+            </span>
+          )}
+        </Show>
         <Show when={rp.r.open}><span class="gopen">open</span></Show>
       </button>
     );

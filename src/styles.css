@@ -804,6 +804,36 @@ h4 > .muted { color: var(--muted); text-transform: none; letter-spacing: 0; font
 .wt-dlg .chip:hover { color: var(--text); border-color: var(--accent); }
 .wt-dlg .chip.on { color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--bg)); }
 .wt-dlg .row { display: flex; align-items: center; gap: 7px; margin-top: 4px; color: var(--muted); }
+/* Link folder dialog (LinkFolder.tsx; design/linked-folders.html). "This machine" is marigold, as in the tree. */
+.link-dlg { width: min(600px, calc(100% - 32px)); height: min(600px, calc(100% - 32px)); --here: var(--p-marigold); }
+/* Not `.body`: a global `.body > *` rule makes every child full height. */
+.link-dlg .lbody { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; }
+.link-dlg .lbody > * { flex: none; }
+.link-dlg .lbody > .picker { flex: 1 1 auto; min-height: 180px; }
+.link-dlg .mt { margin-top: 0; }
+.link-dlg .where { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.link-dlg .opt { display: flex; gap: 9px; align-items: flex-start; padding: 8px 10px; text-align: left; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.link-dlg .opt svg { flex: none; margin-top: 2px; color: var(--muted); }
+.link-dlg .opt b { display: block; font-size: 12.5px; font-weight: 600; }
+.link-dlg .opt span span { font-size: 11.5px; color: var(--muted); }
+.link-dlg .opt:hover { border-color: var(--muted); }
+.link-dlg .opt[aria-checked="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
+.link-dlg .opt[aria-checked="true"] svg { color: var(--accent); }
+.link-dlg .opt.here[aria-checked="true"] { border-color: var(--here); background: color-mix(in srgb, var(--here) 12%, var(--bg)); }
+.link-dlg .opt.here[aria-checked="true"] svg { color: var(--here); }
+.link-dlg .opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.link-dlg .picker .lwarn { flex: none; font: 11px var(--mono); color: var(--warn); }
+.link-dlg button.primary { padding: 4px 12px; border-radius: 4px; background: var(--accent); color: var(--bg); }
+.link-dlg button.primary:disabled { opacity: .45; cursor: default; }
+.link-dlg .opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.link-dlg .opts .nm { display: flex; align-items: center; gap: 7px; flex: 1 1 260px; font-size: 12px; color: var(--muted); }
+.link-dlg .opts .nm input { flex: 1; }
+.link-dlg .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
+.link-dlg .chk input { padding: 0; margin: 0; }
+.link-dlg .lnote { display: flex; gap: 7px; align-items: flex-start; padding: 7px 9px; border-radius: 5px; font-size: 12px; background: color-mix(in srgb, var(--here) 12%, transparent); }
+.link-dlg .lnote svg { flex: none; margin-top: 2px; color: var(--here); }
+@media (max-width: 560px) { .link-dlg .where { grid-template-columns: 1fr; } }
+
 /* New worktree: the form, and beside it what Create will do (design/worktree-gitignore.html, variant B) */
 .wt-dlg.wide { width: min(860px, calc(100% - 32px)); max-height: calc(100% - 48px); }
 /* each column scrolls on its own when the window is short */

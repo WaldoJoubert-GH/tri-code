@@ -31,6 +31,10 @@ const OBJ_ICON: Record<Obj["kind"], string> = { table: "table-2", view: "eye", s
 
 const targetText = (t: DbTarget) => ("env" in t ? `.env ${t.env}` : "url" in t ? t.url.replace(/:[^:@/]*@/, ":•••@") : "sheet" in t ? t.sheet : t.file);
 /** The kind chip: a spreadsheet file shows CSV or its extension, not the SQLite it is loaded into. */
+/** Why a Connection opens read-only. */
+const roWhy = (c: DbConn) =>
+  isBookConn(c) ? "Workbooks open read-only" : isSheet(c) ? "In a read-only Linked Folder" : "Read-only Connection";
+
 const kindChip = (c: DbConn) => {
   if (!isSheet(c)) return { cls: c.kind, label: KIND_LABEL[c.kind] };
   const ext = sheetPathOf(c).split(".").pop()?.toUpperCase() ?? "";
@@ -352,7 +356,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
           <div class="db-tree-f">
             <span class="live" classList={{ on: w()?.status === "open" }} />
             <span class="db-grow">{w()?.version ?? "…"}{w()?.tunnel ? ` · tunnel :${w()!.tunnel}` : ""}</span>
-            <Show when={props.conn.readOnly}><span class="db-pill ro" title={isSheet(props.conn) ? "Workbooks open read-only" : "Read-only Connection"}><Icon name="lock" size={10} />read-only</span></Show>
+            <Show when={props.conn.readOnly}><span class="db-pill ro" title={roWhy(props.conn)}><Icon name="lock" size={10} />read-only</span></Show>
             <Show when={props.conn.tag === "prod"}><span class="db-pill prod">prod</span></Show>
             <Show when={!isSheet(props.conn)}><button class="db-ib" title="Edit connection" onClick={props.onEdit}><Icon name="settings" size={13} /></button></Show>
             <button class="db-ib" title="Other connections" onClick={() => setTabDb(props.project.id, id, undefined)}><Icon name="list" size={13} /></button>
@@ -382,7 +386,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
 
 /** Why the shown table can't be edited, or nothing. */
 function lockReason(conn: DbConn, win: Win | undefined): string | null {
-  if (conn.readOnly) return isSheet(conn) ? "Workbooks open read-only" : "Read-only Connection";
+  if (conn.readOnly) return roWhy(conn);
   const o = win?.obj;
   if (!o) return "";
   if (o.kind === "view") return "Views can't be edited";

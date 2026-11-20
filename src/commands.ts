@@ -34,6 +34,8 @@ import { startTour } from "./Tour";
 import { openWelcome } from "./Welcome";
 import { flash } from "./ui";
 import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./media";
+import { openLinkDialog } from "./LinkFolder";
+import { linksOn } from "./links";
 
 export type Command = {
   /** Stable across openings, so the palette can remember recent picks. */
@@ -197,6 +199,7 @@ export function commands(): Command[] {
     add({ id: "workspace-prev", group: "Layout", title: "Previous workspace", icon: "chevron-left", keys: capsOf("workspace-prev"), run: () => stepWorkspace(p, -1) });
     add({ id: "workspace-next", group: "Layout", title: "Next workspace", icon: "chevron-right", keys: capsOf("workspace-next"), run: () => stepWorkspace(p, 1) });
 
+    if (linksOn()) add({ id: "link-folder", group: "Project", title: "Link folder…", hint: "show another folder in the editor's tree and Go to File", icon: "folder-symlink", run: () => openLinkDialog(p) });
     add({ id: "new-worktree", group: "Project", title: "New worktree", hint: "another checkout of the repo, on its own branch", icon: "git-branch-plus", keys: capsOf("new-worktree"), run: () => openNewWorktree(p) });
     if (!p.sample) add({
       id: "pin-project", group: "Project", title: isPinned(p.id) ? `Unpin ${p.parent ? labelOf(p).text : p.name}` : `Pin ${p.parent ? labelOf(p).text : p.name} to top`,

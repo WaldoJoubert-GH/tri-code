@@ -10,7 +10,7 @@ import { For, JSX, Show, createEffect, createSignal, on } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import logo from "../assets/icon.svg";
 import "./welcome.css";
-import { AlertMode, SoundEvent, addAgent, app, envIcon, envName, isLocalHost, newId, removeAgent, setClaudeUsage, setNotify, setSettings, setTheme, setToured, setWelcomed } from "./state";
+import { AlertMode, SoundEvent, addAgent, app, envIcon, envName, isLocalHost, newId, removeAgent, setClaudeUsage, setLinkedFolders, setNotify, setSettings, setTheme, setToured, setWelcomed } from "./state";
 import { type Known, KNOWN, NODE_INSTALL, commandOf, foundOf, lookups, ownCommand, platform, serverBlocker } from "./welcomedata";
 import { installAgent, refreshSetup, setupBusy, setupError, setupStatus } from "./agentsetup";
 import { looksLikeUrl } from "./agents";
@@ -21,6 +21,7 @@ import { openEnvDialog } from "./EnvDialog";
 import { openProjectDialog } from "./OpenProject";
 import { startTour } from "./Tour";
 import { Icon } from "./lucide";
+import { linksOn } from "./links";
 import { Caps, KeyList } from "./Keys";
 import { metaName, modLabel } from "./modkey";
 import { copyText } from "./clipboard";
@@ -406,6 +407,19 @@ function MachinesStep() {
       <p class="wel-note wel-foot-note">
         A host needs ssh that logs in with a key, without a password prompt, and ideally <code>shpool</code> (<code>tmux</code> works too, but drops agent signals). Skip this if you only work on this computer.
       </p>
+      <h3>In a project</h3>
+      <div class="wel-list">
+      <div class="wel-agent" classList={{ on: linksOn() }}>
+        <div class="wel-agent-head">
+          <span class="wel-ico"><Icon name="folder-symlink" size={16} /></span>
+          <span class="wel-grow">
+            <span class="wel-name">Linked folders</span>
+            <span class="wel-sub">Show other folders beside a project's own, in the editor's tree and Go to File: a shared library, logs, assets. A project on an ssh host can link one there or on this computer.</span>
+          </span>
+          <button type="button" class="wel-switch" role="switch" aria-checked={linksOn()} aria-label="Linked folders" onClick={() => setLinkedFolders(!linksOn())} />
+        </div>
+      </div>
+      </div>
     </>
   );
 }

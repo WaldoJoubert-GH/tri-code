@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource, createSignal } from "solid-js";
-import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setMedia, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setMedia, setLinkedFolders, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
@@ -26,6 +26,7 @@ import { openWelcome } from "./Welcome";
 import { ICON_THEMES, type IconTheme } from "./fileicons";
 import { FileIcon } from "./FileList";
 import "./files.css";
+import { linksOn } from "./links";
 
 export type SettingsPage = "appearance" | "windows" | "agents" | "environments" | "files" | "languages" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview";
 
@@ -277,6 +278,22 @@ function FilesPage() {
         </Show>
       </label>
       <p class="note">Folder names, separated by commas or spaces, that Go to File never looks in, gitignored or not. <code>.git</code> is always skipped. Takes effect the next time the box opens.</p>
+      <h4>Linked folders</h4>
+      <div class="row">
+        Linked folders
+        <span class="set-seg" role="radiogroup" aria-label="Linked folders">
+          <For each={[[true, "On"], [false, "Off"]] as const}>
+            {([on, label]) => (
+              <button type="button" role="radio" aria-checked={linksOn() === on} onClick={() => setLinkedFolders(on)}>
+                {label}
+              </button>
+            )}
+          </For>
+        </span>
+      </div>
+      <p class="note">
+        Show other folders beside a project's own: an extra root each in the Editor's tree, and their files in Go to File. A project on an ssh host can link a folder there or on this computer. Link one from the tree's header or Link folder… in <Caps id="palette" />. Off, they are hidden and each project's links are kept for when it is on again.
+      </p>
       <h4>Diffs</h4>
       <div class="row">
         Layout

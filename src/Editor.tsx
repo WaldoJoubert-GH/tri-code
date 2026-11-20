@@ -38,6 +38,7 @@ import { headText, repoEpoch, repoOfFile, type RepoRef } from "./repos";
 import { isBookPath, isCsvPath } from "./csv";
 import { BookView, CsvTable } from "./SheetView";
 import { openSheetDb } from "./db";
+import { asProject, hostAt, linkAt, relIn, rootAt, within } from "./links";
 import { redo, undo } from "@codemirror/commands";
 import "./files.css";
 import { ctrlName } from "./modkey";
@@ -163,7 +164,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   const build = async (f: string, file: FsText) => {
     const body = toBody(file.text ?? "");
     const state = await createState({
-      path: f, body, readOnly: file.truncated,
+      path: f, body, readOnly: file.truncated || !!linkAt(props.project, f)?.readOnly,
       save: () => windows.get(tabId)?.save(f),
       onUpdate: (s, changed) => windows.get(tabId)?.update(f, s, changed),
     });
@@ -287,6 +288,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
   async function save(f: string) {
     const d = mine.get(f);
     if (!d || d.saving || !isDirty(f)) return;
+    if (linkAt(props.project, f)?.readOnly) return flash(`${linkAt(props.project, f)!.name} is linked read-only`);
     const snapshot = d.state.doc;
     const write = (stamp: string | null) => saveText(props.project, f, fromBody(d.body, snapshot), stamp);
     d.saving = true;
@@ -408,14 +410,16 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
         return;
       }
       try {
-        const ref = await repoOfFile(props.project, f);
+        // A file in a Linked Folder is diffed against that folder's repo, on its host.
+        const proj = asProject(props.project, rootAt(props.project, f));
+        const ref = await repoOfFile(proj, f);
         if (seq !== headSeq) return;
         if (!ref) {
           setHeadTried(f);
           setHeadNote("This file is not in a git repository.");
           return;
         }
-        const at = await headText(props.project, ref, fresh);
+        const at = await headText(proj, ref, fresh);
         if (seq !== headSeq) return;
         setHead({ key: f, ref, text: at.text, from: at.from });
         setHeadNote("");
@@ -600,7 +604,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     if (!href) return;
     if (hasScheme(href)) return openExternal(href);
     const hash = href.includes("#") ? href.slice(href.indexOf("#") + 1) : "";
-    const target = href.startsWith("#") ? path() : resolvePath(path(), props.project.path, href);
+    const target = href.startsWith("#") ? path() : resolvePath(path(), rootAt(props.project, path()).path, href);
     if (target !== path()) return openFile(props.project, target, { from: tabId, beside: e.ctrlKey || e.metaKey });
     if (!hash) return;
     let id = hash;
@@ -615,7 +619,8 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
    *  file is served from its host through a tunnel (tunnels.ts), `~/` and all. */
   const fileUrl = () => {
     const p = text()?.file?.path;
-    if (p && isRemote(props.project)) return fileUrlOf(p);
+    // A remote project's browser windows read `file:` on the remote: a Linked Folder on this machine has none.
+    if (p && isRemote(props.project)) return hostAt(props.project, p) === "local" ? "" : fileUrlOf(p);
     if (!p || p.startsWith("~")) return "";
     let s = p.replace(/\\/g, "/");
     if (/^[a-zA-Z]:/.test(s)) s = `/${s}`;
@@ -624,7 +629,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
 
   const markdown = (src: string) => {
     const el = (<div class="md" innerHTML={renderMarkdown(src)} />) as HTMLElement;
-    enhance(el, (src) => loadImage(props.project, resolvePath(path(), props.project.path, src)));
+    enhance(el, (src) => loadImage(props.project, resolvePath(path(), rootAt(props.project, path()).path, src)));
     return <div class="mdscroll" onClick={openLink}>{el}</div>;
   };
 
@@ -660,11 +665,16 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
 
   // ---- chrome -------------------------------------------------------------------------------
 
+  /** `f` relative to its root: the project's folder or the Linked Folder it is in. */
   const relOf = (f: string) => {
-    const root = props.project.path.replace(/[\\/]+$/, "");
-    return f.startsWith(`${root}/`) ? f.slice(root.length + 1) : f;
+    const root = rootAt(props.project, f).path;
+    return within(root, f) ? relIn(root, f) || f : f;
   };
-  const rel = () => relOf(path());
+  /** The breadcrumb: a Linked Folder's file starts with the link's name. */
+  const crumbParts = () => {
+    const f = path(), l = linkAt(props.project, f);
+    return [...(l ? [l.name] : []), ...relOf(f).split("/")];
+  };
   const pathItems = (f: string): CtxItem[] => [
     { label: "Copy Path", run: () => copyText(f) },
     { label: "Copy Relative Path", run: () => copyText(relOf(f)) },
@@ -733,11 +743,11 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
         <Show when={path()}>
           <div class="crumbs" classList={{ ign: !markAt(marks(), path()) && ignoredAt(marks(), path()) }}>
             <span class="cpath" title={path()}>
-              <For each={rel().split("/")}>
+              <For each={crumbParts()}>
                 {(part, i) => (
                   <>
                     <Show when={i() > 0}><i>›</i></Show>
-                    <span classList={{ last: i() === rel().split("/").length - 1 }}>{part}</span>
+                    <span classList={{ last: i() === crumbParts().length - 1, croot: i() === 0 && !!linkAt(props.project, path()) }}>{part}</span>
                   </>
                 )}
               </For>
@@ -815,7 +825,7 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
           {other()}
           <Show when={tableShown()}>
             <div class="sg-host" onKeyDown={tableKeys}>
-              <CsvTable text={source()} path={path()} readOnly={!!text()?.file?.truncated} onChange={editCsv} />
+              <CsvTable text={source()} path={path()} readOnly={!!text()?.file?.truncated || !!linkAt(props.project, path())?.readOnly} onChange={editCsv} />
             </div>
           </Show>
         </div>
@@ -850,6 +860,13 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
             <span class="sp" />
             <Show when={text()?.file}>
               {(f) => <span classList={{ warn: f().truncated }}>{bytes(f().size)}{f().truncated ? " · truncated, read-only" : ""}</span>}
+            </Show>
+            <Show when={linkAt(props.project, path())}>
+              {(l) => (
+                <span class="elink" title={`In the Linked Folder ${l().path}${l().local ? " on this machine" : ""}`}>
+                  {l().name}{l().local && isRemote(props.project) ? " · this machine" : ""}{l().readOnly ? " · read-only" : ""}
+                </span>
+              )}
             </Show>
             <Show when={isDirty(path())}><span class="mod">modified</span></Show>
           </div>

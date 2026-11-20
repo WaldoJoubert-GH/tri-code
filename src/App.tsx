@@ -31,6 +31,7 @@ import { clearLook } from "./backdrop";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
+import { LinkFolderDialog, linkDialogOpen } from "./LinkFolder";
 import { EnvDialog, envDialogOpen } from "./EnvDialog";
 import { NewWorktreeDialog } from "./NewWorktree";
 import { WorktreeDialog } from "./WorktreeDialog";
@@ -170,7 +171,7 @@ export default function App() {
 
   // Native browser windows draw above HTML, so hide them while an overlay is open.
   // Only the ones under an overlay hide; the tour spotlights anything, so it hides them all.
-  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || tunnelPopOpen() || profileMenuOpen() || debugMenuOpen() || downloadMenuOpen() || openProjectOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen() || mediaPopOpen()));
+  createEffect(() => setBrowsersOverlaid(holdMenuShown() || appearanceOpen() || settingsOpen() || tabMenuOpen() || ctxMenuOpen() || iconPickerOpen() || favEditOpen() || tunnelPopOpen() || profileMenuOpen() || debugMenuOpen() || downloadMenuOpen() || openProjectOpen() || linkDialogOpen() || envDialogOpen() || newWorktreeOpen() || paletteOpen() || aboutOpen() || askRestart() || signalsOpen() || feedbackOpen() || leftoversOpen() || mediaPopOpen()));
   createEffect(() => setBrowsersSuspended(tourOpen()));
 
   // The backdrop and Transparency are the active project's repo's.
@@ -215,6 +216,7 @@ export default function App() {
       <DownloadMenu />
       <Palette />
       <OpenProjectDialog />
+      <LinkFolderDialog />
       <EnvDialog />
       <NewWorktreeDialog />
       <WorktreeDialog />
