@@ -2,6 +2,14 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.55 — 2026-11-20
+
+- On a Mac, Cmd+X cuts in text fields and the Editor, and Cmd+Enter in fields, popovers and dialogs sends, runs or commits again instead of opening a New shell. Shortcut hints read Cmd on a Mac and Ctrl elsewhere. ([#74](https://github.com/WaldoJoubert-GH/tri-code/issues/74))
+- On a Mac, Ctrl+clicking a link in a terminal opens it. ([#74](https://github.com/WaldoJoubert-GH/tri-code/issues/74))
+- A new tab in a browser window of a local project lists what is listening on this machine, dev servers first, as it already did on an ssh Environment. ([#74](https://github.com/WaldoJoubert-GH/tri-code/issues/74))
+- The File Index leaves out files inside skipped folders such as `node_modules/` at any depth, not only where the folder sits at the top.
+- Feedback focuses the title and says so when Enter is pressed with nothing to file.
+
 ## 0.1.54 — 2026-11-19
 
 - Browser windows gain a Debug Menu. DevTools opens for every page, and on Windows the menu also shows console errors, counted on its button and sendable to an agent, with Disable cache, network throttling and Clear site data for the page's origin. Page Profiles let each page in a window use its own Browser Profile, and Remote Debugging gives a non-default Browser Profile a DevTools port on 127.0.0.1 so tools such as Playwright or Chrome DevTools MCP can drive its signed-in pages. ([#70](https://github.com/WaldoJoubert-GH/tri-code/pull/70))
