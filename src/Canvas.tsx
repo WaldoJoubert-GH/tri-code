@@ -1,5 +1,5 @@
 import "./canvas.css";
-import { For, Show, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
+import { type JSX, For, Match, Show, Switch, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
 import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isRemote, isTerminal, live, projectById, removePage,
   canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, pageProfile, toggleMono, visibleTabs,
@@ -12,7 +12,7 @@ import { Caps, HintCaps } from "./Keys";
 import { hintsShown } from "./hints";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
-  addressToUrl, answerPassword, openExternalIn, passwordPrompts, pickElement, placeBrowser, profilesSupported, setBrowsersSuspended,
+  addressToUrl, answerPassword, openExternalIn, passwordPrompts, pickElement, placeBrowser, screenshotPage, profilesSupported, setBrowsersSuspended,
   consoleErrors, debugPortOf, debugSupport, profilesKey,
 } from "./browsers";
 import { DebugButton } from "./debugmenu";
@@ -38,6 +38,7 @@ import { clock, dev, panelTitle } from "./issues";
 import { SIG_TEXT, sigOf } from "./signals";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
 import { DownloadBar, DownloadButton, forgetDownloads } from "./downloads";
+import { hostHue, monogram } from "./favicons";
 
 /** "just now", "4m ago", "2h ago": how long an agent has been in its state. */
 const ago = (ms: number) => {
@@ -494,7 +495,7 @@ export default function Canvas(props: { project: Project }) {
               </span>
             )}
           </Show>
-          <Show when={isBrowser && (tab.pages?.length ?? 0) > 1} fallback={<span class="ttl">{title()}</span>}>
+          <Show when={isBrowser && (tab.pages?.length ?? 0) > 1} fallback={<>{isBrowser && page() && <TabIcon pageId={pageId()} url={page()!.url} />}<span class="ttl">{title()}</span></>}>
             <div class="ptabs" role="tablist">
               <For each={tab.pages}>
                 {(pg) => (
@@ -511,9 +512,11 @@ export default function Canvas(props: { project: Project }) {
                     <Show when={pageDots()}>
                       <i class="pdot" style={{ "--pc": profileColor(pageProfile(props.project, tab, pg)) }} />
                     </Show>
-                    <Show when={(consoleErrors[pg.id]?.length ?? 0) > 0 && app.settings.debugMenu && pg.id !== pageId()}>
-                      <i class="perr" title={`${consoleErrors[pg.id]!.length} console errors`} />
-                    </Show>
+                    <TabIcon pageId={pg.id} url={pg.url}>
+                      <Show when={(consoleErrors[pg.id]?.length ?? 0) > 0 && app.settings.debugMenu && pg.id !== pageId()}>
+                        <i class="perr" title={`${consoleErrors[pg.id]!.length} console errors`} />
+                      </Show>
+                    </TabIcon>
                     <span>{pageTitle(pg)}</span>
                     <button title="Close tab" onClick={(e) => { e.stopPropagation(); closeTabPage(pg.id); }}>×</button>
                   </div>
@@ -609,6 +612,9 @@ export default function Canvas(props: { project: Project }) {
               <Show when={nativeBrowsers && !blank()}>
                 <button title="Select element for the agent" onClick={() => pickElement(props.project, pageId())}>
                   <Icon name="crosshair" size={14} />
+                </button>
+                <button title="Screenshot the page and draw on it, for the agent" onClick={() => screenshotPage(props.project, pageId())}>
+                  <Icon name="camera" size={14} />
                 </button>
               </Show>
               <Show when={nativeBrowsers && app.settings.debugMenu && debugSupport().devtools}>
@@ -777,5 +783,31 @@ export function requestClose(projectId: string, tabId: string): void {
       undo: () => restoreTab(projectId, tab, index),
     },
     () => (tab.kind === "browser" ? (closeBrowser(tab), forgetDownloads(tabId)) : isTerminal(tab) ? closeSession(tabId) : tab.kind === "editor" ? dropEditor(tabId) : tab.kind === "db" ? closeDbSession(tabId) : tab.kind === "docker" ? closeDockerWindow(tabId) : undefined),
+  );
+}
+
+/** A browser page's site icon: a spinner while it loads, the site's icon, or else the host's
+ *  letter (a globe for a new tab). `children` sit on its corner (the console error dot). */
+function TabIcon(props: { pageId: string; url: string; children?: JSX.Element }) {
+  const info = () => browserInfo[props.pageId];
+  const addr = () => info()?.url || props.url;
+  /** The icon that failed to load; a different one is tried again. */
+  const [broken, setBroken] = createSignal("");
+  return (
+    <span class="fav">
+      <Switch
+        fallback={
+          <Show when={monogram(addr())} fallback={<Icon name="globe" size={13} />}>
+            <i class="mono" style={{ "--mh": hostHue(addr()) }}>{monogram(addr())}</i>
+          </Show>
+        }
+      >
+        <Match when={info()?.loading}><i class="spin" /></Match>
+        <Match when={info()?.icon && info()!.icon !== broken() && info()!.icon}>
+          {(icon) => <img src={icon()} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setBroken(icon())} />}
+        </Match>
+      </Switch>
+      {props.children}
+    </span>
   );
 }

@@ -21,11 +21,15 @@ import { sigOf } from "./sigs";
 import { iconSvg } from "./lucide";
 import { pasteText } from "./terms";
 import { flash } from "./ui";
+import { copyText } from "./clipboard";
+import { fillShots, setShotPref, shotPref } from "./shots";
 import { onReopened, pageFwd, releasePage, remoteUrl, resolveUrl } from "./tunnels";
 import { targetOf, toLocal } from "./tunnelmap";
+import { guessIcon, originOf } from "./favicons";
 
 export type BrowserInfo = {
   url: string; title: string; loading: boolean;
+  /** the site's icon, as the app can load it: the page's declared one, else its /favicon.ico */ icon?: string;
   /** framed mode: bumped to reload */ rev?: number;
   /** framed mode: what the iframe loads when it differs from `url` (through a remote tunnel) */ src?: string;
 };
@@ -172,7 +176,7 @@ onReopened((f) => {
     const t = o && targetOf(o.page.url, o.project.path);
     if (!o || !t || !f.local) continue;
     const url = toLocal(o.page.url, t.target, f.local);
-    if (!nativeBrowsers) patchInfo(id, { src: url, rev: (browserInfo[id]?.rev ?? 0) + 1 });
+    if (!nativeBrowsers) patchInfo(id, { src: url, rev: (browserInfo[id]?.rev ?? 0) + 1, icon: guessIcon(url) });
     else if (created.has(id)) send(id, "browser_navigate", { url });
   }
 });
@@ -224,6 +228,9 @@ listen<{ label: string; url: string; loading: boolean }>("browser-nav", (e) => {
   const { label: lbl, loading } = e.payload;
   if (!current(lbl)) return;
   const id = pageIdOf(lbl);
+  // Another site: its /favicon.ico until the page reports its own. The address is the webview's,
+  // so a remote project's page gets the icon through its tunnel.
+  if (loading && originOf(e.payload.url) !== originOf(loadedUrl.get(id) ?? "")) patchInfo(id, { icon: guessIcon(e.payload.url) });
   if (loading) {
     loadedUrl.set(id, e.payload.url);
     if (consoleErrors[id]?.length) setConsoleErrors(id, []);
@@ -240,6 +247,11 @@ listen<{ label: string; title: string }>("browser-title", (e) => {
   const { label: lbl, title } = e.payload;
   if (current(lbl)) patchInfo(pageIdOf(lbl), { title });
 }).catch((e) => console.warn("listen browser-title failed:", e));
+
+listen<{ label: string; icon: string }>("browser-icon", (e) => {
+  const { label: lbl, icon } = e.payload;
+  if (current(lbl)) patchInfo(pageIdOf(lbl), { icon });
+}).catch((e) => console.warn("listen browser-icon failed:", e));
 
 listen<{ label: string; text: string }>("browser-console", (e) => {
   const { label: lbl, text } = e.payload;
@@ -279,13 +291,37 @@ listen<{ label: string; url: string; background: boolean }>("browser-open", (e) 
   if (background) flash(`opened ${hostOf(url)} in a background tab`);
 }).catch((e) => console.warn("listen browser-open failed:", e));
 
-// Select element finished in a page: type its description into the agent window chosen in the
-// composer (`to`), or start a new claude or pi (`new`) and type it there once it is ready.
-// Never submitted: the user edits it in the agent and sends it from there.
-listen<{ label: string; text: string; to: string; new: string }>("browser-pick", (e) => {
-  const { label: lbl, text, to, new: start } = e.payload;
+type PickResult = {
+  label: string; text: string; to: string; new: string;
+  /** Screenshots as base64 PNGs, for the text's ⟦shot N⟧ (browser_shot.rs). */
+  images?: string[]; error?: string;
+  /** Copy instead of typing into an agent. */
+  copy?: boolean;
+  /** The Screenshot switch, to remember for the project. */
+  shot?: boolean | null;
+};
+
+// Select element or Screenshot finished in a page: save its screenshots where pasted images go
+// (on the project's host, so a remote agent can read them), then type its description into the
+// agent window chosen in the composer (`to`), or start a new claude or pi (`new`) and type it
+// there once it is ready. Never submitted: the user edits it in the agent and sends it from there.
+listen<PickResult>("browser-pick", async (e) => {
+  const { label: lbl, to, new: start, images = [], error, copy, shot } = e.payload;
   const o = ownerOf(pageIdOf(lbl));
-  if (!o || !text) return;
+  if (!o || !e.payload.text) return;
+  if (typeof shot === "boolean") setShotPref(o.project.id, shot);
+  const paths = await Promise.all(images.map((png) =>
+    invoke<string>("save_pasted_image", { host: o.project.host, pngBase64: png }).catch((err) => {
+      console.warn("save_pasted_image failed:", err);
+      return undefined;
+    })));
+  const text = fillShots(e.payload.text, paths);
+  const lost = error || paths.some((p) => !p) || paths.length < (e.payload.text.match(/⟦shot \d+⟧/g)?.length ?? 0);
+  if (lost) flash(`the screenshot didn't save${error ? `: ${error}` : ""}`);
+  if (copy) {
+    copyText(text);
+    return flash(images.length ? `copied the description with ${images.length > 1 ? `${images.length} image paths` : "the image path"}` : "copied the description");
+  }
   if (start) return void typeIntoNew(o.project, start, text);
   const chosen = agentWindows(o.project).find((t) => t.id === to);
   const target = chosen ?? agentTarget(o.project, space(o.project).focus);
@@ -380,7 +416,7 @@ function initFramed(page: Page) {
 
 /** Framed mode: load `url` through its tunnel in a remote project. */
 function frameSrc(pageId: string, url: string, here?: boolean) {
-  void localOf(pageId, url, here).then((src) => patchInfo(pageId, { src: src === url ? undefined : src }));
+  void localOf(pageId, url, here).then((src) => patchInfo(pageId, { src: src === url ? undefined : src, icon: guessIcon(src) }));
 }
 
 /** A profile's switches as browser_open and browser_autofill take them. */
@@ -538,7 +574,18 @@ export function navigateBrowser(pageId: string, url: string, here?: boolean): vo
 /** Start Select element in a page. Its composer lists the project's agent windows, the one "send to
  *  agent" would use chosen, and offers to start a new claude or pi. */
 export function pickElement(project: Project, pageId: string): void {
-  if (!created.has(pageId)) return;
+  if (!startPick(project, pageId, { mode: "pick", shot: shotPref(project.id) })) return;
+  flash("select element · Esc to stop");
+}
+
+/** Start Screenshot in a page: it freezes as an image to draw on, sent to an agent as Select element is. */
+export function screenshotPage(project: Project, pageId: string): void {
+  if (!startPick(project, pageId, { mode: "draw" })) return;
+  flash("screenshot · draw on it · Esc to stop");
+}
+
+function startPick(project: Project, pageId: string, extra: Record<string, unknown>): boolean {
+  if (!created.has(pageId)) return false;
   const target = agentTarget(project, space(project).focus);
   const css = getComputedStyle(document.documentElement);
   const colors = Object.fromEntries(["working", "blocked", "done", "error"].map((s) => [s, css.getPropertyValue(`--state-${s}`).trim()]));
@@ -551,9 +598,10 @@ export function pickElement(project: Project, pageId: string): void {
     new: newAgentsFor(project).map((a) => ({ id: a.id, name: a.name, icon: iconSvg(a.icon) })),
     colors,
     keys,
+    ...extra,
   };
   send(pageId, "browser_pick", { opts });
-  flash("select element · Esc to stop");
+  return true;
 }
 
 // ---- the Debug Menu ----

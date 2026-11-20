@@ -51,6 +51,8 @@ fontdb = "0.24.0"
 # Leftovers (leftovers.rs): each process's working folder, command line and environment, on every OS.
 # The Monitor Window (monitor.rs) adds disks, network interfaces and user names.
 sysinfo = { version = "0.40.1", default-features = false, features = ["system", "disk", "network", "user"] }
+# Browser screenshots (browser_shot.rs): cropping a page's snapshot. Already in the tree through Tauri.
+png = "0.17"
 
 # Dev builds: keep link time and memory low (4 GB build machines).
 [profile.dev]
@@ -81,14 +83,19 @@ windows = { version = "0.62", features = ["Media_Control", "Foundation", "Founda
 # Keychain. Same versions as wry's.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSObject", "NSString"] }
-objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "objc2-app-kit", "block2", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKContentWorld", "WKScriptMessage", "WKScriptMessageHandler", "WKFrameInfo", "WKSecurityOrigin"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSObject", "NSString", "NSData", "NSDictionary", "NSError"] }
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "objc2-app-kit", "block2", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKContentWorld", "WKScriptMessage", "WKScriptMessageHandler", "WKFrameInfo", "WKSecurityOrigin", "WKSnapshotConfiguration"] }
+# Browser screenshots: WKWebView's snapshot is an NSImage, turned into a PNG.
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep"] }
+block2 = "0.6"
 security-framework = "3"
 
 # Browser panes on Linux: browser_gtk.rs places them on a GtkOverlay, since Tauri ignores child
 # webview bounds there. Same version as Tauri's.
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18", features = ["v3_24"] }
+# Browser screenshots: the page's snapshot (browser_shot.rs). Same version as wry's.
+webkit2gtk = "2.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-process = "2"
