@@ -6,6 +6,7 @@
 import { For, Show, createMemo, createResource, createSignal, onCleanup, onMount, type JSX } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import type { Project } from "./state";
+import { hostAt } from "./links";
 import { type Change, addRowChange, columnNames, deleteRowChange, isNumber, parseCsv, setCellChange } from "./csv";
 import { type Cell, cellText } from "./dbsql";
 import { copyText } from "./clipboard";
@@ -231,7 +232,7 @@ type Book = { label: string; sheets: BookSheet[] };
 
 /** A workbook's sheets, read-only, with a tab per sheet. */
 export function BookView(props: { project: Project; path: string; reloads: number; onOpenDb: () => void }): JSX.Element {
-  const [book] = createResource(() => ({ path: props.path, n: props.reloads }), (s) => invoke<Book>("sheet_read", { host: props.project.host, path: s.path }));
+  const [book] = createResource(() => ({ path: props.path, n: props.reloads }), (s) => invoke<Book>("sheet_read", { host: hostAt(props.project, s.path), path: s.path }));
   const [pick, setPick] = createSignal(0);
   const sheet = () => book.latest?.sheets[Math.min(pick(), (book.latest?.sheets.length ?? 1) - 1)];
   const locked = () => "Excel files open read-only: open it in the Database Window to query it";

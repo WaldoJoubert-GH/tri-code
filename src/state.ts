@@ -263,6 +263,23 @@ export type Project = {
   copyIgnored?: { ticked: string[]; known: string[] };
   /** The tour's sample project: its terminals are scripted, and it can be closed with nothing lost. */
   sample?: boolean;
+  /** Linked Folders: other folders shown as extra roots of the Editor Window's tree and in Go to
+   *  File (links.ts). A Worktree has none of its own; it shows its repo's. */
+  links?: LinkedFolder[];
+};
+
+/** A folder linked to a project. `path` is on the project's host, or on this machine when `local`
+ *  (only offered for a project on an ssh Environment). */
+export type LinkedFolder = {
+  id: string;
+  /** Its root's label in the tree and Go to File; the folder keeps its own name. */
+  name: string;
+  path: string;
+  local?: true;
+  /** The editor opens its files read-only. */
+  readOnly?: true;
+  /** Left out of Go to File. */
+  noIndex?: true;
 };
 
 /** The signals that alert. `working` only badges. */
@@ -356,6 +373,8 @@ export type Settings = {
   claudeUsage?: boolean;
   /** false turns off Media Controls (media.ts): the sidebar card, its hotkeys, and watching what plays. Unset is on. */
   media?: boolean;
+  /** false turns off Linked Folders (links.ts): no roots, button, command or Go to File results; saved links are kept. Unset is on. */
+  linkedFolders?: boolean;
   /** The sidebar's Environment headers: "hide" never shows them, "auto" only once there are two
    *  Environments or more. Unset always shows them. Chosen from design/env-headers.html (variant D). */
   envHeaders?: "auto" | "hide";
@@ -466,6 +485,45 @@ function edit(projectId: string, fn: (p: Project, s: Persisted) => void) {
     const p = s.projects.find((p) => p.id === projectId);
     if (p) fn(p, s);
   }));
+}
+
+// ---- Linked Folders (links.ts) ----
+
+/** Link a folder to a project. Returns the link's id. */
+export function addLink(projectId: string, link: Omit<LinkedFolder, "id">): string {
+  const id = newId();
+  edit(projectId, (p) => { (p.links ??= []).push({ id, ...link }); });
+  return id;
+}
+
+/** Change a link's name, folder or options; an `undefined` field is cleared. */
+export function updateLink(projectId: string, id: string, patch: Partial<Omit<LinkedFolder, "id">>) {
+  edit(projectId, (p) => {
+    const l = p.links?.find((l) => l.id === id);
+    if (!l) return;
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) delete (l as any)[k];
+      else (l as any)[k] = v;
+    }
+  });
+}
+
+/** Unlink a folder. The folder itself is left alone. */
+export function removeLink(projectId: string, id: string) {
+  edit(projectId, (p) => {
+    p.links = p.links?.filter((l) => l.id !== id);
+    if (!p.links?.length) delete p.links;
+  });
+}
+
+/** Move a link one place up (-1) or down (1) in the tree. */
+export function moveLink(projectId: string, id: string, by: -1 | 1) {
+  edit(projectId, (p) => {
+    const ls = p.links ?? [];
+    const i = ls.findIndex((l) => l.id === id), j = i + by;
+    if (i < 0 || j < 0 || j >= ls.length) return;
+    [ls[i], ls[j]] = [ls[j], ls[i]];
+  });
 }
 
 /** Add a project and make it active. Returns its id. */
@@ -899,6 +957,11 @@ export const envHeadersHidden = () =>
 /** Turn Media Controls on or off; on is kept as unset. */
 export function setMedia(on: boolean) {
   setApp("settings", "media", on ? undefined : false);
+}
+
+/** Turn Linked Folders on or off (Settings › Files, Welcome › Where do you work?). */
+export function setLinkedFolders(on: boolean) {
+  setApp("settings", "linkedFolders", on ? undefined : false);
 }
 
 /** Show or hide Claude's usage in the status line. */
@@ -1343,6 +1406,7 @@ export function migrate(raw: any): Persisted {
       ...(p.branchPrefix ? { branchPrefix: p.branchPrefix } : {}),
       ...(p.copyIgnored ? { copyIgnored: p.copyIgnored } : {}),
       ...(p.sample ? { sample: true } : {}),
+      ...(p.links?.length ? { links: p.links } : {}),
     };
   });
   const resumes = new Set<string>();

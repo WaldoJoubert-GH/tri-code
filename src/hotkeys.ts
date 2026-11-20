@@ -10,6 +10,7 @@ import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance"
 import { closeSettings, settingsOpen, toggleHotkeys } from "./Settings";
 import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
+import { closeLinkDialog, linkDialogOpen } from "./LinkFolder";
 import { closeEnvDialog, envDialogOpen } from "./EnvDialog";
 import { closeWelcome, welcomeOpen } from "./Welcome";
 import { toggleSidebar } from "./Sidebar";
@@ -218,6 +219,7 @@ function onKey(e: KeyboardEvent) {
     else if (aboutOpen()) setAboutOpen(false);
     else if (envDialogOpen()) closeEnvDialog();
     else if (openProjectOpen()) closeOpenProject();
+    else if (linkDialogOpen()) closeLinkDialog();
     else if (welcomeOpen()) closeWelcome();
     else if (newWorktreeOpen()) closeNewWorktree();
     else if (mediaPopOpen()) closeMediaPop();

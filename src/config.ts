@@ -24,7 +24,7 @@ const EVENTS: SoundEvent[] = ["blocked", "done", "error"];
 
 /** A project as exported: its place and its appearance, no windows. */
 export type ProjectConfig = Pick<Project, "id" | "name" | "host" | "path" | "accent" | "bg" | "dim" | "favs"> &
-  Partial<Pick<Project, "icon" | "notify" | "profile" | "diffMode" | "setup" | "branchPrefix" | "copyIgnored">>;
+  Partial<Pick<Project, "icon" | "notify" | "profile" | "diffMode" | "setup" | "branchPrefix" | "copyIgnored" | "links">>;
 
 export type ConfigFile = {
   format: typeof CONFIG_FORMAT;
@@ -71,8 +71,8 @@ export const assetKeys = (s: Persisted, sections: Section[]): AssetRef[] => [
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 function projectConfig(p: Project): ProjectConfig {
-  const { id, name, host, path, accent, bg, dim, favs, icon, notify, profile, diffMode, setup, branchPrefix, copyIgnored } = p;
-  return clone({ id, name, host, path, accent, bg, dim, favs, icon, notify, profile, diffMode, setup, branchPrefix, copyIgnored });
+  const { id, name, host, path, accent, bg, dim, favs, icon, notify, profile, diffMode, setup, branchPrefix, copyIgnored, links } = p;
+  return clone({ id, name, host, path, accent, bg, dim, favs, icon, notify, profile, diffMode, setup, branchPrefix, copyIgnored, links });
 }
 
 /** The file for `sections` of `s`. `assets` holds what assetKeys asked for (missing ones are skipped). */
@@ -192,7 +192,7 @@ export function applyImport(s: Persisted, f: ConfigFile, picks: Section[], newId
       const here = exportable(s).find((q) => sameProject(q, p));
       const id = here?.id ?? newId();
       ids.set(fileId, id);
-      const fields = { name: p.name, accent: p.accent, bg: p.bg, dim: p.dim, fx: p.fx, clear: p.clear, favs: p.favs as Fav[], icon: p.icon, notify: p.notify, profile: p.profile, diffMode: p.diffMode, setup: p.setup, branchPrefix: p.branchPrefix, copyIgnored: p.copyIgnored };
+      const fields = { name: p.name, accent: p.accent, bg: p.bg, dim: p.dim, fx: p.fx, clear: p.clear, favs: p.favs as Fav[], icon: p.icon, notify: p.notify, profile: p.profile, diffMode: p.diffMode, setup: p.setup, branchPrefix: p.branchPrefix, copyIgnored: p.copyIgnored, links: p.links };
       // An uploaded file the export lacked falls back to the default.
       for (const a of assetsOf({ ...p, id: fileId })) {
         const dataUrl = f.assets[assetName(a)];

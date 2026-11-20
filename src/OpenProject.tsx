@@ -417,10 +417,17 @@ function CloneRepo(props: { host: string }) {
   );
 }
 
-function FolderPicker(props: {
+/** The Folder Picker; also the Link folder dialog's (LinkFolder.tsx). */
+export function FolderPicker(props: {
   host: string;
   /** Picking a place for something new: no workspace files, no per-row open. */
   pick?: boolean;
+  /** Take the focus on open even with `pick`. */
+  autofocus?: boolean;
+  /** The folder to start in, instead of the last one used on this host. */
+  start?: string;
+  /** The per-row button's label (default "open"). */
+  useLabel?: string;
   /** Enter on an empty filter, and the default footer's button. */
   onHere: (path: string) => void;
   onOpen?: (path: string) => void;
@@ -438,7 +445,7 @@ function FolderPicker(props: {
   let input: HTMLInputElement | undefined;
   let listEl: HTMLDivElement | undefined;
   /** A picker under a name field leaves the focus there until it is used. */
-  let quiet = !!props.pick;
+  let quiet = !!props.pick && !props.autofocus;
 
   const go = async (path: string) => {
     setLoading(true);
@@ -458,7 +465,11 @@ function FolderPicker(props: {
       quiet = false;
     }
   };
-  onMount(() => go(lastDir[props.host] ?? "~"));
+  onMount(async () => {
+    await go(props.start ?? lastDir[props.host] ?? "~");
+    // A start that is gone (a moved Linked Folder's parent) falls back to the usual place.
+    if (props.start && !list()) await go(lastDir[props.host] ?? "~");
+  });
 
   const isPath = () => /^[~/]/.test(q()) || /^[a-zA-Z]:([\\/]|$)/.test(q());
   /** `.code-workspace` files first, then folders, matching the filter, prefix matches first. */
@@ -550,7 +561,7 @@ function FolderPicker(props: {
                   <Show when={isRepo(d.name) && !d.ws}><span class="git">git</span></Show>
                   <Show when={d.ws}><span class="git" title="A VS Code workspace: opens the folder it is in">workspace</span></Show>
                   <Show when={props.onOpen}>
-                    <button type="button" class="use" onClick={(e) => (e.stopPropagation(), use(d))}>open</button>
+                    <button type="button" class="use" onClick={(e) => (e.stopPropagation(), use(d))}>{props.useLabel ?? "open"}</button>
                   </Show>
                 </div>
               )}

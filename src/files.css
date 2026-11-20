@@ -259,3 +259,26 @@
   .ediff-head .seg .lbl, .ediff-head .fnote-inline { display: none; }
 }
 .ediff-sp { flex: 1; min-width: 0; }
+
+/* Linked Folders (links.ts): a root row per folder once a project has one, their badges, and the
+   Link folder row. "This machine" is marigold, as in the Link folder dialog. design/linked-folders.html (A). */
+.froot { height: 26px; --here: var(--p-marigold); }
+.froot + .froot, .frow:not(.froot) + .froot { margin-top: 2px; }
+.froot .frooti { flex: none; color: var(--accent); }
+.froot.link .frooti { color: var(--violet); }
+.froot.missing .fname { color: var(--muted); font-weight: 500; }
+.froot.missing .frooti { color: var(--warn); }
+/* The name keeps its room; badges give theirs up first, clipped. */
+.froot .fname { flex: 0 0 auto; max-width: 65%; }
+.froot .fbadge { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }
+.froot .fbadge svg { flex: none; }
+.fbadge { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 15px; padding: 0 5px; border-radius: 3px; font: 600 10px var(--ui); background: var(--raised); color: var(--muted); }
+.fbadge.here { background: color-mix(in srgb, var(--here) 16%, transparent); color: var(--here); }
+.fbadge.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.flinkrow { display: flex; align-items: center; gap: 6px; width: calc(100% - 16px); margin: 6px 8px 8px; padding: 4px 8px; border: 1px dashed var(--line); border-radius: 5px; color: var(--muted); font-size: 12px; }
+.flinkrow:hover { color: var(--text); border-color: var(--muted); }
+.fthead button { display: inline-grid; place-items: center; }
+.crumbs .cpath .croot { color: var(--violet); }
+.estatus .elink { color: var(--violet); }
+.grow .glink { flex: none; font: 600 10.5px var(--ui); padding: 0 6px; border-radius: 3px; background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
+.grow .glink.here { background: color-mix(in srgb, var(--p-marigold) 14%, transparent); color: var(--p-marigold); }

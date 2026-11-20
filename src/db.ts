@@ -10,6 +10,7 @@ import {
   type Cell, type DbKind, type MongoOp, type Pending, type SqlOp, type Target, emptyPending, mongoOps, mongoText, pendingCount, rowKey, sqlOps,
 } from "./dbsql";
 import { flash } from "./ui";
+import { hostAt, linkAt } from "./links";
 
 /** `sheet` is a CSV or workbook loaded into memory: never saved, made up from the window's id. */
 export type DbTarget = { env: string } | { url: string } | { file: string } | { sheet: string };
@@ -84,21 +85,22 @@ export const rootOf = (p: Project) => repoOf(p).path;
 
 export const connsOf = (p: Project) => conns[repoOf(p).id];
 export const connOf = (p: Project, id: string | undefined) =>
-  !id ? undefined : id.startsWith(SHEET) ? sheetConn(id.slice(SHEET.length)) : connsOf(p)?.find((c) => c.id === id);
+  !id ? undefined : id.startsWith(SHEET) ? sheetConn(p, id.slice(SHEET.length)) : connsOf(p)?.find((c) => c.id === id);
 
 // ── spreadsheet files ───────────────────────────────────────────────
 // A CSV or workbook opened from the editor ("Open in Database") is a window whose `db` is
 // `sheet:<path>`. Rust loads the file into an in-memory SQLite (db/sheet.rs), so the window
-// treats it as SQLite: a CSV's Apply writes the file back, a workbook is read-only.
+// treats it as SQLite: a CSV's Apply writes the file back, a workbook is read-only. The file is read
+// and written on its own host: a Linked Folder on this machine is local in an ssh project (links.ts).
 
 const SHEET = "sheet:";
 export const isSheet = (c: DbConn | undefined) => !!c && "sheet" in c.target;
 export const sheetPathOf = (c: DbConn) => ("sheet" in c.target ? c.target.sheet : "");
 export const isBookConn = (c: DbConn) => isSheet(c) && !/\.(csv|tsv|tab|psv)$/i.test(sheetPathOf(c));
 
-function sheetConn(path: string): DbConn {
+function sheetConn(p: Project, path: string): DbConn {
   const conn: DbConn = { id: SHEET + path, name: path.split(/[\\/]/).pop() ?? path, kind: "sqlite", target: { sheet: path } };
-  if (!/\.(csv|tsv|tab|psv)$/i.test(path)) conn.readOnly = true;
+  if (!/\.(csv|tsv|tab|psv)$/i.test(path) || linkAt(p, path)?.readOnly) conn.readOnly = true;
   return conn;
 }
 
@@ -176,7 +178,9 @@ export async function openSession(p: Project, tab: Tab, force = false) {
   if (w?.session) await invoke("db_close", { session: w.session }).catch(() => {});
   setWins(tab.id, { ...blank(), query: w?.query ?? "", pending: w?.pending ?? {} });
   try {
-    const o = await invoke<{ session: number; version: string; tunnel: number | null }>("db_open", { host: p.host, root: rootOf(p), conn: c });
+    // A spreadsheet is read (and a CSV written back) where the file is, not always on the project's host.
+    const host = isSheet(c) ? hostAt(p, sheetPathOf(c)) : p.host;
+    const o = await invoke<{ session: number; version: string; tunnel: number | null }>("db_open", { host, root: rootOf(p), conn: c });
     up(tab.id, (x) => Object.assign(x, { status: "open", session: o.session, version: o.version, tunnel: o.tunnel }));
     await loadSchema(tab.id);
   } catch (e) {

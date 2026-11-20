@@ -6,9 +6,14 @@
 // folder; a name with slashes makes the folders too. Delete (right-click, or the Delete key)
 // asks first, then sends the file or folder to the Recycle Bin, or removes it for good over ssh.
 // Rename (right-click, or F2) edits the name in place.
+// A project with Linked Folders (links.ts) shows a root row per folder, its own first; a root's
+// right-click renames, relinks, reorders or unlinks it. Chosen from design/linked-folders.html (A).
 
 import { For, Match, Show, Switch, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js";
-import { type Project, app, isRemote } from "./state";
+import { type LinkedFolder, type Project, app, isRemote, moveLink, removeLink, repoOf, updateLink } from "./state";
+import { type Root, hostAt, linkAt, linksOn, relIn, rootAt, rootsOf, within } from "./links";
+import { openLinkDialog } from "./LinkFolder";
+import { Icon } from "./lucide";
 import { type IconOpts, type IconTheme, iconSvg, previewTheme } from "./fileicons";
 import { type OpenHow, createFile, deletePath, dirState, renamePath, loadDir, refreshDir, refreshProject } from "./files";
 import { openCtxMenu } from "./ctxmenu";
@@ -17,8 +22,8 @@ import { ask, flash } from "./ui";
 import { type FileMark, fileMarks, ignoredAt, markAt, peekStatus } from "./git";
 import "./files.css";
 
-/** `draft` is the New File box, in the folder `path`. */
-type Row = { path: string; name: string; dir: boolean; depth: number; draft?: true };
+/** `draft` is the New File box, in the folder `path`; `root` is a root row (only drawn with Linked Folders). */
+type Row = { path: string; name: string; dir: boolean; depth: number; draft?: true; root?: Root };
 
 const join = (dir: string, name: string) => (dir.endsWith("/") ? dir + name : `${dir}/${name}`);
 
@@ -90,13 +95,24 @@ export default function FileTree(props: {
   // The status line polls only the active project; read this one's status when the tree opens.
   onMount(() => void peekStatus(props.project));
 
-  const isOpen = (p: string) => open().has(p);
-  const toggle = (p: string) =>
-    setOpen((s) => {
-      const n = new Set(s);
-      n.has(p) ? n.delete(p) : n.add(p);
-      return n;
-    });
+  const roots = createMemo(() => rootsOf(props.project));
+  /** Root rows show only once the project has a Linked Folder; until then the tree is as it was. */
+  const multi = () => roots().length > 1;
+  /** Roots start open; these were collapsed. */
+  const [shut, setShut] = createSignal<ReadonlySet<string>>(new Set());
+  const isRootPath = (p: string) => roots().some((r) => r.path === p);
+
+  const isOpen = (p: string) => (isRootPath(p) ? !shut().has(p) : open().has(p));
+  const flip = (s: ReadonlySet<string>, p: string) => {
+    const n = new Set(s);
+    n.has(p) ? n.delete(p) : n.add(p);
+    return n;
+  };
+  const toggle = (p: string) => (isRootPath(p) ? setShut((s) => flip(s, p)) : setOpen((s) => flip(s, p)));
+  /** A folder that can't be listed: a Linked Folder moved or deleted, or its host unreachable. */
+  const missing = (r: Root) => !!dirState(props.project, r.path)?.error;
+  /** Inside a Linked Folder made read-only: no New File, Rename or Delete. */
+  const readOnly = (path: string) => !!linkAt(props.project, path)?.readOnly;
 
   const rows = createMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -111,21 +127,30 @@ export default function FileTree(props: {
         if (e.dir && isOpen(path)) walk(path, depth + 1);
       }
     };
-    walk(props.project.path, 0);
+    if (!multi()) {
+      walk(props.project.path, 0);
+      return out;
+    }
+    for (const r of roots()) {
+      out.push({ path: r.path, name: r.name, dir: true, depth: 0, root: r });
+      if (isOpen(r.path) && !missing(r)) walk(r.path, 1);
+    }
     return out;
   });
 
-  // Load the root, and every directory the user has expanded.
+  // Load every root (a missing Linked Folder shows as such even collapsed), and every directory the user has expanded.
   createEffect(() => {
-    loadDir(props.project, props.project.path);
+    for (const r of roots()) loadDir(props.project, r.path);
     for (const p of open()) loadDir(props.project, p);
   });
 
-  // Reveal the file the editor shows: expand its folders and select it.
+  // Reveal the file the editor shows: open its root and folders, and select it.
   createEffect(on(() => props.shown, (f) => {
-    const root = props.project.path.replace(/[\\/]+$/, "");
-    if (!f || !f.startsWith(`${root}/`)) return;
+    if (!f) return;
+    const root = rootAt(props.project, f).path.replace(/[\\/]+$/, "");
+    if (!f.startsWith(`${root}/`)) return;
     const parts = f.slice(root.length + 1).split("/").slice(0, -1);
+    if (shut().has(root)) setShut((s) => flip(s, root));
     setOpen((s) => {
       const n = new Set(s);
       let dir = root;
@@ -153,8 +178,8 @@ export default function FileTree(props: {
     else if (e.key === "ArrowRight" || e.key === "l") { if (at?.dir && !isOpen(at.path)) toggle(at.path); }
     else if (e.key === "ArrowLeft" || e.key === "h") { if (at?.dir && isOpen(at.path)) toggle(at.path); }
     // Space previews and stays in the tree; Enter opens and goes to the file; Ctrl+Enter opens it beside
-    else if (e.key === "Delete") { if (at) void remove(at); }
-    else if (e.key === "F2") { e.preventDefault(); if (at) setRenaming(at.path); }
+    else if (e.key === "Delete") { if (at && !at.root) void remove(at); }
+    else if (e.key === "F2") { e.preventDefault(); if (at && canRename(at)) setRenaming(at.path); }
     else if (e.key === " ") { e.preventDefault(); if (at && !at.dir) props.open(at.path, { preview: true }); }
     else if (e.key === "Enter") {
       if (!at) return;
@@ -165,6 +190,10 @@ export default function FileTree(props: {
 
   const root = () => dirState(props.project, props.project.path);
   const dirOf = (r: Row | undefined) => (!r ? props.project.path : r.dir ? r.path : r.path.slice(0, r.path.lastIndexOf("/")));
+  /** A file or folder, or a Linked Folder's root (its label); not the project's own root. */
+  const canRename = (r: Row) => (r.root ? !!r.root.link : !readOnly(r.path));
+  /** Changes go to the repo project: a Worktree shows its repo's links. */
+  const owner = () => repoOf(props.project).id;
 
   /** Open the New File box in `dir`, expanding it. */
   const newFile = (dir: string) => {
@@ -176,6 +205,7 @@ export default function FileTree(props: {
     const rel = name.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
     setDraft(null);
     if (!rel) return rootEl.focus();
+    if (readOnly(dir)) return flash(`${linkAt(props.project, dir)!.name} is linked read-only`);
     if (rel.split("/").some((p) => p === "" || p === "." || p === "..")) return flash(`not a file name: ${name}`);
     const path = join(dir, rel);
     try {
@@ -193,7 +223,8 @@ export default function FileTree(props: {
 
   const remove = async (r: Row) => {
     const what = `${r.dir ? "the folder " : ""}${relOf(r.path)}${r.dir ? " and everything in it" : ""}`;
-    const note = isRemote(props.project) ? `It is on ${props.project.host}, so this can't be undone.` : "It goes to the Recycle Bin.";
+    const host = hostAt(props.project, r.path);
+    const note = host !== "local" ? `It is on ${host}, so this can't be undone.` : "It goes to the Recycle Bin.";
     if (!await ask(`Delete ${what}?\n\n${note}`)) return;
     try {
       await deletePath(props.project, r.path);
@@ -210,6 +241,11 @@ export default function FileTree(props: {
     setRenaming(null);
     rootEl.focus();
     if (!to || to === r.name) return;
+    // A Linked Folder's root renames the label; the folder keeps its name.
+    if (r.root?.link) {
+      if (roots().some((x) => x.id !== r.root!.id && x.name.toLowerCase() === to.toLowerCase())) return flash(`${to} is already a root's name`);
+      return updateLink(owner(), r.root.link.id, { name: to });
+    }
     if (/[\\/]/.test(to) || to === "." || to === "..") return flash(`not a file name: ${to}`);
     const parent = dirOf({ ...r, dir: false });
     const path = join(parent, to);
@@ -225,22 +261,47 @@ export default function FileTree(props: {
     setSel(path);
   };
 
-  const relOf = (f: string) => f.slice(props.project.path.replace(/[\\/]+$/, "").length + 1);
+  /** `f` relative to its root (the project's folder or its Linked Folder). */
+  const relOf = (f: string) => {
+    const at = rootAt(props.project, f).path;
+    return within(at, f) ? relIn(at, f) : f;
+  };
+  const linkItems = (l: LinkedFolder) => {
+    const links = repoOf(props.project).links ?? [];
+    const i = links.findIndex((x) => x.id === l.id);
+    return [
+      { label: "Rename…", kbd: "F2", run: () => setRenaming(l.path) },
+      { label: "Change Folder…", run: () => openLinkDialog(props.project, l) },
+      { label: l.readOnly ? "Allow Editing" : "Make Read-only", run: () => updateLink(owner(), l.id, { readOnly: l.readOnly ? undefined : true }) },
+      { label: l.noIndex ? "Show in Go to File" : "Leave out of Go to File", run: () => updateLink(owner(), l.id, { noIndex: l.noIndex ? undefined : true }) },
+      "sep" as const,
+      { label: "Move Up", disabled: i <= 0, run: () => moveLink(owner(), l.id, -1) },
+      { label: "Move Down", disabled: i < 0 || i >= links.length - 1, run: () => moveLink(owner(), l.id, 1) },
+      "sep" as const,
+      { label: "Unlink", run: () => (removeLink(owner(), l.id), flash(`unlinked ${l.name}; the folder is untouched`)) },
+    ];
+  };
   const onMenu = (e: MouseEvent) => {
     const el = rowOf(e);
     const r = el ? rows().find((x) => !x.draft && x.path === el.dataset.path) : undefined;
     if (r) setSel(r.path);
+    const ro = readOnly(dirOf(r));
     openCtxMenu(e, [
-      { label: "New File…", run: () => newFile(dirOf(r)) },
+      { label: "New File…", disabled: ro || (!!r?.root && missing(r.root)), run: () => newFile(dirOf(r)) },
       "sep",
-      ...(r ? [
+      ...(r?.root ? [
+        { label: "Copy Path", run: () => copyText(r.path) },
+        "sep" as const,
+        ...(r.root.link ? linkItems(r.root.link) : [{ label: "Link Folder…", run: () => openLinkDialog(props.project) }]),
+        "sep" as const,
+      ] : r ? [
         { label: "Copy Path", run: () => copyText(r.path) },
         { label: "Copy Relative Path", run: () => copyText(relOf(r.path)) },
         "sep" as const,
-        { label: "Rename…", kbd: "F2", run: () => setRenaming(r.path) },
-        { label: "Delete", kbd: "Delete", run: () => void remove(r) },
+        { label: "Rename…", kbd: "F2", disabled: ro, run: () => setRenaming(r.path) },
+        { label: "Delete", kbd: "Delete", disabled: ro, run: () => void remove(r) },
         "sep" as const,
-      ] : []),
+      ] : linksOn() ? [{ label: "Link Folder…", run: () => openLinkDialog(props.project) }, "sep" as const] : []),
       { label: "Refresh", run: () => refreshProject(props.project) },
     ]);
   };
@@ -253,6 +314,11 @@ export default function FileTree(props: {
       <div class="fthead">
         <span class="proj" title={where()}>{props.project.name}</span>
         <button title="New file" onClick={() => newFile(dirOf(rows().find((r) => r.path === sel())))}>+</button>
+        <Show when={linksOn()}>
+          <button title="Link a folder: show another folder in this tree" aria-label="Link folder" onClick={() => openLinkDialog(props.project)}>
+            <Icon name="folder-symlink" size={13} />
+          </button>
+        </Show>
         <button title="Refresh (reloads the whole tree and open files)" onClick={() => refreshProject(props.project)}>⟳</button>
       </div>
       <div
@@ -266,6 +332,11 @@ export default function FileTree(props: {
           if (!el) return;
           const path = el.dataset.path!;
           setSel(path);
+          // A Linked Folder that isn't there: pick where it went.
+          if (el.dataset.missing) {
+            const l = linkAt(props.project, path);
+            return l && openLinkDialog(props.project, l);
+          }
           if (el.dataset.dir === "1") toggle(path);
           else props.open(path, e.ctrlKey || e.metaKey ? { beside: true } : { preview: true });
         }}
@@ -279,7 +350,42 @@ export default function FileTree(props: {
           fallback={<div class="fnote">{root()?.error ?? (root()?.loading ? "Loading…" : "Empty folder")}</div>}
         >
           <For each={rows()}>
-            {(r) => r.draft ? (
+            {(r) => r.root ? (
+              <div
+                class="frow dir froot"
+                classList={{ sel: r.path === sel(), link: !!r.root.link, missing: missing(r.root) }}
+                data-path={r.path}
+                data-dir="1"
+                data-missing={missing(r.root) ? "1" : undefined}
+                title={missing(r.root) ? `${r.root.path}\n${dirState(props.project, r.path)?.error ?? ""}` : `${r.root.host === "local" ? "" : `${r.root.host}:`}${r.root.path}`}
+                style={{ "padding-left": "6px" }}
+              >
+                <span class="fchev">{missing(r.root) ? "" : isOpen(r.path) ? "▾" : "▸"}</span>
+                <Icon name={missing(r.root) ? "triangle-alert" : r.root.link ? "folder-symlink" : "folder"} size={13} class="frooti" />
+                <Show when={renaming() === r.path} fallback={<span class="fname">{r.name}</span>}>
+                  <input
+                    class="fren"
+                    aria-label={`Rename the link ${r.name}`}
+                    value={r.name}
+                    ref={(el) => requestAnimationFrame(() => (el.focus(), el.select()))}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Enter") void rename(r, e.currentTarget.value);
+                      else if (e.key === "Escape") (setRenaming(null), rootEl.focus());
+                    }}
+                    onBlur={(e) => renaming() === r.path && void rename(r, e.currentTarget.value)}
+                  />
+                </Show>
+                <Show when={missing(r.root)}><span class="fbadge warn">not found</span></Show>
+                <Show when={r.root.link?.local && isRemote(props.project)}>
+                  <span class="fbadge here" title={`On this machine, not on ${props.project.host}`}><Icon name="laptop" size={10} />{missing(r.root) ? "" : "this machine"}</span>
+                </Show>
+                <Show when={r.root.link?.readOnly}>
+                  <span class="fbadge" title="Read-only"><Icon name="lock" size={10} /></span>
+                </Show>
+              </div>
+            ) : r.draft ? (
               <div class="frow fdraft" style={{ "padding-left": `${6 + r.depth * 12}px` }}>
                 <span class="fchev" />
                 <FileIcon name="" dir={false} />
@@ -334,6 +440,11 @@ export default function FileTree(props: {
               </div>
             )}
           </For>
+          <Show when={multi()}>
+            <button type="button" class="flinkrow" onClick={() => openLinkDialog(props.project)}>
+              <Icon name="plus" size={12} />Link folder…
+            </button>
+          </Show>
         </Show>
       </div>
     </div>
