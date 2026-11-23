@@ -125,6 +125,21 @@ class TermSession {
     parkElement().appendChild(this.el); // xterm measures fonts, so open it inside the document
 
     this.clear = seesThrough(project);
+    // Plain clicks do nothing; Ctrl+click opens in the canvas, Ctrl+Shift+click in the system browser.
+    let hovered: string | undefined;
+    let openedAt = Number.NEGATIVE_INFINITY;
+    const open = (uri: string, external: boolean) => {
+      openedAt = performance.now();
+      linkHandler?.(uri, this.tab.id, external);
+    };
+    const activate = (event: MouseEvent, uri: string) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      if (performance.now() - openedAt < 500) return; // already opened from the contextmenu below
+      open(uri, event.shiftKey);
+    };
+    const hover = (_e: MouseEvent, uri: string) => { hovered = uri; };
+    const leave = () => { hovered = undefined; };
     this.term = new Terminal({
       // Capped scrollback: each line costs memory per terminal.
       scrollback: 5000,
@@ -135,24 +150,12 @@ class TermSession {
       // Only when asked: a transparent canvas renders glyphs without the background behind them.
       allowTransparency: this.clear,
       theme: this.theme(),
+      // OSC 8 hyperlinks (gh, Claude Code): xterm's default confirm()s then calls window.open,
+      // which the web view ignores. Treat them like the plain-text URLs below.
+      linkHandler: { activate, hover, leave },
     });
     this.term.loadAddon(this.fit);
-    // Plain clicks do nothing; Ctrl+click opens in the canvas, Ctrl+Shift+click in the system browser.
-    let hovered: string | undefined;
-    let openedAt = Number.NEGATIVE_INFINITY;
-    const open = (uri: string, external: boolean) => {
-      openedAt = performance.now();
-      linkHandler?.(uri, this.tab.id, external);
-    };
-    this.term.loadAddon(new WebLinksAddon((event, uri) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
-      event.preventDefault();
-      if (performance.now() - openedAt < 500) return; // already opened from the contextmenu below
-      open(uri, event.shiftKey);
-    }, {
-      hover: (_e, uri) => { hovered = uri; },
-      leave: () => { hovered = undefined; },
-    }));
+    this.term.loadAddon(new WebLinksAddon(activate, { hover, leave }));
     // macOS turns Ctrl+click into a right-click: the web view's context menu takes the
     // mouseup, so xterm never activates the link. Open the hovered link from here instead.
     if (isMac) {
