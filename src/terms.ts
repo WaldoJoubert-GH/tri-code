@@ -583,6 +583,17 @@ class TermSession {
     return this.term.hasSelection();
   }
 
+  /** The last `n` lines with text on the screen (not the scrollback), right-trimmed. */
+  tail(n: number): string[] {
+    const b = this.term.buffer.active;
+    const lines: string[] = [];
+    for (let y = b.baseY + this.term.rows - 1; y >= b.baseY && lines.length < n; y--) {
+      const text = b.getLine(y)?.translateToString(true) ?? "";
+      if (text.trim() || lines.length) lines.push(text);
+    }
+    return lines.reverse();
+  }
+
   focus() {
     this.term.focus();
   }
@@ -805,6 +816,11 @@ export function unmountSession(tabId: string): void {
 /** Is text selected in a tab's terminal? */
 export function hasSelection(tabId: string): boolean {
   return sessions.get(tabId)?.hasSelection() ?? false;
+}
+
+/** The last lines on a terminal's screen, for the phone's window tiles; empty without a session. */
+export function screenTail(tabId: string, n: number): string[] {
+  return sessions.get(tabId)?.tail(n) ?? [];
 }
 
 export function focusSession(tabId: string): void {
