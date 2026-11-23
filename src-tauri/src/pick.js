@@ -104,7 +104,8 @@
       .box.below b { top: auto; bottom: -19px; border-radius: 0 3px 3px 3px; }
       /* The hidden attribute must win over the display a class gives (.bar is flex). */
       [hidden] { display: none !important; }
-      .card { position: fixed; left: 50%; transform: translateX(-50%); pointer-events: auto; color: #23262d;
+      /* Above the highlight boxes, which are appended after it. */
+      .card { position: fixed; z-index: 1; left: 50%; transform: translateX(-50%); pointer-events: auto; color: #23262d;
         background: #fbfbfc; border: 1px solid #d9dce3; box-shadow: 0 14px 40px -12px rgba(30,34,44,.35); }
       .bar { top: 8px; display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border-radius: 8px;
         font-size: 12px; white-space: nowrap; max-width: calc(100vw - 16px); }
