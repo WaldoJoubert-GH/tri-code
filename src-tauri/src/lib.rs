@@ -421,7 +421,10 @@ pub fn run() {
             phone::phone_status,
             phone::phone_pair,
             phone::phone_forget,
-            phone::phone_agents,
+            phone::phone_config,
+            phone::phone_snapshot,
+            phone::phone_tails,
+            phone::phone_reply,
             phone::phone_push,
         ])
         .build(tauri::generate_context!())

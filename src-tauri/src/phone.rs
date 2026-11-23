@@ -1,10 +1,13 @@
-//! Remote Control: the agents on your phone. While it is on, a small web server on
-//! 127.0.0.1 serves the phone page (`phone/`) and a WebSocket, and `tailscale serve` puts it
-//! on the tailnet over HTTPS, which Web Push needs. Nothing listens on the LAN.
+//! Remote Control: tri-code on your phone. While it is on, a small web server serves the phone
+//! page (`phone/`) and a WebSocket. How a phone reaches it is the user's pick (`Reach`): by
+//! default it listens on 127.0.0.1 and `tailscale serve` puts it on the tailnet over HTTPS, which
+//! Web Push needs; or it listens on the local network over plain HTTP (no pushes); or only on
+//! 127.0.0.1, for a tunnel or reverse proxy of the user's own. The port is theirs to change too.
 //!
-//! The frontend owns the agent list and their signals; it sends a snapshot here
-//! (`phone_agents`) whenever it changes, and asks for a push when a signal alerts
-//! (`phone_push`). Terminal output and input go straight between the phone and the PTY.
+//! The frontend owns the projects, their windows and signals; it sends a snapshot here
+//! (`phone_snapshot`) whenever it changes, the last lines of each terminal's screen for the
+//! window tiles (`phone_tails`) while a phone is connected, and asks for a push when a signal
+//! alerts (`phone_push`). Terminal output and input go straight between the phone and the PTY.
 //!
 //! A phone pairs once with a short code from Settings › Remote and keeps a device token;
 //! only the token's hash is stored, beside the VAPID key, in `phone.json`. So is whether it is
@@ -29,15 +32,28 @@ use p256::ecdsa::SigningKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::sync::{broadcast, oneshot, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 use crate::pty::Ptys;
 use crate::push::{self, PushError, Subscription};
 
-/// Where the server listens, and the tailnet HTTPS port `tailscale serve` maps to it. Not 443,
-/// which is often serving something else on the same machine.
+/// Where the server listens, and the tailnet HTTPS port `tailscale serve` maps to it, unless
+/// Settings › Remote picks others. Not 443, which is often serving something else on the machine.
 const PORT: u16 = 7520;
 const TS_PORT: u16 = 7443;
+
+/// How a phone reaches the server.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Reach {
+    /// On 127.0.0.1, put on the tailnet over HTTPS by `tailscale serve`.
+    #[default]
+    Tailscale,
+    /// On every interface over plain HTTP: the phone uses this computer's LAN address. No pushes.
+    Lan,
+    /// On 127.0.0.1 only, for the user's own tunnel or reverse proxy (`address` is what it gives).
+    Local,
+}
 const PAIR_TTL: Duration = Duration::from_secs(10 * 60);
 const PAIR_TRIES: u32 = 5;
 
@@ -61,6 +77,25 @@ struct Saved {
     /// The VAPID private key, base64url.
     vapid: Option<String>,
     devices: Vec<Device>,
+    #[serde(default)]
+    reach: Reach,
+    /// The port it listens on; unset is PORT.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    port: Option<u16>,
+    /// The tailnet HTTPS port; unset is TS_PORT.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ts_port: Option<u16>,
+    /// `Reach::Local`: the address the user's tunnel or proxy gives, shown and put in pair links.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    address: Option<String>,
+}
+
+/// The server while it runs: its address, how to stop it, and the tailnet port it serves on (to
+/// take down when it stops, even after Settings picked another).
+struct Running {
+    url: String,
+    shutdown: oneshot::Sender<()>,
+    ts_port: Option<u16>,
 }
 
 struct Pairing {
@@ -73,20 +108,25 @@ struct Inner {
     saved: Saved,
     vapid: SigningKey,
     pairing: Option<Pairing>,
-    /// The tailnet URL and the server's shutdown, while on.
-    running: Option<(String, oneshot::Sender<()>)>,
+    running: Option<Running>,
     /// Phones watching each PTY. While any are, the PTY has the phone's size.
     holds: HashMap<u32, usize>,
     /// Open sockets per device.
     online: HashMap<String, usize>,
+    /// Questions passed to the frontend (`phone-ask`), by id: the socket that asked and its own
+    /// number for the question, which the answer goes back with.
+    asks: HashMap<u64, (mpsc::UnboundedSender<Message>, u64)>,
+    next_ask: u64,
 }
 
 pub struct Phone {
     app: AppHandle,
     ptys: Arc<Ptys>,
     inner: Mutex<Inner>,
-    /// The frontend's latest agents snapshot (JSON), sent to every phone on change.
-    agents: watch::Sender<String>,
+    /// The frontend's latest snapshot of projects and windows (JSON), sent to every phone on change.
+    snapshot: watch::Sender<String>,
+    /// The last lines of each terminal's screen by tab id (JSON), sent to every phone on change.
+    tails: watch::Sender<String>,
     /// Ends sockets: `None` all of them (server stopped), `Some(id)` one device's (forgotten).
     kick: broadcast::Sender<Option<String>>,
 }
@@ -102,11 +142,26 @@ pub struct DeviceView {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Status {
     url: Option<String>,
     /// Should be serving: on at launch, or retrying while Tailscale isn't up yet.
     on: bool,
     devices: Vec<DeviceView>,
+    reach: Reach,
+    port: u16,
+    ts_port: u16,
+    address: String,
+}
+
+/// What Settings › Remote can change.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Config {
+    reach: Reach,
+    port: u16,
+    ts_port: u16,
+    address: String,
 }
 
 #[derive(Serialize)]
@@ -161,8 +216,11 @@ impl Phone {
                 running: None,
                 holds: HashMap::new(),
                 online: HashMap::new(),
+                asks: HashMap::new(),
+                next_ask: 0,
             }),
-            agents: watch::channel(r#"{"projects":[]}"#.to_string()).0,
+            snapshot: watch::channel(r#"{"envs":[],"pinned":[],"projects":[]}"#.to_string()).0,
+            tails: watch::channel("{}".to_string()).0,
             kick: broadcast::channel(16).0,
         });
         let mut inner = phone.inner.lock().unwrap();
@@ -195,8 +253,12 @@ impl Phone {
     fn status(&self) -> Status {
         let inner = self.inner.lock().unwrap();
         Status {
-            url: inner.running.as_ref().map(|(u, _)| u.clone()),
+            url: inner.running.as_ref().map(|r| r.url.clone()),
             on: inner.saved.on,
+            reach: inner.saved.reach,
+            port: inner.saved.port.unwrap_or(PORT),
+            ts_port: inner.saved.ts_port.unwrap_or(TS_PORT),
+            address: inner.saved.address.clone().unwrap_or_default(),
             devices: inner
                 .saved
                 .devices
@@ -264,10 +326,12 @@ impl Phone {
 
     fn stop(&self) {
         let running = self.inner.lock().unwrap().running.take();
-        if let Some((_, shutdown)) = running {
-            let _ = shutdown.send(());
+        if let Some(r) = running {
+            let _ = r.shutdown.send(());
             let _ = self.kick.send(None);
-            if let Err(e) = tailscale_off() {
+            if let Some(ts_port) = r.ts_port
+                && let Err(e) = tailscale_off(ts_port)
+            {
                 eprintln!("tailscale serve off: {e}");
             }
         }
@@ -355,10 +419,10 @@ fn tailnet_name() -> Result<String, String> {
     Ok(name.to_string())
 }
 
-fn tailscale_on() -> Result<String, String> {
+fn tailscale_on(port: u16, ts_port: u16) -> Result<String, String> {
     let name = tailnet_name()?;
-    let https = format!("--https={TS_PORT}");
-    let target = format!("http://127.0.0.1:{PORT}");
+    let https = format!("--https={ts_port}");
+    let target = format!("http://127.0.0.1:{port}");
     run_tailscale(&["serve", "--bg", &https, &target], Duration::from_secs(20)).map_err(|e| {
         if e.contains("login.tailscale.com") || e.to_lowercase().contains("not enabled") {
             format!("Turn on Serve and HTTPS certificates for your tailnet, then try again: {e}")
@@ -366,11 +430,21 @@ fn tailscale_on() -> Result<String, String> {
             e
         }
     })?;
-    Ok(format!("https://{name}:{TS_PORT}"))
+    Ok(format!("https://{name}:{ts_port}"))
 }
 
-fn tailscale_off() -> Result<(), String> {
-    run_tailscale(&["serve", &format!("--https={TS_PORT}"), "off"], Duration::from_secs(10)).map(|_| ())
+fn tailscale_off(ts_port: u16) -> Result<(), String> {
+    run_tailscale(&["serve", &format!("--https={ts_port}"), "off"], Duration::from_secs(10)).map(|_| ())
+}
+
+/// This computer's address on the local network: the one the OS would send from to reach the
+/// internet. A UDP connect only picks the route; nothing is sent.
+fn lan_ip() -> Result<std::net::IpAddr, String> {
+    let none = || "This computer isn't on a network: connect to Wi-Fi or Ethernet, or use Tailscale".to_string();
+    let socket = std::net::UdpSocket::bind(("0.0.0.0", 0)).map_err(|_| none())?;
+    socket.connect(("8.8.8.8", 80)).map_err(|_| none())?;
+    let ip = socket.local_addr().map_err(|_| none())?.ip();
+    if ip.is_unspecified() { Err(none()) } else { Ok(ip) }
 }
 
 // ---------- the web server ----------
@@ -388,6 +462,7 @@ fn router(phone: Shared) -> Router {
         .route("/app.css", get(|| async { asset("text/css", include_bytes!("../phone/app.css")) }))
         .route("/sw.js", get(|| async { asset("text/javascript", include_bytes!("../phone/sw.js")) }))
         .route("/icon.png", get(|| async { asset("image/png", include_bytes!("../icons/icon.png")) }))
+        .route("/icon.svg", get(|| async { asset("image/svg+xml", include_bytes!("../../assets/icon.svg")) }))
         .route("/icon-192.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-192.png")) }))
         .route("/icon-maskable.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-maskable.png")) }))
         .route("/apple-touch-icon.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-apple-touch.png")) }))
@@ -514,10 +589,18 @@ enum FromPhone {
     Size { cols: u16, rows: u16 },
     Unwatch,
     Input { pty: u32, data: String },
+    /// A question for the frontend (phoneask.ts): open a window, a project's git changes, a diff,
+    /// a folder or a file. The answer comes back as `{"t":"reply","req":<req>,"data":...}`.
+    Ask { req: u64, q: serde_json::Value },
 }
 
 fn text(v: serde_json::Value) -> Message {
     Message::Text(v.to_string().into())
+}
+
+/// `{"t":<t>,"data":<json>}` around JSON the frontend already made (checked when it came in).
+fn raw(t: &str, json: &str) -> Message {
+    Message::Text(format!(r#"{{"t":"{t}","data":{json}}}"#).into())
 }
 
 /// Output of `pty`: its id (big-endian u32), then the bytes, so output that was in flight when
@@ -535,14 +618,20 @@ async fn serve_socket(phone: Shared, mut ws: WebSocket, device: Option<String>) 
         return;
     };
     let mut kick = phone.kick.subscribe();
-    let mut agents = phone.agents.subscribe();
+    let mut snapshot = phone.snapshot.subscribe();
+    let mut tails = phone.tails.subscribe();
     phone.online(&device, 1);
     let vapid = push::vapid_public(&phone.inner.lock().unwrap().vapid);
     let hello = serde_json::json!({ "t": "hello", "vapid": vapid });
-    let first = agents.borrow_and_update().clone();
+    let first = snapshot.borrow_and_update().clone();
+    let first_tails = tails.borrow_and_update().clone();
     let mut watching: Option<(u32, tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>)> = None;
+    let (replies_tx, mut replies) = mpsc::unbounded_channel::<Message>();
 
-    if ws.send(text(hello)).await.is_ok() && ws.send(Message::Text(format!(r#"{{"t":"agents","data":{first}}}"#).into())).await.is_ok() {
+    if ws.send(text(hello)).await.is_ok()
+        && ws.send(raw("snap", &first)).await.is_ok()
+        && ws.send(raw("tails", &first_tails)).await.is_ok()
+    {
         loop {
             tokio::select! {
                 msg = ws.recv() => {
@@ -581,7 +670,18 @@ async fn serve_socket(phone: Shared, mut ws: WebSocket, device: Option<String>) 
                         FromPhone::Input { pty, data } => {
                             let _ = phone.ptys.write(pty, data.as_bytes());
                         }
+                        FromPhone::Ask { req, q } => {
+                            let mut inner = phone.inner.lock().unwrap();
+                            inner.next_ask += 1;
+                            let id = inner.next_ask;
+                            inner.asks.insert(id, (replies_tx.clone(), req));
+                            drop(inner);
+                            let _ = phone.app.emit("phone-ask", serde_json::json!({ "id": id, "q": q }));
+                        }
                     }
+                }
+                Some(reply) = replies.recv() => {
+                    if ws.send(reply).await.is_err() { break }
                 }
                 chunk = async {
                     match watching.as_mut() {
@@ -599,10 +699,15 @@ async fn serve_socket(phone: Shared, mut ws: WebSocket, device: Option<String>) 
                         }
                     }
                 }
-                changed = agents.changed() => {
+                changed = snapshot.changed() => {
                     if changed.is_err() { break }
-                    let snapshot = agents.borrow_and_update().clone();
-                    if ws.send(Message::Text(format!(r#"{{"t":"agents","data":{snapshot}}}"#).into())).await.is_err() { break }
+                    let data = snapshot.borrow_and_update().clone();
+                    if ws.send(raw("snap", &data)).await.is_err() { break }
+                }
+                changed = tails.changed() => {
+                    if changed.is_err() { break }
+                    let data = tails.borrow_and_update().clone();
+                    if ws.send(raw("tails", &data)).await.is_err() { break }
                 }
                 who = kick.recv() => {
                     match who {
@@ -624,29 +729,45 @@ async fn serve_socket(phone: Shared, mut ws: WebSocket, device: Option<String>) 
     if let Some((pty, _)) = watching {
         phone.release(pty);
     }
+    // Questions still out for this socket have nowhere to go.
+    phone.inner.lock().unwrap().asks.retain(|_, (tx, _)| !tx.same_channel(&replies_tx));
     phone.online(&device, -1);
 }
 
 // ---------- commands ----------
 
-#[tauri::command]
-pub async fn phone_start(phone: tauri::State<'_, Arc<Phone>>) -> Result<Status, String> {
-    let phone = Arc::clone(phone.inner());
+/// Start serving the way Settings › Remote says: listen, then make the address a phone uses.
+async fn start(phone: Shared) -> Result<Status, String> {
     if phone.inner.lock().unwrap().running.is_some() {
         return Ok(phone.status());
     }
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", PORT))
-        .await
-        .map_err(|e| format!("couldn't listen on port {PORT}: {e}"))?;
+    let (reach, port, ts_port, address) = {
+        let inner = phone.inner.lock().unwrap();
+        let s = &inner.saved;
+        (s.reach, s.port.unwrap_or(PORT), s.ts_port.unwrap_or(TS_PORT), s.address.clone().unwrap_or_default())
+    };
+    let host = if reach == Reach::Lan { std::net::Ipv4Addr::UNSPECIFIED } else { std::net::Ipv4Addr::LOCALHOST };
+    let listener = tokio::net::TcpListener::bind((host, port)).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AddrInUse {
+            format!("Port {port} is in use by another program: pick another port below")
+        } else {
+            format!("couldn't listen on port {port}: {e}")
+        }
+    })?;
     let (tx, rx) = oneshot::channel::<()>();
     let app = router(Arc::clone(&phone));
     tauri::async_runtime::spawn(async move {
         let _ = axum::serve(listener, app).with_graceful_shutdown(async { let _ = rx.await; }).await;
     });
-    match tauri::async_runtime::spawn_blocking(tailscale_on).await.map_err(|e| e.to_string())? {
+    let url = match reach {
+        Reach::Tailscale => tauri::async_runtime::spawn_blocking(move || tailscale_on(port, ts_port)).await.map_err(|e| e.to_string()).and_then(|r| r),
+        Reach::Lan => lan_ip().map(|ip| format!("http://{ip}:{port}")),
+        Reach::Local => Ok(if address.is_empty() { format!("http://127.0.0.1:{port}") } else { address }),
+    };
+    match url {
         Ok(url) => {
             let mut inner = phone.inner.lock().unwrap();
-            inner.running = Some((url, tx));
+            inner.running = Some(Running { url, shutdown: tx, ts_port: (reach == Reach::Tailscale).then_some(ts_port) });
             inner.saved.on = true;
             phone.save(&inner);
             drop(inner);
@@ -658,6 +779,46 @@ pub async fn phone_start(phone: tauri::State<'_, Arc<Phone>>) -> Result<Status, 
             Err(e)
         }
     }
+}
+
+#[tauri::command]
+pub async fn phone_start(phone: tauri::State<'_, Arc<Phone>>) -> Result<Status, String> {
+    start(Arc::clone(phone.inner())).await
+}
+
+/// Settings › Remote changed how phones reach it or its ports: save, and serve again that way if
+/// it was serving.
+#[tauri::command]
+pub async fn phone_config(phone: tauri::State<'_, Arc<Phone>>, config: Config) -> Result<Status, String> {
+    if config.port < 1024 {
+        return Err("Pick a port from 1024 to 65535".to_string());
+    }
+    if config.ts_port == 0 {
+        return Err("Pick a tailnet port from 1 to 65535".to_string());
+    }
+    let address = config.address.trim().trim_end_matches('/').to_string();
+    if !address.is_empty() && !(address.starts_with("http://") || address.starts_with("https://")) {
+        return Err("The address starts with https:// (or http://)".to_string());
+    }
+    let phone = Arc::clone(phone.inner());
+    let serving = {
+        let mut inner = phone.inner.lock().unwrap();
+        let s = &mut inner.saved;
+        s.reach = config.reach;
+        s.port = (config.port != PORT).then_some(config.port);
+        s.ts_port = (config.ts_port != TS_PORT).then_some(config.ts_port);
+        s.address = (!address.is_empty()).then_some(address);
+        inner.pairing = None;
+        phone.save(&inner);
+        inner.running.is_some()
+    };
+    phone.changed();
+    if !serving {
+        return Ok(phone.status());
+    }
+    let stopping = Arc::clone(&phone);
+    tauri::async_runtime::spawn_blocking(move || stopping.stop()).await.map_err(|e| e.to_string())?;
+    start(phone).await
 }
 
 #[tauri::command]
@@ -684,7 +845,7 @@ pub fn phone_status(phone: tauri::State<'_, Arc<Phone>>) -> Status {
 #[tauri::command]
 pub fn phone_pair(phone: tauri::State<'_, Arc<Phone>>) -> Result<PairInfo, String> {
     let mut inner = phone.inner.lock().unwrap();
-    let base = inner.running.as_ref().map(|(u, _)| u.clone()).ok_or("Remote control is off")?;
+    let base = inner.running.as_ref().map(|r| r.url.clone()).ok_or("Remote control is off")?;
     let code = pair_code();
     let url = format!("{base}/?pair={code}");
     let qr = qrcode::QrCode::new(url.as_bytes())
@@ -707,11 +868,30 @@ pub fn phone_forget(phone: tauri::State<'_, Arc<Phone>>, id: String) {
     phone.changed();
 }
 
-/// The frontend's agent snapshot, already JSON; phones get it as is.
+/// The frontend's snapshot of projects and windows, already JSON; phones get it as is.
 #[tauri::command]
-pub fn phone_agents(phone: tauri::State<'_, Arc<Phone>>, json: String) {
+pub fn phone_snapshot(phone: tauri::State<'_, Arc<Phone>>, json: String) {
     if serde_json::from_str::<serde_json::Value>(&json).is_ok() {
-        phone.agents.send_replace(json);
+        phone.snapshot.send_replace(json);
+    }
+}
+
+/// The frontend's answer to a phone's question (`phone-ask`), already JSON.
+#[tauri::command]
+pub fn phone_reply(phone: tauri::State<'_, Arc<Phone>>, id: u64, json: String) {
+    if serde_json::from_str::<serde_json::Value>(&json).is_err() {
+        return;
+    }
+    if let Some((tx, req)) = phone.inner.lock().unwrap().asks.remove(&id) {
+        let _ = tx.send(Message::Text(format!(r#"{{"t":"reply","req":{req},"data":{json}}}"#).into()));
+    }
+}
+
+/// The last lines of each terminal's screen, already JSON; phones draw them in the window tiles.
+#[tauri::command]
+pub fn phone_tails(phone: tauri::State<'_, Arc<Phone>>, json: String) {
+    if serde_json::from_str::<serde_json::Value>(&json).is_ok() {
+        phone.tails.send_replace(json);
     }
 }
 
