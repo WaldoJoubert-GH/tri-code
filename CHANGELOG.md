@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.57 — 2026-11-23
+
+- tri-code's hotkeys and the Browser keys (Ctrl+L, Ctrl+T, Ctrl+W and the rest) work while a browser page has focus, on Windows and macOS. Every other key still goes to the page.
+- Favourites show the site's own icon in the favourites bar and on the start page, falling back to the site's `/favicon.ico` and then a letter. The + new tab button sits right after the last page tab.
+- Hyperlinks that terminal programs such as `gh` and Claude Code print as OSC 8 links open like plain-text links.
+
 ## 0.1.56 — 2026-11-20
 
 - A project can link other folders to show beside its own. Each Linked Folder gets its own root in the Editor Window's tree and its files appear under its name in Go to File. A link can be read-only, left out of Go to File, renamed, reordered or unlinked, and unlinking never deletes the folder. Add one from the tree header, the Command Palette or the Welcome window; on an ssh project a link can point at a folder on this machine. Settings › Files turns the feature off. ([#82](https://github.com/WaldoJoubert-GH/tri-code/pull/82))
