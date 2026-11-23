@@ -2,6 +2,12 @@
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
 
+## 0.1.58 — 2026-11-23
+
+- A News Window reads RSS, Atom and JSON feeds, one per project. Feeds are grouped by topic, with headlines on the left and the picked item's text and pictures on the right. Items and read marks are kept, so it reads offline, and articles open in the project's browser window. Topics are edited in Settings › News. ([#84](https://github.com/WaldoJoubert-GH/tri-code/pull/84))
+- The Remote Control phone page mirrors the desktop: the home screen is the sidebar (what needs you, pinned projects, each Environment's projects and Worktrees), and a project opens on its workspaces with each window as a tile. Terminals open live, and Git and Editor windows open read-only, over ssh too. It follows the desktop's theme, and on a tablet the sidebar stays beside the canvas. ([#85](https://github.com/WaldoJoubert-GH/tri-code/pull/85))
+- In a browser window, Select element's card stays above the highlight boxes.
+
 ## 0.1.57 — 2026-11-23
 
 - tri-code's hotkeys and the Browser keys (Ctrl+L, Ctrl+T, Ctrl+W and the rest) work while a browser page has focus, on Windows and macOS. Every other key still goes to the page.
