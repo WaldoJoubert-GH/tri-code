@@ -14,6 +14,7 @@ import { Caps, KeyList } from "./Keys";
 import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./RemoteSettings";
 import { BrowserPage } from "./profiles";
+import { NewsPage } from "./NewsSettings";
 import { AgentsPage } from "./AgentSettings";
 import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
@@ -28,7 +29,7 @@ import { FileIcon } from "./FileList";
 import "./files.css";
 import { linksOn } from "./links";
 
-export type SettingsPage = "appearance" | "windows" | "agents" | "environments" | "files" | "languages" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview";
+export type SettingsPage = "appearance" | "windows" | "agents" | "environments" | "files" | "languages" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview" | "news";
 
 /** Pages that belong to a preview feature: listed only while it is on. */
 const shown = (p: SettingsPage) => p !== "sandbox" || sandboxPreview();
@@ -44,6 +45,7 @@ const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "sandbox", name: "Sandbox", icon: "shield" },
   { page: "signals", name: "Signals", icon: "bell" },
   { page: "browser", name: "Browser", icon: "globe" },
+  { page: "news", name: "News", icon: "rss" },
   { page: "remote", name: "Remote", icon: "smartphone" },
   { page: "cli", name: "Command line", icon: "square-terminal" },
   { page: "hotkeys", name: "Hotkeys", icon: "keyboard" },
@@ -618,6 +620,7 @@ export function SettingsDialog() {
               <Show when={p() === "sandbox" && shown("sandbox")}><SandboxPage /></Show>
               <Show when={p() === "signals"}><SignalsPage /></Show>
               <Show when={p() === "browser"}><BrowserPage /></Show>
+              <Show when={p() === "news"}><NewsPage /></Show>
               <Show when={p() === "remote"}><RemotePage /></Show>
               <Show when={p() === "cli"}><CliPage /></Show>
               <Show when={p() === "hotkeys"}><HotkeysPage /></Show>

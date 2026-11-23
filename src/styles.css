@@ -1162,6 +1162,22 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .settings-dlg .set-seg button { padding: 3px 10px; font-size: 12px; color: var(--muted); }
 .settings-dlg .set-seg button + button { border-left: 1px solid var(--line); }
 .settings-dlg .set-seg button[aria-checked="true"] { background: var(--raised); color: var(--text); }
+/* Settings › News (NewsSettings.tsx) */
+.settings-dlg .nw-topics { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.settings-dlg .nw-topics li { display: flex; align-items: center; gap: 4px; }
+.settings-dlg :is(.nw-topics, .nw-topic-add) input {
+  flex: 1; min-width: 0; max-width: 260px; font: 12px var(--ui); color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; outline: none; user-select: text;
+}
+.settings-dlg :is(.nw-topics, .nw-topic-add) input:focus { border-color: var(--accent); }
+.settings-dlg .nw-topic-n { width: 64px; margin-left: 4px; color: var(--muted); font-size: 11.5px; }
+.settings-dlg .nw-topics button, .settings-dlg .nw-topic-add .reset { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); }
+.settings-dlg .nw-topics button:hover:not(:disabled), .settings-dlg .nw-topic-add .reset:hover { background: var(--hover); color: var(--text); }
+.settings-dlg .nw-topics button:disabled { opacity: .3; }
+.settings-dlg .nw-topic-add { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.settings-dlg .nw-topic-add button[type="submit"] { padding: 3px 10px; border: 1px solid var(--line); border-radius: 5px; font-size: 12px; color: var(--text); }
+.settings-dlg .nw-topic-add button[type="submit"]:hover:not(:disabled) { background: var(--hover); }
+.settings-dlg .nw-topic-add button[type="submit"]:disabled { opacity: .45; }
 /* Settings › Languages (LangSettings.tsx) */
 .settings-dlg .lang-list { display: flex; flex-direction: column; }
 .settings-dlg .lang-row { padding: 3px 0; }

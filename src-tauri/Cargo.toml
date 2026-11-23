@@ -53,6 +53,8 @@ fontdb = "0.24.0"
 sysinfo = { version = "0.40.1", default-features = false, features = ["system", "disk", "network", "user"] }
 # Browser screenshots (browser_shot.rs): cropping a page's snapshot. Already in the tree through Tauri.
 png = "0.17"
+# The News Window (news.rs): RSS 0.9-2.0, Atom and JSON Feed, with Media RSS images, into one shape.
+feed-rs = "3"
 
 # Dev builds: keep link time and memory low (4 GB build machines).
 [profile.dev]

@@ -17,6 +17,7 @@ mod dirs;
 mod docker;
 mod monitor;
 mod newfolder;
+mod news;
 mod envs;
 mod envssh;
 mod folders;
@@ -339,6 +340,10 @@ pub fn run() {
             monitor::monitor_start,
             monitor::monitor_stop,
             monitor::monitor_end,
+            news::news_fetch,
+            news::news_page,
+            news::news_load,
+            news::news_save,
             forward::forward_port,
             forward::forward_dir,
             forward::forward_close,

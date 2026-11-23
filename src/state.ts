@@ -3,8 +3,9 @@ import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 import type { DiffMode } from "./diff";
 import type { Clear, Fx } from "./backdrop";
+import type { NewsFeed } from "./newsdata";
 
-export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker" | "monitor";
+export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker" | "monitor" | "news";
 
 /** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
@@ -157,7 +158,7 @@ export const isTerminal = (t: Tab) => t.kind === "term";
 
 export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
 
-const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database", docker: "container", monitor: "activity" };
+const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database", docker: "container", monitor: "activity", news: "rss" };
 
 /** A window's lucide icon: its agent's for a terminal or web app, else its kind's. */
 export const tabIcon = (t: Tab) =>
@@ -345,6 +346,11 @@ export type Persisted = {
   agentSetup?: Partial<Record<"claude" | "pi", "installed" | "never">>;
   /** The first two commands were given FIRST_AGENT_KEYS (once, so a key removed later stays removed). */
   agentKeys?: true;
+  /** The News Window's feeds, app-wide, in its list order; unset is none. Their items and read
+   *  marks are in news.json, not here. */
+  feeds?: NewsFeed[];
+  /** The News Window's topics, in order (Settings › News); unset is TOPICS (newsdata.ts). */
+  newsTopics?: string[];
 };
 
 export type Settings = {
@@ -1443,6 +1449,8 @@ export function migrate(raw: any): Persisted {
     welcomed: raw.welcomed ?? true,
     // `fileOpen` chose how a file window opened the next file; the editor's preview tab replaced it.
     settings: (({ fileOpen: _, ...rest }) => ({ ...defaultSettings(), ...rest }))(raw.settings ?? {}),
+    ...(Array.isArray(raw.feeds) ? { feeds: raw.feeds } : {}),
+    ...(Array.isArray(raw.newsTopics) ? { newsTopics: raw.newsTopics.filter((t: unknown) => typeof t === "string" && t.trim()) } : {}),
   };
 }
 
