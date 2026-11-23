@@ -204,7 +204,8 @@ export type ProjectIcon =
 export type RecentFolder = { host: string; path: string };
 
 /** A favourite page of a project's browser windows. Keyed by `url`. */
-export type Fav = { url: string; name: string };
+/** `icon`: the site's icon as last seen on the page, so the bar and tiles show it before the page is opened. */
+export type Fav = { url: string; name: string; icon?: string };
 
 export type Project = {
   id: string;
@@ -1132,6 +1133,16 @@ export function renameFav(projectId: string, url: string, name: string) {
   edit(projectId, (p) => {
     const f = p.favs.find((f) => f.url === url);
     if (f) f.name = name;
+  });
+}
+
+/** Remember the icon a favourited page reported; a page that is no favourite changes nothing. */
+export function setFavIcon(projectId: string, url: string, icon: string) {
+  const f = projectById(projectId)?.favs.find((f) => f.url === url);
+  if (!f || f.icon === icon) return;
+  edit(projectId, (p) => {
+    const f = p.favs.find((f) => f.url === url);
+    if (f) f.icon = icon;
   });
 }
 

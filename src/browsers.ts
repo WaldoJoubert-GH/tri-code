@@ -11,7 +11,7 @@ import { batch, createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import {
   type Agent, DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, isRemote, isWebApp, live, Page, pageProfile, Profile, Project,
-  profileById, projectById, setPageUrl, space, Tab, tabIcon, tabName, visibleTabs,
+  profileById, projectById, setFavIcon, setPageUrl, space, Tab, tabIcon, tabName, visibleTabs,
 } from "./state";
 import { looksLikeUrl } from "./agents";
 import { agentTarget, agentWindows, rememberAgent } from "./agenttarget";
@@ -250,7 +250,13 @@ listen<{ label: string; title: string }>("browser-title", (e) => {
 
 listen<{ label: string; icon: string }>("browser-icon", (e) => {
   const { label: lbl, icon } = e.payload;
-  if (current(lbl)) patchInfo(pageIdOf(lbl), { icon });
+  if (!current(lbl)) return;
+  const id = pageIdOf(lbl);
+  patchInfo(id, { icon });
+  // A favourite keeps the icon its page declares, for the favourites bar and the start page's tiles.
+  const o = ownerOf(id);
+  const url = browserInfo[id]?.url;
+  if (o && url) setFavIcon(o.project.id, url, icon);
 }).catch((e) => console.warn("listen browser-icon failed:", e));
 
 listen<{ label: string; text: string }>("browser-console", (e) => {

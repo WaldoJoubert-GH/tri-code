@@ -6,6 +6,7 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "./state";
 import { browserInfo } from "./browsers";
 import { flash } from "./ui";
+import { guessIcon } from "./favicons";
 import { Key, KeyText } from "./Keys";
 
 const ICON_COLOURS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#2ac3de", "#ff9e64", "#e0af68", "#73daca"];
@@ -18,14 +19,32 @@ export const hostOf = (url: string) => {
   }
 };
 
-/** A stand-in favicon: the name's first letter on a colour picked from the host, so one site keeps one colour. */
+/** A favourite's icon: the one its page declared, else its site's /favicon.ico, else the name's first
+ *  letter on a colour picked from the host, so one site keeps one colour. */
 export function FavIcon(props: { fav: Fav }) {
   const colour = () => {
     const h = hostOf(props.fav.url);
     return ICON_COLOURS[[...h].reduce((a, c) => a + c.charCodeAt(0), 0) % ICON_COLOURS.length];
   };
   const letter = () => (props.fav.name.trim()[0] || hostOf(props.fav.url)[0] || "?").toUpperCase();
-  return <i class="ico" style={{ "--c": colour() }} aria-hidden="true">{letter()}</i>;
+  /** Icons that failed to load; the next candidate is tried. */
+  const [broken, setBroken] = createSignal<string[]>([]);
+  const src = () => [props.fav.icon, guessIcon(props.fav.url)].find((s) => s && !broken().includes(s));
+  return (
+    <Show when={src()} keyed fallback={<i class="ico" style={{ "--c": colour() }} aria-hidden="true">{letter()}</i>}>
+      {(s) => (
+        <img
+          class="ico img"
+          src={s}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          referrerPolicy="no-referrer"
+          onError={() => setBroken((b) => [...b, s])}
+        />
+      )}
+    </Show>
+  );
 }
 
 type Edit = { projectId: string; url: string; anchor: HTMLElement; added: boolean };
@@ -52,7 +71,8 @@ export function starPage(projectId: string, pageId: string, url: string, anchor:
   if (added) {
     const title = browserInfo[pageId]?.title ?? "";
     const name = (title && title !== "New tab" ? title : hostOf(url)).slice(0, 40);
-    addFav(projectId, { url, name });
+    const icon = browserInfo[pageId]?.icon;
+    addFav(projectId, { url, name, ...(icon ? { icon } : {}) });
   }
   openFavEdit(projectId, url, anchor, added);
 }

@@ -570,7 +570,7 @@ export default function Canvas(props: { project: Project }) {
             </div>
           </Show>
           <Show when={isBrowser}>
-            <button title="New tab" onClick={newPage}>+</button>
+            <button class="newtab" title="New tab" onClick={newPage}>+</button>
           </Show>
           <Show when={appBar()}>
             <button title={showAddr() ? "Hide the address bar" : "Show the address bar"} onClick={() => setShowAddr(!showAddr())}>
