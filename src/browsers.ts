@@ -705,6 +705,20 @@ export function browserReload(pageId: string): void {
   if (created.has(pageId)) send(pageId, "browser_reload");
 }
 
+/** Give a page's webview the keyboard. */
+export function focusPage(pageId: string): void {
+  if (nativeBrowsers && created.has(pageId)) send(pageId, "browser_focus");
+}
+
+/** Give the app's own webview the keyboard back from a page. */
+export function focusApp(): void {
+  if (nativeBrowsers) invoke("browser_focus_app").catch((e) => console.warn("browser_focus_app failed:", e));
+}
+
+/** Each browser window's Browser keys (keymap BROWSER_ACTIONS), by window id; Canvas.tsx fills it.
+ *  `inPage`: pressed in the page, so the page's webview has the keyboard. */
+export const browserKeys = new Map<string, (action: string, inPage: boolean) => void>();
+
 /** Close one page's webview. */
 export function closePage(pageId: string): void {
   if (created.has(pageId)) send(pageId, "browser_close");

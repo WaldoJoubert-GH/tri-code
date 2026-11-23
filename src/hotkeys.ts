@@ -4,7 +4,7 @@
 // the terminal.
 
 import { listen } from "@tauri-apps/api/event";
-import { Project, Tab, activeProject, addTab, canvasTabs, focusedTab, setRatio, space } from "./state";
+import { Project, Tab, activePage, activeProject, addTab, app, canvasTabs, focusedTab, setRatio, space } from "./state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
 import { closeSettings, settingsOpen, toggleHotkeys } from "./Settings";
@@ -40,7 +40,10 @@ import { closeLeftovers, leftoversOpen } from "./leftovers";
 import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./media";
 import { flash } from "./ui";
 import { hasSelection } from "./terms";
-import { actionFor, editorKey } from "./keymap";
+import { ACTIONS, BROWSER_ACTIONS, actionFor, editorKey, isKey, keysOf } from "./keymap";
+import { browserKeys, focusApp, nativeBrowsers, pageOfLabel } from "./browsers";
+import { createEffect, createRoot } from "solid-js";
+import { invoke } from "@tauri-apps/api/core";
 import { hintChord, hintDown, hintsShown, hintUp, isHintModifier } from "./hints";
 import { modDown } from "./modkey";
 
@@ -61,6 +64,12 @@ function fieldEnter(e: KeyboardEvent): boolean {
   const el = document.activeElement as HTMLElement | null;
   if (!el || el.closest(".xterm")) return false;
   return !!el.closest(".pop, [role=dialog]") || el.isContentEditable || el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && !["button", "checkbox", "radio"].includes(el.type));
+}
+
+/** The keyboard is in window `f` (its bar or address), or nowhere in particular: not a dialog or popover. */
+function inWindow(f: Tab): boolean {
+  const el = document.activeElement;
+  return !el || el === document.body || !!el.closest(`[data-tab="${f.id}"]`);
 }
 
 /** Run one Keymap action for the active project. Returns false to let the key through. */
@@ -243,6 +252,15 @@ function onKey(e: KeyboardEvent) {
   const p = activeProject();
   const f = p && focusedTab(p);
   if (textChord(e, f) || fieldEnter(e)) return;
+  // A focused browser window's own keys come before window hotkeys, as the editor's do: with Cmd
+  // as the modifier, Cmd+L, Cmd+W and Cmd+D are the browser's, as in Safari or Chrome.
+  const act = f?.kind === "browser" && inWindow(f) ? BROWSER_ACTIONS.find((a) => isKey(a, e)) : undefined;
+  if (act && f) {
+    browserKeys.get(f.id)?.(act, false);
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   const id = actionFor(e);
   // The focused editor's own actions (fold recursively and the rest) come before window hotkeys.
   let done = editorKey(e);
@@ -296,6 +314,42 @@ function dedupeAltSpace(e: KeyboardEvent) {
   } else altSpaceAt.real = Date.now();
 }
 
+/** A chord as browser_keys.rs matches it against a key pressed in a page. */
+type PageChord = { code: string; ctrl: boolean; alt: boolean; shift: boolean; meta: boolean };
+
+/** Every chord a browser page hands over (browser_keys.rs): the window hotkeys, the Commands' and
+ *  the Browser keys. Anything else stays the page's. */
+function pageChords(): PageChord[] {
+  const meta = app.settings.modKey === "meta";
+  const held = (c: { code: string; ctrl?: boolean; shift?: boolean }): PageChord => ({ code: c.code, ctrl: !!c.ctrl, shift: !!c.shift, alt: !meta, meta });
+  // A page can't say whether it has a selection, so Cmd+C and Cmd+X stay its copy and cut.
+  const copyKey = (c: PageChord) => c.meta && !c.ctrl && !c.shift && (c.code === "KeyC" || c.code === "KeyX");
+  const out = ACTIONS.filter((a) => !a.text).flatMap((a) => keysOf(a.id).map(held)).filter((c) => !copyKey(c));
+  for (const a of app.agents) if (a.hotkey && !copyKey(held(a.hotkey))) out.push(held(a.hotkey));
+  for (const id of BROWSER_ACTIONS) {
+    for (const c of keysOf(id)) if (!c.then) out.push({ code: c.code, ctrl: !!c.ctrl, shift: !!c.shift, alt: false, meta: !!c.meta });
+  }
+  return out;
+}
+
+type PageKey = PageChord & { label: string; repeat: boolean };
+
+/** A key a browser page handed over: a Browser key runs on its window, anything else as if pressed
+ *  in the app. When that leaves another window focused, the app takes the keyboard back. */
+function onPageKey(k: PageKey) {
+  const page = pageOfLabel(k.label);
+  const init = { code: k.code, ctrlKey: k.ctrl, altKey: k.alt, shiftKey: k.shift, metaKey: k.meta, repeat: k.repeat, bubbles: true, cancelable: true };
+  const e = new KeyboardEvent("keydown", init);
+  const act = page && BROWSER_ACTIONS.find((a) => isKey(a, e));
+  if (act) return browserKeys.get(page.tab.id)?.(act, true);
+  onKey(e);
+  requestAnimationFrame(() => {
+    const p = activeProject();
+    const f = p && focusedTab(p);
+    if (!page || !f || f.id !== page.tab.id || activePage(f)?.id !== page.pageId) focusApp();
+  });
+}
+
 /** Register the window keydown listener once (called from App's onMount). */
 export function installHotkeys() {
   if (installed) return;
@@ -303,6 +357,12 @@ export function installHotkeys() {
   // First, so a duplicate never reaches onKey or a key recorder.
   window.addEventListener("keydown", dedupeAltSpace, { capture: true });
   if ("__TAURI_INTERNALS__" in window) void listen<{ shift: boolean; ctrl: boolean }>("alt-space", (e) => relayAltSpace(e.payload));
+  if ("__TAURI_INTERNALS__" in window && nativeBrowsers) {
+    void listen<PageKey>("browser-key", (e) => onPageKey(e.payload));
+    createRoot(() => createEffect(() => {
+      invoke("browser_keys", { keys: pageChords() }).catch((err) => console.warn("browser_keys failed:", err));
+    }));
+  }
   window.addEventListener("keydown", onKey, { capture: true });
   window.addEventListener("keyup", onKeyUp, { capture: true });
   // Alt+Tab and the rest take the keyup to another window; leaving the app must not leave hints up.

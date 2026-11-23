@@ -5,6 +5,7 @@ mod altspace;
 mod bg;
 mod browser;
 mod browser_debug;
+mod browser_keys;
 mod browser_shot;
 #[cfg(target_os = "linux")]
 mod browser_gtk;
@@ -387,6 +388,9 @@ pub fn run() {
             browser::browser_back,
             browser::browser_forward,
             browser::browser_reload,
+            browser::browser_focus,
+            browser::browser_focus_app,
+            browser_keys::browser_keys,
             browser::browser_download,
             browser_debug::browser_devtools,
             browser_debug::browser_cdp,

@@ -95,7 +95,7 @@
 }
 .ptab:hover { background: var(--hover); }
 .ptab.on { background: var(--raised); color: var(--text); }
-.ptab > span:not(.fav) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptab > span:not(.tfav) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ptab button { width: 18px; height: 18px; opacity: 0; }
 .ptab:hover button, .ptab.on button { opacity: 1; }
 
@@ -156,20 +156,20 @@
 .ptab .pdot { width: 7px; height: 7px; border-radius: 50%; background: var(--pc); flex: none; }
 .ptab .perr { width: 5px; height: 5px; border-radius: 50%; background: var(--bad); flex: none; }
 /* A browser page's site icon (TabIcon): the site's image, a load spinner, or the host's letter */
-.fav { width: 16px; height: 16px; flex: none; display: grid; place-items: center; position: relative; }
-.bar > .fav { margin-right: -2px; }
-.fav img { width: 16px; height: 16px; object-fit: contain; border-radius: 2px; }
-.fav .mono {
+.tfav { width: 16px; height: 16px; flex: none; display: grid; place-items: center; position: relative; }
+.bar > .tfav { margin-right: -2px; }
+.tfav img { width: 16px; height: 16px; object-fit: contain; border-radius: 2px; }
+.tfav .mono {
   width: 14px; height: 14px; border-radius: 3px; display: grid; place-items: center; font-style: normal;
   font-size: 9px; font-weight: 700; line-height: 1; color: #fff; background: hsl(var(--mh) 45% 46%);
 }
-.fav .spin {
+.tfav .spin {
   width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--line); border-top-color: var(--accent);
   animation: fav-spin .8s linear infinite;
 }
-.fav .perr { position: absolute; top: -1px; right: -2px; box-shadow: 0 0 0 1.5px var(--panel); }
+.tfav .perr { position: absolute; top: -1px; right: -2px; box-shadow: 0 0 0 1.5px var(--panel); }
 @keyframes fav-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .fav .spin { animation-duration: 2.4s; } }
+@media (prefers-reduced-motion: reduce) { .tfav .spin { animation-duration: 2.4s; } }
 .nav .dlbtn.running { color: var(--accent); }
 .dlbtn .ring { position: absolute; inset: 1px; width: 22px; height: 22px; transform: rotate(-90deg); pointer-events: none; }
 .dlbtn .ring circle { fill: none; stroke-width: 2; }

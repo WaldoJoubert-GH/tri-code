@@ -15,7 +15,7 @@ import { flash } from "./ui";
 import { Key, KeyList } from "./Keys";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph", "OS"]);
-const GROUPS = ["Focus", "Arrange", "Project", "Windows and links", "Signals", "Media", "Commands", "Editor", "Text"];
+const GROUPS = ["Focus", "Arrange", "Project", "Windows and links", "Signals", "Media", "Commands", "Editor", "Browser", "Text"];
 
 /** A row: a Keymap action, or an agent (one hotkey, kept on the agent). */
 type Row = { kind: "action" | "agent"; id: string; desc: string; keys: Chord[]; text?: boolean; seq?: boolean; changed: boolean };

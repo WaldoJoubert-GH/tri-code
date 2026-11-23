@@ -426,6 +426,7 @@ pub async fn browser_open(
     crate::browser_debug::watch_console(&app, &webview, &label)?;
     #[cfg(windows)]
     watch_favicon(&app, &webview, &label)?;
+    crate::browser_keys::watch(&app, &webview, &label)?;
     #[cfg(target_os = "macos")]
     crate::passwords::install(&app, &webview, &label, &profile, passwords)?;
     if hidden == Some(true) {
@@ -580,6 +581,19 @@ pub async fn browser_back(app: AppHandle, label: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn browser_forward(app: AppHandle, label: String) -> Result<(), String> {
     find(&app, &label)?.eval("history.forward()").map_err(|e| e.to_string())
+}
+
+/// Gives a page the keyboard (a page switched to by a key pressed in another).
+#[tauri::command]
+pub async fn browser_focus(app: AppHandle, label: String) -> Result<(), String> {
+    find(&app, &label)?.set_focus().map_err(|e| e.to_string())
+}
+
+/// Gives the app's own webview the keyboard back from a page: a key pressed in a page moved the
+/// focus to another window, or to the address bar.
+#[tauri::command]
+pub async fn browser_focus_app(app: AppHandle) -> Result<(), String> {
+    app.get_webview("main").ok_or("no main webview")?.set_focus().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

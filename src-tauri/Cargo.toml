@@ -85,8 +85,9 @@ windows = { version = "0.62", features = ["Media_Control", "Foundation", "Founda
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSObject", "NSString", "NSData", "NSDictionary", "NSError"] }
 objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "objc2-app-kit", "block2", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKContentWorld", "WKScriptMessage", "WKScriptMessageHandler", "WKFrameInfo", "WKSecurityOrigin", "WKSnapshotConfiguration"] }
-# Browser screenshots: WKWebView's snapshot is an NSImage, turned into a PNG.
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep"] }
+# Browser screenshots: WKWebView's snapshot is an NSImage, turned into a PNG. Hotkeys in browser
+# pages (browser_keys.rs): an NSEvent key monitor and the window's first responder.
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "block2", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSEvent", "NSResponder", "NSView", "NSWindow"] }
 block2 = "0.6"
 security-framework = "3"
 

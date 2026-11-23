@@ -7,13 +7,13 @@ import {
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { flash, showToast } from "./ui";
-import { hintKeys, isKey, withKey } from "./keymap";
+import { hintKeys, withKey } from "./keymap";
 import { Caps, HintCaps } from "./Keys";
 import { hintsShown } from "./hints";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
   addressToUrl, answerPassword, openExternalIn, passwordPrompts, pickElement, placeBrowser, screenshotPage, profilesSupported, setBrowsersSuspended,
-  consoleErrors, debugPortOf, debugSupport, profilesKey,
+  consoleErrors, debugPortOf, debugSupport, profilesKey, browserKeys, focusApp, focusPage,
 } from "./browsers";
 import { DebugButton } from "./debugmenu";
 import { fwdOfPage, heldBy } from "./tunnels";
@@ -359,6 +359,58 @@ export default function Canvas(props: { project: Project }) {
     };
     const open = (u: string) => navigateBrowser(pageId(), u);
 
+    /** The Browser keys (hotkeys.ts runs them), pressed in the window's bar or in its page (`inPage`, which has the keyboard). */
+    const browserKey = (act: string, inPage: boolean) => {
+      const pages = tab.pages ?? [];
+      const step = (d: number) => {
+        if (pages.length < 2) return;
+        const i = pages.findIndex((pg) => pg.id === pageId());
+        const next = pages[(i + d + pages.length) % pages.length].id;
+        showPage(props.project.id, id, next);
+        // The page that was shown hides: the shown one takes the keyboard once it is placed.
+        if (inPage) requestAnimationFrame(() => focusPage(next));
+      };
+      switch (act) {
+        case "address":
+          if (bare()) setShowAddr(true);
+          if (inPage) focusApp();
+          requestAnimationFrame(() => {
+            inputEl.focus();
+            inputEl.select();
+          });
+          break;
+        case "page-new":
+          // A blank page focuses its address itself.
+          if (inPage) focusApp();
+          newPage();
+          break;
+        case "page-close": {
+          const last = pages.length < 2;
+          closeTabPage(pageId());
+          if (!inPage) break;
+          if (last) focusApp();
+          else requestAnimationFrame(() => focusPage(pageId()));
+          break;
+        }
+        case "page-next":
+        case "page-prev":
+          step(act === "page-next" ? 1 : -1);
+          break;
+        case "reload":
+          browserReload(pageId());
+          break;
+        case "favourite":
+          if (blank()) break;
+          if (inPage) focusApp();
+          star();
+          break;
+      }
+    };
+    if (isBrowser) {
+      browserKeys.set(id, browserKey);
+      onCleanup(() => browserKeys.delete(id));
+    }
+
     const onUrlKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         // In a remote project localhost is the remote's; Alt+Enter opens this machine's instead.
@@ -455,13 +507,6 @@ export default function Canvas(props: { project: Project }) {
           "z-index": z(),
         }}
         onPointerDown={() => focusTab(props.project.id, id)}
-        onKeyDown={(e) => {
-          // Ctrl+D while the window's own HTML (address, bar) has focus; the webview keeps its own keys.
-          if (isBrowser && isKey("favourite", e)) {
-            e.preventDefault();
-            star();
-          }
-        }}
       >
         <div
           class="bar"
@@ -794,7 +839,7 @@ function TabIcon(props: { pageId: string; url: string; children?: JSX.Element })
   /** The icon that failed to load; a different one is tried again. */
   const [broken, setBroken] = createSignal("");
   return (
-    <span class="fav">
+    <span class="tfav">
       <Switch
         fallback={
           <Show when={monogram(addr())} fallback={<Icon name="globe" size={13} />}>

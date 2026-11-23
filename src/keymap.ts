@@ -68,8 +68,17 @@ export const ACTIONS: Action[] = [
   { id: "cut", group: "Text", desc: "Cut the selection in a text field or the editor", def: tx("KeyX"), text: true },
   { id: "copy", group: "Text", desc: "Copy the selection (sends it on to the app when nothing is selected)", def: tx("KeyC"), text: true },
   { id: "paste", group: "Text", desc: "Paste into the focused window", def: tx("KeyV"), text: true },
-  { id: "favourite", group: "Text", desc: "Favourite the browser's page", def: tx("KeyD"), text: true },
+  { id: "address", group: "Browser", desc: "Go to the browser's address bar", def: tx("KeyL"), text: true },
+  { id: "page-new", group: "Browser", desc: "New page in the browser window", def: tx("KeyT"), text: true },
+  { id: "page-close", group: "Browser", desc: "Close the browser's page (the window, on its last page)", def: tx("KeyW"), text: true },
+  { id: "page-next", group: "Browser", desc: "Next page in the browser window", def: [k("Tab", { bare: true, ctrl: true })], text: true },
+  { id: "page-prev", group: "Browser", desc: "Previous page in the browser window", def: [k("Tab", { bare: true, ctrl: true, shift: true })], text: true },
+  { id: "reload", group: "Browser", desc: "Reload the browser's page", def: tx("KeyR"), text: true },
+  { id: "favourite", group: "Browser", desc: "Favourite the browser's page", def: tx("KeyD"), text: true },
 ];
+
+/** The text actions a browser window runs, as Canvas.tsx and the page's own keys (hotkeys.ts) take them. */
+export const BROWSER_ACTIONS = ["address", "page-new", "page-close", "page-next", "page-prev", "reload", "favourite"] as const;
 
 const BY_ID = new Map(ACTIONS.map((a) => [a.id, a]));
 export const actionById = (id: string) => BY_ID.get(id);
