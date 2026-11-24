@@ -52,7 +52,7 @@ import { Welcome, openWelcome } from "./Welcome";
 import { applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
 import { applyLook, themeOf } from "./look";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
-import { flash, flashMsg, toast, undoToast } from "./ui";
+import { closeToast, flash, flashMsg, toast, undoToast } from "./ui";
 import { keyOf, withKey } from "./keymap";
 import { Caps, HoldFace, HoldKey } from "./Keys";
 import { hintsShown, holdMenuShown } from "./hints";
@@ -199,6 +199,9 @@ export default function App() {
               <Show when={t().undo}>
                 <button onClick={undoToast}>Undo</button>
               </Show>
+              <For each={t().actions ?? []}>
+                {(a) => <button onClick={() => (closeToast(), a.run())}>{a.label}</button>}
+              </For>
             </div>
           )}
         </Show>

@@ -53,8 +53,16 @@
 
 /* Markdown preview. The scroller fills the window so its scrollbar sits on the edge;
    the text inside keeps a readable measure. */
-.mdscroll { flex: 1; min-height: 0; overflow: auto; }
-.md { padding: 18px 22px 28px; max-width: 860px; line-height: 1.55; user-select: text; overflow-wrap: anywhere; }
+/* The preview in the project's export CSS (MdPaper.tsx): its own document, on white like the PDF. */
+.mdpaper { flex: 1; min-height: 0; width: 100%; border: 0; background: #fff; color-scheme: light; }
+/* The preview fills the pane at any width; its padding grows with the pane (container units). */
+.mdscroll { flex: 1; min-height: 0; overflow: auto; container-type: inline-size; }
+.md {
+  padding: clamp(14px, 2.5cqi, 40px) clamp(22px, 4cqi, 64px) 28px;
+  line-height: 1.55; user-select: text; overflow-wrap: anywhere;
+}
+.md p, .md li, .md blockquote { text-wrap: pretty; }
+.md h1, .md h2, .md h3 { text-wrap: balance; }
 .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { scroll-margin-top: 10px; }
 .md > :first-child { margin-top: 0; }
 .md h1, .md h2, .md h3, .md h4 { line-height: 1.3; margin: 1.3em 0 .5em; }
@@ -76,6 +84,32 @@
 .md th { background: var(--panel); }
 .md img { max-width: 100%; height: auto; }
 .md input[type="checkbox"] { margin-right: 6px; }
+/* Heading anchors: a # in the left padding, on hover. */
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { position: relative; }
+.md .anchor { position: absolute; left: -15px; padding-right: 4px; color: var(--muted); text-decoration: none; font-weight: 400; opacity: 0; }
+.md h1:hover .anchor, .md h2:hover .anchor, .md h3:hover .anchor, .md h4:hover .anchor, .md h5:hover .anchor, .md h6:hover .anchor { opacity: 1; }
+/* Front matter, as a table above the document. */
+.md .frontmatter { display: table; font: 11.5px var(--mono); }
+.md .frontmatter th { color: var(--muted); font-weight: 400; }
+.md .frontmatter td { white-space: pre-wrap; }
+/* GitHub alerts. */
+.md .alert { border-left-color: var(--c); color: var(--text); }
+.md .alert-title { color: var(--c); font-weight: 600; margin-bottom: 2px; }
+.md .alert > :last-child { margin-bottom: 4px; }
+.md .alert-note { --c: var(--accent); } .md .alert-tip { --c: var(--ok); } .md .alert-important { --c: #a371f7; }
+.md .alert-warning { --c: var(--warn); } .md .alert-caution { --c: var(--bad); }
+/* Footnotes: GitHub's hidden "Footnotes" heading stays for screen readers. */
+.md sup a { text-decoration: none; }
+.md .footnotes { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 6px; font-size: 12px; color: var(--muted); }
+.md .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* Mermaid diagrams and math (KaTeX as MathML). */
+.md .mermaid { display: flex; justify-content: center; margin: 0 0 12px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; }
+.md .mermaid svg { max-width: 100%; height: auto; }
+.md .mermaid-error { display: block; color: var(--bad); font-size: 12px; }
+.md .mermaid-error pre { color: var(--text); margin: 6px 0 0; }
+.md .math-block { margin: 0 0 12px; overflow-x: auto; text-align: center; }
+.md math { font-size: 1.1em; }
+.md .math-error { color: var(--bad); font: 12px var(--mono); }
 
 /* Command Palette (Palette.tsx): commands and files in one box, centered under the toolbar */
 .gtf {

@@ -29,6 +29,7 @@ mod grammars;
 mod ignored;
 mod github;
 mod leftovers;
+mod mdpdf;
 mod media;
 mod passwords;
 mod phone;
@@ -229,6 +230,8 @@ pub fn run() {
             leftovers::leftovers_end,
             leftovers::leftovers_remote,
             leftovers::leftovers_checkouts,
+            mdpdf::md_pdf,
+            mdpdf::md_pdf_open,
             media::media_watch,
             media::media_unwatch,
             media::media_control,

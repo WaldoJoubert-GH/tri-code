@@ -6,6 +6,8 @@ import App from "./App";
 import { restoreLook } from "./look";
 
 restoreLook();
+// TEMPORARY self-test, removed before commit.
+if (import.meta.env.VITE_MDPDF_SELFTEST) setTimeout(() => void import("./__selftest").then((m) => m.selftest(import.meta.env.VITE_MDPDF_SELFTEST)), 3000);
 
 // Opening the Vite URL in a normal browser has no Rust backend, so nothing
 // (terminals, saved state, folder listing) can work there.

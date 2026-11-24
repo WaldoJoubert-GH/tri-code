@@ -1,13 +1,15 @@
 // Per-project appearance: name, icon, accent colour, background preset or uploaded image, dim, the
 // Backdrop Effect and Transparency;
-// and on its Signals tab, the project's sounds and alerts for agent signals.
+// on its Signals tab, the project's sounds and alerts for agent signals;
+// on its PDF export tab, the page and CSS Export PDF uses for Markdown files (mdexport.ts).
 // The popover is anchored under the toolbar button, or beside a sidebar gear.
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { CLEAR_MAX, type Clear, type Fx, type FxKind, fxOn, paintBackdrop } from "./backdrop";
 import { createStore, produce } from "solid-js/store";
-import { ACCENTS, GAP_MAX, Project, activeProject, app, projectById, renameProject, repoOf, setAppearance, setGap, setIcon } from "./state";
+import { ACCENTS, GAP_MAX, type MdExport, Project, activeProject, app, projectById, renameProject, repoOf, setAppearance, setGap, setIcon, setMdExport } from "./state";
+import { CSS_HINT, DEFAULT_MARGIN, PAGES } from "./mdexport";
 import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
 import { Icon, toggleIconPicker } from "./lucide";
 import { SignalsForm } from "./SignalSettings";
@@ -123,7 +125,7 @@ function FxBackdrop(props: { project: Project }) {
   return <canvas class="bg fx" ref={el} aria-hidden="true" />;
 }
 
-export type AppearanceSection = "look" | "signals";
+export type AppearanceSection = "look" | "signals" | "export";
 type PopState = { projectId: string; anchor: HTMLElement; section: AppearanceSection };
 const [pop, setPop] = createSignal<PopState | null>(null);
 
@@ -225,13 +227,15 @@ export function AppearancePopover() {
                       else if (e.key === "Escape") (e.currentTarget.value = p.name), e.currentTarget.blur();
                     }}
                   />
-                  <span>{s.section === "look" ? "appearance" : "signals"}</span>
+                  <span>{s.section === "look" ? "appearance" : s.section === "signals" ? "signals" : "PDF export"}</span>
                 </div>
                 <div class="seg wide" role="group" aria-label="Section">
                   <button type="button" aria-pressed={s.section === "look"} onClick={() => setPop({ ...s, section: "look" })}>Appearance</button>
                   <button type="button" aria-pressed={s.section === "signals"} onClick={() => setPop({ ...s, section: "signals" })}>Signals</button>
+                  <button type="button" aria-pressed={s.section === "export"} title="Export PDF of Markdown files" onClick={() => setPop({ ...s, section: "export" })}>PDF export</button>
                 </div>
                 <Show when={s.section === "signals"}><SignalsForm project={p} /></Show>
+                <Show when={s.section === "export"}><ExportSection project={p} /></Show>
                 <Show when={s.section === "look"}>
                   <IconSection project={p} />
                   <h4>Accent</h4>
@@ -309,6 +313,65 @@ export function AppearancePopover() {
     </Show>
   );
 }
+
+/** Export PDF of Markdown files: page, margin and the project's CSS over tri-code's print CSS. */
+function ExportSection(props: { project: Project }) {
+  const cfg = () => props.project.mdExport ?? {};
+  const set = (patch: Partial<MdExport>) => setMdExport(props.project.id, patch);
+  return (
+    <>
+      <h4>Page</h4>
+      <div class="seg wide" role="group" aria-label="Page size">
+        <For each={Object.keys(PAGES) as (keyof typeof PAGES)[]}>
+          {(size) => (
+            <button type="button" aria-pressed={(cfg().page ?? "A4") === size} onClick={() => set({ page: size === "A4" ? undefined : size })}>{size}</button>
+          )}
+        </For>
+      </div>
+      <label class="row">
+        Margin
+        <span class="px">
+          <input
+            type="number" min={0} max={60} value={cfg().margin ?? DEFAULT_MARGIN}
+            onInput={(e) => e.currentTarget.value !== "" && set({ margin: +e.currentTarget.value === DEFAULT_MARGIN ? undefined : Math.max(0, Math.min(60, +e.currentTarget.value)) })}
+            onBlur={(e) => (e.currentTarget.value = String(cfg().margin ?? DEFAULT_MARGIN))}
+          />
+          mm
+        </span>
+      </label>
+      <h4 class="with-action">
+        CSS
+        <Show when={cfg().css}>
+          <button type="button" title="Back to tri-code's print CSS alone" onClick={() => set({ css: undefined })}>reset to default</button>
+        </Show>
+      </h4>
+      <textarea
+        class="mdcss"
+        spellcheck={false}
+        placeholder={CSS_HINT}
+        value={cfg().css ?? ""}
+        aria-label="Export CSS"
+        onInput={(e) => set({ css: e.currentTarget.value })}
+        onKeyDown={(e) => {
+          // A tab indents instead of leaving the box; Escape still closes the panel.
+          if (e.key !== "Tab" || e.shiftKey) return;
+          e.preventDefault();
+          e.currentTarget.setRangeText("  ", e.currentTarget.selectionStart, e.currentTarget.selectionEnd, "end");
+          set({ css: e.currentTarget.value });
+        }}
+      />
+      <label class="chk" title="The editor's Markdown preview shows the page as the PDF will look, and follows this CSS as you type">
+        <input type="checkbox" checked={!!cfg().preview} onChange={(e) => set({ preview: e.currentTarget.checked || undefined })} />
+        Use in the preview
+      </label>
+      <div class="note">
+        Laid over tri-code's print CSS when a Markdown file is exported (Export PDF in the editor). {repoNote(props.project)}
+      </div>
+    </>
+  );
+}
+
+const repoNote = (p: Project) => (app.projects.some((q) => q.parent === p.id) ? "Its worktrees use it too." : "");
 
 const FX_NAMES: Record<FxKind, string> = { dither: "Dither", halftone: "Halftone" };
 /** What a newly picked effect starts at: Zeron's "medium". */

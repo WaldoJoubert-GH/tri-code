@@ -17,7 +17,7 @@ export function flash(msg: string) {
   flashTimer = window.setTimeout(() => setFlashMsg(""), 1800);
 }
 
-export type Toast = { msg: string; undo?: () => void };
+export type Toast = { msg: string; undo?: () => void; actions?: { label: string; run: () => void }[] };
 const [toast, setToastSig] = createSignal<Toast | null>(null);
 let toastTimer: number | undefined;
 export { toast };
@@ -38,6 +38,15 @@ export function showToast(t: Toast, onExpire?: () => void) {
   }, 5000);
 }
 let pendingExpire: (() => void) | undefined;
+
+/** Hide the toast now (an action was taken). */
+export function closeToast() {
+  clearTimeout(toastTimer);
+  const f = pendingExpire;
+  pendingExpire = undefined;
+  setToastSig(null);
+  f?.();
+}
 
 /** Called by the toast's Undo button. */
 export function undoToast() {
