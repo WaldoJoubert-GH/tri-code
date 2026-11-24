@@ -515,6 +515,12 @@ canvas.bg { display: block; width: 100%; height: 100%; }
 .pop .logos button:hover, .pop .glyphs button:hover { background: var(--hover); }
 .pop .logos button[aria-pressed="true"], .pop .glyphs button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
 .pop .note { color: var(--muted); font-size: 12px; font-style: italic; }
+.pop .mdcss {
+  height: 220px; min-height: 90px; resize: vertical; padding: 7px 8px; border: 1px solid var(--line); border-radius: 5px;
+  background: var(--bg); color: var(--text); font: 11.5px/1.5 var(--mono); tab-size: 2; outline: none; white-space: pre;
+}
+.pop .mdcss:focus { border-color: var(--accent); }
+.pop .mdcss::placeholder { color: var(--muted); opacity: .8; }
 .pop > .upload {
   display: flex; height: 30px; border: 1px dashed var(--line); border-radius: 5px; cursor: pointer;
   font-size: 11.5px; color: var(--muted); align-items: center; justify-content: center; background: var(--bg);

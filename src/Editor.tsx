@@ -27,6 +27,8 @@ import { copyText } from "./clipboard";
 import FileTree, { FileIcon, MARK_TITLE } from "./FileList";
 import { fileMarks, ignoredAt, markAt, peekStatus } from "./git";
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
+import { directPdf, exportMarkdownPdf, mdExportOf } from "./mdexport";
+import { MdPaper } from "./MdPaper";
 import { openExternal, openUrlInProject } from "./browsers";
 import { capsOf, withKey } from "./keymap";
 import { HoldKey, KeyList } from "./Keys";
@@ -596,23 +598,25 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     );
   };
 
-  const openLink = (e: MouseEvent) => {
-    const a = (e.target as HTMLElement).closest("a");
-    if (!a) return;
-    e.preventDefault();
-    const href = a.getAttribute("href") ?? "";
+  /** A link in a Markdown preview: a URL opens outside, a repo file in this editor, `#x` scrolls `root`. */
+  const followLink = (href: string, ctrl: boolean, root: ParentNode) => {
     if (!href) return;
     if (hasScheme(href)) return openExternal(href);
     const hash = href.includes("#") ? href.slice(href.indexOf("#") + 1) : "";
     const target = href.startsWith("#") ? path() : resolvePath(path(), rootAt(props.project, path()).path, href);
-    if (target !== path()) return openFile(props.project, target, { from: tabId, beside: e.ctrlKey || e.metaKey });
+    if (target !== path()) return openFile(props.project, target, { from: tabId, beside: ctrl });
     if (!hash) return;
     let id = hash;
     try { id = decodeURIComponent(hash); } catch { /* keep it as written */ }
-    const root = e.currentTarget as HTMLElement;
     const el = root.querySelector(`[id="${CSS.escape(id)}"]`) ?? root.querySelector(`[id="${CSS.escape(id.toLowerCase())}"]`);
     if (el) el.scrollIntoView({ block: "start" });
     else flash(`no heading #${id}`);
+  };
+  const openLink = (e: MouseEvent) => {
+    const a = (e.target as HTMLElement).closest("a");
+    if (!a) return;
+    e.preventDefault();
+    followLink(a.getAttribute("href") ?? "", e.ctrlKey || e.metaKey, e.currentTarget as HTMLElement);
   };
 
   /** Best-effort `file://` URL for the HTML "open in a browser window" button. A remote project's
@@ -627,10 +631,35 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
     return `file://${s.startsWith("/") ? "" : "/"}${s}`;
   };
 
+  /** A repo-relative image of the shown Markdown file, as a data: URL. */
+  const mdImage = (src: string) => loadImage(props.project, resolvePath(path(), rootAt(props.project, path()).path, src));
+
+  /** Only the switch: a CSS edit swaps the paper preview's style in place rather than building it again. */
+  const paperPreview = createMemo(() => !!mdExportOf(props.project).preview);
+
   const markdown = (src: string) => {
+    // With "Use in the preview", the page as Export PDF prints it, in the project's CSS.
+    if (paperPreview()) {
+      return <MdPaper src={src} cfg={mdExportOf(props.project)} load={mdImage} onLink={followLink} />;
+    }
     const el = (<div class="md" innerHTML={renderMarkdown(src)} />) as HTMLElement;
-    enhance(el, (src) => loadImage(props.project, resolvePath(path(), rootAt(props.project, path()).path, src)));
+    const dark = getComputedStyle(document.documentElement).colorScheme === "dark";
+    void enhance(el, mdImage, { dark, anchors: true });
     return <div class="mdscroll" onClick={openLink}>{el}</div>;
+  };
+
+  const [exporting, setExporting] = createSignal(false);
+  /** Export PDF (design/markdown.html, variant A): the buffer as it is, unsaved edits and all. */
+  const exportPdf = async () => {
+    if (exporting()) return;
+    setExporting(true);
+    try {
+      await exportMarkdownPdf(props.project, path(), source(), mdImage);
+    } catch (e) {
+      flash(`couldn't export the PDF: ${e}`);
+    } finally {
+      setExporting(false);
+    }
   };
 
   /** What shows instead of the editor: a note, a preview or media; null when the editor shows. */
@@ -771,6 +800,13 @@ export default function Editor(props: { project: Project; tab: Tab; focused: boo
             </Show>
             <Show when={kind() === "csv" || book()}>
               <button title="Query this file with SQL in a Database Window beside this one" onClick={() => void toDb()}>Open in Database ↗</button>
+            </Show>
+            <Show when={kind() === "md" && text()?.file && !text()!.file!.binary}>
+              <button
+                disabled={exporting()}
+                title={directPdf ? "Export PDF with the project's CSS (Appearance › PDF export)" : "Print to PDF with the project's CSS (Appearance › PDF export)"}
+                onClick={() => void exportPdf()}
+              >{exporting() ? "Exporting…" : "Export PDF"}</button>
             </Show>
             <Show when={kind() === "html" && fileUrl()}>
               <button title="Open in a browser window (relative assets load there)" onClick={() => openUrlInProject(props.project.id, fileUrl(), tabId)}>

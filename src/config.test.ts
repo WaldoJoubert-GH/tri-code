@@ -51,6 +51,16 @@ describe("export", () => {
     const f = buildExport(s, ALL, {}, "0.1.42");
     expect(parseConfig(JSON.stringify(f))).toEqual(f);
   });
+
+  test("a project's PDF export settings travel with it and import onto the same project", () => {
+    const md = { css: "h1 { color: red; }", page: "Letter" as const, margin: 12 };
+    const from = state({ projects: [proj("a", { mdExport: md })] });
+    const f = buildExport(from, ["projects"], {}, "0.1.42");
+    expect(f.sections.projects![0].mdExport).toEqual(md);
+    const into = state({ projects: [proj("a2", { path: "/src/a" })] });
+    applyImport(into, f, ["projects"], ids);
+    expect(into.projects[0].mdExport).toEqual(md);
+  });
 });
 
 describe("parseConfig", () => {

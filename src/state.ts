@@ -268,7 +268,14 @@ export type Project = {
   /** Linked Folders: other folders shown as extra roots of the Editor Window's tree and in Go to
    *  File (links.ts). A Worktree has none of its own; it shows its repo's. */
   links?: LinkedFolder[];
+  /** Export PDF of a Markdown file: the page and the CSS laid over tri-code's print CSS (mdexport.ts).
+   *  A Worktree uses its repo's. */
+  mdExport?: MdExport;
 };
+
+/** A project's PDF export settings; a missing field is the default (A4, 18 mm, no CSS). `preview`
+ *  draws the Editor's Markdown preview with the same CSS, as the PDF will look. */
+export type MdExport = { css?: string; page?: "A4" | "Letter"; margin?: number; preview?: boolean };
 
 /** A folder linked to a project. `path` is on the project's host, or on this machine when `local`
  *  (only offered for a project on an ssh Environment). */
@@ -1026,6 +1033,16 @@ export function setAppearance(projectId: string, patch: Partial<Pick<Project, "a
   edit(projectId, (p) => Object.assign(p, patch));
 }
 
+/** Change a project's PDF export settings; an unset field goes back to its default. */
+export function setMdExport(projectId: string, patch: Partial<MdExport>) {
+  edit(projectId, (p) => {
+    const next: MdExport = { ...p.mdExport, ...patch };
+    for (const k of Object.keys(next) as (keyof MdExport)[]) if (next[k] === undefined || next[k] === "") delete next[k];
+    if (Object.keys(next).length) p.mdExport = next;
+    else delete p.mdExport;
+  });
+}
+
 function newPages(url: string): Pick<Tab, "pages" | "page"> {
   const id = newId();
   return { pages: [{ id, url }], page: id };
@@ -1424,6 +1441,7 @@ export function migrate(raw: any): Persisted {
       ...(p.copyIgnored ? { copyIgnored: p.copyIgnored } : {}),
       ...(p.sample ? { sample: true } : {}),
       ...(p.links?.length ? { links: p.links } : {}),
+      ...(p.mdExport ? { mdExport: p.mdExport } : {}),
     };
   });
   const resumes = new Set<string>();
