@@ -1,3 +1,9 @@
+## 0.1.59 — 2026-11-24
+
+- Dialogs, the Command Palette and the icon picker share one modal built on the native <dialog> element, so focus stays inside them and returns to whatever opened them. In text fields, Enter that confirms IME composition no longer submits or renames early, so CJK input works.
+- The Editor Window exports Markdown files to PDF with an Export PDF button. On Windows it saves straight to the PDF you pick; elsewhere the system print dialog opens, where Save as PDF does the rest. Each project's Appearance sets the PDF's page size, margin and custom CSS, and Use in the preview shows the PDF layout. Markdown also renders footnotes, emoji shortcodes, KaTeX math and Mermaid diagrams. ([#86](https://github.com/WaldoJoubert-GH/tri-code/pull/86))
+- Toasts can carry action buttons.
+
 # Changelog
 
 Each release's section becomes its GitHub Release notes, and tri-code shows this file in the About dialog. Add a `## <version>` section above the newest one before tagging.
