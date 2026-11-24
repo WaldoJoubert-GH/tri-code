@@ -14,6 +14,7 @@ import { isMac } from "./modkey";
 import { Icon, toggleIconPicker } from "./lucide";
 import { openSettings } from "./Settings";
 import { flash } from "./ui";
+import { isEnter } from "./enterkey";
 
 /** A profile's colour as a CSS value; the --p-* tokens are tuned for light and dark. */
 export const profileColor = (p: Profile) => `var(--p-${p.color})`;
@@ -298,7 +299,7 @@ function DebugPort(props: { profile: Profile }) {
           inputmode="numeric"
           aria-label={`${p().name}'s remote debugging port`}
           value={p().debugPort}
-          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          onKeyDown={(e) => isEnter(e) && e.currentTarget.blur()}
           onBlur={(e) => commit(e.currentTarget)}
         />
       </Show>

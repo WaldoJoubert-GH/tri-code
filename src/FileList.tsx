@@ -21,6 +21,7 @@ import { copyText } from "./clipboard";
 import { ask, flash } from "./ui";
 import { type FileMark, fileMarks, ignoredAt, markAt, peekStatus } from "./git";
 import "./files.css";
+import { isEnter } from "./enterkey";
 
 /** `draft` is the New File box, in the folder `path`; `root` is a root row (only drawn with Linked Folders). */
 type Row = { path: string; name: string; dir: boolean; depth: number; draft?: true; root?: Root };
@@ -371,7 +372,7 @@ export default function FileTree(props: {
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => {
                       e.stopPropagation();
-                      if (e.key === "Enter") void rename(r, e.currentTarget.value);
+                      if (isEnter(e)) void rename(r, e.currentTarget.value);
                       else if (e.key === "Escape") (setRenaming(null), rootEl.focus());
                     }}
                     onBlur={(e) => renaming() === r.path && void rename(r, e.currentTarget.value)}
@@ -395,7 +396,7 @@ export default function FileTree(props: {
                   ref={(el) => requestAnimationFrame(() => el.focus())}
                   onKeyDown={(e) => {
                     e.stopPropagation();
-                    if (e.key === "Enter") void create(r.path, e.currentTarget.value);
+                    if (isEnter(e)) void create(r.path, e.currentTarget.value);
                     else if (e.key === "Escape") (setDraft(null), rootEl.focus());
                   }}
                   onBlur={(e) => draft() === r.path && void create(r.path, e.currentTarget.value)}
@@ -428,7 +429,7 @@ export default function FileTree(props: {
                     onDblClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => {
                       e.stopPropagation();
-                      if (e.key === "Enter") void rename(r, e.currentTarget.value);
+                      if (isEnter(e)) void rename(r, e.currentTarget.value);
                       else if (e.key === "Escape") (setRenaming(null), rootEl.focus());
                     }}
                     onBlur={(e) => renaming() === r.path && void rename(r, e.currentTarget.value)}

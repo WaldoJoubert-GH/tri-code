@@ -82,7 +82,7 @@ export function cycleLayout(p: Project) {
 export function stepGap(dir: 1 | -1) {
   // The next step past the current gap, which may be a typed value between steps.
   const gap = dir > 0 ? (GAPS.find((g) => g > app.gap) ?? Math.max(app.gap, GAPS[GAPS.length - 1]))
-    : ([...GAPS].reverse().find((g) => g < app.gap) ?? 0);
+    : (GAPS.findLast((g) => g < app.gap) ?? 0);
   setGap(gap);
   flash(`gap ${app.gap}px`);
 }

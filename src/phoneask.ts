@@ -76,7 +76,7 @@ async function answer(q: Ask): Promise<unknown> {
         return { repos: [one("", await invoke<GitStatus>("git_status", args))] };
       } catch (e) {
         const repos = await invoke<RepoStatus[]>("folder_status", args).catch(() => null);
-        if (!repos?.length) throw new Error(`Not a git repo: ${e}`);
+        if (!repos?.length) throw new Error(`Not a git repo: ${e}`, { cause: e });
         return { repos: repos.map((r) => (r.status ? one(r.repo, r.status) : { repo: r.repo, error: r.error ?? "couldn't read it", files: [] })) };
       }
     }
@@ -97,7 +97,7 @@ async function answer(q: Ask): Promise<unknown> {
     case "list": {
       const at = under(p, q.path || p.path);
       const list = await invoke<FsList>("list_files", at);
-      return { path: list.path, root: p.path, entries: [...list.entries].sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name)) };
+      return { path: list.path, root: p.path, entries: list.entries.toSorted((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name)) };
     }
     case "read": {
       const f = await invoke<FsText>("read_file", under(p, q.path));

@@ -8,8 +8,10 @@ import { type LinkedFolder, type Project, addLink, envName, isRemote, projectByI
 import { linkName, linkProblem } from "./links";
 import { FolderPicker } from "./OpenProject";
 import { Icon } from "./lucide";
+import { Modal } from "./Modal";
 import { Key } from "./Keys";
 import { flash } from "./ui";
+import { isEnter } from "./enterkey";
 
 /** The project the dialog links to, and the link it changes (unset: a new one). */
 const [target, setTarget] = createSignal<{ projectId: string; linkId?: string } | null>(null);
@@ -64,8 +66,8 @@ function Dialog(props: { project: Project; link?: LinkedFolder }) {
   onMount(() => box.querySelector<HTMLElement>(".picker .q")?.focus());
 
   return (
-    <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && closeLinkDialog()}>
-      <div class="wt-dlg link-dlg" role="dialog" aria-label="Link folder" ref={box}>
+    <Modal label="Link folder" onClose={closeLinkDialog}>
+      <div class="wt-dlg link-dlg" ref={box}>
         <header>
           <span><Icon name="folder-symlink" size={14} />{props.link ? `Change the folder ${props.link.name} shows` : `Link a folder to ${p.name}`}</span>
           <button type="button" title="Close (Esc)" aria-label="Close" onClick={closeLinkDialog}>×</button>
@@ -124,7 +126,7 @@ function Dialog(props: { project: Project; link?: LinkedFolder }) {
                 spellcheck={false}
                 autocomplete="off"
                 onInput={(e) => setTyped(e.currentTarget.value)}
-                onKeyDown={(e) => e.key === "Enter" && here() && link(here())}
+                onKeyDown={(e) => isEnter(e) && here() && link(here())}
               />
             </label>
             <label class="chk"><input type="checkbox" checked={readOnly()} onChange={(e) => setReadOnly(e.currentTarget.checked)} /> Read-only in the editor</label>
@@ -138,6 +140,6 @@ function Dialog(props: { project: Project; link?: LinkedFolder }) {
           </Show>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

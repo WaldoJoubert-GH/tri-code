@@ -8,9 +8,11 @@ import { createStore } from "solid-js/store";
 import { type EnvFields, type EnvKind, type EnvOriginal, emptyFields, envFormView, fieldsFrom, isSshCommand, optionsText, parseSsh, sshOf } from "./envform";
 import { envLocked, markUnlocked, moveUnlock, tryPin } from "./envlock";
 import { Icon, toggleIconPicker } from "./lucide";
+import { Modal } from "./Modal";
 import { addEnvironment, app, envIcon, envName, isLocalHost, isTerminal, moveEnvironment, setEnvLock, setEnvSsh, setEnvStyle } from "./state";
 import { moveSessions } from "./terms";
 import { flash } from "./ui";
+import { isEnter } from "./enterkey";
 
 /** `host` set = Edit it; unset = New. onAdded: where to go with a new Environment. */
 type Target = { host?: string; onAdded?: (host: string) => void };
@@ -38,9 +40,9 @@ export function EnvDialog() {
   return (
     <Show when={target()} keyed>
       {(t) => (
-        <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && closeEnvDialog()}>
+        <Modal label={t.host === undefined ? "New environment" : "Edit environment"} onClose={closeEnvDialog}>
           <EnvForm host={t.host} onAdded={t.onAdded} />
-        </div>
+        </Modal>
       )}
     </Show>
   );
@@ -211,7 +213,7 @@ function EnvForm(props: { host?: string; onAdded?: (host: string) => void }) {
   const digits = (el: HTMLInputElement) => el.value.replace(/\D/g, "");
 
   return (
-    <form class="env-dlg" role="dialog" aria-label={original ? "Edit environment" : "New environment"} onSubmit={(e) => (e.preventDefault(), save())}>
+    <form class="env-dlg" onSubmit={(e) => (e.preventDefault(), save())}>
       <header>
         <span>{original ? "Edit environment" : "New environment"}</span>
         <button type="button" title="Close (Esc)" aria-label="Close" onClick={closeEnvDialog}>×</button>
@@ -248,7 +250,7 @@ function EnvForm(props: { host?: string; onAdded?: (host: string) => void }) {
               <input
                 class="pin" type="password" inputmode="numeric" maxlength={8} autocomplete="off" aria-label="PIN" placeholder="PIN" value={unlockPin()}
                 onInput={(e) => (setUnlockPin(digits(e.currentTarget)), setUnlockError(""))}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void unlock(); } }}
+                onKeyDown={(e) => { if (isEnter(e)) { e.preventDefault(); void unlock(); } }}
               />
               <button type="button" onClick={unlock}>Unlock</button>
             </div>

@@ -14,9 +14,11 @@ import { SETUP_VARS } from "./setup";
 import { dev, inProgress, slugOf } from "./issues";
 import { gitOf } from "./git";
 import { Icon } from "./lucide";
+import { Modal } from "./Modal";
 import { sandboxPreview } from "./preview";
 import { canSandbox, hostKey, mountsFor, refreshSbx, sandboxByDefault, sandboxFolders, sbxReady, sbxState, setSandboxHost } from "./sandbox";
 import { openSettings } from "./Settings";
+import { isEnter } from "./enterkey";
 
 export function NewWorktreeDialog() {
   return (
@@ -70,7 +72,7 @@ export function NewWorktreeDialog() {
         /** The prefix the folder leaves out: the typed one, or the saved one for an existing branch. */
         const dirPrefix = () => (picked() ? repo.branchPrefix : prefix());
         const keys = (e: KeyboardEvent) => {
-          if (e.key === "Enter") void create();
+          if (isEnter(e)) void create();
           else if (e.key === "Escape") closeNewWorktree();
           e.stopPropagation();
         };
@@ -129,8 +131,8 @@ export function NewWorktreeDialog() {
         };
 
         return (
-          <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && closeNewWorktree()}>
-            <div class="wt-dlg wide" role="dialog" aria-label="New worktree">
+          <Modal label="New worktree" onClose={closeNewWorktree}>
+            <div class="wt-dlg wide">
               <header>
                 <span><Icon name="git-branch-plus" size={14} /> New worktree · {repo.name}</span>
                 <button type="button" title="Close (Esc)" aria-label="Close" onClick={closeNewWorktree}>×</button>
@@ -407,7 +409,7 @@ export function NewWorktreeDialog() {
                 </button>
               </footer>
             </div>
-          </div>
+          </Modal>
         );
       }}
     </Show>

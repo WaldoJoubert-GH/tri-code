@@ -251,7 +251,7 @@ export const touchEditor = (tabId: string) => lastUsed.set(tabId, Date.now());
 export const filesOf = (t: Tab): string[] => (t.kind === "editor" ? t.files ?? [] : []);
 
 const editorsOf = (p: Project) => p.tabs.filter((t) => t.kind === "editor");
-const latest = (tabs: Tab[]) => [...tabs].sort((a, b) => (lastUsed.get(b.id) ?? 0) - (lastUsed.get(a.id) ?? 0))[0];
+const latest = (tabs: Tab[]) => tabs.toSorted((a, b) => (lastUsed.get(b.id) ?? 0) - (lastUsed.get(a.id) ?? 0))[0];
 
 /** Open or focus the project's editor: the one used last, else a new one. */
 export function openEditor(project: Project): string {

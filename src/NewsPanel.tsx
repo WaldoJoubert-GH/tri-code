@@ -21,6 +21,7 @@ import { Icon } from "./lucide";
 import { Key } from "./Keys";
 import { flash } from "./ui";
 import "./news.css";
+import { isEnter } from "./enterkey";
 
 /** Headlines listed at most, newest first. */
 const LIST_MAX = 400;
@@ -379,7 +380,7 @@ export default function NewsPanel(props: { project: Project; tab: Tab; focused: 
           ref={(el) => requestAnimationFrame(() => { el.focus(); el.select(); })}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
+            if (isEnter(e)) e.currentTarget.blur();
           }}
           onBlur={(e) => {
             const name = e.currentTarget.value.trim();

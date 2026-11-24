@@ -21,6 +21,7 @@ import { openEnvDialog } from "./EnvDialog";
 import { openProjectDialog } from "./OpenProject";
 import { startTour } from "./Tour";
 import { Icon } from "./lucide";
+import { Modal } from "./Modal";
 import { linksOn } from "./links";
 import { Caps, KeyList } from "./Keys";
 import { metaName, modLabel } from "./modkey";
@@ -500,8 +501,8 @@ export function Welcome() {
   createEffect(on(step, () => main?.scrollTo(0, 0), { defer: true }));
   return (
     <Show when={open()}>
-      <div class="wel-scrim">
-        <div class="wel" role="dialog" aria-modal="true" aria-label="Set up tri-code" tabindex="-1" onKeyDown={onKey} ref={(el) => queueMicrotask(() => el.focus())}>
+      <Modal class="wel-scrim" label="Set up tri-code" onClose={closeWelcome} dismiss={false}>
+        <div class="wel" tabindex="-1" onKeyDown={onKey} ref={(el) => queueMicrotask(() => el.focus())}>
           <nav class="wel-rail" aria-label="Setup steps">
             <div class="wel-brand"><img src={logo} alt="" width="22" height="22" />Set up tri-code</div>
             <For each={STEPS}>
@@ -527,7 +528,7 @@ export function Welcome() {
             </Show>
           </div>
         </div>
-      </div>
+      </Modal>
     </Show>
   );
 }

@@ -12,10 +12,12 @@ import { addProject, app, envIcon, envName, isLocalHost, setApp } from "./state"
 import { PinPad, envLocked } from "./envlock";
 import { openEnvDialog } from "./EnvDialog";
 import { Icon } from "./lucide";
+import { Modal } from "./Modal";
 import { autoIcon } from "./icons";
 import { flash } from "./ui";
 import { Key } from "./Keys";
 import { addLines, caselessPath, isRepoUrl, nameProblem, progress, repoFolder, shortUrl, type CloneLine } from "./newfolder";
+import { isEnter } from "./enterkey";
 
 type DirList = { path: string; dirs: string[]; repos: string[]; drives: string[]; workspaces: string[] };
 /** A row of the folder list: a folder, or a `.code-workspace` file (`ws`). */
@@ -77,8 +79,8 @@ export function OpenProjectDialog() {
   return (
     <Show when={selected()}>
       {(sel) => (
-        <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && closeOpenProject()}>
-          <div class="open-dlg" role="dialog" aria-label="Open project">
+        <Modal label="Open project" onClose={closeOpenProject}>
+          <div class="open-dlg">
             <header>
               <span>Open project</span>
               <button type="button" title="Close (Esc)" aria-label="Close" onClick={closeOpenProject}>×</button>
@@ -102,7 +104,7 @@ export function OpenProjectDialog() {
               {(host) => <FolderPane host={host} />}
             </Show>
           </div>
-        </div>
+        </Modal>
       )}
     </Show>
   );
@@ -221,7 +223,7 @@ function NewFolder(props: { host: string }) {
           autocomplete="off"
           onInput={(e) => { setName(e.currentTarget.value); setError(""); }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); void create(); }
+            if (isEnter(e)) { e.preventDefault(); void create(); }
           }}
         />
       </div>
@@ -345,7 +347,7 @@ function CloneRepo(props: { host: string }) {
                 if (!typedName) setName(repoFolder(e.currentTarget.value));
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); void start(); }
+                if (isEnter(e)) { e.preventDefault(); void start(); }
               }}
             />
             <label for="cl-name">Folder</label>
@@ -360,7 +362,7 @@ function CloneRepo(props: { host: string }) {
                 typedName = e.currentTarget.value !== "";
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); void start(); }
+                if (isEnter(e)) { e.preventDefault(); void start(); }
               }}
             />
           </div>
@@ -503,7 +505,7 @@ export function FolderPicker(props: {
     if (e.key === "ArrowDown") setSel(Math.min(sel() + 1, s.length - 1));
     else if (e.key === "ArrowUp") setSel(Math.max(sel() - 1, 0));
     else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { if (cur && props.onOpen) use(cur); }
-    else if (e.key === "Enter") {
+    else if (isEnter(e)) {
       if (isPath()) go(q());
       else if (q() && cur) enter(cur);
       else if (!q() && list()) props.onHere(list()!.path);

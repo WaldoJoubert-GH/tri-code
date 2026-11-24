@@ -261,7 +261,7 @@ export function sortIssues(state: DevState | undefined, issues: UnifiedIssue[]):
     i.source === "sentry"
       ? [1, Math.max(0, LEVEL_ORDER.indexOf(i.level ?? "error")), 0, i.title]
       : [0, priorityRank(i.source === "plane" ? i.priority : undefined), GROUP_ORDER[stateOf(state, i)?.group ?? ""] ?? 9, i.title];
-  return [...issues].sort((a, b) => {
+  return issues.toSorted((a, b) => {
     const x = key(a), y = key(b);
     return x[0] - y[0] || x[1] - y[1] || x[2] - y[2] || x[3].localeCompare(y[3]);
   });

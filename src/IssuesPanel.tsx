@@ -22,6 +22,7 @@ import { Icon } from "./lucide";
 import { flash } from "./ui";
 import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";
 import { Key } from "./Keys";
+import { isEnter } from "./enterkey";
 
 // ── small presentational pieces ─────────────────────────────────────
 
@@ -219,7 +220,7 @@ export default function IssuesPanel(props: { project: Project; home?: Project; t
       e.preventDefault();
       if (!jump()) setJump(view() === "detail" ? "detail" : "list");
       setHit(Math.max(0, Math.min(list.length - 1, hit() + (e.key === "ArrowDown" ? 1 : -1))));
-    } else if (e.key === "Enter") {
+    } else if (isEnter(e)) {
       e.preventDefault();
       const pick = list[hit()] ?? list[0];
       if (pick) { setJump(null); openDetailById(issueKey(pick)); }

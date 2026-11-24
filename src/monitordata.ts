@@ -126,7 +126,7 @@ export function rowsOf(procs: Proc[], o: { scope: Scope; find: string; tree: boo
     const r = x < y ? -1 : x > y ? 1 : a.pid - b.pid;
     return o.asc ? r : -r;
   };
-  if (!o.tree || q) return list.slice().sort(cmp).map((p) => ({ p, prefix: "" }));
+  if (!o.tree || q) return list.toSorted(cmp).map((p) => ({ p, prefix: "" }));
   const kids = childrenOf(list);
   const out: Row[] = [];
   const seen = new Set<number>();
@@ -134,11 +134,11 @@ export function rowsOf(procs: Proc[], o: { scope: Scope; find: string; tree: boo
     if (seen.has(p.pid)) return;
     seen.add(p.pid);
     out.push({ p, prefix: depth ? lead + (last ? "└─ " : "├─ ") : "" });
-    const cs = (kids.get(p.pid) ?? []).slice().sort(cmp);
+    const cs = (kids.get(p.pid) ?? []).toSorted(cmp);
     const next = depth ? lead + (last ? "   " : "│  ") : "";
     cs.forEach((c, i) => add(c, next, i === cs.length - 1, depth + 1));
   };
-  for (const p of (kids.get(0) ?? []).slice().sort(cmp)) add(p, "", true, 0);
+  for (const p of (kids.get(0) ?? []).toSorted(cmp)) add(p, "", true, 0);
   return out;
 }
 

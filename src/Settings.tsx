@@ -10,6 +10,7 @@ import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
 import { Icon } from "./lucide";
+import { Modal } from "./Modal";
 import { Caps, KeyList } from "./Keys";
 import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./RemoteSettings";
@@ -588,8 +589,8 @@ export function SettingsDialog() {
   return (
     <Show when={page()}>
       {(p) => (
-        <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && closeSettings()}>
-          <div class="settings-dlg" role="dialog" aria-label="Settings">
+        <Modal label="Settings" onClose={closeSettings}>
+          <div class="settings-dlg">
             <header>
               Settings <span>every project</span>
               <button type="button" class="x" title="Close (Esc)" aria-label="Close" onClick={closeSettings}>×</button>
@@ -628,7 +629,7 @@ export function SettingsDialog() {
               <Show when={p() === "preview"}><PreviewPage /></Show>
             </section>
           </div>
-        </div>
+        </Modal>
       )}
     </Show>
   );

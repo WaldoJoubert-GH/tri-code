@@ -8,6 +8,7 @@ import { browserInfo } from "./browsers";
 import { flash } from "./ui";
 import { guessIcon } from "./favicons";
 import { Key, KeyText } from "./Keys";
+import { isEnter } from "./enterkey";
 
 const ICON_COLOURS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#2ac3de", "#ff9e64", "#e0af68", "#73daca"];
 
@@ -193,7 +194,7 @@ export function FavPopover() {
                     ref={(el) => requestAnimationFrame(() => { el.focus(); el.select(); })}
                     onInput={(e) => renameFav(p.id, f.url, e.currentTarget.value.trim() || hostOf(f.url))}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") closeFavEdit();
+                      if (isEnter(e)) closeFavEdit();
                     }}
                   />
                   <h4>Address</h4>

@@ -14,6 +14,7 @@ import { flashHints, hintsShown } from "./hints";
 import { runHotkey } from "./hotkeys";
 import { tabMenuOpen, toggleTabMenu } from "./tabs";
 import { modLabel } from "./modkey";
+import { Modal } from "./Modal";
 
 const [step, setStep] = createSignal(0);
 /** "tour" while walking the stops, "end" for the closing card. */
@@ -282,8 +283,8 @@ export function Tour() {
         </div>
       </Show>
       <Show when={mode() === "end"}>
-        <div class="dialog-scrim">
-          <div class="tour-end" role="dialog" aria-label="Tour finished">
+        <Modal label="Tour finished" dismiss={false}>
+          <div class="tour-end">
             <h3>Now open your own</h3>
             <p>Any folder on this computer or on a server you reach over ssh. The <b>tour</b> project stays in the sidebar until you close it.</p>
             <div class="tour-picks">
@@ -303,7 +304,7 @@ export function Tour() {
               <button class="g-btn" onClick={() => void startTour()}>Replay</button>
             </div>
           </div>
-        </div>
+        </Modal>
       </Show>
     </>
   );

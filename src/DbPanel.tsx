@@ -24,6 +24,7 @@ import { ask, flash } from "./ui";
 import "./db.css";
 import { Key, KeyText } from "./Keys";
 import { ctrlName } from "./modkey";
+import { isEnter } from "./enterkey";
 
 const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", sqlite: "SQLITE", mongo: "MONGO" };
 const KIND_NAME: Record<DbKind, string> = { postgres: "PostgreSQL", sqlite: "SQLite", mongo: "MongoDB" };
@@ -538,7 +539,7 @@ function DataView(props: { project: Project; tab: Tab; conn: DbConn; win: Win | 
           placeholder={props.conn.kind === "mongo" ? "a filter document, e.g. { \"status\": \"open\" } · Enter applies, Esc clears" : "a WHERE expression, e.g. status = 'open' · Enter applies, Esc clears"}
           onInput={(e) => setFilterText(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); setFilter(id, filterText()); gridEl.focus(); }
+            if (isEnter(e)) { e.preventDefault(); setFilter(id, filterText()); gridEl.focus(); }
             if (e.key === "Escape") { e.preventDefault(); setFilterText(""); setFilter(id, ""); gridEl.focus(); }
           }}
         />
@@ -683,7 +684,7 @@ function CellInput(props: { value: string; placeholder: string; onDone: (text: s
       placeholder={props.placeholder}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === "Enter") { e.preventDefault(); finish(el.value); }
+        if (isEnter(e)) { e.preventDefault(); finish(el.value); }
         if (e.key === "Escape") { e.preventDefault(); finish(null); }
         if (e.key === "Tab") { e.preventDefault(); done = true; props.onTab(el.value); }
       }}

@@ -7,6 +7,7 @@ import { Portal } from "solid-js/web";
 import { BUILTIN, type LangKey, autoKey, languageKey, offerFor } from "./cm";
 import { LANGS, downloadSize, kb } from "./grammars";
 import { installLang, installedGrammars, installing, installError, isInstalled, setOverride } from "./langs";
+import { isEnter } from "./enterkey";
 
 type Item = { key: LangKey; name: string; types: string; install?: string };
 
@@ -49,7 +50,7 @@ export default function LangPicker(props: { path: string; anchor: HTMLElement; o
     const n = flat().length;
     if (e.key === "ArrowDown") setSel((s) => Math.min(n - 1, s + 1));
     else if (e.key === "ArrowUp") setSel((s) => Math.max(0, s - 1));
-    else if (e.key === "Enter") flat()[sel()] && void choose(flat()[sel()]);
+    else if (isEnter(e)) flat()[sel()] && void choose(flat()[sel()]);
     else if (e.key === "Escape") props.onClose();
     else return;
     e.preventDefault();

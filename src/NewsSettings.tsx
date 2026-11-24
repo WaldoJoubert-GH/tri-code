@@ -5,6 +5,7 @@ import { For, Show, createSignal } from "solid-js";
 import { app } from "./state";
 import { feeds, newTopic, removeTopic, renameTopic, resetTopics, shiftTopic, topics } from "./news";
 import { Caps } from "./Keys";
+import { isEnter } from "./enterkey";
 
 export function NewsPage() {
   const [draft, setDraft] = createSignal("");
@@ -35,7 +36,7 @@ export function NewsPage() {
                   else renameTopic(t, to);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (isEnter(e)) e.currentTarget.blur();
                   if (e.key === "Escape") { e.currentTarget.value = t; e.currentTarget.blur(); e.stopPropagation(); }
                 }}
               />

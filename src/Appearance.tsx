@@ -13,6 +13,7 @@ import { Icon, toggleIconPicker } from "./lucide";
 import { SignalsForm } from "./SignalSettings";
 import { flash } from "./ui";
 import { keyOf } from "./keymap";
+import { isEnter } from "./enterkey";
 
 const tint = (a: string, p: number) => `color-mix(in srgb, ${a} ${p}%, transparent)`;
 
@@ -221,7 +222,7 @@ export function AppearancePopover() {
                     spellcheck={false}
                     onChange={(e) => renameProject(p.id, e.currentTarget.value.trim() || p.path.split(/[\\/]/).filter(Boolean).pop() || p.name)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur();
+                      if (isEnter(e)) e.currentTarget.blur();
                       else if (e.key === "Escape") (e.currentTarget.value = p.name), e.currentTarget.blur();
                     }}
                   />

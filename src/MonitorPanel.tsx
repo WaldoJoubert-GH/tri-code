@@ -12,6 +12,7 @@ import { Icon } from "./lucide";
 import { Key } from "./Keys";
 import { flash } from "./ui";
 import "./monitor.css";
+import { isEnter } from "./enterkey";
 
 const RETRY = 10_000;
 const RATES = [1, 2, 5];
@@ -164,7 +165,7 @@ export default function MonitorPanel(props: { project: Project; tab: Tab; focuse
       return;
     }
     if (typing) {
-      if (e.key === "Enter" || e.key === "ArrowDown") {
+      if (isEnter(e) || e.key === "ArrowDown") {
         (target as HTMLInputElement).blur();
         e.preventDefault();
       }

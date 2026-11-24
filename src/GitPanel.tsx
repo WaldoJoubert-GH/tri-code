@@ -27,6 +27,7 @@ import { withKey } from "./keymap";
 import { HoldKey, KeyText } from "./Keys";
 import "./git.css";
 import { ctrlName } from "./modkey";
+import { isEnter } from "./enterkey";
 
 function BranchIcon(): JSX.Element {
   return (
@@ -309,7 +310,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
           <div class="g-menu g-stashform" style={{ left: `${f().x}px`, top: `${f().y}px` }}>
             <div class="g-group">Stash changes</div>
             <input class="g-in" placeholder={`WIP on ${s()?.branch ?? "HEAD"}`} value={stashMsg()} ref={(el) => queueMicrotask(() => el.focus())}
-              onInput={(e) => setStashMsg(e.currentTarget.value)} onKeyDown={(e) => { if (e.key === "Enter") void go(); }} />
+              onInput={(e) => setStashMsg(e.currentTarget.value)} onKeyDown={(e) => { if (isEnter(e)) void go(); }} />
             <label class="g-hint g-check-l"><input type="checkbox" checked={stashU()} onChange={(e) => setStashU(e.currentTarget.checked)} /> include untracked files</label>
             <div class="g-row">
               <span class="g-hint">Staged and unstaged both go in.</span>
@@ -557,7 +558,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
           <div class="g-menu g-destmenu" role="menu" style={{ left: `${destAt().x}px`, top: `${destAt().y}px` }}>
             <input class="g-in g-destq" placeholder="Find a branch" value={destQ()} spellcheck={false} ref={(el) => queueMicrotask(() => el.focus())}
               onInput={(e) => setDestQ(e.currentTarget.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && names()[0]) pick(names()[0]); }} />
+              onKeyDown={(e) => { if (isEnter(e) && names()[0]) pick(names()[0]); }} />
             <div class="g-group">{s()!.branch} merges into</div>
             <div class="g-destlist">
               <Show when={g().branches} fallback={<div class="g-hint pad">Reading branches…</div>}>

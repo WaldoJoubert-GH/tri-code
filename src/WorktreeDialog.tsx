@@ -6,7 +6,9 @@ import { For, Show, createSignal } from "solid-js";
 import { type Project, projectById, repoOf } from "./state";
 import { folderStatus } from "./git";
 import { Icon } from "./lucide";
+import { Modal } from "./Modal";
 import { cleanPrefix, labelOf, removeWorktree, renameWorktree, startNextFeature, toBranch } from "./worktrees";
+import { isEnter } from "./enterkey";
 
 export type WorktreeAction = "rename" | "next" | "finish";
 
@@ -52,14 +54,11 @@ function Dialog(props: { w: Project; action: WorktreeAction }) {
   };
 
   return (
-    <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && closeWorktreeDialog()}>
+    <Modal label={title()} onClose={closeWorktreeDialog}>
       <div
         class="wt-dlg"
-        role="dialog"
-        aria-label={title()}
         onKeyDown={(e) => {
-          if (e.key === "Escape") closeWorktreeDialog();
-          else if (e.key === "Enter" && props.action !== "finish") run();
+          if (isEnter(e) && props.action !== "finish") run();
         }}
       >
         <header>
@@ -123,6 +122,6 @@ function Dialog(props: { w: Project; action: WorktreeAction }) {
           </button>
         </footer>
       </div>
-    </div>
+    </Modal>
   );
 }

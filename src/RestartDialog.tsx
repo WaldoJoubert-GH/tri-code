@@ -6,6 +6,7 @@ import { Show } from "solid-js";
 import { appVersion, askRestart, cancelRestart, installNow, updateReady } from "./updater";
 import { busySignals } from "./sigs";
 import { Icon } from "./lucide";
+import { Modal } from "./Modal";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -25,15 +26,8 @@ export function RestartDialog() {
       {(u) => {
         const sigs = () => busySignals();
         return (
-          <div class="dialog-scrim" onPointerDown={(e) => e.target === e.currentTarget && cancelRestart()}>
-            <div
-              class="restart-dlg"
-              role="alertdialog"
-              aria-label="Restart to update?"
-              onKeyDown={(e) => {
-                if (e.key === "Escape") cancelRestart();
-              }}
-            >
+          <Modal role="alertdialog" label="Restart to update?" onClose={cancelRestart}>
+            <div class="restart-dlg">
               <header>
                 <span>
                   <Icon name="triangle-alert" size={14} />
@@ -61,7 +55,7 @@ export function RestartDialog() {
                 </button>
               </footer>
             </div>
-          </div>
+          </Modal>
         );
       }}
     </Show>

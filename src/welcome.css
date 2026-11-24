@@ -1,6 +1,6 @@
-/* The Welcome window (Welcome.tsx), from design/new-user.html (variant A). Under the dialogs it opens
-   (Add environment, z-index 9999), over everything else. */
-.wel-scrim { position: fixed; inset: 0; z-index: 9900; display: grid; place-items: center; padding: 24px; background: var(--scrim); }
+/* The Welcome window (Welcome.tsx), from design/new-user.html (variant A). A Modal: the dialogs it
+   opens (Add environment) stack over it. */
+dialog.wel-scrim { padding: 24px; }
 .wel {
   width: min(880px, 100%); height: min(620px, 100%); display: grid; grid-template-columns: 210px 1fr; grid-template-rows: 1fr auto;
   overflow: hidden; background: var(--bg-solid); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 30px 80px -20px var(--shadow);

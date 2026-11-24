@@ -13,6 +13,7 @@ import { copyText } from "./clipboard";
 import { flash } from "./ui";
 import "./db.css";
 import "./sheet.css";
+import { isEnter } from "./enterkey";
 
 /** Row height in px: `.sheet-grid td` is drawn to exactly this. */
 const ROW = 24;
@@ -171,7 +172,7 @@ function CellEdit(props: { value: string; select: boolean; onDone: (t: string | 
       value={props.value}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === "Enter") { e.preventDefault(); finish(() => props.onEnter(el.value)); }
+        if (isEnter(e)) { e.preventDefault(); finish(() => props.onEnter(el.value)); }
         if (e.key === "Escape") { e.preventDefault(); finish(() => props.onDone(null)); }
         if (e.key === "Tab") { e.preventDefault(); finish(() => props.onTab(el.value, e.shiftKey)); }
       }}

@@ -13,6 +13,7 @@ import {
   type Template, SIGNIN_BOX, connectGithub, listTemplates, removeTemplate, sandboxByDefault, signInBox, signOutClaude, sandboxFolders, sbxState, serviceLabel, setSecret, stopSandbox,
 } from "./sandbox";
 import { flash } from "./ui";
+import { isEnter } from "./enterkey";
 
 const windows = /Windows/i.test(navigator.userAgent);
 const mac = /Mac/i.test(navigator.userAgent);
@@ -308,7 +309,7 @@ function KeyList(props: { host: string; secrets: Secret[]; busy: boolean; change
           spellcheck={false}
           autocomplete="off"
           onInput={(e) => setText(e.currentTarget.value)}
-          onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") add(); }}
+          onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e)) add(); }}
         />
         <button type="button" class="sb-btn" disabled={props.busy || !text().trim()} onClick={add}>Add</button>
       </div>
@@ -362,7 +363,7 @@ function Network(props: { host: string; rules: Rule[]; blocked: Blocked[]; busy:
           placeholder="example.com, *.example.com or localhost:5432"
           spellcheck={false}
           onInput={(e) => setDest(e.currentTarget.value)}
-          onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") add(); }}
+          onKeyDown={(e) => { e.stopPropagation(); if (isEnter(e)) add(); }}
         />
         <button type="button" class="sb-btn" disabled={props.busy || !dest().trim()} onClick={add}>Allow</button>
       </div>

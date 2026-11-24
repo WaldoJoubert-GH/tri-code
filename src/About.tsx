@@ -5,6 +5,7 @@
 import { Show, createSignal } from "solid-js";
 import changelog from "../CHANGELOG.md?raw";
 import { renderMarkdown } from "./markdown";
+import { Modal } from "./Modal";
 import { appVersion, checkForUpdates, installUpdate, updateReady, updateStatus } from "./updater";
 import "./files.css";
 
@@ -36,8 +37,8 @@ export function AboutDialog() {
   const [showOlder, setShowOlder] = createSignal(false);
   return (
     <Show when={aboutOpen()}>
-      <div class="dialog-scrim" onClick={(e) => e.target === e.currentTarget && setAboutOpen(false)}>
-        <div class="about" role="dialog" aria-label="About tri-code">
+      <Modal label="About tri-code" onClose={() => setAboutOpen(false)}>
+        <div class="about">
           <header>
             <span>tri-code <span class="ver">v{appVersion}</span></span>
             <button aria-label="Close" onClick={() => setAboutOpen(false)}>×</button>
@@ -67,7 +68,7 @@ export function AboutDialog() {
             </Show>
           </div>
         </div>
-      </div>
+      </Modal>
     </Show>
   );
 }

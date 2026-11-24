@@ -23,6 +23,7 @@ import { closeSession, ensureSession, focusSession, mountSession, unmountSession
 import { runsInSandbox, sandboxOf } from "./sandbox";
 import IssuesPanel from "./IssuesPanel";
 import { dirtyCount, dropEditor } from "./files";
+import { isEnter } from "./enterkey";
 
 /** CodeMirror and its languages load the first time an editor window opens. */
 const Editor = lazy(() => import("./Editor"));
@@ -414,7 +415,7 @@ export default function Canvas(props: { project: Project }) {
     }
 
     const onUrlKey = (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
+      if (isEnter(e)) {
         // In a remote project localhost is the remote's; Alt+Enter opens this machine's instead.
         navigateBrowser(pageId(), addressToUrl(inputEl.value), isRemote(props.project) ? e.altKey : undefined);
         inputEl.blur();

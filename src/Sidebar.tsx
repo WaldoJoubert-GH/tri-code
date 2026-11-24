@@ -30,6 +30,7 @@ import { endLeftover, staleCheckouts } from "./leftovers";
 import { sandboxOf } from "./sandbox";
 import { MediaDock } from "./MediaDock";
 import { mediaPopOpen } from "./media";
+import { isEnter } from "./enterkey";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
 const FULL = 220;
@@ -172,7 +173,7 @@ function RenameInput(props: { value: string; placeholder?: string; save: (value:
       onBlur={(e) => save(e.currentTarget.value)}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === "Enter") e.currentTarget.blur();
+        if (isEnter(e)) e.currentTarget.blur();
         else if (e.key === "Escape") (cancelled = true), e.currentTarget.blur();
       }}
     />

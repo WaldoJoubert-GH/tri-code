@@ -733,7 +733,16 @@ h4 > .muted { color: var(--muted); text-transform: none; letter-spacing: 0; font
 .restart-dlg footer button.danger:hover { background: color-mix(in oklab, var(--bad) 85%, #000); }
 
 /* Open project dialog (Alt+O) */
-.dialog-scrim { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--scrim); }
+/* A Modal (Modal.tsx): the <dialog> fills the viewport as the scrim, the window's box sits inside.
+   The scrim colour is on the dialog, not ::backdrop, which inherits custom properties only in newer WebKit. */
+dialog.dialog-scrim {
+  position: fixed; inset: 0; width: auto; height: auto; max-width: none; max-height: none;
+  margin: 0; padding: 0; border: 0; overflow: visible; color: inherit; background: var(--scrim);
+  overscroll-behavior: contain;
+}
+dialog.dialog-scrim[open] { display: grid; place-items: center; }
+dialog.dialog-scrim::backdrop { background: transparent; }
+dialog.dialog-scrim.clear { background: transparent; }
 .open-dlg {
   width: min(760px, calc(100% - 32px)); height: min(520px, calc(100% - 32px)); display: grid;
   grid-template-columns: 200px 1fr; grid-template-rows: auto 1fr; overflow: hidden;

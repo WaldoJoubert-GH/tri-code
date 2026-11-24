@@ -25,6 +25,7 @@ import { flash, showToast } from "./ui";
 import { ctrlName, modDown, modLabel } from "./modkey";
 import "./agents.css";
 import { KeyList } from "./Keys";
+import { isEnter } from "./enterkey";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph"]);
 
@@ -67,6 +68,8 @@ function HotkeyField(props: { agent: Agent }) {
 /** The command (one line or several) or URL cell. Typing an address into a one-line command (or
  *  the other way round) flips the row's kind; the chip flips it by hand. A web app also picks its
  *  address bar. A script is folded to its first line until focused. */
+const FIELD_SIZING = CSS.supports("field-sizing", "content");
+
 function TargetField(props: { agent: Agent }) {
   const [open, setOpen] = createSignal(false);
   const web = () => isWebApp(props.agent);
@@ -79,8 +82,9 @@ function TargetField(props: { agent: Agent }) {
     if (isUrl !== looksLikeUrl(prev) && isUrl !== web()) setKind(isUrl, value);
     else updateAgent(props.agent.id, web() ? { url: value } : { command: value });
   };
-  /** Grow to fit every line while focused. */
+  /** Grow to fit every line while focused, where CSS `field-sizing: content` (agents.css) can't. */
   const fit = (el: HTMLTextAreaElement) => {
+    if (FIELD_SIZING) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight + 2}px`;
   };
@@ -382,7 +386,7 @@ export default function AgentsPanel(props: { project: Project }) {
                 e.stopPropagation();
                 if (searchEl.value) clearFilter();
                 else searchEl.blur();
-              } else if (e.key === "Enter" || e.key === "ArrowDown") {
+              } else if (isEnter(e) || e.key === "ArrowDown") {
                 listEl.querySelector<HTMLInputElement>("input[data-name]")?.focus();
               }
             }}

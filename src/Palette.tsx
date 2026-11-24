@@ -6,7 +6,7 @@
 // Enter runs the command or opens the file in the project's editor window.
 
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
+import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
 import { createStore } from "solid-js/store";
 import { type Choice, type Command, commands } from "./commands";
 import { type Project, activeProject, focusTab, focusedTab, isRemote, skipFolders, space, tabName } from "./state";
@@ -20,6 +20,8 @@ import { Icon } from "./lucide";
 import "./files.css";
 import { Key, KeyList } from "./Keys";
 import { linkHost, linksOf, relIn, rootAt, within } from "./links";
+import { isEnter } from "./enterkey";
+import { Modal } from "./Modal";
 
 type FileIndex = { files: string[]; git: boolean; truncated: boolean };
 type IndexState = { loading: boolean; index?: FileIndex; error?: string };
@@ -104,17 +106,16 @@ type View = { browse?: string; sections: Section[] };
 const MAX_COMMANDS = 8;
 const MAX_FILES = 80;
 
-/** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
+/**
+ * Mount once (in App). A Modal with a clear scrim, so it opens over Settings and the other windows
+ * too; a press outside closes it (its #palBtn and #where buttons included, so they toggle it).
+ */
 export function Palette() {
-  const onDown = (e: PointerEvent) => {
-    if (open() && !(e.target as Element).closest(".pal, #where, #palBtn")) closePalette();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
   return (
     <Show when={open()}>
-      <Box project={activeProject()} />
+      <Modal class="clear" label="Command palette" onClose={closePalette}>
+        <Box project={activeProject()} />
+      </Modal>
     </Show>
   );
 }
@@ -306,7 +307,7 @@ function Box(props: { project?: Project }) {
     else if (e.key === "ArrowUp" || (e.ctrlKey && e.key === "p")) setHi(n ? (hi() + n - 1) % n : 0);
     else if (e.key === "PageDown") setHi(Math.min(n - 1, hi() + 10));
     else if (e.key === "PageUp") setHi(Math.max(0, hi() - 10));
-    else if (e.key === "Enter") pick(r, howOf(e));
+    else if (isEnter(e)) pick(r, howOf(e));
     // Backspace in an empty box leaves the choices for the command list
     else if (e.key === "Backspace" && sub() && !input.value) { sub()!.leave?.(); setSub(null); setQ(""); }
     // Tab completes the highlighted file into the box; a folder then lists its contents
@@ -428,7 +429,7 @@ function Box(props: { project?: Project }) {
   const hiFile = () => rows()[hi()]?.kind === "file";
 
   return (
-    <div class="gtf pal" role="dialog" aria-label="Command palette">
+    <div class="gtf pal">
       <div class="gin">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
         <input

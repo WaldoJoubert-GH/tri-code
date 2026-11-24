@@ -2,7 +2,9 @@
 // The icon set (~2000 icons) is its own chunk, loaded once at startup; until it arrives an
 // icon renders as an empty square of the right size.
 
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
+import { isEnter } from "./enterkey";
+import { Modal } from "./Modal";
 
 type IconNode = [tag: string, attrs: Record<string, string>][];
 
@@ -88,15 +90,11 @@ function place(el: HTMLElement, a: HTMLElement) {
 
 const SHOWN = 144;
 
-/** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
+/**
+ * Mount once (in App). A Modal with a clear scrim, so it works over the windows that open it
+ * (Settings, Environment): a press outside closes it, its anchor included, so clicking that toggles.
+ */
 export function IconPicker() {
-  const onDown = (e: PointerEvent) => {
-    const p = picker();
-    if (p && !(e.target as Element).closest(".iconpick") && !p.anchor.contains(e.target as Node)) closeIconPicker();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
   return (
     <Show when={picker()} keyed>
       {(p) => {
@@ -110,7 +108,8 @@ export function IconPicker() {
           p.onPick(name);
         };
         return (
-          <div class="iconpick" role="dialog" aria-label="Choose an icon" ref={(el) => requestAnimationFrame(() => place(el, p.anchor))}>
+          <Modal class="clear" label="Choose an icon" onClose={closeIconPicker}>
+          <div class="iconpick" ref={(el) => requestAnimationFrame(() => place(el, p.anchor))}>
             <input
               class="q"
               placeholder={`Search ${names().length || ""} lucide icons…`}
@@ -118,7 +117,7 @@ export function IconPicker() {
               ref={(el) => requestAnimationFrame(() => el.focus())}
               onInput={(e) => setQ(e.currentTarget.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && matches()[0]) pick(matches()[0]);
+                if (isEnter(e) && matches()[0]) pick(matches()[0]);
               }}
             />
             <div class="grid">
@@ -139,6 +138,7 @@ export function IconPicker() {
               <code>{p.value}</code>
             </div>
           </div>
+          </Modal>
         );
       }}
     </Show>
