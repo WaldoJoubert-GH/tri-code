@@ -1,3 +1,7 @@
+## 0.1.60 — 2026-11-26
+
+- The Database Window connects to MySQL and MariaDB. They share one Connection kind, with the chip reading MARIADB when the server says so; each database is a group, and system databases are left out. Queries and pending edits follow MySQL's names and escaping, count rows found so setting a cell to its current value still works, stop a cancelled or over-long query with `KILL QUERY`, and note when a table's engine can't roll a failed batch back. TLS is read from the URL's usual parameters. ([#89](https://github.com/WaldoJoubert-GH/tri-code/pull/89))
+
 ## 0.1.59 — 2026-11-24
 
 - Dialogs, the Command Palette and the icon picker share one modal built on the native <dialog> element, so focus stays inside them and returns to whatever opened them. In text fields, Enter that confirms IME composition no longer submits or renames early, so CJK input works.
