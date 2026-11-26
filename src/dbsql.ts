@@ -2,12 +2,12 @@
 // Pending Edits become the statements the review shows and `db_apply` runs (ADR 0004).
 // No imports, so `bun test` covers it.
 
-export type DbKind = "postgres" | "sqlite" | "mongo";
-/** A cell as the backend sends it. Postgres cells are the text Postgres prints; Mongo cells are
+export type DbKind = "postgres" | "mysql" | "sqlite" | "mongo";
+/** A cell as the backend sends it. Postgres and MySQL cells are the text the server prints; Mongo cells are
  *  relaxed Extended JSON; `{ __cut, len }` is a value cut at 64 KB, `{ __blob }` a SQLite blob. */
 export type Cell = null | string | number | boolean | { [k: string]: unknown } | unknown[];
 
-/** The table or collection the edits are on. `group` is a schema, `main`, or a Mongo database. */
+/** The table or collection the edits are on. `group` is a schema, `main`, or a MySQL or Mongo database. */
 export type Target = { kind: DbKind; group: string; name: string };
 
 /** Pending Edits of one table, keyed by the row's key values (`rowKey`). */
@@ -57,11 +57,11 @@ export const editText = (v: Cell) => (v === null || v === undefined ? "" : typeo
 
 const NUMERIC = /int|real|num|float|double|dec|serial/i;
 
-/** Typed text as a value of the column. Empty is NULL when the column allows it. Postgres takes
- *  text (it casts), SQLite a number for a numeric column, Mongo the original's JSON type. */
+/** Typed text as a value of the column. Empty is NULL when the column allows it. Postgres and
+ *  MySQL take text (they cast), SQLite a number for a numeric column, Mongo the original's JSON type. */
 export function parseInput(kind: DbKind, text: string, was: Cell, type: string, nullable: boolean): Cell {
   if (text === "" && nullable) return null;
-  if (kind === "postgres") return text;
+  if (kind === "postgres" || kind === "mysql") return text;
   if (kind === "sqlite") return NUMERIC.test(type) && text.trim() !== "" && !isNaN(Number(text)) ? Number(text) : text;
   if (typeof was === "string") return text;
   if (typeof was === "number") return isNaN(Number(text)) ? text : Number(text);
@@ -72,43 +72,51 @@ export function parseInput(kind: DbKind, text: string, was: Cell, type: string, 
   }
 }
 
-export const qi = (name: string) => `"${name.replace(/"/g, '""')}"`;
+/** A quoted identifier: `"name"`, or `` `name` `` on MySQL, the inner quote doubled. */
+export const qi = (name: string, kind?: DbKind) =>
+  kind === "mysql" ? `\`${name.replace(/`/g, "``")}\`` : `"${name.replace(/"/g, '""')}"`;
 
-/** A value as an SQL literal. Postgres gets quoted text and casts it to the column's type. */
+/** A value as an SQL literal. Postgres and MySQL get quoted text and cast it to the column's
+ *  type. MySQL also reads `\` as an escape in a string, so it is doubled. */
 export function lit(kind: DbKind, v: Cell): string {
   if (v === null || v === undefined) return "NULL";
   if (kind === "sqlite" && typeof v === "number") return String(v);
   if (kind === "sqlite" && typeof v === "boolean") return v ? "1" : "0";
-  const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+  let s = typeof v === "object" ? JSON.stringify(v) : String(v);
+  if (kind === "mysql") s = s.replace(/\\/g, "\\\\");
   return `'${s.replace(/'/g, "''")}'`;
 }
 
-/** Types Postgres can't compare with `=`: their text is compared instead. */
+/** Types that can't be compared with `=`, or not exactly: their text is compared instead. */
 const NO_EQUALS = /^(jsonb?|xml|point|line|lseg|box|path|polygon|circle)\b/;
+const MY_NO_EQUALS = /^(json|float|double|real|bit|geometry|point|linestring|polygon|multi\w+|geometrycollection)\b/i;
 
 /** "The cell still holds what was loaded", null-safe. */
 function still(kind: DbKind, col: string, v: Cell, type: string): string {
-  if (v === null) return `${qi(col)} IS NULL`;
-  if (kind === "sqlite") return `${qi(col)} IS ${lit(kind, v)}`;
-  const c = NO_EQUALS.test(type) ? `${qi(col)}::text` : qi(col);
+  const q = qi(col, kind);
+  if (v === null) return `${q} IS NULL`;
+  if (kind === "sqlite") return `${q} IS ${lit(kind, v)}`;
+  if (kind === "mysql") return `${MY_NO_EQUALS.test(type) ? `CAST(${q} AS CHAR)` : q} <=> ${lit(kind, v)}`;
+  const c = NO_EQUALS.test(type) ? `${q}::text` : q;
   return `${c} IS NOT DISTINCT FROM ${lit(kind, v)}`;
 }
 
 const where = (t: Target, key: string[], row: Record<string, Cell>) =>
-  key.map((k) => (k === "rowid" ? `rowid = ${Number(row[k])}` : `${qi(k)} = ${lit(t.kind, row[k] ?? null)}`));
+  key.map((k) => (k === "rowid" ? `rowid = ${Number(row[k])}` : `${qi(k, t.kind)} = ${lit(t.kind, row[k] ?? null)}`));
 
-const table = (t: Target) => (t.kind === "sqlite" ? qi(t.name) : `${qi(t.group)}.${qi(t.name)}`);
+const table = (t: Target) => (t.kind === "sqlite" ? qi(t.name) : `${qi(t.group, t.kind)}.${qi(t.name, t.kind)}`);
 
 /** Pending Edits as statements: inserts, then updates, then deletes. Each update also checks
  *  the cells it changes still hold what was loaded, and expects to change exactly one row. */
 export function sqlOps(t: Target, key: string[], types: Record<string, string>, p: Pending): SqlOp[] {
   const out: SqlOp[] = [];
+  const q = (c: string) => qi(c, t.kind);
   for (const row of p.added) {
     const cols = Object.keys(row).filter((c) => row[c] !== null && row[c] !== "");
     out.push({
       sql: cols.length
-        ? `INSERT INTO ${table(t)} (${cols.map(qi).join(", ")}) VALUES (${cols.map((c) => lit(t.kind, row[c])).join(", ")})`
-        : `INSERT INTO ${table(t)} DEFAULT VALUES`,
+        ? `INSERT INTO ${table(t)} (${cols.map(q).join(", ")}) VALUES (${cols.map((c) => lit(t.kind, row[c])).join(", ")})`
+        : t.kind === "mysql" ? `INSERT INTO ${table(t)} () VALUES ()` : `INSERT INTO ${table(t)} DEFAULT VALUES`,
       expect: 1,
     });
   }
@@ -118,7 +126,7 @@ export function sqlOps(t: Target, key: string[], types: Record<string, string>, 
     const cols = Object.keys(set);
     if (!cols.length) continue;
     const conds = [...where(t, key, row), ...cols.map((c) => still(t.kind, c, row[c] ?? null, types[c] ?? ""))];
-    out.push({ sql: `UPDATE ${table(t)} SET ${cols.map((c) => `${qi(c)} = ${lit(t.kind, set[c])}`).join(", ")} WHERE ${conds.join(" AND ")}`, expect: 1 });
+    out.push({ sql: `UPDATE ${table(t)} SET ${cols.map((c) => `${q(c)} = ${lit(t.kind, set[c])}`).join(", ")} WHERE ${conds.join(" AND ")}`, expect: 1 });
   }
   for (const row of Object.values(p.deleted)) {
     out.push({ sql: `DELETE FROM ${table(t)} WHERE ${where(t, key, row).join(" AND ")}`, expect: 1 });
@@ -159,6 +167,9 @@ export function mongoText(ops: MongoOp[]): string[] {
 /** A statement that changes data or schema, which a `prod` Connection asks about first. */
 export function writes(kind: DbKind, text: string): boolean {
   if (kind === "mongo") return /"(insert|update|delete|findAndModify|drop|dropDatabase|create|createIndexes|dropIndexes|renameCollection)"\s*:|"\$(out|merge)"/.test(text);
-  const bare = text.replace(/--[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/'(?:[^']|'')*'/g, "''");
-  return /\b(insert|update|delete|merge|drop|alter|truncate|create|grant|revoke|vacuum|reindex|replace|upsert)\b/i.test(bare);
+  let bare = text.replace(/--[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  // MySQL: `#` comments, `\'` inside a string, and `quoted` names.
+  if (kind === "mysql") bare = bare.replace(/#[^\n]*/g, "").replace(/'(?:[^'\\]|\\.|'')*'/g, "''").replace(/"(?:[^"\\]|\\.|"")*"/g, '""').replace(/`(?:[^`]|``)*`/g, "``");
+  else bare = bare.replace(/'(?:[^']|'')*'/g, "''");
+  return /\b(insert|update|delete|merge|drop|alter|truncate|create|grant|revoke|vacuum|reindex|replace|upsert|rename|load|call|optimize|repair|flush|handler)\b/i.test(bare);
 }

@@ -33,7 +33,7 @@ pub async fn resolve(host: &str, root: &str, conn: &Connection) -> Result<String
 #[derive(Serialize)]
 pub struct EnvVar {
     key: String,
-    /// `postgres`, `sqlite` or `mongo`.
+    /// `postgres`, `mysql`, `sqlite` or `mongo`.
     kind: &'static str,
 }
 
@@ -53,6 +53,8 @@ fn kind_of(url: &str) -> Option<&'static str> {
     let u = url.to_ascii_lowercase();
     if u.starts_with("postgres://") || u.starts_with("postgresql://") {
         Some("postgres")
+    } else if u.starts_with("mysql://") || u.starts_with("mysql2://") || u.starts_with("mariadb://") {
+        Some("mysql")
     } else if u.starts_with("mongodb://") || u.starts_with("mongodb+srv://") {
         Some("mongo")
     } else if u.starts_with("file:") || u.starts_with("sqlite:") || u.ends_with(".db") || u.ends_with(".sqlite") || u.ends_with(".sqlite3") {
@@ -217,6 +219,16 @@ mod tests {
         assert_eq!(vars[0], ("DATABASE_URL".into(), "postgres://a@b/c".into()));
         assert_eq!(vars[1], ("MONGO_URL".into(), "mongodb://x".into()));
         assert_eq!(vars[2].1, "");
+    }
+
+    #[test]
+    fn kinds_by_scheme() {
+        assert_eq!(kind_of("mysql://app@db/app"), Some("mysql"));
+        assert_eq!(kind_of("mysql2://app@db/app"), Some("mysql"));
+        assert_eq!(kind_of("MariaDB://app@db/app"), Some("mysql"));
+        assert_eq!(kind_of("postgresql://app@db/app"), Some("postgres"));
+        assert_eq!(kind_of("redis://cache"), None);
+        assert_eq!(first_host("mysql://u:p@db.internal/app", 3306), Some(("db.internal".into(), 3306)));
     }
 
     #[test]

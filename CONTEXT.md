@@ -287,7 +287,7 @@ A page a project keeps for its browser windows: a URL and a name, in `state.json
 _Avoid_: Bookmark.
 
 **Database Window**:
-A canvas Window, one per Connection, for browsing, querying and editing a project's database: a schema tree and Data, Query and Structure views. New `TabKind` `"db"`. Plain HTML; `Alt+Shift+D` addresses the most recent. Postgres, SQLite (local projects only) and MongoDB. See ADR 0004. It also opens a Spreadsheet File.
+A canvas Window, one per Connection, for browsing, querying and editing a project's database: a schema tree and Data, Query and Structure views. New `TabKind` `"db"`. Plain HTML; `Alt+Shift+D` addresses the most recent. Postgres, MySQL, SQLite (local projects only) and MongoDB. See ADR 0004. It also opens a Spreadsheet File. MySQL and MariaDB are one Connection kind, `mysql`; the server's version says which, and the chip then reads MARIADB. Chosen from design/mysql-connection.html (variant A).
 _Avoid_: DB client, db viewer, studio.
 
 **Spreadsheet File**:

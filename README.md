@@ -25,7 +25,7 @@ tri-code is a minimal agent development environment. The left sidebar lists proj
 
 ![Editor with the file tree, git marks and a TypeScript file open](docs/screenshots/files.png)
 
-**Database window.** Browse and edit a project's Postgres, SQLite and MongoDB databases: filter with a WHERE, sort, page, edit rows in place, run queries and read the structure. Pending edits apply in one transaction, each checking the row it expects.
+**Database window.** Browse and edit a project's Postgres, MySQL / MariaDB, SQLite and MongoDB databases: filter with a WHERE, sort, page, edit rows in place, run queries and read the structure. Pending edits apply in one transaction, each checking the row it expects.
 
 ![Database window browsing an invoices table in Postgres](docs/screenshots/database.png)
 

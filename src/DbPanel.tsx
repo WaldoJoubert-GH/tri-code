@@ -9,12 +9,12 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } f
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting, bracketMatching } from "@codemirror/language";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
-import { PostgreSQL, SQLite, sql } from "@codemirror/lang-sql";
+import { MariaSQL, MySQL, PostgreSQL, SQLite, sql } from "@codemirror/lang-sql";
 import { json } from "@codemirror/lang-json";
 import { type Project, type Tab, isRemote, newId, setTabDb } from "./state";
 import {
   type DbConn, type DbTarget, type EnvVar, type Obj, type ResultSet, type Win, addRow, apply, cancelQuery, closeReview, connOf, connsOf, discard,
-  envVars, isBookConn, isSheet, loadConns, loadPage, loadSchema, openObj, openSession, pendingOf, removeConn, review, rowObj, runQuery, saveConn, setCell, setDoc, sheetPathOf,
+  envVars, isBookConn, isMaria, isSheet, loadConns, loadPage, loadSchema, openObj, openSession, pendingOf, removeConn, review, rowObj, runQuery, saveConn, setCell, setDoc, sheetPathOf,
   setFilter, setQuery, setResTab, setSelCell, setView, structOf, testConn, toggleDelete, toggleGroup, toggleSort, turnPage, undo, wins,
 } from "./db";
 import { type Cell, type DbKind, cellText, editText, isNested, isOpaque, parseInput, pendingCount, rowKey, writes } from "./dbsql";
@@ -26,23 +26,44 @@ import { Key, KeyText } from "./Keys";
 import { ctrlName } from "./modkey";
 import { isEnter } from "./enterkey";
 
-const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", sqlite: "SQLITE", mongo: "MONGO" };
-const KIND_NAME: Record<DbKind, string> = { postgres: "PostgreSQL", sqlite: "SQLite", mongo: "MongoDB" };
+const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", mysql: "MYSQL", sqlite: "SQLITE", mongo: "MONGO" };
+const KIND_NAME: Record<DbKind, string> = { postgres: "PostgreSQL", mysql: "MySQL", sqlite: "SQLite", mongo: "MongoDB" };
+const KINDS: DbKind[] = ["postgres", "mysql", "sqlite", "mongo"];
 const OBJ_ICON: Record<Obj["kind"], string> = { table: "table-2", view: "eye", system: "table-2", collection: "braces" };
 
 const targetText = (t: DbTarget) => ("env" in t ? `.env ${t.env}` : "url" in t ? t.url.replace(/:[^:@/]*@/, ":•••@") : "sheet" in t ? t.sheet : t.file);
-/** The kind chip: a spreadsheet file shows CSV or its extension, not the SQLite it is loaded into. */
 /** Why a Connection opens read-only. */
 const roWhy = (c: DbConn) =>
   isBookConn(c) ? "Workbooks open read-only" : isSheet(c) ? "In a read-only Linked Folder" : "Read-only Connection";
 
+/** The kind chip: a spreadsheet file shows CSV or its extension, not the SQLite it is loaded into;
+ *  a MySQL Connection shows MARIADB once its server said so. */
 const kindChip = (c: DbConn) => {
+  if (isMaria(c)) return { cls: "mariadb", label: "MARIADB" };
   if (!isSheet(c)) return { cls: c.kind, label: KIND_LABEL[c.kind] };
   const ext = sheetPathOf(c).split(".").pop()?.toUpperCase() ?? "";
   return isBookConn(c) ? { cls: "xlsx", label: ext } : { cls: "csv", label: ext === "TSV" || ext === "TAB" ? "TSV" : "CSV" };
 };
-/** A name for the Query view: quoted when SQL needs it. */
-const sqlName = (n: string) => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(n) ? n : `"${n.replace(/"/g, '""')}"`);
+/** A name for the Query view: quoted when SQL needs it, with backticks on MySQL. */
+const sqlName = (n: string, kind?: DbKind) =>
+  /^[A-Za-z_][A-Za-z0-9_]*$/.test(n) ? n : kind === "mysql" ? `\`${n.replace(/`/g, "``")}\`` : `"${n.replace(/"/g, '""')}"`;
+
+/** One choice of a few, as native radio buttons that look like a segmented control: arrow keys
+ *  move between them, and the fieldset's legend names the group. */
+function Seg<T extends string>(props: { label: string; name: string; value: T; options: readonly (readonly [T, JSX.Element])[]; onChange: (v: T) => void }): JSX.Element {
+  return (
+    <fieldset class="db-field db-fs">
+      <legend>{props.label}</legend>
+      <div class="db-seg">
+        <For each={props.options}>
+          {([v, text]) => (
+            <label><input type="radio" name={props.name} value={v} checked={props.value === v} onChange={() => props.onChange(v)} />{text}</label>
+          )}
+        </For>
+      </div>
+    </fieldset>
+  );
+}
 const fmtCount = (n: number | null) => (n == null ? "" : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}k` : n.toLocaleString());
 
 export default function DbPanel(props: { project: Project; tab: Tab; focused: boolean }): JSX.Element {
@@ -111,7 +132,7 @@ function StartPage(props: { project: Project; tab: Tab; missing: boolean; onNew:
               </span>
               <Show when={c.readOnly}><span class="db-pill ro">read-only</span></Show>
               <Show when={c.tag === "prod"}><span class="db-pill prod">prod</span></Show>
-              <span class={`db-kind ${c.kind}`}>{KIND_LABEL[c.kind]}</span>
+              <span class={`db-kind ${kindChip(c).cls}`}>{kindChip(c).label}</span>
               <button class="db-ib" title="Edit" onClick={(e) => { e.stopPropagation(); props.onEdit(c); }}><Icon name="settings" size={13} /></button>
             </div>
           )}
@@ -123,6 +144,13 @@ function StartPage(props: { project: Project; tab: Tab; missing: boolean; onNew:
 }
 
 // ── connection form ─────────────────────────────────────────────────
+
+const URL_HINT: Record<DbKind, string> = {
+  postgres: "postgres://app@db.internal:5432/app",
+  mysql: "mysql://app@db.internal:3306/app",
+  sqlite: "",
+  mongo: "mongodb://app@mongo.internal:27017/analytics",
+};
 
 function ConnForm(props: { project: Project; conn?: DbConn; onDone: (c?: DbConn) => void; onRemove: (c: DbConn) => void }): JSX.Element {
   const remote = () => isRemote(props.project);
@@ -208,24 +236,17 @@ function ConnForm(props: { project: Project; conn?: DbConn; onDone: (c?: DbConn)
           <span class="muted">{props.project.name} · {props.project.host}</span>
         </div>
         <label class="db-field"><span>Name</span><input value={name()} placeholder="app" onInput={(e) => setName(e.currentTarget.value)} autofocus /></label>
-        <div class="db-field"><span>Kind</span>
-          <div class="db-seg">
-            <For each={["postgres", "sqlite", "mongo"] as DbKind[]}>
-              {(k) => <button type="button" classList={{ on: kind() === k }} onClick={() => setKind(k)}>{KIND_NAME[k]}</button>}
-            </For>
-          </div>
-        </div>
+        <Seg label="Kind" name={`dbkind-${id}`} value={kind()} onChange={setKind} options={KINDS.map((k) => [k, KIND_NAME[k]] as const)} />
+        <Show when={kind() === "mysql"}>
+          <div class="db-hint">MySQL or MariaDB: the server's version says which.</div>
+        </Show>
         <Show when={sqliteRemote()}>
           <div class="db-hint warn">SQLite on an ssh host isn't supported yet: the file lives on {props.project.host}.</div>
         </Show>
-        <div class="db-field"><span>Target</span>
-          <div class="db-seg">
-            <button type="button" classList={{ on: src() === "env" }} onClick={() => setSrc("env")}>From .env</button>
-            <Show when={kind() !== "sqlite"} fallback={<button type="button" classList={{ on: src() === "file" }} onClick={() => setSrc("file")}>File</button>}>
-              <button type="button" classList={{ on: src() === "url" }} onClick={() => setSrc("url")}>URL</button>
-            </Show>
-          </div>
-        </div>
+        <Seg
+          label="Target" name={`dbsrc-${id}`} value={src()} onChange={setSrc}
+          options={[["env", "From .env"], kind() === "sqlite" ? ["file", "File"] : ["url", "URL"]] as const}
+        />
         <Show when={src() === "env"}>
           <label class="db-field"><span>Variable</span>
             <input list={`dbenv-${id}`} value={env()} placeholder="DATABASE_URL" onInput={(e) => setEnv(e.currentTarget.value)} />
@@ -234,7 +255,7 @@ function ConnForm(props: { project: Project; conn?: DbConn; onDone: (c?: DbConn)
           <div class="db-hint">Read from <code>.env</code> or <code>.env.local</code> on the project's host each time it connects. Nothing is stored.</div>
         </Show>
         <Show when={src() === "url"}>
-          <label class="db-field"><span>URL</span><input class="mono" value={url()} placeholder={kind() === "mongo" ? "mongodb://app@mongo.internal:27017/analytics" : "postgres://app@db.internal:5432/app"} onInput={(e) => setUrl(e.currentTarget.value)} /></label>
+          <label class="db-field"><span>URL</span><input class="mono" value={url()} placeholder={URL_HINT[kind()]} onInput={(e) => setUrl(e.currentTarget.value)} /></label>
           <label class="db-field"><span>Password</span><input type="password" value={pw()} placeholder={c0 && "url" in c0.target ? "unchanged" : ""} onInput={(e) => setPw(e.currentTarget.value)} /></label>
           <div class="db-hint">Kept out of <code>.dev/</code>, in <code>~/.tri-code/secrets/databases.json</code> on {remote() ? props.project.host : "this machine"}.</div>
         </Show>
@@ -252,16 +273,14 @@ function ConnForm(props: { project: Project; conn?: DbConn; onDone: (c?: DbConn)
           </div>
         </Show>
         <Show when={remote() && kind() !== "sqlite"}>
-          <div class="db-field"><span>Connect</span>
-            <div class="db-seg">
-              <button type="button" classList={{ on: via() === "host" }} onClick={() => setVia("host")}>Through {props.project.host}</button>
-              <button type="button" classList={{ on: via() === "direct" }} onClick={() => setVia("direct")}>Direct</button>
-            </div>
-          </div>
+          <Seg
+            label="Connect" name={`dbvia-${id}`} value={via()} onChange={setVia}
+            options={[["host", <>Through {props.project.host}</>], ["direct", "Direct"]] as const}
+          />
           <div class="db-hint">
             {via() === "host"
               ? <>An ssh tunnel through <b>{props.project.host}</b>, with its key and options, closed with the window.{kind() === "mongo" ? " Uses directConnection=true." : ""}</>
-              : <>From this machine: for cloud databases (Neon, Supabase, Atlas <code>mongodb+srv://</code>).</>}
+              : <>From this machine: for cloud databases (Neon, Supabase, PlanetScale, Atlas <code>mongodb+srv://</code>).</>}
           </div>
         </Show>
         <div class="db-field"><span>Safety</span>
@@ -302,7 +321,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
   };
   onMount(() => window.addEventListener("keydown", onKey));
   onCleanup(() => window.removeEventListener("keydown", onKey));
-  const objLabel = () => (w()?.obj ? (props.conn.kind === "postgres" && w()!.obj!.group !== "public" ? `${w()!.obj!.group}.` : "") + w()!.obj!.name : "");
+  const objLabel = () => (w()?.obj ? (homeGroup(props.conn, w()) !== undefined && w()!.obj!.group !== homeGroup(props.conn, w()) ? `${w()!.obj!.group}.` : "") + w()!.obj!.name : "");
 
   return (
     <Show when={w()?.status !== "error"} fallback={
@@ -331,7 +350,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
                 <>
                   <div class="db-grp" classList={{ shut: w()?.shut.includes(g.name) }} onClick={() => toggleGroup(id, g.name)}>
                     <Icon name="chevron-down" size={12} class="chev" />
-                    {isSheet(props.conn) ? (isBookConn(props.conn) ? "sheets · " : "file · ") + props.conn.name : <>{props.conn.kind === "mongo" ? "database · " : props.conn.kind === "postgres" ? "schema · " : ""}{g.name}</>}
+                    {isSheet(props.conn) ? (isBookConn(props.conn) ? "sheets · " : "file · ") + props.conn.name : <>{props.conn.kind === "mongo" || props.conn.kind === "mysql" ? "database · " : props.conn.kind === "postgres" ? "schema · " : ""}{g.name}</>}
                     <span class="db-grow" /><span class="db-c">{g.objects.length}</span>
                   </div>
                   <Show when={!w()?.shut.includes(g.name)}>
@@ -383,6 +402,14 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
       </div>
     </Show>
   );
+}
+
+/** The group a bare table name means in SQL: `public` on Postgres, the URL's database on MySQL
+ *  (the backend lists it first). Tables elsewhere are written `group.name`. */
+function homeGroup(conn: DbConn, win: Win | undefined): string | undefined {
+  if (conn.kind === "postgres") return "public";
+  if (conn.kind === "mysql") return win?.groups[0]?.name;
+  return undefined;
 }
 
 /** Why the shown table can't be edited, or nothing. */
@@ -583,7 +610,7 @@ function DataView(props: { project: Project; tab: Tab; conn: DbConn; win: Win | 
                       {(c, ci) => {
                         const v = () => r.values[c.name] ?? null;
                         const isEd = () => editing()?.r === ri() && editing()?.c === ci();
-                        const num = () => typeof v() === "number" || /^(int|bigint|smallint|numeric|real|double|float|decimal|integer|long|double precision|money|oid)/i.test(info(c.name)?.type ?? c.type);
+                        const num = () => typeof v() === "number" || /^(int|bigint|smallint|tinyint|mediumint|numeric|real|double|float|decimal|integer|long|double precision|money|oid)/i.test(info(c.name)?.type ?? c.type);
                         return (
                           <td
                             data-r={ri()}
@@ -708,14 +735,17 @@ function Review(props: { project: Project; tabId: string; conn: DbConn; review: 
         <div class="db-dlg-h"><Icon name="check" size={14} /><b class="db-grow">Review {props.review.ops.length} {props.review.ops.length === 1 ? "change" : "changes"}</b><button class="db-ib" onClick={() => closeReview(props.tabId)}><Icon name="x" size={13} /></button></div>
         <div class="db-dlg-b">
           <Show when={prod()}>
-            <div class="db-prodwarn"><Icon name="triangle-alert" size={14} /><div><b>This Connection is tagged prod.</b> These run against {props.conn.name}{props.conn.kind === "mongo" ? ", in order." : " in one transaction."}</div></div>
+            <div class="db-prodwarn"><Icon name="triangle-alert" size={14} /><div><b>This Connection is tagged prod.</b> These run against {props.conn.name}{props.conn.kind === "mongo" || props.review.note ? ", in order." : " in one transaction."}</div></div>
           </Show>
+          <Show when={props.review.note}>{(n) => <div class="db-hint warn" role="note"><Icon name="triangle-alert" size={12} /> {n()}</div>}</Show>
           <pre class="db-stmts">{props.review.text.join("\n")}</pre>
           <div class="muted small">
             {sheet()
               ? `Applying rewrites ${props.conn.name} with its own delimiter and line endings; rows and cells you didn't change are written as they were. If the file changed on disk since it was loaded, nothing is written.`
               : props.conn.kind === "mongo"
               ? "Each update also matches the old values. If a document changed since it was loaded, it stops there; the changes before it stay written (a transaction needs a replica set)."
+              : props.review.note
+              ? "Each UPDATE also matches the cell's old value. If a row changed since it was loaded, it stops there."
               : "Each UPDATE also matches the cell's old value. If a row changed since it was loaded, nothing is written."}
           </div>
         </div>
@@ -734,6 +764,7 @@ function Review(props: { project: Project; tabId: string; conn: DbConn; review: 
 
 const STARTER: Record<DbKind, (obj?: string) => string> = {
   postgres: (o) => `-- ${ctrlName}+Enter runs, Esc cancels\nSELECT *\n  FROM ${o ?? "users"}\n LIMIT 100;\n`,
+  mysql: (o) => `-- ${ctrlName}+Enter runs, Esc cancels\nSELECT *\n  FROM ${o ?? "information_schema.TABLES"}\n LIMIT 100;\n`,
   sqlite: (o) => `-- ${ctrlName}+Enter runs, Esc cancels\nSELECT *\n  FROM ${o ?? "sqlite_master"}\n LIMIT 100;\n`,
   mongo: (o) => `{\n  "find": "${o ?? "collection"}",\n  "filter": {},\n  "limit": 50\n}\n`,
 };
@@ -744,17 +775,25 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
   let host!: HTMLDivElement;
   let view: EditorView | undefined;
   const lang = new Compartment();
-  const qname = (o?: { group: string; name: string }) =>
-    !o ? undefined : props.conn.kind === "postgres" ? (o.group === "public" ? o.name : `${o.group}.${o.name}`) : props.conn.kind === "sqlite" ? sqlName(o.name) : o.name;
+  const kind = props.conn.kind;
+  const home = () => homeGroup(props.conn, w());
+  /** A table as the Query view writes it: bare in its home group, `group.name` elsewhere. */
+  const qname = (o?: { group: string; name: string }) => {
+    if (!o) return undefined;
+    if (kind === "mongo") return o.name;
+    const name = sqlName(o.name, kind);
+    return home() === undefined || o.group === home() ? name : `${sqlName(o.group, kind)}.${name}`;
+  };
 
   const language = () => {
-    if (props.conn.kind === "mongo") return json();
+    if (kind === "mongo") return json();
     const schema: Record<string, string[]> = {};
     for (const g of w()?.groups ?? []) for (const o of g.objects) {
       const s = w()?.structs[`${g.name}.${o.name}`];
-      schema[props.conn.kind === "postgres" && g.name !== "public" ? `${g.name}.${o.name}` : o.name] = s?.columns.map((c) => c.name) ?? [];
+      schema[home() !== undefined && g.name !== home() ? `${g.name}.${o.name}` : o.name] = s?.columns.map((c) => c.name) ?? [];
     }
-    return sql({ dialect: props.conn.kind === "postgres" ? PostgreSQL : SQLite, schema, upperCaseKeywords: true });
+    const dialect = kind === "postgres" ? PostgreSQL : kind === "mysql" ? (isMaria(props.conn) ? MariaSQL : MySQL) : SQLite;
+    return sql({ dialect, schema, upperCaseKeywords: true });
   };
 
   const run = async () => {
@@ -787,7 +826,7 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
     if (props.focused) view.focus();
   });
   onCleanup(() => view?.destroy());
-  createEffect(on(() => [w()?.groups, Object.keys(w()?.structs ?? {}).length], () => view?.dispatch({ effects: lang.reconfigure(language()) }), { defer: true }));
+  createEffect(on(() => [w()?.groups, Object.keys(w()?.structs ?? {}).length, isMaria(props.conn)], () => view?.dispatch({ effects: lang.reconfigure(language()) }), { defer: true }));
   createEffect(() => { if (props.focused) requestAnimationFrame(() => view?.focus()); });
 
   const sets = () => w()?.results ?? [];
@@ -811,7 +850,7 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
           </div>
         </Show>
         <span class="muted small" title={isSheet(props.conn) ? `Queries run on a copy of ${props.conn.name} in memory: what they change isn't saved. Edit cells in Data to change the file.` : undefined}>
-          {isSheet(props.conn) ? "SQLite · in-memory copy, not saved" : props.conn.kind === "mongo" ? "a runCommand document · EJSON" : props.conn.kind === "postgres" ? "PostgreSQL · timeout 30 s" : "SQLite"} · max 500 rows
+          {isSheet(props.conn) ? "SQLite · in-memory copy, not saved" : props.conn.kind === "mongo" ? "a runCommand document · EJSON" : kind === "postgres" ? "PostgreSQL · timeout 30 s" : kind === "mysql" ? `${isMaria(props.conn) ? "MariaDB" : "MySQL"} · timeout 30 s` : "SQLite"} · max 500 rows
         </span>
       </div>
       <div class="db-res">
