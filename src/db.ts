@@ -34,7 +34,8 @@ export type Obj = { name: string; kind: ObjKind; count: number | null };
 export type Group = { name: string; objects: Obj[] };
 export type ColInfo = { name: string; type: string; nullable: boolean; pk: boolean; default: string | null };
 export type Named = { name: string; def: string };
-export type Structure = { columns: ColInfo[]; key: string[]; indexes: Named[]; fks: Named[]; ddl: string };
+/** `applyNote`: said before Apply, e.g. that a MyISAM table can't roll back. */
+export type Structure = { columns: ColInfo[]; key: string[]; indexes: Named[]; fks: Named[]; ddl: string; applyNote?: string };
 export type Page = { columns: Column[]; rows: Cell[][]; more: boolean; total: number | null };
 export type Sel = { group: string; name: string; kind: ObjKind };
 export type View = "data" | "query" | "structure";
@@ -68,8 +69,8 @@ export type Win = {
   runError?: string;
   /** A nested value opened in the side panel. */
   doc?: { col: string; v: Cell };
-  /** The statements under review, with the text shown. */
-  review?: { ops: (SqlOp | MongoOp)[]; text: string[] };
+  /** The statements under review, with the text shown, and what to say before they run. */
+  review?: { ops: (SqlOp | MongoOp)[]; text: string[]; note?: string };
   applyError?: string;
 };
 
@@ -149,10 +150,19 @@ export async function removeConn(p: Project, id: string) {
 export type EnvVar = { key: string; kind: DbKind };
 export const envVars = (p: Project) => invoke<EnvVar[]>("db_env_vars", { host: p.host, root: rootOf(p) });
 
+// ── MySQL or MariaDB ────────────────────────────────────────────────
+// Both are the `mysql` kind; the server's version says which. It's remembered by Connection id
+// once a window or Test has connected, so the start page's chip can say MARIADB too.
+
+const [servers, setServers] = createStore<Record<string, string>>({});
+const noteServer = (c: DbConn, version: string) => { if (c.kind === "mysql") setServers(c.id, version); };
+export const isMaria = (c: DbConn) => c.kind === "mysql" && /^MariaDB\b/.test(servers[c.id] ?? "");
+
 /** Open and close a Connection, for the form's Test button. */
 export async function testConn(p: Project, c: DbConn, secret?: string): Promise<string> {
   if (secret) await invoke("db_secret_set", { host: p.host, root: rootOf(p), id: c.id, secret });
   const o = await invoke<{ session: number; version: string; tunnel: number | null }>("db_open", { host: p.host, root: rootOf(p), conn: c });
+  noteServer(c, o.version);
   await invoke("db_close", { session: o.session });
   return o.tunnel ? `${o.version} · tunnel 127.0.0.1:${o.tunnel}` : o.version;
 }
@@ -181,7 +191,8 @@ export async function openSession(p: Project, tab: Tab, force = false) {
     // A spreadsheet is read (and a CSV written back) where the file is, not always on the project's host.
     const host = isSheet(c) ? hostAt(p, sheetPathOf(c)) : p.host;
     const o = await invoke<{ session: number; version: string; tunnel: number | null }>("db_open", { host, root: rootOf(p), conn: c });
-    up(tab.id, (x) => Object.assign(x, { status: "open", session: o.session, version: o.version, tunnel: o.tunnel }));
+    noteServer(c, o.version);
+    up(tab.id,(x) => Object.assign(x, { status: "open", session: o.session, version: o.version, tunnel: o.tunnel }));
     await loadSchema(tab.id);
   } catch (e) {
     up(tab.id, (x) => Object.assign(x, { status: "error", error: errText(e) }));
@@ -380,7 +391,8 @@ export function review(p: Project, tabId: string) {
   } else {
     const types = Object.fromEntries(s.columns.map((col) => [col.name, col.type]));
     const ops = sqlOps(t, s.key, types, pend!);
-    up(tabId, (x) => { x.review = { ops, text: ["BEGIN;", ...ops.map((o) => o.sql + ";"), "COMMIT;"] }; });
+    const begin = c.kind === "mysql" ? "START TRANSACTION;" : "BEGIN;";
+    up(tabId, (x) => { x.review = { ops, text: [begin, ...ops.map((o) => o.sql + ";"), "COMMIT;"], note: s.applyNote }; });
   }
 }
 

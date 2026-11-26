@@ -47,6 +47,32 @@ describe("sqlOps", () => {
   });
 });
 
+describe("sqlOps on MySQL", () => {
+  const t = { kind: "mysql" as const, group: "app", name: "users" };
+  const my = { id: "bigint", plan: "varchar(20)", meta: "json", score: "double", n: "int" };
+
+  test("backticks, <=> for the old value, json and floats compared as text", () => {
+    const p: Pending = { ...emptyPending(), edits: { "[7]": { row: { id: "7", plan: "pro", meta: '{"n": 7}', score: "1.1" }, set: { plan: "team", meta: '{"n": 70}', score: "2" } } } };
+    expect(sqlOps(t, ["id"], my, p)[0].sql).toBe(
+      "UPDATE `app`.`users` SET `plan` = 'team', `meta` = '{\"n\": 70}', `score` = '2' WHERE `id` = '7' AND `plan` <=> 'pro' AND CAST(`meta` AS CHAR) <=> '{\"n\": 7}' AND CAST(`score` AS CHAR) <=> '1.1'",
+    );
+  });
+
+  test("backslashes are escaped, so a value can't end the quote", () => {
+    const p: Pending = { ...emptyPending(), edits: { k: { row: { id: "1", plan: null }, set: { plan: "a\\' OR 1=1 -- " } } } };
+    expect(sqlOps(t, ["id"], my, p)[0].sql).toBe("UPDATE `app`.`users` SET `plan` = 'a\\\\'' OR 1=1 -- ' WHERE `id` = '1' AND `plan` IS NULL");
+  });
+
+  test("an empty insert, a backtick in a name, a delete", () => {
+    const p: Pending = { added: [{}, { "we`ird": "x" }], edits: {}, deleted: { "[3]": { id: "3" } } };
+    expect(sqlOps(t, ["id"], my, p).map((o) => o.sql)).toEqual([
+      "INSERT INTO `app`.`users` () VALUES ()",
+      "INSERT INTO `app`.`users` (`we``ird`) VALUES ('x')",
+      "DELETE FROM `app`.`users` WHERE `id` = '3'",
+    ]);
+  });
+});
+
 describe("mongoOps", () => {
   test("by _id, matching the old values of what is set", () => {
     const t = { kind: "mongo" as const, group: "analytics", name: "events" };
@@ -68,6 +94,8 @@ test("parseInput follows each database", () => {
   expect(parseInput("postgres", "42", "1", "bigint", false)).toBe("42");
   expect(parseInput("sqlite", "42", 1, "INTEGER", false)).toBe(42);
   expect(parseInput("sqlite", "42", "1", "TEXT", false)).toBe("42");
+  expect(parseInput("mysql", "42", "1", "int", false)).toBe("42");
+  expect(parseInput("mysql", "", "x", "varchar(9)", true)).toBeNull();
   expect(parseInput("mongo", "7", 1, "int", true)).toBe(7);
   expect(parseInput("mongo", "7", "1", "string", true)).toBe("7");
   expect(parseInput("mongo", '{"a":1}', { a: 0 }, "object", true)).toEqual({ a: 1 });
@@ -87,6 +115,11 @@ test("cells, keys and counts", () => {
 test("writes spots changes, not words in strings or comments", () => {
   expect(writes("postgres", "UPDATE users SET plan = 'pro'")).toBe(true);
   expect(writes("postgres", "SELECT * FROM users WHERE note = 'delete me' -- drop")).toBe(false);
+  expect(writes("mysql", "SELECT * FROM t WHERE note = 'it\\'s a delete'")).toBe(false);
+  expect(writes("mysql", "SELECT `delete` FROM t")).toBe(false);
+  expect(writes("mysql", "RENAME TABLE a TO b")).toBe(true);
+  expect(writes("mysql", "LOAD DATA INFILE 'x' INTO TABLE t")).toBe(true);
+  expect(writes("mysql", "CALL purge()")).toBe(true);
   expect(writes("mongo", '{ "find": "events" }')).toBe(false);
   expect(writes("mongo", '{ "delete": "events", "deletes": [] }')).toBe(true);
   expect(writes("mongo", '{ "aggregate": "e", "pipeline": [{ "$out": "x" }] }')).toBe(true);

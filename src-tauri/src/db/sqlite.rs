@@ -11,7 +11,7 @@ use rusqlite::{Batch, Connection, InterruptHandle, OpenFlags};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::{ColInfo, Column, Group, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure, page_sql, qi, text_cell};
+use super::{ColInfo, Column, Dialect, Group, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure, page_sql, qi, text_cell};
 
 pub struct Lite {
     conn: Arc<Mutex<Connection>>,
@@ -166,7 +166,7 @@ impl Lite {
             for i in indexes.iter().filter(|i| !i.def.is_empty()) {
                 ddl += &format!("\n{};", i.def);
             }
-            Ok(Structure { columns: cols.drain(..).map(|(_, c)| c).collect(), key, indexes, fks, ddl })
+            Ok(Structure { columns: cols.drain(..).map(|(_, c)| c).collect(), key, indexes, fks, ddl, ..Default::default() })
         })
         .await
     }
@@ -174,7 +174,7 @@ impl Lite {
     pub async fn rows(&self, req: &RowsReq) -> Result<Page, String> {
         let rowid = req.key == ["rowid"];
         let from = qi(&req.name);
-        let sql = page_sql(&from, req, rowid)?;
+        let sql = page_sql(Dialect::Std, &from, req, rowid)?;
         let count = if req.filter.trim().is_empty() { format!("SELECT count(*) FROM {from}") } else { format!("SELECT count(*) FROM {from} WHERE {}", req.filter.trim()) };
         self.on(move |c| {
             let mut stmt = c.prepare(&sql).map_err(|e| e.to_string())?;

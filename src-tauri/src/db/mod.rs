@@ -1,4 +1,4 @@
-//! The Database Window's backend (ADR 0004): Sessions on Postgres, SQLite and MongoDB behind
+//! The Database Window's backend (ADR 0004): Sessions on Postgres, MySQL, SQLite and MongoDB behind
 //! one set of commands, so the window never branches on the driver for anything but syntax.
 //!
 //! A Session is an open Connection: its client, and for an ssh project with `via: "host"` the
@@ -8,12 +8,14 @@
 //! expects to change.
 
 // With every driver left out the commands still exist, but nothing past the match runs.
-#![cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo")), allow(unused, unreachable_code))]
+#![cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo", feature = "db-mysql")), allow(unused, unreachable_code))]
 
 mod target;
 pub(crate) mod tunnel;
 #[cfg(feature = "db-mongo")]
 mod mongo;
+#[cfg(feature = "db-mysql")]
+mod mysql;
 #[cfg(feature = "db-pg")]
 mod pg;
 #[cfg(feature = "db-sqlite")]
@@ -53,6 +55,8 @@ pub struct Connection {
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
     Postgres,
+    /// MySQL or MariaDB: one kind, the server's version says which.
+    Mysql,
     Sqlite,
     Mongo,
 }
@@ -145,6 +149,9 @@ pub struct Structure {
     pub indexes: Vec<Named>,
     pub fks: Vec<Named>,
     pub ddl: String,
+    /// Said before Apply, e.g. that a MyISAM table can't roll back a failed batch.
+    #[serde(rename = "applyNote", skip_serializing_if = "Option::is_none")]
+    pub apply_note: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -180,8 +187,10 @@ enum Driver {
     Sheet(sheet::Sheet),
     #[cfg(feature = "db-mongo")]
     Mongo(mongo::Mongo),
+    #[cfg(feature = "db-mysql")]
+    My(mysql::My),
     /// A build with every driver left out still compiles; it can't open anything.
-    #[cfg(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo")))]
+    #[cfg(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo", feature = "db-mysql")))]
     #[allow(dead_code)]
     None(std::convert::Infallible),
 }
@@ -198,7 +207,9 @@ macro_rules! each {
             Driver::Sheet($d) => $body,
             #[cfg(feature = "db-mongo")]
             Driver::Mongo($d) => $body,
-            #[cfg(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo")))]
+            #[cfg(feature = "db-mysql")]
+            Driver::My($d) => $body,
+            #[cfg(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo", feature = "db-mysql")))]
             Driver::None(n) => match *n {},
         }
     };
@@ -245,14 +256,14 @@ pub async fn db_open(host: String, root: String, conn: Connection) -> Result<Ope
     if conn.kind == Kind::Sqlite && remote {
         return Err("SQLite on an ssh host isn't supported yet: the file lives over there".into());
     }
-    #[cfg_attr(not(feature = "db-pg"), allow(unused_variables))]
+    #[cfg_attr(not(any(feature = "db-pg", feature = "db-mysql")), allow(unused_variables))]
     let original = url.clone();
     let mut url = url;
     let tunnel = if remote && conn.via == Via::Host && conn.kind != Kind::Sqlite {
         if url.starts_with("mongodb+srv://") {
             return Err("mongodb+srv:// is a cloud address: set Connect to Direct".into());
         }
-        let default_port = if conn.kind == Kind::Mongo { 27017 } else { 5432 };
+        let default_port = default_port(conn.kind);
         let (h, p) = target::first_host(&url, default_port).ok_or("can't find the database's host in the URL")?;
         let t = tunnel::open(&host, &h, p).await?;
         url = target::point_at(&url, "127.0.0.1", t.port);
@@ -282,6 +293,13 @@ pub async fn db_open(host: String, root: String, conn: Connection) -> Result<Ope
             let (d, v) = mongo::connect(&url).await?;
             (Driver::Mongo(d), v)
         }
+        #[cfg(feature = "db-mysql")]
+        Kind::Mysql => {
+            // Through a tunnel TLS still names the real server, as for Postgres.
+            let real = tunnel.as_ref().and_then(|_| target::first_host(&original, 3306)).map(|(h, _)| h);
+            let (d, v) = mysql::connect(&url, conn.read_only, real).await?;
+            (Driver::My(d), v)
+        }
         #[allow(unreachable_patterns)]
         _ => return Err("this build of tri-code leaves that database out".into()),
     };
@@ -289,6 +307,14 @@ pub async fn db_open(host: String, root: String, conn: Connection) -> Result<Ope
     let s = Session { driver, read_only: conn.read_only, busy: Default::default(), _tunnel: tunnel };
     SESSIONS.lock().unwrap().insert(id, Arc::new(s));
     Ok(Opened { session: id, version, tunnel: port })
+}
+
+fn default_port(kind: Kind) -> u16 {
+    match kind {
+        Kind::Mongo => 27017,
+        Kind::Mysql => 3306,
+        Kind::Postgres | Kind::Sqlite => 5432,
+    }
 }
 
 #[tauri::command]
@@ -402,37 +428,68 @@ pub(crate) fn cap(v: Value) -> Value {
 }
 
 /// `"name"` with inner quotes doubled.
-#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite")), allow(dead_code))]
+#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mysql")), allow(dead_code))]
 pub(crate) fn qi(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
-/// A WHERE text from the filter box must stay one expression: no `;` outside quotes.
-#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite")), allow(dead_code))]
-pub(crate) fn one_expression(filter: &str) -> Result<(), String> {
-    let mut quote: Option<char> = None;
-    for c in filter.chars() {
-        match (quote, c) {
-            (None, '\'' | '"') => quote = Some(c),
-            (Some(q), c) if c == q => quote = None,
-            (None, ';') => return Err("the filter is one WHERE expression: use the Query view for statements".into()),
-            _ => {}
+/// How names are quoted and strings escaped: Postgres and SQLite (`"name"`), or MySQL
+/// (`` `name` ``, and `\` an escape inside a string).
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mysql")), allow(dead_code))]
+pub(crate) enum Dialect {
+    Std,
+    My,
+}
+
+#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mysql")), allow(dead_code))]
+impl Dialect {
+    pub(crate) fn q(self, name: &str) -> String {
+        match self {
+            Dialect::Std => qi(name),
+            Dialect::My => format!("`{}`", name.replace('`', "``")),
         }
+    }
+}
+
+/// A WHERE text from the filter box must stay one expression: no `;` outside quotes and comments.
+#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mysql")), allow(dead_code))]
+pub(crate) fn one_expression(d: Dialect, filter: &str) -> Result<(), String> {
+    let my = d == Dialect::My;
+    let c: Vec<char> = filter.chars().collect();
+    let mut quote: Option<char> = None;
+    let mut i = 0;
+    while i < c.len() {
+        match quote {
+            Some(q) if my && q != '`' && c[i] == '\\' => i += 1,
+            Some(q) if c[i] == q => quote = None,
+            Some(_) => {}
+            None => match c[i] {
+                '\'' | '"' => quote = Some(c[i]),
+                '`' if my => quote = Some('`'),
+                '-' if c.get(i + 1) == Some(&'-') => i = c[i..].iter().position(|&x| x == '\n').map_or(c.len(), |n| i + n),
+                '#' if my => i = c[i..].iter().position(|&x| x == '\n').map_or(c.len(), |n| i + n),
+                '/' if c.get(i + 1) == Some(&'*') => i = c[i + 2..].windows(2).position(|w| w == ['*', '/']).map_or(c.len(), |n| i + 2 + n + 1),
+                ';' => return Err("the filter is one WHERE expression: use the Query view for statements".into()),
+                _ => {}
+            },
+        }
+        i += 1;
     }
     Ok(())
 }
 
-/// `SELECT … FROM t WHERE … ORDER BY … LIMIT … OFFSET …` for a Data page, Postgres and SQLite alike.
-#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite")), allow(dead_code))]
-pub(crate) fn page_sql(from: &str, req: &RowsReq, rowid: bool) -> Result<String, String> {
-    one_expression(&req.filter)?;
+/// `SELECT … FROM t WHERE … ORDER BY … LIMIT … OFFSET …` for a Data page, Postgres, SQLite and MySQL alike.
+#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mysql")), allow(dead_code))]
+pub(crate) fn page_sql(d: Dialect, from: &str, req: &RowsReq, rowid: bool) -> Result<String, String> {
+    one_expression(d, &req.filter)?;
     let mut sql = format!("SELECT {}* FROM {from}", if rowid { "rowid AS \"rowid\", " } else { "" });
     if !req.filter.trim().is_empty() {
         sql += &format!(" WHERE {}", req.filter.trim());
     }
     let dir = if req.desc { "DESC" } else { "ASC" };
-    let mut order: Vec<String> = req.sort.iter().map(|c| format!("{} {dir}", qi(c))).collect();
-    order.extend(req.key.iter().filter(|k| req.sort.as_deref() != Some(k)).map(|k| qi(k)));
+    let mut order: Vec<String> = req.sort.iter().map(|c| format!("{} {dir}", d.q(c))).collect();
+    order.extend(req.key.iter().filter(|k| req.sort.as_deref() != Some(k)).map(|k| d.q(k)));
     if !order.is_empty() {
         sql += &format!(" ORDER BY {}", order.join(", "));
     }
@@ -446,18 +503,40 @@ mod tests {
 
     #[test]
     fn filters_stay_one_expression() {
-        assert!(one_expression("plan = 'pro'").is_ok());
-        assert!(one_expression("body LIKE '%;%'").is_ok());
-        assert!(one_expression("1=1; DROP TABLE users").is_err());
+        for d in [Dialect::Std, Dialect::My] {
+            assert!(one_expression(d, "plan = 'pro'").is_ok());
+            assert!(one_expression(d, "body LIKE '%;%'").is_ok());
+            assert!(one_expression(d, "1=1; DROP TABLE users").is_err());
+            // A comment can't hide a quote that the `;` after it would seem to be inside.
+            assert!(one_expression(d, "x = 1 -- '\n; DROP TABLE users; '").is_err());
+            assert!(one_expression(d, "x = 1 /* ' */; DROP TABLE users; '").is_err());
+        }
+        // MySQL: `\'` stays inside the string, `#` is a comment, backticks quote names.
+        assert!(one_expression(Dialect::My, r"note = '\'' ; DROP TABLE users; '").is_err());
+        assert!(one_expression(Dialect::My, "x = 1 # '\n; DROP TABLE users; '").is_err());
+        assert!(one_expression(Dialect::My, r"note = 'a\';b'").is_ok());
+        assert!(one_expression(Dialect::My, "`we;ird` = 1").is_ok());
+        // Postgres: a backtick is no quote.
+        assert!(one_expression(Dialect::Std, "x = `; DROP TABLE users; `").is_err());
     }
 
     #[test]
     fn page_sql_orders_by_sort_then_key() {
         let req = RowsReq { group: "public".into(), name: "users".into(), offset: 500, filter: "plan = 'pro'".into(), sort: Some("email".into()), desc: true, key: vec!["id".into()] };
         assert_eq!(
-            page_sql("\"public\".\"users\"", &req, false).unwrap(),
+            page_sql(Dialect::Std, "\"public\".\"users\"", &req, false).unwrap(),
             "SELECT * FROM \"public\".\"users\" WHERE plan = 'pro' ORDER BY \"email\" DESC, \"id\" LIMIT 501 OFFSET 500"
         );
+        assert_eq!(
+            page_sql(Dialect::My, "`app`.`users`", &req, false).unwrap(),
+            "SELECT * FROM `app`.`users` WHERE plan = 'pro' ORDER BY `email` DESC, `id` LIMIT 501 OFFSET 500"
+        );
+    }
+
+    #[test]
+    fn quoted_names() {
+        assert_eq!(qi("a\"b"), "\"a\"\"b\"");
+        assert_eq!(Dialect::My.q("a`b"), "`a``b`");
     }
 
     #[test]

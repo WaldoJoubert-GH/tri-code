@@ -11,7 +11,7 @@ use tokio_postgres::config::SslMode;
 use tokio_postgres::{CancelToken, Client, SimpleQueryMessage};
 
 use super::tls::{self, Mode, Tls};
-use super::{ColInfo, Column, Group, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure, page_sql, qi, text_cell};
+use super::{ColInfo, Column, Dialect, Group, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure, page_sql, qi, text_cell};
 
 pub struct Pg {
     client: Client,
@@ -183,7 +183,7 @@ impl Pg {
         };
         // A view has no key to find a row by, so it isn't editable.
         let key = if kind == "view" { Vec::new() } else { key };
-        Ok(Structure { columns, key, indexes, fks, ddl })
+        Ok(Structure { columns, key, indexes, fks, ddl, ..Default::default() })
     }
 
     pub async fn rows(&self, req: &RowsReq) -> Result<Page, String> {
@@ -197,7 +197,7 @@ impl Pg {
         } else {
             req
         };
-        let sql = page_sql(&from, req, false)?;
+        let sql = page_sql(Dialect::Std, &from, req, false)?;
         let mut set = self.simple(&sql, PAGE + 1).await?.into_iter().next().unwrap_or_default();
         let more = set.rows.len() > PAGE;
         set.rows.truncate(PAGE);

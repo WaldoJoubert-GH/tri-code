@@ -177,7 +177,7 @@ impl Mongo {
         let shape: serde_json::Map<String, Value> = cols.into_iter().map(|c| (c.name, Value::String(c.ty))).collect();
         let ddl = format!("// {name}: the fields of {n} sampled documents\n{}", serde_json::to_string_pretty(&shape).unwrap_or_default());
         let key = if kind == "collection" { vec!["_id".into()] } else { Vec::new() };
-        Ok(Structure { columns, key, indexes, fks: Vec::new(), ddl })
+        Ok(Structure { columns, key, indexes, fks: Vec::new(), ddl, ..Default::default() })
     }
 
     pub async fn rows(&self, req: &RowsReq) -> Result<Page, String> {
