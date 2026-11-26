@@ -8,11 +8,11 @@
 
 /* Header: branch → base, then the push / PR / merge steps. */
 .g-head {
-  height: 32px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 6px 0 10px;
+  height: 34px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 6px 0 10px;
   background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden;
 }
-.g-bi { vertical-align: -2px; }
-.g-branch { font: 600 11.5px var(--mono); padding: 2px 7px; border-radius: 4px; background: var(--raised); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.g-bi { color: var(--muted); }
+.g-branch { display: inline-flex; align-items: center; gap: 5px; font: 600 11.5px var(--mono); padding: 2px 7px; border-radius: 4px; background: var(--raised); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .g-branch.base { font-weight: 400; color: var(--muted); background: none; border: 1px solid var(--line); flex: none; }
 .g-arrow, .g-ahead { color: var(--muted); flex: none; }
 .g-ahead { font: 11px var(--mono); }
@@ -24,7 +24,7 @@
 .g-fs.done { color: var(--ok); }
 .g-fs.now { color: var(--text); font-weight: 600; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .g-fs.open { background: var(--raised); color: var(--text); }
-.g-icon { width: 24px; height: 22px; border-radius: 4px; color: var(--muted); flex: none; }
+.g-icon { width: 24px; height: 24px; border-radius: 5px; color: var(--muted); flex: none; display: inline-grid; place-items: center; }
 .g-icon:hover { background: var(--hover); color: var(--text); }
 .g-icon.spin { animation: g-spin 1s linear infinite; }
 @keyframes g-spin { to { transform: rotate(360deg); } }
@@ -79,13 +79,14 @@
 
 /* Context chips: what ✦ reads. */
 .g-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.g-chips .lbl { color: var(--muted); font-size: 11px; margin-right: 2px; cursor: help; }
+.g-chips .lbl { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; margin-right: 2px; cursor: help; }
+.g-chips .lbl .lucide { color: var(--violet); }
 .g-chip {
   display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 999px;
   font-size: 11px; border: 1px solid var(--line); color: var(--muted); max-width: 100%; overflow: hidden; white-space: nowrap;
 }
 .g-chip.on { color: var(--text); border-color: color-mix(in srgb, var(--violet) 45%, var(--line)); background: color-mix(in srgb, var(--violet) 9%, transparent); }
-.g-chip.on::before { content: "✓"; color: var(--violet); font-size: 10px; }
+.g-chip.on .lucide { color: var(--violet); }
 .g-chip .k { font: 10.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
 
 /* File lists and commits. */
@@ -338,3 +339,57 @@
   .g-diffhead .g-side, .g-diffhead .g-seg .lbl { display: none; }
   .g-diffhead .g-seg button { padding: 2px 7px; }
 }
+
+/* Lucide icons and icon buttons (design/git-panel.html, variant A "Quiet"). */
+.g-arrow, .g-ahead .in, .g-dest .cv, .g-repo .cv, .g-flow .sepa { display: inline-flex; align-items: center; }
+.g-ahead .in { gap: 1px; margin-right: 6px; vertical-align: -2px; }
+.g-dest { height: 22px; border-radius: 5px; }
+.g-fs { display: inline-flex; align-items: center; gap: 5px; height: 24px; border-radius: 6px; }
+.g-fs.now .lucide { color: var(--accent); }
+.g-fs.now.warn .lucide { color: var(--warn); }
+.g-count {
+  font: 600 10.5px/16px var(--mono); padding: 0 5px; border-radius: 999px; min-width: 16px; text-align: center;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.g-btn { height: 26px; border-radius: 6px; }
+.g-btn.sm { height: 22px; gap: 5px; }
+.g-btn.ghost { border-color: transparent; background: none; color: var(--muted); }
+.g-btn.ghost:hover:not(:disabled) { color: var(--text); }
+.g-btn:focus-visible, .g-icon:focus-visible, .g-fs:focus-visible, .g-racts button:focus-visible, .g-sec button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+.g-split .more { display: inline-grid; place-items: center; }
+.g-sec { height: 28px; padding-right: 6px; }
+.g-sec > .lucide { opacity: .8; }
+.g-sec button { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: 5px; }
+.g-racts button { display: inline-grid; place-items: center; width: 22px; height: 20px; min-width: 0; padding: 0; border-radius: 4px; }
+.g-racts button.txt { display: inline-flex; align-items: center; gap: 3px; width: auto; padding: 0 5px; }
+.g-frow, .g-srow { height: 26px; }
+.g-frow { padding-right: 6px; }
+.g-commit .w.local { display: inline-flex; align-items: center; gap: 3px; color: var(--warn); }
+.g-menu button { align-items: center; }
+.g-menu button > .lucide { color: var(--muted); }
+.g-menu button.bad:not(:disabled) > .lucide { color: var(--bad); }
+.g-dh { gap: 8px; height: 36px; }
+.g-dh > .lucide { color: var(--accent); }
+.g-dh .x { display: inline-grid; place-items: center; width: 24px; height: 24px; }
+.g-banner > .lucide { color: var(--bad); }
+.g-check .ic { display: inline-grid; place-items: center; }
+.g-finding .sev { display: inline-grid; place-items: center; padding-top: 1px; }
+.g-repohead .cv { display: inline-grid; place-items: center; width: 12px; }
+.g-destmenu .ck { width: 12px; display: inline-grid; place-items: center; }
+.g-side { display: inline-flex; align-items: center; gap: 4px; font-family: var(--ui); }
+.g-side.staged .lucide { color: var(--ok); }
+.g-seg button { display: inline-flex; align-items: center; gap: 5px; }
+.g-hunks .g-icon { width: 24px; height: 20px; }
+.g-icon.spin .lucide, .lucide.spin { animation: g-spin 1s linear infinite; }
+.g-icon.spin { animation: none; }
+@media (prefers-reduced-motion: reduce) { .g-icon.spin .lucide, .lucide.spin { animation: none; } }
+
+/* A narrow window: the header steps and Remove worktree keep their icons and counts, not their words. */
+.gitwin { container: gitwin / inline-size; }
+@container gitwin (max-width: 760px) {
+  .g-fs .lbl, .g-head .g-btn .lbl { display: none; }
+  .g-head .g-btn.sm { padding: 0 5px; }
+}
+.g-revhead { display: inline-flex; align-items: center; gap: 4px; } .g-revhead > .lucide { color: var(--violet); }
