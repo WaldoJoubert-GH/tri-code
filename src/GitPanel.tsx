@@ -28,15 +28,12 @@ import { HoldKey, KeyText } from "./Keys";
 import "./git.css";
 import { ctrlName } from "./modkey";
 import { isEnter } from "./enterkey";
+import { Icon } from "./lucide";
 
-function BranchIcon(): JSX.Element {
-  return (
-    <svg class="g-bi" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-      <circle cx="4" cy="3.5" r="1.7" /><circle cx="4" cy="12.5" r="1.7" /><circle cx="12" cy="5" r="1.7" />
-      <path d="M4 5.2v5.6M12 6.7c0 3-8 2-8 4.1" />
-    </svg>
-  );
-}
+// Icons and buttons follow design/git-panel.html (variant A, "Quiet"): Lucide icons throughout,
+// borderless icon buttons for row and section actions, labels kept on the main actions.
+
+const BranchIcon = () => <Icon name="git-branch" size={12} class="g-bi" />;
 
 /** The status letter shown for a file in one list. */
 const letter = (c: Change, inStaged: boolean) => (inStaged ? c.x : c.x === "?" ? "U" : c.y);
@@ -178,12 +175,12 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
 
   const chip = (id: CtxId, label: string, detail: string, title: string) => (
     <button class="g-chip" classList={{ on: g().ctx[id] }} title={title} onClick={() => toggleCtx(p(), id)}>
-      {label} <span class="k">{detail}</span>
+      <Icon name={g().ctx[id] ? "check" : "plus"} size={11} />{label} <span class="k">{detail}</span>
     </button>
   );
   const Chips = () => (
     <div class="g-chips">
-      <span class="lbl" title="What ✦ reads. Click to switch one off.">✦ reads</span>
+      <span class="lbl" title="What ✦ reads. Click to switch one off."><Icon name="sparkles" size={12} />reads</span>
       {chip("diff", "diff", stagedList().length ? `${stagedList().length} staged` : "branch", "The staged diff (commit) or the branch diff (PR, review)")}
       <Show when={linkedIssue(p())}>{(i) => chip("issue", i().slug, i().title.slice(0, 24), `${i().slug}: ${i().title}`)}</Show>
       {chip("style", "commit style", `last ${s()?.commits.length ?? 0}`, "Recent commit subjects, to match their style")}
@@ -250,13 +247,13 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
           <RowStat n={fp.inStaged ? fp.c.index : fp.c.work} />
           <span class="g-racts" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
             <Show when={conflicted(fp.c)} fallback={
-              <button class="bad g-ask" title={del() ? "Delete file…" : "Discard changes…"} onClick={() => setConfirm(keyOf(fp.c, fp.inStaged))}>
-                {del() ? "🗑" : "↺"}
+              <button class="bad g-ask" title={del() ? "Delete file…" : "Discard changes…"} aria-label={del() ? "Delete file" : "Discard changes"} onClick={() => setConfirm(keyOf(fp.c, fp.inStaged))}>
+                <Icon name={del() ? "trash-2" : "undo-2"} />
               </button>
             }>
-              <button class="txt" title="Mark resolved (git add)" onClick={() => stage(p(), [fp.c.path])}>resolved</button>
+              <button class="txt" title="Mark resolved (git add)" onClick={() => stage(p(), [fp.c.path])}><Icon name="check" size={12} />resolved</button>
             </Show>
-            <button title="More" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.right - 250, r.bottom + 2); }}>⋯</button>
+            <button title="More" aria-label="More" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.right - 250, r.bottom + 2); }}><Icon name="ellipsis" /></button>
           </span>
         </div>
       </Show>
@@ -273,23 +270,25 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         return (
           <div class="g-menu g-ctx" role="menu" style={{ left: `${m().x}px`, top: `${m().y}px` }}>
             <button role="menuitem" disabled={c().x === "D" || c().y === "D"}
-              onClick={run(() => openFile(p(), abs({ repo: g().repo, path: c().path, staged: m().staged }), { from: props.tab.id }))}>Open in editor</button>
-            <button role="menuitem" onClick={run(() => { copyText(c().path); flash("copied the path"); })}>Copy path</button>
+              onClick={run(() => openFile(p(), abs({ repo: g().repo, path: c().path, staged: m().staged }), { from: props.tab.id }))}><Icon name="square-pen" />Open in editor</button>
+            <button role="menuitem" onClick={run(() => { copyText(c().path); flash("copied the path"); })}><Icon name="copy" />Copy path</button>
             <hr />
             <button role="menuitem" onClick={run(() => (m().staged ? unstage(p(), [c().path]) : stage(p(), [c().path])))}>
+              <Icon name={conflicted(c()) ? "check" : m().staged ? "minus" : "plus"} />
               {conflicted(c()) ? "Mark resolved" : m().staged ? "Unstage" : "Stage"}
             </button>
             <button role="menuitem" disabled={conflicted(c()) || c().path.endsWith("/")}
-              onClick={run(() => stashPush(p(), { message: short(c().path), untracked: untrackedC(c()), files: [c().path] }))}>Stash this file</button>
+              onClick={run(() => stashPush(p(), { message: short(c().path), untracked: untrackedC(c()), files: [c().path] }))}><Icon name="archive" />Stash this file</button>
             <hr />
             <Show when={untrackedC(c())}>
-              <button role="menuitem" onClick={run(() => ignore(p(), c().path))}>Add to .gitignore</button>
+              <button role="menuitem" onClick={run(() => ignore(p(), c().path))}><Icon name="file-x" />Add to .gitignore</button>
             </Show>
             <Show when={!untrackedC(c()) && c().x !== "A" && c().x !== "D"}>
-              <button role="menuitem" onClick={run(() => untrack(p(), c().path))}>Stop tracking (keep on disk)</button>
+              <button role="menuitem" onClick={run(() => untrack(p(), c().path))}><Icon name="eye-off" />Stop tracking (keep on disk)</button>
             </Show>
             <button role="menuitem" class="bad g-ask" disabled={conflicted(c())}
               onClick={() => { const k = keyOf(c(), m().staged); close(); setConfirm(k); }}>
+              <Icon name={deletes(c(), m().staged) ? "trash-2" : "undo-2"} />
               {deletes(c(), m().staged) ? "Delete file…" : "Discard changes…"}
             </button>
           </div>
@@ -317,7 +316,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               <span class="grow" />
               <button class="g-btn sm" onClick={() => setStashForm(null)}>Cancel</button>
               <button class="g-btn sm primary" disabled={!n() || !!g().working} onClick={() => void go()}>
-                {g().working === "stash" ? "Stashing…" : `Stash ${n()}`}
+                <Icon name="archive" size={13} />{g().working === "stash" ? "Stashing…" : `Stash ${n()}`}
               </button>
             </div>
           </div>
@@ -337,7 +336,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         <span class="g-racts" onClick={(e) => e.stopPropagation()}>
           <button class="txt" title="git stash apply: keep the stash" disabled={!!g().working} onClick={() => stashOp(p(), sp.st, "apply")}>Apply</button>
           <button class="txt" title="git stash pop: apply, then drop it" disabled={!!g().working} onClick={() => stashOp(p(), sp.st, "pop")}>Pop</button>
-          <button class="bad g-ask" title="Drop…" onClick={() => setConfirm(`drop:${sp.st.sha}`)}>×</button>
+          <button class="bad g-ask" title="Drop…" aria-label="Drop stash" onClick={() => setConfirm(`drop:${sp.st.sha}`)}><Icon name="trash-2" /></button>
         </span>
       </div>
     </Show>
@@ -345,19 +344,21 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
 
   const Lists = (lp: { sub?: boolean }) => (
     <>
-      <div class="g-sec" classList={{ sub: lp.sub }}>Staged <span class="n">{stagedList().length}</span>
-        <button title="Unstage all" onClick={() => unstage(p(), stagedList().map((c) => c.path))}>− all</button>
+      <div class="g-sec" classList={{ sub: lp.sub }}><Icon name="circle-check-big" size={12} />Staged <span class="n">{stagedList().length}</span>
+        <Show when={stagedList().length}>
+          <button title="Unstage all" aria-label="Unstage all" onClick={() => unstage(p(), stagedList().map((c) => c.path))}><Icon name="minus" /></button>
+        </Show>
       </div>
       <For each={stagedList()}>{(c) => <FileRow c={c} inStaged={true} />}</For>
-      <div class="g-sec" classList={{ sub: lp.sub }}>Changes <span class="n">{unstagedList().length}</span>
+      <div class="g-sec" classList={{ sub: lp.sub }}><Icon name="file-diff" size={12} />Changes <span class="n">{unstagedList().length}</span>
         <Show when={unstagedList().length}>
           <span class="acts">
-            <button class="g-stashbtn" title="Stash the changes…" onClick={(e) => {
+            <button class="g-stashbtn" title="Stash the changes…" aria-label="Stash the changes" onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect();
               setStashForm(stashForm() ? null : at(r.right - 290, r.bottom + 4, 290));
-            }}>Stash…</button>
-            <button class="bad g-ask" title="Discard all changes…" onClick={() => setConfirm("*")}>↺ all</button>
-            <button title="Stage all" onClick={() => stage(p(), unstagedList().map((c) => c.path))}>+ all</button>
+            }}><Icon name="archive" /></button>
+            <button class="bad g-ask" title="Discard all changes…" aria-label="Discard all changes" onClick={() => setConfirm("*")}><Icon name="undo-2" /></button>
+            <button title="Stage all" aria-label="Stage all" onClick={() => stage(p(), unstagedList().map((c) => c.path))}><Icon name="plus" /></button>
           </span>
         </Show>
       </div>
@@ -378,10 +379,10 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
       <For each={unstagedList()}>{(c) => <FileRow c={c} inStaged={false} />}</For>
       <Show when={s() && !s()!.files.length && !g().loading}><div class="g-hint pad">Working tree clean.</div></Show>
       <Show when={g().stashes?.length}>
-        <div class="g-sec" classList={{ sub: lp.sub }}>Stashes <span class="n">{g().stashes!.length}</span></div>
+        <div class="g-sec" classList={{ sub: lp.sub }}><Icon name="archive" size={12} />Stashes <span class="n">{g().stashes!.length}</span></div>
         <For each={g().stashes}>{(st) => <StashRow st={st} />}</For>
       </Show>
-      <div class="g-sec" classList={{ sub: lp.sub }}>Commits</div>
+      <div class="g-sec" classList={{ sub: lp.sub }}><Icon name="history" size={12} />Commits</div>
       <For each={s()?.commits ?? []}>
         {(c) => (
           <div
@@ -391,7 +392,9 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             onClick={() => selectCommit(p(), c.sha)}
           >
             <span class="sha">{c.sha.slice(0, 7)}</span><span class="s">{c.subject}</span>
-            <span class="w">{c.pushed ? c.when : "local"}</span>
+            <span class="w" classList={{ local: !c.pushed }} title={c.pushed ? undefined : "Not pushed"}>
+              <Show when={!c.pushed}><Icon name="cloud-off" size={11} /></Show>{c.pushed ? c.when : "local"}
+            </span>
           </div>
         )}
       </For>
@@ -405,7 +408,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     return (
       <div class="g-reposec">
         <div class="g-repohead" classList={{ on: active() }} title={`${rp.r.repo || p().name}${rs()?.branch ? ` · ${rs()!.branch}` : ""}`} onClick={() => selectRepo(p(), rp.r.repo)}>
-          <span class="cv">{active() ? "▾" : "▸"}</span>
+          <span class="cv"><Icon name={active() ? "chevron-down" : "chevron-right"} size={12} /></span>
           <b>{rp.r.repo || p().name}</b>
           <span class="br">{rs()?.branch ?? "—"}</span>
           <Show when={rs()?.ahead}><span class="ab">↑{rs()!.ahead}</span></Show>
@@ -427,7 +430,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     );
   };
 
-  const FlowStep = (fp: { id: Drawer; label: string; done: boolean; now: boolean; warn?: boolean; disabled?: string }) => (
+  const FlowStep = (fp: { id: Drawer; icon: string; label: string; count?: number; done: boolean; now: boolean; warn?: boolean; disabled?: string }) => (
     <button
       class="g-fs"
       classList={{ done: fp.done && !fp.now, now: fp.now, warn: fp.now && fp.warn, open: g().drawer === fp.id }}
@@ -435,7 +438,8 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
       title={fp.disabled ?? ""}
       onClick={() => openDrawer(p(), g().drawer === fp.id ? null : fp.id)}
     >
-      {fp.done ? "✓ " : ""}{fp.label}
+      <Icon name={fp.done && !fp.now ? "check" : fp.icon} size={13} /><span class="lbl">{fp.label}</span>
+      <Show when={fp.count}><span class="g-count">{fp.count}</span></Show>
     </button>
   );
 
@@ -444,7 +448,11 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
       <For each={g().pr?.checks ?? []} fallback={<div class="g-hint">No checks on this PR.</div>}>
         {(c) => (
           <div class="g-check">
-            <span class={`ic ${c.state}`}>{c.state === "pass" ? "✓" : c.state === "fail" ? "✕" : c.state === "skip" ? "–" : ""}</span>
+            <span class={`ic ${c.state}`}>
+              <Show when={c.state !== "pending"}>
+                <Icon name={c.state === "pass" ? "circle-check" : c.state === "fail" ? "circle-x" : "circle-minus"} />
+              </Show>
+            </span>
             {c.name}
             <span class="t">{c.state === "pending" ? "running" : c.state}</span>
           </div>
@@ -460,7 +468,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         <div class="g-row">
           <span class="g-hint">A second pass over the whole branch before it lands.</span>
           <span class="grow" />
-          <Show when={g().busy === "review"} fallback={<button class="g-btn ai sm" onClick={() => review(p())}>✦ Review PR</button>}>
+          <Show when={g().busy === "review"} fallback={<button class="g-btn ai sm" onClick={() => review(p())}><Icon name="sparkles" size={13} />Review PR</button>}>
             <Thinking what="reviewing…" />
           </Show>
         </div>
@@ -471,22 +479,22 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         return (
           <div class="g-review">
             <div class="g-row">
-              <span class="g-hint">✦ review · <b classList={{ warn: open() > 0, ok: open() === 0 }}>{open() ? `${open()} to fix before merge` : "nothing blocking"}</b></span>
+              <span class="g-hint g-revhead"><Icon name="sparkles" size={12} />review · <b classList={{ warn: open() > 0, ok: open() === 0 }}>{open() ? `${open()} to fix before merge` : "nothing blocking"}</b></span>
               <span class="grow" />
               <Show when={g().busy !== "review"} fallback={<Thinking what="reviewing…" />}>
-                <button class="g-btn sm" onClick={() => review(p())}>Again</button>
+                <button class="g-btn sm" onClick={() => review(p())}><Icon name="rotate-cw" size={13} />Again</button>
               </Show>
             </div>
             <For each={list()}>
               {(f, i) => (
                 <div class="g-finding">
-                  <span class={`sev ${f.sev}`}>{f.sev === "fix" ? "!" : f.sev === "ok" ? "✓" : "i"}</span>
+                  <span class={`sev ${f.sev}`}><Icon name={f.sev === "fix" ? "circle-alert" : f.sev === "ok" ? "circle-check" : "info"} /></span>
                   <div>
                     <Show when={f.loc}><div class="loc">{f.loc}</div></Show>
                     <p>{f.text}</p>
                   </div>
                   <Show when={f.sev !== "ok"} fallback={<span />}>
-                    <button class="g-btn sm" title="Copy the note to the clipboard" onClick={() => copyFinding(p(), i())}>Copy</button>
+                    <button class="g-btn sm" title="Copy the note to the clipboard" onClick={() => copyFinding(p(), i())}><Icon name="copy" size={13} />Copy</button>
                   </Show>
                 </div>
               )}
@@ -508,7 +516,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             </span>
             <span class="g-hint">{s()?.branch} → {pr().baseRefName}</span>
             <span class="grow" />
-            <button class="g-btn sm" onClick={() => openUrlInProject(p().id, pr().url, props.tab.id)}>Open ↗</button>
+            <button class="g-btn sm" onClick={() => openUrlInProject(p().id, pr().url, props.tab.id)}><Icon name="external-link" size={13} />Open</button>
           </div>
           <Show when={pr().body}>
             <details><summary class="g-hint">Description</summary><div class="g-md">{pr().body}</div></details>
@@ -528,7 +536,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                 <span class="sha">{d().sha.slice(0, 7)}</span>
                 <span class="g-hint">{d().author} · {d().when}</span>
                 <span class="grow" />
-                <button class="g-icon" title="Close the commit" onClick={() => selectCommit(p(), c.sha)}>×</button>
+                <button class="g-icon" title="Close the commit" aria-label="Close the commit" onClick={() => selectCommit(p(), c.sha)}><Icon name="x" /></button>
               </div>
               <h3>{d().message.split("\n")[0]}</h3>
               <Show when={d().message.split("\n").slice(1).join("\n").trim()}>
@@ -565,7 +573,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                 <For each={names()} fallback={<div class="g-hint pad">No match.</div>}>
                   {(b) => (
                     <button role="menuitemradio" aria-checked={b === s()!.base} classList={{ on: b === s()!.base }} onClick={() => pick(b)}>
-                      <span class="ck">{b === s()!.base ? "✓" : ""}</span><span class="nm">{b}</span>
+                      <span class="ck"><Show when={b === s()!.base}><Icon name="check" size={12} /></Show></span><span class="nm">{b}</span>
                       <Show when={b === s()!.defaultBase}><span class="keycaps g-hint">default</span></Show>
                     </button>
                   )}
@@ -590,12 +598,13 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         const name = () => (op() === "merge" ? "Merge" : "Rebase");
         return (
           <div class="g-banner" role="status">
+            <Icon name="triangle-alert" class="g-bad" />
             <b>{name()} stopped</b>
             <span>{left() ? `${left()} conflict${left() === 1 ? "" : "s"}: fix the file, then mark it resolved` : "conflicts resolved: continue when ready"}</span>
             <span class="grow" />
-            <button class="g-btn sm" disabled={!!g().working} onClick={() => finishOp(p(), "abort")}>Abort {op()}</button>
+            <button class="g-btn sm" disabled={!!g().working} onClick={() => finishOp(p(), "abort")}><Icon name="circle-x" size={13} />Abort {op()}</button>
             <button class="g-btn sm primary" disabled={!!g().working || left() > 0} onClick={() => finishOp(p(), "continue")}>
-              {g().working === "rebase" ? "Working…" : "Continue"}
+              <Icon name="play" size={13} />{g().working === "rebase" ? "Working…" : "Continue"}
             </button>
           </div>
         );
@@ -619,13 +628,13 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                     <Show when={confirm() !== `drop:${e().sha}`} fallback={
                       <Confirm q={<>Drop <b>{e().ref}</b>?</>} yes="Drop" onYes={() => void stashOp(p(), e(), "drop")} />
                     }>
-                      <button class="g-btn sm" disabled={!!g().working} title="git stash apply: keep the stash" onClick={() => stashOp(p(), e(), "apply")}>Apply</button>
-                      <button class="g-btn sm primary" disabled={!!g().working} title="git stash pop: apply, then drop it" onClick={() => stashOp(p(), e(), "pop")}>Pop</button>
-                      <button class="g-btn sm ghostdanger g-ask" onClick={() => setConfirm(`drop:${e().sha}`)}>Drop</button>
+                      <button class="g-btn sm" disabled={!!g().working} title="git stash apply: keep the stash" onClick={() => stashOp(p(), e(), "apply")}><Icon name="clipboard-paste" size={13} />Apply</button>
+                      <button class="g-btn sm primary" disabled={!!g().working} title="git stash pop: apply, then drop it" onClick={() => stashOp(p(), e(), "pop")}><Icon name="archive-restore" size={13} />Pop</button>
+                      <button class="g-btn sm ghostdanger g-ask" onClick={() => setConfirm(`drop:${e().sha}`)}><Icon name="trash-2" size={13} />Drop</button>
                     </Show>
                   )}
                 </Show>
-                <button class="g-icon" title="Close the stash" onClick={() => closeStash(p())}>×</button>
+                <button class="g-icon" title="Close the stash" aria-label="Close the stash" onClick={() => closeStash(p())}><Icon name="x" /></button>
               </div>
               <h3>{st().subject}</h3>
             </div>
@@ -651,7 +660,11 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     return (
       <Show when={d()}>
         <div class="g-drawer">
-          <div class="g-dh">{title()}<button class="x" title="Close" onClick={() => openDrawer(p(), null)}>×</button></div>
+          <div class="g-dh">
+            <Icon name={d() === "pull" ? "arrow-down-to-line" : d() === "push" ? "arrow-up-from-line" : d() === "pr" ? "git-pull-request-arrow" : "git-merge"} />
+            {title()}
+            <button class="x" title="Close" aria-label="Close" onClick={() => openDrawer(p(), null)}><Icon name="x" /></button>
+          </div>
           <div class="g-db">
             <Show when={d() === "pull"}>
               <div class="g-hint">from <b class="g-mono">{s()?.upstream}</b> into <b class="g-mono">{s()?.branch}</b></div>
@@ -725,7 +738,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               <Show when={s()?.behind && !elsewhere()}>
                 <div class="g-note warn">
                   {s()!.behind} commit{s()!.behind === 1 ? " is" : "s are"} on {s()!.upstream} but not here yet; the push will be refused.
-                  <button class="g-btn sm" style={{ "margin-left": "6px" }} onClick={() => openDrawer(p(), "pull")}>Pull first</button>
+                  <button class="g-btn sm" style={{ "margin-left": "6px" }} onClick={() => openDrawer(p(), "pull")}><Icon name="arrow-down-to-line" size={13} />Pull first</button>
                 </div>
               </Show>
             </Show>
@@ -734,7 +747,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                 <div class="g-row">
                   <span class="g-branch"><BranchIcon /> {s()?.branch}</span>→<span class="g-branch base">{s()?.base}</span>
                   <span class="grow" />
-                  <Show when={g().busy === "pr"} fallback={<button class="g-btn ai sm" onClick={() => draftPr(p())}>✦ Draft PR</button>}>
+                  <Show when={g().busy === "pr"} fallback={<button class="g-btn ai sm" onClick={() => draftPr(p())}><Icon name="sparkles" size={13} />Draft PR</button>}>
                     <Thinking what="drafting…" />
                   </Show>
                 </div>
@@ -769,11 +782,13 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
           <div class="g-df">
             <Show when={d() === "pull"}>
               <button class="g-btn sm" disabled={!!g().working} title="git fetch --all --prune" onClick={() => fetchRemotes(p())}>
-                {g().working === "fetch" ? "Fetching…" : "Fetch"}
+                <Icon name="refresh-cw" size={13} class={g().working === "fetch" ? "spin" : ""} />{g().working === "fetch" ? "Fetching…" : "Fetch"}
               </button>
               <span class="grow" />
               <button class="g-btn primary" disabled={!!g().working || !s()?.behind || ffBlocked()} onClick={() => pull(p())}>
-                {g().working === "pull" ? "Pulling…" : s()?.behind ? `Pull ↓${s()!.behind}` : "Up to date"}
+                <Icon name={s()?.behind ? "arrow-down-to-line" : "check"} />
+                {g().working === "pull" ? "Pulling…" : s()?.behind ? "Pull" : "Up to date"}
+                <Show when={s()?.behind && g().working !== "pull"}><span class="g-count">{s()!.behind}</span></Show>
               </button>
             </Show>
             <Show when={d() === "push"}>
@@ -789,7 +804,9 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                   if (await push(p(), same ? undefined : t)) openDrawer(p(), null);
                 }}
               >
-                {g().working === "push" ? "Pushing…" : up() ? `Push ↑${up()}` : "Push"}
+                <Icon name="arrow-up-from-line" />
+                {g().working === "push" ? "Pushing…" : "Push"}
+                <Show when={up() && g().working !== "push"}><span class="g-count">{up()}</span></Show>
               </button>
             </Show>
             <Show when={d() === "pr" && (!g().pr || g().pr!.state !== "OPEN")}>
@@ -799,7 +816,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               <span class="grow" />
               <Show when={up() > 0}><span class="g-hint warn">push first</span></Show>
               <button class="g-btn primary" disabled={!g().prTitle.trim() || up() > 0 || !!g().working} onClick={() => openPr(p())}>
-                {g().working === "pr" ? "Opening…" : "Open PR"}
+                <Icon name="git-pull-request-arrow" />{g().working === "pr" ? "Opening…" : "Open PR"}
               </button>
             </Show>
             <Show when={d() === "merge" && g().pr?.state === "OPEN"}>
@@ -814,7 +831,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                     </span>
                     <span class="grow" />
                     <button class="g-btn ok" disabled={pending() || !!g().working} onClick={() => merge(p())}>
-                      {g().working === "merge" ? "Merging…" : failing() ? `Merge #${g().pr!.number} anyway` : `Merge #${g().pr!.number}`}
+                      <Icon name="git-merge" />{g().working === "merge" ? "Merging…" : failing() ? `Merge #${g().pr!.number} anyway` : `Merge #${g().pr!.number}`}
                     </button>
                   </>
                 );
@@ -831,7 +848,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
       <div class="g-head" classList={{ "g-head-open": repoMenu() }}>
         <Show when={multiRepo()}>
           <button class="g-repo" title="Active repo: click to switch" aria-haspopup="menu" aria-expanded={repoMenu()} onClick={() => setRepoMenu(!repoMenu())}>
-            <b>{repoName()}</b><span class="k">{g().repos!.length} repos</span><span class="cv">▾</span>
+            <b>{repoName()}</b><span class="k">{g().repos!.length} repos</span><span class="cv"><Icon name="chevron-down" size={12} /></span>
           </button>
           <Show when={repoMenu()}>
             <div class="g-repomenu" role="menu">
@@ -858,7 +875,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         </Show>
         <Show when={s()} fallback={<span class="g-hint" classList={{ bad: !!g().repoError }}>{g().repoError ?? (isRemote(p()) ? `${p().host}:${p().path}` : p().path)}</span>}>
           <span class="g-branch"><BranchIcon /> {s()!.branch ?? "detached HEAD"}</span>
-          <span class="g-arrow">→</span>
+          <span class="g-arrow"><Icon name="arrow-right" size={12} /></span>
           <button
             class="g-dest"
             classList={{ open: destMenu() }}
@@ -875,10 +892,10 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               if (open) void loadBranches(p());
             }}
           >
-            {s()!.base}<span class="cv">▾</span>
+            {s()!.base}<span class="cv"><Icon name="chevron-down" size={12} /></span>
           </button>
           <span class="g-ahead">
-            {s()!.behind ? <span class="in" title={`${s()!.behind} on ${s()!.upstream} not here yet`}>↓{s()!.behind} </span> : ""}
+            {s()!.behind ? <span class="in" title={`${s()!.behind} on ${s()!.upstream} not here yet`}><Icon name="arrow-down" size={12} />{s()!.behind}</span> : ""}
             {s()!.files.length ? `${s()!.files.length} changed` : ""}
           </span>
         </Show>
@@ -887,25 +904,29 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
           <div class="g-flow">
             <FlowStep
               id="pull"
-              label={s()!.behind ? `Pull ↓${s()!.behind}` : "Pull"}
+              icon="arrow-down-to-line"
+              label="Pull"
+              count={s()!.behind}
               done={!!s()!.upstream && !s()!.behind}
               now={s()!.behind > 0}
               warn
               disabled={!s()!.upstream ? "No upstream yet: push the branch first" : undefined}
             />
-            <span class="sepa">›</span>
-            <FlowStep id="push" label={up() ? `Push ↑${up()}` : "Push"} done={!up() && !!s()!.upstream} now={step() === "push" && !s()!.behind} />
-            <span class="sepa">›</span>
+            <span class="sepa"><Icon name="chevron-right" size={12} /></span>
+            <FlowStep id="push" icon="arrow-up-from-line" label="Push" count={up()} done={!up() && !!s()!.upstream} now={step() === "push" && !s()!.behind} />
+            <span class="sepa"><Icon name="chevron-right" size={12} /></span>
             <FlowStep
               id={g().pr?.state === "OPEN" ? "merge" : "pr"}
+              icon="git-pull-request-arrow"
               label={g().pr?.state === "OPEN" ? `#${g().pr!.number}` : "PR"}
               done={g().pr?.state === "OPEN" || g().pr?.state === "MERGED"}
               now={step() === "pr" && !onBase()}
               disabled={onBase() && !g().pr ? `You are on ${s()!.base}; work on a branch to open a PR` : undefined}
             />
-            <span class="sepa">›</span>
+            <span class="sepa"><Icon name="chevron-right" size={12} /></span>
             <FlowStep
               id="merge"
+              icon={g().pr?.checks.some((c) => c.state === "pending") ? "loader-circle" : "git-merge"}
               label={g().pr?.checks.some((c) => c.state === "pending") ? "Checks…" : "Merge"}
               done={g().pr?.state === "MERGED"}
               now={step() === "merge"}
@@ -916,14 +937,14 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
         <Show when={p().parent}>
           <button
             class="g-btn sm"
-            classList={{ primary: g().pr?.state === "MERGED" }}
+            classList={{ primary: g().pr?.state === "MERGED", ghost: g().pr?.state !== "MERGED" }}
             title={`Close this worktree's windows, delete ${p().path} and its branch`}
             onClick={() => void removeWorktree(p())}
           >
-            Remove worktree
+            <Icon name="folder-x" size={13} /><span class="lbl">Remove worktree</span>
           </button>
         </Show>
-        <button class="g-icon" title="Refresh" classList={{ spin: g().loading }} onClick={() => refresh(p())}>⟳</button>
+        <button class="g-icon" title="Refresh" aria-label="Refresh" classList={{ spin: g().loading }} onClick={() => refresh(p())}><Icon name="refresh-cw" /></button>
       </div>
 
       <OpBanner />
@@ -944,21 +965,23 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
               />
               <div class="g-row">
                 <Show when={g().busy === "commit"} fallback={
-                  <button class="g-btn ai sm" disabled={!stagedList().length} title="Write the message from the staged diff" onClick={() => draftCommit(p())}>✦ Draft</button>
+                  <button class="g-btn ai sm" disabled={!stagedList().length} title="Write the message from the staged diff" onClick={() => draftCommit(p())}><Icon name="sparkles" size={13} />Draft</button>
                 }>
                   <Thinking what="drafting…" />
                 </Show>
                 <span class="grow" />
                 <span class="g-split">
                   <button class="g-btn primary" disabled={!ready()} onClick={() => commit(p())}>
-                    {g().working === "commit" ? "Committing…" : `Commit${stagedList().length ? ` ${stagedList().length}` : ""}`}
+                    <Icon name="git-commit-horizontal" />
+                    {g().working === "commit" ? "Committing…" : "Commit"}
+                    <Show when={stagedList().length && g().working !== "commit"}><span class="g-count">{stagedList().length}</span></Show>
                   </button>
-                  <button class="g-btn primary more" disabled={!ready()} aria-haspopup="menu" onClick={() => setMenu(!menu())}>▾</button>
+                  <button class="g-btn primary more" disabled={!ready()} aria-haspopup="menu" aria-label="More commit options" onClick={() => setMenu(!menu())}><Icon name="chevron-down" /></button>
                   <Show when={menu()}>
                     <div class="g-menu" role="menu">
-                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p(), "push"); }}>Commit &amp; push<KeyText text="Mod+Shift+↵" /></button>
-                      <button role="menuitem" disabled={onBase()} onClick={() => { setMenu(false); void commit(p(), "pr"); }}>Commit, push &amp; open PR…</button>
-                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p()); }}>Commit<KeyText text="Mod+↵" /></button>
+                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p(), "push"); }}><Icon name="arrow-up-from-line" />Commit &amp; push<KeyText text="Mod+Shift+↵" /></button>
+                      <button role="menuitem" disabled={onBase()} onClick={() => { setMenu(false); void commit(p(), "pr"); }}><Icon name="git-pull-request-arrow" />Commit, push &amp; open PR…</button>
+                      <button role="menuitem" onClick={() => { setMenu(false); void commit(p()); }}><Icon name="git-commit-horizontal" />Commit<KeyText text="Mod+↵" /></button>
                     </div>
                   </Show>
                 </span>
@@ -987,21 +1010,25 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
                     <span class="g-stat"><i class="p">+{stat().added}</i> <i class="m">−{stat().removed}</i></span>
                   </Show>
                   <span class="grow" />
-                  <Show when={g().sel}><span class="g-side">{g().sel!.staged ? "staged" : "not staged"}</span></Show>
+                  <Show when={g().sel}>
+                    <span class="g-side" classList={{ staged: g().sel!.staged }}>
+                      <Icon name={g().sel!.staged ? "circle-check-big" : "circle-dashed"} size={12} />{g().sel!.staged ? "staged" : "not staged"}
+                    </span>
+                  </Show>
                   <span class="g-hunks">
-                    <button class="g-icon" title="Previous hunk (P)" disabled={!hunks().length} onClick={() => nav(-1)}>⌃</button>
-                    <button class="g-icon" title="Next hunk (N)" disabled={!hunks().length} onClick={() => nav(1)}>⌄</button>
+                    <button class="g-icon" title="Previous hunk (P)" aria-label="Previous hunk" disabled={!hunks().length} onClick={() => nav(-1)}><Icon name="chevron-up" /></button>
+                    <button class="g-icon" title="Next hunk (N)" aria-label="Next hunk" disabled={!hunks().length} onClick={() => nav(1)}><Icon name="chevron-down" /></button>
                   </span>
                   <span class="g-seg" role="group" aria-label="Diff orientation">
-                    <button aria-pressed={mode() === "unified"} title="A stacked diff" onClick={() => setMode("unified")}>☰<span class="lbl"> Unified</span></button>
+                    <button aria-pressed={mode() === "unified"} title="A stacked diff" onClick={() => setMode("unified")}><Icon name="rows-2" size={13} /><span class="lbl">Unified</span></button>
                     <button
                       aria-pressed={mode() === "split"}
                       title={wantedMode() === "split" && !splitFits() ? "Split needs about 660px: this pane shows unified" : "Side by side"}
                       onClick={() => setMode("split")}
-                    >▥<span class="lbl"> Split</span></button>
+                    ><Icon name="columns-2" size={13} /><span class="lbl">Split</span></button>
                   </span>
-                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : "Open the file at its first change"} onClick={() => openAt("source")}>↗ Editor</button>
-                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : withKey("Open the editor in its diff view", "diff")} onClick={() => openAt("diff")}>Diff<HoldKey id="diff" when={!!(props.focused && g().sel && first() && !deleted())} /></button>
+                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : "Open the file at its first change"} onClick={() => openAt("source")}><Icon name="square-pen" size={13} />Editor</button>
+                  <button class="g-btn sm" disabled={!g().sel || !first() || deleted()} title={deleted() ? "A deleted file has no working copy to open" : withKey("Open the editor in its diff view", "diff")} onClick={() => openAt("diff")}><Icon name="file-diff" size={13} />Diff<HoldKey id="diff" when={!!(props.focused && g().sel && first() && !deleted())} /></button>
                 </div>
                 <Show when={!g().repoError} fallback={<div class="g-note bad">{g().repoError}</div>}>
                   <DiffView
