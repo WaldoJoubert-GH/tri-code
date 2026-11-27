@@ -14,7 +14,7 @@ import { sigOf } from "./shared/sigs";
 import { envLocked } from "./modules/environments";
 import { iconSvg } from "./shared/ui/lucide";
 import { screenTail } from "./terms";
-import { labelOf, tileLabel } from "./worktrees";
+import { labelOf, tileLabel } from "./modules/worktrees";
 import { answerPhones, phoneCommands } from "./phoneask";
 import { flash } from "./shared/ui/ui";
 

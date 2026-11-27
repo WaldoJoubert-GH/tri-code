@@ -29,7 +29,7 @@ import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";
 import { openGitPanel } from "./modules/git";
 import { connsOf, openDbWindow } from "./modules/db";
-import { labelOf, openNewWorktree, removeWorktree } from "./worktrees";
+import { labelOf, openNewWorktree, removeWorktree } from "./modules/worktrees";
 import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgentsPanel } from "./agents";
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
 import { startTour } from "./modules/tour";

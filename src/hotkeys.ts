@@ -13,7 +13,7 @@ import { closeOpenProject, openProjectDialog, openProjectOpen, closeEnvDialog, e
 import { closeLinkDialog, linkDialogOpen } from "./modules/linked-folders";
 import { closeWelcome, welcomeOpen } from "./modules/welcome";
 import { toggleSidebar } from "./Sidebar";
-import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees";
+import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./modules/worktrees";
 import { closeCtxMenu, ctxMenuOpen } from "./shared/ui/ctxmenu";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { closeTunnelPop, tunnelPopOpen } from "./tunnelui";

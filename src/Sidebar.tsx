@@ -14,8 +14,10 @@ import { Caps, HoldFace } from "./shared/keys/Keys";
 import { projectStepKey } from "./shared/keys/hints";
 import { openProjectDialog, envDialogOpen, openEnvDialog, envLocked, lockEnv } from "./modules/environments";
 import { SIG_TEXT, sigOf, sigSummary, topSig } from "./signals";
-import { adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel } from "./worktrees";
-import { openWorktreeDialog } from "./WorktreeDialog";
+import {
+  adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel,
+  openWorktreeDialog,
+} from "./modules/worktrees";
 import { type CtxItem, openCtxMenu } from "./shared/ui/ctxmenu";
 import { folderStatus, peekStatus } from "./modules/git";
 import { ask, flash } from "./shared/ui/ui";

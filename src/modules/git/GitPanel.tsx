@@ -19,7 +19,7 @@ import {
 import { copyText } from "../../shared/ui/clipboard";
 import { openFile } from "../editor";
 import { openUrlInProject } from "../../browsers";
-import { removeWorktree } from "../../worktrees";
+import { removeWorktree } from "../worktrees";
 import { type DiffMode, diffStats, firstChange, parseUnified } from "../../shared/text/diff";
 import DiffView, { type Drill, diffKeys, stepHunk } from "../../shared/text/DiffView";
 import { flash } from "../../shared/ui/ui";

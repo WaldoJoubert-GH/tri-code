@@ -3,12 +3,12 @@
 // collapsed. Finish only explains what is about to happen; removeWorktree then asks for the exact list.
 
 import { For, Show, createSignal } from "solid-js";
-import { type Project, projectById, repoOf } from "./shared/state/state";
-import { folderStatus } from "./modules/git";
-import { Icon } from "./shared/ui/lucide";
-import { Modal } from "./shared/ui/Modal";
+import { type Project, projectById, repoOf } from "../../shared/state/state";
+import { folderStatus } from "../git";
+import { Icon } from "../../shared/ui/lucide";
+import { Modal } from "../../shared/ui/Modal";
 import { cleanPrefix, labelOf, removeWorktree, renameWorktree, startNextFeature, toBranch } from "./worktrees";
-import { isEnter } from "./shared/ui/enterkey";
+import { isEnter } from "../../shared/ui/enterkey";
 
 export type WorktreeAction = "rename" | "next" | "finish";
 

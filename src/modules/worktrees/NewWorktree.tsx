@@ -7,18 +7,20 @@
 // design/worktree-gitignore.html (variant B).
 
 import { For, Show, createEffect, createSignal, on } from "solid-js";
-import { app, projectById, setBranchPrefix, setCopyIgnored, setWorktreeSetup, worktreeAgent, worktreesOf } from "./shared/state/state";
+import { app, projectById, setBranchPrefix, setCopyIgnored, setWorktreeSetup, worktreeAgent, worktreesOf } from "../../shared/state/state";
 import { branches, cleanPrefix, closeNewWorktree, createWorktree, fetching, ignored, issueBranch, kinds, listed, newWorktreeFor, setupFor, toBranch, worktreeDir } from "./worktrees";
 import { BIG, fileSize, filterIgnored, splitPath, startingTicks } from "./ignored";
 import { SETUP_VARS } from "./setup";
-import { dev, inProgress, slugOf } from "./modules/issues";
-import { gitOf } from "./modules/git";
-import { Icon } from "./shared/ui/lucide";
-import { Modal } from "./shared/ui/Modal";
-import { sandboxPreview } from "./shared/preview";
-import { canSandbox, hostKey, mountsFor, refreshSbx, sandboxByDefault, sandboxFolders, sbxReady, sbxState, setSandboxHost } from "./modules/sandbox";
-import { openSettings } from "./shared/nav";
-import { isEnter } from "./shared/ui/enterkey";
+import { dev, inProgress, slugOf } from "../issues";
+import { gitOf } from "../git";
+import { Icon } from "../../shared/ui/lucide";
+import { Modal } from "../../shared/ui/Modal";
+import { sandboxPreview } from "../../shared/preview";
+import {
+  canSandbox, hostKey, mountsFor, refreshSbx, sandboxByDefault, sandboxFolders, sbxReady, sbxState, setSandboxHost,
+} from "../sandbox";
+import { openSettings } from "../../shared/nav";
+import { isEnter } from "../../shared/ui/enterkey";
 
 export function NewWorktreeDialog() {
   return (
