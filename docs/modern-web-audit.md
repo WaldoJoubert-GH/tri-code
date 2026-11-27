@@ -105,3 +105,15 @@ One `ago()` in `shared/text/` on `Intl.RelativeTimeFormat` (`style: "narrow"` fo
 ## Fixed already
 
 - `bd27b21`: `pick.js` clears with `replaceChildren()`, and the phone keeps `<meta name="color-scheme">` in step with the desktop's theme.
+- `5e66800` (item 7): the uncovered pulses, the phone's animations and the PIN shake animate only under `prefers-reduced-motion: no-preference`. The site's demo plays only then too, and has a Pause button.
+- `487b745` (item 8): `shared/text/ago.ts` (`age`, `ago`) on `Intl.RelativeTimeFormat` and `Intl.DurationFormat` replaces six of the seven copies. The phone keeps its own, since it has no build step. News no longer says "now ago".
+- `7b563ff` (item 6): Git's repo heads and history rows and Database's group headers are `<button>`s. Rows that hold their own buttons (Git's files and stashes, a Connection, Saved queries, a sidebar project) get a `.rowmain` label button whose click bubbles to the row. Git's row actions show on `:focus-within`, so Tab can reach them. A project's menu gains Rename.
+- `4ac5894` (item 5): `shared/ui/windowModal.ts` makes the rest of a canvas window inert while Issues' New issue form or Database's Review is up. These stay modal to their window rather than to the app, so the other windows keep working. The phone's New window sheet is a modal `<dialog>`.
+- `8eae83c` (item 4): `shared/ui/Popover.tsx`, a `popover="manual"` in the top layer with one `placeNear` and one outside-press rule, replaces twelve hand-rolled popups. Two more turned up during the work: the New window menu and the language picker.
+
+Changed from the findings above:
+- **Docker and Monitor rows (item 6):** dropped. Both windows already drive selection from the keyboard (arrows, j/k, Home/End).
+- **The Issues lightbox (item 5):** dropped. While it's up, the window's key handler takes every key, Tab included.
+- **The popover is `manual`, not `auto`:** `showModal()` hides every auto popover (Appearance opens the icon picker), and the popups keep presses from related controls, through `keep`.
+- **No CSS anchor positioning in `Popover`:** older macOS and Linux webviews need the script anyway, so `placeNear` is the one placement. DbPanel's Export CSV keeps its CSS anchor positioning and uses `placeNear` as its fallback.
+- **Git's in-panel menus:** these open inside the panel, not at viewport coordinates, and were left as they are.
