@@ -12,7 +12,7 @@ import { createStore, produce } from "solid-js/store";
 import {
   type Agent, DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, isRemote, isWebApp, live, Page, pageProfile, Profile, Project,
   profileById, projectById, setFavIcon, setPageUrl, space, Tab, tabIcon, tabName, visibleTabs,
-} from "./state";
+} from "./shared/state/state";
 import { looksLikeUrl } from "./agents";
 import { normalizeUrl } from "./urls";
 import { agentTarget, agentWindows, rememberAgent } from "./agenttarget";

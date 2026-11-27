@@ -3,7 +3,7 @@
 // Tour.tsx can drop a project without importing the UI.
 
 import { invoke } from "@tauri-apps/api/core";
-import { type Project, isTerminal, removeProject } from "./state";
+import { type Project, isTerminal, removeProject } from "./shared/state/state";
 import { closeBrowser } from "./browsers";
 import { closeSession } from "./terms";
 import { forgetBgImage } from "./Appearance";

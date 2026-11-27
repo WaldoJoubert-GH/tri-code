@@ -6,7 +6,7 @@
 import { createEffect, createSignal, on, onCleanup } from "solid-js";
 import { enhance, renderMarkdown, titleOf } from "./markdown";
 import { baseCss, printDocument, projectCss, screenCss } from "./mdexport";
-import type { MdExport } from "./state";
+import type { MdExport } from "./shared/state/state";
 
 export function MdPaper(props: {
   src: string;

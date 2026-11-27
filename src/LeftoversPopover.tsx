@@ -3,7 +3,7 @@
 
 import { For, Show, onCleanup, onMount } from "solid-js";
 import { type Leftover, closeLeftovers, endAll, endLeftover, leftovers, leftoversAt, leftoversPop, toggleLeftovers } from "./leftovers";
-import { envName, projectById } from "./state";
+import { envName, projectById } from "./shared/state/state";
 import { labelOf } from "./worktrees";
 import { Icon } from "./lucide";
 

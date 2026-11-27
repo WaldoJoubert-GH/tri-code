@@ -4,7 +4,7 @@
 // ("Change Folder…", or a click on one that is not found). Chosen from design/linked-folders.html.
 
 import { Show, createSignal, onMount } from "solid-js";
-import { type LinkedFolder, type Project, addLink, envName, isRemote, projectById, repoOf, updateLink } from "./state";
+import { type LinkedFolder, type Project, addLink, envName, isRemote, projectById, repoOf, updateLink } from "./shared/state/state";
 import { linkName, linkProblem } from "./links";
 import { FolderPicker } from "./OpenProject";
 import { Icon } from "./lucide";

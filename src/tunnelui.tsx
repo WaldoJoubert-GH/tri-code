@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createResource, createSignal, onCleanup, onMount } from "solid-js";
-import { type Project, envName, isRemote, skipFolders } from "./state";
+import { type Project, envName, isRemote, skipFolders } from "./shared/state/state";
 import { type Fwd, fwdOfPage, fwds, reconnect, remoteLabel } from "./tunnels";
 import { type Listener, fileUrlOf, parseListening } from "./tunnelmap";
 import { copyText } from "./clipboard";

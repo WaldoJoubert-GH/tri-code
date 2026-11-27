@@ -6,7 +6,7 @@
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
 import DOMPurify from "dompurify";
-import { type Project, type Tab } from "./state";
+import { type Project, type Tab } from "./shared/state/state";
 import {
   addFeed, feedById, feeds, fetching, findArticleImage, isRead, lastFetched, loaded, markAllRead, moveFeed, news, refindIcon,
   refresh, removeFeed, setRead, topics as allTopics, unreadOf, updateFeed, watchNews,

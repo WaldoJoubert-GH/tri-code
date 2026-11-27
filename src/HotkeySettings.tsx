@@ -5,7 +5,7 @@
 // action back. Commands keep their one hotkey on the command (also edited in the commands window).
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { type Chord, type Hotkey, app, setSettings, updateAgent } from "./state";
+import { type Chord, type Hotkey, app, setSettings, updateAgent } from "./shared/state/state";
 import { metaName, modLabel } from "./modkey";
 import {
   ACTIONS, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,

@@ -1,7 +1,7 @@
 // The first two commands' hotkeys: Alt+A for the first and Alt+Shift+A for the second. New state
 // files start with them (defaultAgents); older ones get them once, here.
 
-import { FIRST_AGENT_KEYS, app, setAgentKeys, updateAgent } from "./state";
+import { FIRST_AGENT_KEYS, app, setAgentKeys, updateAgent } from "./shared/state/state";
 import { owner, sameChord } from "./keymap";
 
 /** Once per state.json (after loadState): each of the first two commands gets its key if it has

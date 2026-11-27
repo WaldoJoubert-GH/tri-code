@@ -4,7 +4,7 @@
 
 import { Index, For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Project, type Tab, isRemote } from "./state";
+import { type Project, type Tab, isRemote } from "./shared/state/state";
 import { endProcess, sample } from "./monitor";
 import { type Proc, type Scope, type Snapshot, type SortKey, bytes, descendants, duration, firstAsc, graphPaths, perSec, pushed, rowsOf, tone } from "./monitordata";
 import { copyText } from "./clipboard";

@@ -6,7 +6,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { enhance, renderMarkdown, titleOf } from "./markdown";
-import { type MdExport, type Project, isRemote, repoOf } from "./state";
+import { type MdExport, type Project, isRemote, repoOf } from "./shared/state/state";
 import { flash, showToast } from "./ui";
 
 export const PAGES = { A4: "210mm 297mm", Letter: "8.5in 11in" } as const;

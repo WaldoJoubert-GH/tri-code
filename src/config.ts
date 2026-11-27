@@ -5,8 +5,8 @@
 // (phone.json holds secrets), browser data (cookies, passwords), Worktrees and the Sample Project
 // (their folders are this machine's), window layouts and runtime state (recent, pinned, tour).
 
-import type { Agent, Fav, NotifySettings, Persisted, Profile, Project, SoundEvent } from "./state";
-import { defaultNotify, migrate } from "./state";
+import type { Agent, Fav, NotifySettings, Persisted, Profile, Project, SoundEvent } from "./shared/state/state";
+import { defaultNotify, migrate } from "./shared/state/state";
 
 export const CONFIG_FORMAT = "tri-code-config";
 export const CONFIG_VERSION = 1;

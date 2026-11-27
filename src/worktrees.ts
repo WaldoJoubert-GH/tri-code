@@ -13,7 +13,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Agent, type Project, addTab, addWorktree, app, focusTab, isLocalHost, projectById, repoOf, setApp, worktreesOf } from "./state";
+import { type Agent, type Project, addTab, addWorktree, app, focusTab, isLocalHost, projectById, repoOf, setApp, worktreesOf } from "./shared/state/state";
 import { cleanPrefix, toBranch } from "./branchname";
 import { setupCommand, setupLines } from "./setup";
 import { launchAgent } from "./agents";

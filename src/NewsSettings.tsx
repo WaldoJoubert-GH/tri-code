@@ -2,7 +2,7 @@
 // feeds with it; removing one moves them to the first topic left (news.ts).
 
 import { For, Show, createSignal } from "solid-js";
-import { app } from "./state";
+import { app } from "./shared/state/state";
 import { feeds, newTopic, removeTopic, renameTopic, resetTopics, shiftTopic, topics } from "./news";
 import { Caps } from "./Keys";
 import { isEnter } from "./enterkey";

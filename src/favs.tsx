@@ -3,7 +3,7 @@
 // to the project, so every browser window in it shows the same list. Chosen from design/canvas.html.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "./state";
+import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "./shared/state/state";
 import { browserInfo } from "./browsers";
 import { flash } from "./ui";
 import { guessIcon } from "./favicons";

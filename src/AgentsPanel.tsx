@@ -11,7 +11,7 @@ import { Portal } from "solid-js/web";
 import {
   type Agent, type Fav, type Project, type Scope, type SoundEvent, addAgent, app, envName, isWebApp, moveAgent, profileById,
   removeAgent, restoreAgent, updateAgent,
-} from "./state";
+} from "./shared/state/state";
 import { profilesInUse } from "./profiles";
 import {
   duplicateAgent, hotkeyKeys, hotkeyProblem, launchAgent, looksLikeUrl, nameProblem, newAgent, reaches, recording, replaceNote,

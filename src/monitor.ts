@@ -2,7 +2,7 @@
 // src-tauri/src/monitor.rs, the data's shape and the pure parts in monitordata.ts.
 
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { type Project, addTab, focusTab } from "./state";
+import { type Project, addTab, focusTab } from "./shared/state/state";
 import type { Snapshot } from "./monitordata";
 
 /** Open or focus the project's Monitor Window. */

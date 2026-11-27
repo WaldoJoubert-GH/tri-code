@@ -2,7 +2,7 @@
 // forwards behind port chips. Commands are in src-tauri/src/docker.rs, parsing in dockerdata.ts.
 
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { type Project, addTab, focusTab } from "./state";
+import { type Project, addTab, focusTab } from "./shared/state/state";
 import { type Port, parseContainers, tunnelTarget } from "./dockerdata";
 
 /** Open or focus the project's Docker Window. */

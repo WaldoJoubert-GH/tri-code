@@ -10,7 +10,7 @@ import { For, JSX, Show, createEffect, createSignal, on } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import logo from "../assets/icon.svg";
 import "./welcome.css";
-import { AlertMode, SoundEvent, addAgent, app, envIcon, envName, isLocalHost, newId, removeAgent, setClaudeUsage, setLinkedFolders, setNotify, setSettings, setTheme, setToured, setWelcomed } from "./state";
+import { AlertMode, SoundEvent, addAgent, app, envIcon, envName, isLocalHost, newId, removeAgent, setClaudeUsage, setLinkedFolders, setNotify, setSettings, setTheme, setToured, setWelcomed } from "./shared/state/state";
 import { type Known, KNOWN, NODE_INSTALL, commandOf, foundOf, lookups, ownCommand, platform, serverBlocker } from "./welcomedata";
 import { installAgent, refreshSetup, setupBusy, setupError, setupStatus } from "./agentsetup";
 import { looksLikeUrl } from "./agents";

@@ -4,7 +4,7 @@
 
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Project, type Tab, isRemote } from "./state";
+import { type Project, type Tab, isRemote } from "./shared/state/state";
 import { type Stop, containerAction, followEvents, followLogs, forwardPort, forwardedPorts, listContainers, portKey } from "./docker";
 import {
   type Container, type Level, type LogLine, type Port, type Stack, clockOf, containerOfPrefix, failureOf, groupStacks, isAlive, isUp, localAddr, matchesFind, needsLook, opensPage,

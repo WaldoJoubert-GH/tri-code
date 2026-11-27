@@ -1,7 +1,7 @@
 // Opening the Calculator Window. The window is CalcPanel.tsx, the Tape's maths calcdata.ts and its
 // highlighting and answers calclang.ts.
 
-import { type Project, addTab, focusTab } from "./state";
+import { type Project, addTab, focusTab } from "./shared/state/state";
 
 /** Open or focus the project's Calculator Window. */
 export function openCalcPanel(project: Project): string {

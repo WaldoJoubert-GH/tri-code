@@ -4,7 +4,7 @@ import { For, Show, createEffect, createSignal, on, onCleanup, onMount, untrack 
 import {
   SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
   persistChanges, repoOf, sessionName, setLayout, space, tabName,
-} from "./state";
+} from "./shared/state/state";
 import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";

@@ -6,7 +6,7 @@ import { untrack } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { EditorState, Text } from "@codemirror/state";
 import type { Body } from "./cm";
-import { type Project, type Tab, addTab, focusTab, setEditorTab } from "./state";
+import { type Project, type Tab, addTab, focusTab, setEditorTab } from "./shared/state/state";
 import { hostAt, rootsOf, within } from "./links";
 
 export type FsEntry = { name: string; dir: boolean; size: number };

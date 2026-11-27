@@ -6,7 +6,7 @@ import { produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { type ConfigFile, type ImportPlan, type Section, SECTIONS, applyImport, assetKeys, assetName, buildExport, parseConfig, planImport } from "./config";
-import { app, newId, setApp } from "./state";
+import { app, newId, setApp } from "./shared/state/state";
 import { setBgImage } from "./Appearance";
 import { loadIcons } from "./icons";
 import { reloadSound } from "./signals";

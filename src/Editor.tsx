@@ -12,7 +12,7 @@ import { For, Show, createEffect, createMemo, createResource, createSignal, on, 
 import { createStore } from "solid-js/store";
 import type { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { type Project, type Tab, diffModeOf, focusTab, isRemote, setEditorTab, setProjectDiffMode } from "./state";
+import { type Project, type Tab, diffModeOf, focusTab, isRemote, setEditorTab, setProjectDiffMode } from "./shared/state/state";
 import { fileUrlOf } from "./tunnelmap";
 import {
   CHANGED, type Doc, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,

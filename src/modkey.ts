@@ -1,7 +1,7 @@
 // The Hotkey Modifier: the key every window binding starts with. Alt by default; Settings can
 // make it Cmd (Super / Win off macOS). The Keymap (keymap.ts) prints chords with `modLabel`.
 
-import { app } from "./state";
+import { app } from "./shared/state/state";
 
 export type ModKey = "alt" | "meta";
 

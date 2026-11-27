@@ -4,7 +4,7 @@
 // the terminal.
 
 import { listen } from "@tauri-apps/api/event";
-import { Project, Tab, activePage, activeProject, addTab, app, canvasTabs, focusedTab, setRatio, space } from "./state";
+import { Project, Tab, activePage, activeProject, addTab, app, canvasTabs, focusedTab, setRatio, space } from "./shared/state/state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
 import { closeSettings, settingsOpen, toggleHotkeys } from "./nav";

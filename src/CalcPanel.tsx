@@ -11,7 +11,7 @@ import {
   type CompletionContext, type CompletionResult, acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap,
   closeCompletion, moveCompletionSelection, startCompletion,
 } from "@codemirror/autocomplete";
-import { type Project, type Tab, setCalcTape } from "./state";
+import { type Project, type Tab, setCalcTape } from "./shared/state/state";
 import { type Answer, CONSTS, FNS, KEYWORDS, SAMPLE, stripComment } from "./calcdata";
 import { answerAt, answers, tape } from "./calclang";
 import { theme } from "./cm";

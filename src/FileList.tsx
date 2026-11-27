@@ -10,7 +10,7 @@
 // right-click renames, relinks, reorders or unlinks it. Chosen from design/linked-folders.html (A).
 
 import { For, Match, Show, Switch, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js";
-import { type LinkedFolder, type Project, app, isRemote, moveLink, removeLink, repoOf, updateLink } from "./state";
+import { type LinkedFolder, type Project, app, isRemote, moveLink, removeLink, repoOf, updateLink } from "./shared/state/state";
 import { type Root, hostAt, linkAt, linksOn, relIn, rootAt, rootsOf, within } from "./links";
 import { openLinkDialog } from "./LinkFolder";
 import { Icon } from "./lucide";

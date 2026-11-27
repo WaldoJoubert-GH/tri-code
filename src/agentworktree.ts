@@ -6,7 +6,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { app, isLocalHost, moveTab, piCanFollow, projectById, repoOf, setApp } from "./state";
+import { app, isLocalHost, moveTab, piCanFollow, projectById, repoOf, setApp } from "./shared/state/state";
 import { followAfterTurn, rehomeSession } from "./terms";
 import { agentBranch } from "./branchname";
 import { type Branch, adoptWorktrees, createWorktree, kinds } from "./worktrees";

@@ -1,6 +1,6 @@
 // Pure tiling maths: where each window of a workspace goes. No DOM, no state.
 
-import type { Layout } from "./state";
+import type { Layout } from "./shared/state/state";
 
 export type Rect = { x: number; y: number; w: number; h: number };
 

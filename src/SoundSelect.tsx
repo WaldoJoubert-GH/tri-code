@@ -4,7 +4,7 @@
 // Chosen from design "Signal Sounds" (variant B).
 
 import { For, Show, onMount } from "solid-js";
-import { Project, SoundEvent, app } from "./state";
+import { Project, SoundEvent, app } from "./shared/state/state";
 import { SOUNDS, SYSTEM_NAME, addMySound, loadSystemSounds, soundName, systemSounds } from "./signals";
 
 const UPLOAD = "__upload";

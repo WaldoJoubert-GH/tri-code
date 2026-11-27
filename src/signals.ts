@@ -10,7 +10,7 @@ import { createSignal } from "solid-js";
 import { produce } from "solid-js/store";
 import {
   AgentState, AlertMode, Project, SoundEvent, Tab, agentOf, app, defaultNotify, focusTab, live, newId, projectById, repoOf, setApp, setNotify, space, tabName,
-} from "./state";
+} from "./shared/state/state";
 import { flash } from "./ui";
 import { keyOf } from "./keymap";
 import { type Sig, sigOf } from "./sigs";

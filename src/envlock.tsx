@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
-import { app, envName } from "./state";
+import { app, envName } from "./shared/state/state";
 import { clock } from "./ui";
 import { Icon } from "./lucide";
 

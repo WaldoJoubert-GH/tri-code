@@ -1,7 +1,7 @@
 // bun test: configuration export and import (config.ts).
 
 import { describe, expect, test } from "bun:test";
-import { type Persisted, migrate } from "./state";
+import { type Persisted, migrate } from "./shared/state/state";
 import { SECTIONS, applyImport, assetKeys, buildExport, parseConfig, planImport } from "./config";
 
 const ALL = SECTIONS.map((s) => s.id);

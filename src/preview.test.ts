@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { PREVIEWS, previewOn, sandboxPreview } from "./preview";
-import { type Project, app, migrate, setPreview } from "./state";
+import { type Project, app, migrate, setPreview } from "./shared/state/state";
 import { runsInSandbox, sandboxOf } from "./sandbox";
 
 describe("preview features", () => {

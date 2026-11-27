@@ -7,7 +7,7 @@
 // design/worktree-gitignore.html (variant B).
 
 import { For, Show, createEffect, createSignal, on } from "solid-js";
-import { app, projectById, setBranchPrefix, setCopyIgnored, setWorktreeSetup, worktreeAgent, worktreesOf } from "./state";
+import { app, projectById, setBranchPrefix, setCopyIgnored, setWorktreeSetup, worktreeAgent, worktreesOf } from "./shared/state/state";
 import { branches, cleanPrefix, closeNewWorktree, createWorktree, fetching, ignored, issueBranch, kinds, listed, newWorktreeFor, setupFor, toBranch, worktreeDir } from "./worktrees";
 import { BIG, fileSize, filterIgnored, splitPath, startingTicks } from "./ignored";
 import { SETUP_VARS } from "./setup";

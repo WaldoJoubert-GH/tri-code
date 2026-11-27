@@ -6,7 +6,7 @@
 import { createSignal } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { type Project, app, isLocalHost, setApp } from "./state";
+import { type Project, app, isLocalHost, setApp } from "./shared/state/state";
 import { openFolder } from "./OpenProject";
 import { openFile } from "./files";
 import { flash } from "./ui";

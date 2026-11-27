@@ -7,7 +7,7 @@ import { For, Show, createResource, createSignal, onCleanup, onMount } from "sol
 import {
   DEFAULT_PROFILE, PROFILE_COLORS, Profile, activePage, addProfile, app, pageProfile, projectById, projectProfile, removeProfile,
   setDefaultProfile, setPageProfile, setProfileScope, setProjectProfile, setSettings, setTabProfile, tabName, tabProfile, updateProfile,
-} from "./state";
+} from "./shared/state/state";
 import { applyProfileAutofill, browserInfo, debugSupport, leaveProfile, nativeBrowsers, profilesSupported } from "./browsers";
 import { freePort, setDebugPort } from "./debugmenu";
 import { isMac } from "./modkey";

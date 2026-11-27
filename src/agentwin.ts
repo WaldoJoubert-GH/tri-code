@@ -7,7 +7,7 @@
 import { createEffect } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { type Agent, type Project, app, focusTab, addTab, isWebApp, projectById, removeTab } from "./state";
+import { type Agent, type Project, app, focusTab, addTab, isWebApp, projectById, removeTab } from "./shared/state/state";
 import { offeredIn } from "./scope";
 import { flash } from "./ui";
 

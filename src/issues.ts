@@ -12,7 +12,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { type Project, addTab, focusTab } from "./state";
+import { type Project, addTab, focusTab } from "./shared/state/state";
 import { clock, flash } from "./ui";
 
 // ── types (the shapes in .dev/) ─────────────────────────────────────

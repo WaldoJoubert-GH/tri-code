@@ -4,7 +4,7 @@
 // Window (AgentsPanel.tsx); the list lives in state.json as `agents`, in + menu order.
 
 import { createSignal } from "solid-js";
-import { Agent, Hotkey, Project, addAgent, addTab, app, focusTab, isWebApp, newId } from "./state";
+import { Agent, Hotkey, Project, addAgent, addTab, app, focusTab, isWebApp, newId } from "./shared/state/state";
 import { normalizeUrl } from "./urls";
 import { flash } from "./ui";
 import { modDown } from "./modkey";

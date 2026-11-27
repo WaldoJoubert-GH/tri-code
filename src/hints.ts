@@ -12,7 +12,7 @@
 // start of a chord and leaves it open.
 
 import { createSignal } from "solid-js";
-import { app } from "./state";
+import { app } from "./shared/state/state";
 
 /** How long the modifier must be held before the hints appear. */
 export const HINT_HOLD_MS = 120;

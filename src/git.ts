@@ -6,7 +6,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { createStore, produce } from "solid-js/store";
-import { type DraftKind, type Project, addTab, draftCommand, focusTab, repoOf } from "./state";
+import { type DraftKind, type Project, addTab, draftCommand, focusTab, repoOf } from "./shared/state/state";
 import { copyText } from "./clipboard";
 import { devOf, inProgress, slugOf } from "./issues";
 import { flash, showToast } from "./ui";

@@ -8,7 +8,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save as pickSavePath } from "@tauri-apps/plugin-dialog";
 import { createStore, produce, unwrap } from "solid-js/store";
-import { type Project, type Tab, addTab, focusTab, newId, repoOf } from "./state";
+import { type Project, type Tab, addTab, focusTab, newId, repoOf } from "./shared/state/state";
 import {
   type Cell, type DbKind, type MongoOp, type Pending, type SqlOp, type Target, emptyPending, mongoOps, mongoText, pendingCount, rowKey, sqlOps,
 } from "./dbsql";

@@ -11,7 +11,7 @@ import { syntaxHighlighting, bracketMatching } from "@codemirror/language";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { MariaSQL, MySQL, PostgreSQL, SQLite, sql } from "@codemirror/lang-sql";
 import { json } from "@codemirror/lang-json";
-import { type Project, type Tab, isRemote, newId, setTabDb } from "./state";
+import { type Project, type Tab, isRemote, newId, setTabDb } from "./shared/state/state";
 import {
   type DbConn, type DbTarget, type EnvVar, type Obj, type ResultSet, type SavedQuery, type Win, addRow, apply, cancelQuery, closeReview, connOf, connsOf, copyCsv, discard,
   envVars, exportCsv, isBookConn, isMaria, isSheet, loadConns, loadPage, loadSchema, moreRows, openObj, openQueryText, openSession, pendingOf, queryDirty, removeConn,

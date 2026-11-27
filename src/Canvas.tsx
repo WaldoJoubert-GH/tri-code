@@ -3,7 +3,7 @@ import { type JSX, For, Match, Show, Switch, createEffect, createMemo, createSig
 import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isRemote, isTerminal, live, projectById, removePage,
   canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, pageProfile, toggleMono, visibleTabs,
-} from "./state";
+} from "./shared/state/state";
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { clock, flash, showToast } from "./ui";

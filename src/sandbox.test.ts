@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { canSandbox, hostKey, isAgentCommand, lastJson, mountsFor, parseBlocked, parseBoxes, parseRules, parseSecrets, parseTemplates, readSignIn, sandboxName, sandboxesFor, templateOf } from "./sandbox";
-import { type Project, migrate } from "./state";
+import { type Project, migrate } from "./shared/state/state";
 
 describe("a Worktree keeps its sandbox", () => {
   test("across a save and a load of state.json", () => {

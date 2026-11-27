@@ -1,7 +1,7 @@
 // Which agent signal a window shows right now, and which of them a restart would cut short.
 // Kept free of UI imports so the rules can be tested on their own (restart.test.ts).
 
-import { type AgentState, type Tab, app, live } from "./state";
+import { type AgentState, type Tab, app, live } from "./shared/state/state";
 
 /** What a window signals now. `working` only badges the tab strip, title bar and status line. */
 export type Sig = AgentState;

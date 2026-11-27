@@ -4,7 +4,7 @@
 // terminal, so plain keys drive it while the window is focused.
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
-import { type Project, type Tab, focusTab, setTabTimeline, space, tabName } from "./state";
+import { type Project, type Tab, focusTab, setTabTimeline, space, tabName } from "./shared/state/state";
 import { agentTarget } from "./agents";
 import {
   ACTIVE_GROUPS, DEFAULT_PROGRESS_LABEL, LEVEL_COLORS, PRIORITY_COLORS, SOURCES, SOURCE_NAMES, type DevState,

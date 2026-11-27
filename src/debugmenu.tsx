@@ -4,7 +4,7 @@
 // is left out elsewhere. Chosen from design/browser-debug-profile.html.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { DEFAULT_PROFILE, activePage, app, pageProfile, projectById, updateProfile } from "./state";
+import { DEFAULT_PROFILE, activePage, app, pageProfile, projectById, updateProfile } from "./shared/state/state";
 import {
   THROTTLE_NAMES, type Throttle, browserInfo, clearSiteData, consoleErrors, debugPortOf, debugSupport, hardReload, openDevtools,
   pageDebug, pageOrigin, restartProfile, sendErrorsToAgent, setNoCache, setThrottle,

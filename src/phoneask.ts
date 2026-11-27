@@ -6,7 +6,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { type Agent, type Project, addTab, isWebApp, projectById, sendTo, tabName } from "./state";
+import { type Agent, type Project, addTab, isWebApp, projectById, sendTo, tabName } from "./shared/state/state";
 import { normalizeUrl } from "./urls";
 import { envLocked } from "./envlock";
 import { offeredIn } from "./scope";

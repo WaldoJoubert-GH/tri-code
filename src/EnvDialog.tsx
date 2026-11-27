@@ -9,7 +9,7 @@ import { type EnvFields, type EnvKind, type EnvOriginal, emptyFields, envFormVie
 import { envLocked, markUnlocked, moveUnlock, tryPin } from "./envlock";
 import { Icon, toggleIconPicker } from "./lucide";
 import { Modal } from "./Modal";
-import { addEnvironment, app, envIcon, envName, isLocalHost, isTerminal, moveEnvironment, setEnvLock, setEnvSsh, setEnvStyle } from "./state";
+import { addEnvironment, app, envIcon, envName, isLocalHost, isTerminal, moveEnvironment, setEnvLock, setEnvSsh, setEnvStyle } from "./shared/state/state";
 import { moveSessions } from "./terms";
 import { flash } from "./ui";
 import { isEnter } from "./enterkey";

@@ -21,7 +21,7 @@ import type { CtxItem } from "./ctxmenu";
 import { copyText, readText } from "./clipboard";
 import { isMac } from "./modkey";
 import { isKey, keysOf, sameChord, setEditorKeys, textPress } from "./keymap";
-import type { Chord } from "./state";
+import type { Chord } from "./shared/state/state";
 import { type Lang, langById, langOfName } from "./grammars";
 import { isInstalled, loadInstalled, overrideOf } from "./langs";
 

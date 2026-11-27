@@ -5,7 +5,7 @@
 // was already open.
 
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focusTab, lastMinimised, live, projectById, space, tabName, tabProfile, visibleTabs } from "./state";
+import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focusTab, lastMinimised, live, projectById, space, tabName, tabProfile, visibleTabs } from "./shared/state/state";
 import { profileColor, profilesInUse } from "./profiles";
 import { nativeBrowsers } from "./browsers";
 import { openEditor } from "./files";

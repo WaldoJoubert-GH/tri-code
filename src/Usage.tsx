@@ -7,7 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Icon } from "./lucide";
 import { weekTarget } from "./pace";
-import { app } from "./state";
+import { app } from "./shared/state/state";
 
 type Window = { percent: number; resetsAt: string | null };
 /** Command Code's pool: dollars left, and the plan's grant they come out of. */

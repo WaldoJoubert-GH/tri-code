@@ -3,7 +3,7 @@
 // runs as a command. Pure apart from the store, for bun test.
 
 import { createEffect, createRoot } from "solid-js";
-import { type Project, type Tab, app, live, space } from "./state";
+import { type Project, type Tab, app, live, space } from "./shared/state/state";
 
 /** claude or pi as a window's command, before either has said anything. */
 const AGENT_CLI = /^(claude|pi)(\.cmd|\.exe)?(\s|$)/;

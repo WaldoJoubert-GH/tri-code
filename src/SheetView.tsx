@@ -5,7 +5,7 @@
 
 import { For, Show, createMemo, createResource, createSignal, onCleanup, onMount, type JSX } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import type { Project } from "./state";
+import type { Project } from "./shared/state/state";
 import { hostAt } from "./links";
 import { type Change, addRowChange, columnNames, deleteRowChange, isNumber, parseCsv, setCellChange } from "./csv";
 import { type Cell, cellText } from "./dbsql";

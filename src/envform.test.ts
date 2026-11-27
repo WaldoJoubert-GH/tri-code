@@ -1,7 +1,7 @@
 // bun test: the Environment dialog's rules (envform.ts) and moving an Environment to a new destination (state.ts).
 import { beforeEach, describe, expect, test } from "bun:test";
 import { type EnvFields, type EnvOriginal, emptyFields, envFormView, fieldsFrom, optionsList, optionsText, parseSsh, sshOf } from "./envform";
-import { app, moveEnvironment, setApp } from "./state";
+import { app, moveEnvironment, setApp } from "./shared/state/state";
 
 const devbox: EnvOriginal = { host: "dev@box", port: "2222", key: "~/k.pem", options: "A=1", hasPin: true };
 const edit = (over: Partial<EnvFields> = {}): EnvFields => ({ ...fieldsFrom(devbox), ...over });

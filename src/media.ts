@@ -4,7 +4,7 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { createEffect, createRoot, createSignal, onCleanup } from "solid-js";
-import { app } from "./state";
+import { app } from "./shared/state/state";
 import { flash } from "./ui";
 
 /** One player's session, as media.rs sends it. */

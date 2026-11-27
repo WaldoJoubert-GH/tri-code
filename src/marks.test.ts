@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { type Change, fileMarks, markAt, setBranchStatus, setFolderStatus } from "./git";
-import type { Project } from "./state";
+import type { Project } from "./shared/state/state";
 
 const ch = (path: string, x: string, y: string): Change => ({ path, x, y });
 const status = (files: Change[]) => ({ branch: "main", upstream: null, ahead: 0, behind: 0, base: "main", files, commits: [] });

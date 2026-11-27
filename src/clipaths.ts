@@ -1,6 +1,6 @@
 // Path matching for the `tri` command (cli.ts). Pure, for bun test.
 
-import { type Project, isLocalHost } from "./state";
+import { type Project, isLocalHost } from "./shared/state/state";
 
 /** Forward slashes, no trailing slash, and lowercase on a Windows path (`C:\…`), which ignores case. */
 export function norm(p: string): string {

@@ -4,7 +4,7 @@
 // which host reads and writes it. A Worktree shows its repo's links. Chosen from
 // design/linked-folders.html (variant A).
 
-import { type LinkedFolder, type Project, app, repoOf } from "./state";
+import { type LinkedFolder, type Project, app, repoOf } from "./shared/state/state";
 
 /** The project's own folder or one of its Linked Folders. */
 export type Root = { id: string; name: string; host: string; path: string; link?: LinkedFolder };

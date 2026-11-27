@@ -3,7 +3,7 @@
 // collapsed. Finish only explains what is about to happen; removeWorktree then asks for the exact list.
 
 import { For, Show, createSignal } from "solid-js";
-import { type Project, projectById, repoOf } from "./state";
+import { type Project, projectById, repoOf } from "./shared/state/state";
 import { folderStatus } from "./git";
 import { Icon } from "./lucide";
 import { Modal } from "./Modal";

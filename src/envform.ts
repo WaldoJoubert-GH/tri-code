@@ -1,7 +1,7 @@
 // The Environment dialog's rules, for New and Edit alike. Pure, so bun test can run them
 // (envform.test.ts); EnvDialog.tsx draws what envFormView says.
 
-import type { EnvSsh } from "./state";
+import type { EnvSsh } from "./shared/state/state";
 
 export type EnvKind = "local" | "ssh";
 export type TestState = "wait" | "ok" | "bad" | null;

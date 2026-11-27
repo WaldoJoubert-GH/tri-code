@@ -2,7 +2,7 @@
 // Command, and what it says about each. Pure, so bun test can run it (welcomedata.test.ts).
 // Chosen from design/new-user.html (variant A).
 
-import type { Agent } from "./state";
+import type { Agent } from "./shared/state/state";
 
 export type Platform = "windows" | "mac" | "linux";
 

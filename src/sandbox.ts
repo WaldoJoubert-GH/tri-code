@@ -15,7 +15,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Project, app, isLocalHost, projectById, setApp } from "./state";
+import { type Project, app, isLocalHost, projectById, setApp } from "./shared/state/state";
 import { sandboxPreview } from "./preview";
 
 /** The key a host's sbx goes by: "local" for this machine, else its ssh destination. */

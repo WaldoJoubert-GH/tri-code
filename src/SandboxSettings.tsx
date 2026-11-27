@@ -6,7 +6,7 @@
 
 import { For, Show, createEffect, createSignal, on } from "solid-js";
 import "./sandbox.css";
-import { activeProject, addTab, app, focusTab, setSandboxSettings } from "./state";
+import { activeProject, addTab, app, focusTab, setSandboxSettings } from "./shared/state/state";
 import {
   type Blocked, type Box, type KeyHow, type Rule, type Secret, SERVICES,
   allowHost, hostKey, listBlocked, listBoxes, listRules, listSecrets, refreshSbx, removeRule, removeSandbox, removeSecret, sandboxHost, setSandboxHost,

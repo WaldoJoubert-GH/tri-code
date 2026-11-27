@@ -2,7 +2,7 @@
 // link mutations in state.ts.
 
 import { beforeEach, describe, expect, test } from "bun:test";
-import { type Project, addLink, app, migrate, moveLink, removeLink, setApp, setLinkedFolders, updateLink } from "./state";
+import { type Project, addLink, app, migrate, moveLink, removeLink, setApp, setLinkedFolders, updateLink } from "./shared/state/state";
 import { hostAt, linkAt, linkName, linkProblem, linksOf, linksOn, relIn, rootAt, rootsOf, within } from "./links";
 
 const space = () => ({ layout: "master", ratio: 0.55 });

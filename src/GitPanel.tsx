@@ -9,7 +9,7 @@
 // the active repo owns the commit box, commits, PR and push (design/diff.html, folder of repos).
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
-import { type Project, type Tab, diffModeOf, isRemote, setProjectDiffMode } from "./state";
+import { type Project, type Tab, diffModeOf, isRemote, setProjectDiffMode } from "./shared/state/state";
 import {
   type Change, type CtxId, type Drawer, type RepoStatus, type Sel, type Stash, closeStash, commit, copyFinding, discard, draftCommit, draftPr, fetchRemotes,
   finishOp, gitOf, ignore, isStaged, isUnstaged, linkedIssue, loadBranches, loadPr, markOf, merge, openDrawer, openPr, pull, push, refresh,

@@ -9,7 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
 import { createStore } from "solid-js/store";
 import { type Choice, type Command, commands } from "./commands";
-import { type Project, activeProject, focusTab, focusedTab, isRemote, skipFolders, space, tabName } from "./state";
+import { type Project, activeProject, focusTab, focusedTab, isRemote, skipFolders, space, tabName } from "./shared/state/state";
 import { agentTarget } from "./agents";
 import { filesOf, openFile } from "./files";
 import { FileIcon, iconOpts } from "./FileList";

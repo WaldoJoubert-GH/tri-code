@@ -1,7 +1,7 @@
 // bun test: which commands a project offers, and the name and hotkey rules across scopes (src/scope.ts).
 
 import { beforeEach, describe, expect, test } from "bun:test";
-import { type Agent, type Project, app, setApp } from "./state";
+import { type Agent, type Project, app, setApp } from "./shared/state/state";
 import { chordHolder, nameProblem, offeredIn, reaches, replaceNote, scopesOverlap } from "./scope";
 import { seedAgentKeys } from "./agentkeys";
 

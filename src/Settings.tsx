@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource } from "solid-js";
-import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setMedia, setLinkedFolders, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
+import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setMedia, setLinkedFolders, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./shared/state/state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";

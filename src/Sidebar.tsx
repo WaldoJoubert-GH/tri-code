@@ -4,7 +4,7 @@ import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
   Project, app, envHeadersHidden, envIcon, envName, isLocalHost, isPinned, moveProject, projectById, removeEnvironment, renameProject, setApp, setEnvStyle,
   setSidebarCollapsed, togglePin, worktreesOf,
-} from "./state";
+} from "./shared/state/state";
 import { setBrowsersCovered } from "./browsers";
 import { appearanceOpen, closeAppearance, openAppearance } from "./Appearance";
 import { dev, isActive, sourcesOf, stateOf } from "./issues";

@@ -8,7 +8,7 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { For, Match, Show, Switch, createEffect, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
-import { addProject, app, envIcon, envName, isLocalHost, setApp } from "./state";
+import { addProject, app, envIcon, envName, isLocalHost, setApp } from "./shared/state/state";
 import { PinPad, envLocked } from "./envlock";
 import { openEnvDialog } from "./EnvDialog";
 import { Icon } from "./lucide";

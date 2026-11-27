@@ -5,7 +5,7 @@
 import {
   GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, app, focusTab, focusedTab, goSpace, isPinned, isRemote, live,
   lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, setMedia, setSettings, space, tabIcon, tabName, toggleMono, togglePin,
-} from "./state";
+} from "./shared/state/state";
 import { ICON_THEMES, type IconTheme, setPreviewTheme } from "./fileicons";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { requestClose } from "./Canvas";
