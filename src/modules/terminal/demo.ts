@@ -2,7 +2,7 @@
 // starting a PTY. Status goes out as real OSC 7501 reports, written into the terminal, so the
 // badges, sounds and notifications are the ones a real agent gets.
 
-import type { DemoKind } from "./shared/state/state";
+import type { DemoKind } from "../../shared/state/state";
 
 export type Demo = {
   /** Keys typed into the terminal. */

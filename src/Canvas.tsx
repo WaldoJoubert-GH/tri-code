@@ -19,7 +19,7 @@ import { DebugButton } from "./debugmenu";
 import { fwdOfPage, heldBy } from "./tunnels";
 import { RemoteStart, TunnelBar, TunnelChip, TunnelHeld } from "./tunnelui";
 import { Icon } from "./shared/ui/lucide";
-import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
+import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./modules/terminal";
 import { runsInSandbox, sandboxOf } from "./modules/sandbox";
 import { IssuesPanel, dev, panelTitle } from "./modules/issues";
 import { Editor, dirtyCount, dropEditor } from "./modules/editor";

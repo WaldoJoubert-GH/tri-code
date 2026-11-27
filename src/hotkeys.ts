@@ -38,7 +38,7 @@ import { closeFeedback, feedbackOpen } from "./Feedback";
 import { closeLeftovers, leftoversOpen } from "./modules/leftovers";
 import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./modules/media";
 import { flash } from "./shared/ui/ui";
-import { hasSelection } from "./terms";
+import { hasSelection } from "./modules/terminal";
 import { ACTIONS, BROWSER_ACTIONS, actionFor, editorKey, isKey, keysOf } from "./shared/keys/keymap";
 import { browserKeys, focusApp, nativeBrowsers, pageOfLabel } from "./browsers";
 import { createEffect, createRoot } from "solid-js";

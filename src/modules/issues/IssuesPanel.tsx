@@ -17,7 +17,7 @@ import {
   statesFor, statusStopsOf, stateOf, syncDev, syncNow, toggleLabel, toggleTimer, updateIssue,
 } from "./issues";
 import { openUrlInProject } from "../../browsers";
-import { sendText } from "../../terms";
+import { sendText } from "../terminal";
 import { Icon } from "../../shared/ui/lucide";
 import { clock, flash } from "../../shared/ui/ui";
 import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";

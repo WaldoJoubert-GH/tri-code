@@ -2,7 +2,7 @@
 // the Agent toggle on, that the project offers; a worktree gets its repo's Commands.
 
 import { beforeEach, describe, expect, test } from "bun:test";
-import { type Agent, type Project, app, setApp } from "./shared/state/state";
+import { type Agent, type Project, app, setApp } from "../../shared/state/state";
 import { agentRunsIn } from "./agentwin";
 
 const project = (id: string, host: string, parent?: string) => ({ id, name: id, host, path: "~", tabs: [], ...(parent ? { parent } : {}) }) as unknown as Project;

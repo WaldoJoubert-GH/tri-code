@@ -13,7 +13,7 @@ import { type Project, activeProject, focusTab, focusedTab, isRemote, skipFolder
 import { agentTarget } from "./modules/agents";
 import { filesOf, openFile, FileIcon, iconOpts } from "./modules/editor";
 import { iconSvg } from "./shared/ui/fileicons";
-import { focusSession, sendText } from "./terms";
+import { focusSession, sendText } from "./modules/terminal";
 import { flash } from "./shared/ui/ui";
 import { Icon } from "./shared/ui/lucide";
 import "./files.css";

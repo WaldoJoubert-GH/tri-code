@@ -18,7 +18,7 @@ import { normalizeUrl } from "./shared/urls";
 import { offeredIn } from "./shared/scope";
 import { sigOf } from "./shared/sigs";
 import { iconSvg } from "./shared/ui/lucide";
-import { pasteText } from "./terms";
+import { pasteText } from "./modules/terminal";
 import { flash } from "./shared/ui/ui";
 import { copyText } from "./shared/ui/clipboard";
 import { fillShots, setShotPref, shotPref } from "./shots";

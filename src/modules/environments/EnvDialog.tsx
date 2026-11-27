@@ -10,7 +10,7 @@ import { envLocked, markUnlocked, moveUnlock, tryPin } from "./envlock";
 import { Icon, toggleIconPicker } from "../../shared/ui/lucide";
 import { Modal } from "../../shared/ui/Modal";
 import { addEnvironment, app, envIcon, envName, isLocalHost, isTerminal, moveEnvironment, setEnvLock, setEnvSsh, setEnvStyle } from "../../shared/state/state";
-import { moveSessions } from "../../terms";
+import { moveSessions } from "../terminal";
 import { flash } from "../../shared/ui/ui";
 import { isEnter } from "../../shared/ui/enterkey";
 

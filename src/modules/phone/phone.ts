@@ -13,7 +13,7 @@ import { onAlert } from "../signals";
 import { sigOf } from "../../shared/sigs";
 import { envLocked } from "../environments";
 import { iconSvg } from "../../shared/ui/lucide";
-import { screenTail } from "../../terms";
+import { screenTail } from "../terminal";
 import { labelOf, tileLabel } from "../worktrees";
 import { answerPhones, phoneCommands } from "./phoneask";
 import { flash } from "../../shared/ui/ui";
