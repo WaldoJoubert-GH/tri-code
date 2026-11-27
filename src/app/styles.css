@@ -90,6 +90,12 @@ body {
 }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 button:focus-visible, select:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+/* A row with buttons of its own (Git's files, a Connection) can't be a <button>, so its label is:
+   Tab reaches it, and Enter or Space clicks it, which bubbles to the row's own onClick. The row
+   wears the focus ring. */
+.rowmain { min-width: 0; padding: 0; text-align: start; cursor: inherit; white-space: inherit; }
+.rowmain:focus-visible { outline: none; }
+:where(div):has(> .rowmain:focus-visible) { outline: 1px solid var(--accent); outline-offset: -1px; }
 /* The one keycap (Keys.tsx). Every key in the app is this; a place may lay it out, not restyle it. */
 kbd {
   display: inline-grid; place-items: center; height: 17px; min-width: 16px; padding: 0 3px; vertical-align: middle;

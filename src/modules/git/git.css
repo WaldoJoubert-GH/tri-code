@@ -111,6 +111,8 @@
 .g-st.s-R, .g-st.s-C { color: var(--git-ren); }
 .g-commit { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; white-space: nowrap; }
 .g-commit:hover { background: var(--hover); }
+button.g-commit { width: 100%; text-align: start; cursor: default; }
+button.g-commit:focus-visible { outline-offset: -1px; }
 .g-commit.sel { background: color-mix(in srgb, var(--accent) 15%, transparent); box-shadow: inset 2px 0 var(--accent); }
 .win:not(.focused) .g-commit.sel { background: var(--hover); box-shadow: inset 2px 0 var(--muted); }
 .g-commit .sha { font: 11px var(--mono); color: var(--accent); flex: none; }
@@ -228,7 +230,8 @@
 .g-repoitem .ct { grid-column: 2; grid-row: 1 / span 2; align-self: center; font: 10.5px var(--mono); color: var(--muted); }
 .g-repoitem .ct.bad { color: var(--bad); }
 .g-reposec { border-bottom: 1px solid var(--line); padding-bottom: 2px; margin-bottom: 2px; }
-.g-repohead { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; white-space: nowrap; cursor: default; }
+.g-repohead { display: flex; align-items: center; gap: 6px; width: 100%; height: 28px; padding: 0 10px; white-space: nowrap; cursor: default; text-align: start; }
+.g-repohead:focus-visible { outline-offset: -1px; }
 .g-repohead:hover { background: var(--hover); }
 .g-repohead.on { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 2px 0 var(--accent); }
 .win:not(.focused) .g-repohead.on { background: var(--hover); box-shadow: inset 2px 0 var(--muted); }
@@ -291,8 +294,8 @@
 
 /* Row actions: on hover they take the line counts' place. */
 .g-racts { display: none; margin-left: auto; gap: 1px; flex: none; }
-.g-frow:hover .g-rstat, .g-srow:hover .w { display: none; }
-.g-frow:hover .g-racts, .g-srow:hover .g-racts { display: inline-flex; }
+.g-frow:is(:hover, :focus-within) .g-rstat, .g-srow:is(:hover, :focus-within) .w { display: none; }
+.g-frow:is(:hover, :focus-within) .g-racts, .g-srow:is(:hover, :focus-within) .g-racts { display: inline-flex; }
 .g-racts button { min-width: 20px; height: 18px; padding: 0 3px; border-radius: 3px; color: var(--muted); font-size: 12px; }
 .g-racts button:hover:not(:disabled) { background: var(--raised); color: var(--text); }
 .g-racts button.bad:hover { color: var(--bad); }

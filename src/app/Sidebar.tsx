@@ -115,6 +115,7 @@ function projectMenu(e: MouseEvent, p: Project, env: CtxItem[] = []) {
         openAppearance(anchor, p.id);
       },
     },
+    { label: "Rename", run: () => setRenaming(p.id) },
     "sep",
     folderItem(p),
     ...(env.length ? ["sep" as const, ...env] : []),
@@ -481,7 +482,7 @@ export default function Sidebar() {
                   <Show when={badge(p)}>
                     {(b) => <span class={`sb s-${b().s}`} aria-label={`${b().n} ${SIG_TEXT[b().s]}`}>{b().n > 1 ? b().n : ""}</span>}
                   </Show>
-                  <Show when={renaming() === p.id} fallback={<span class="name" title="Double-click to rename" onDblClick={() => setRenaming(p.id)}>{p.name}</span>}>
+                  <Show when={renaming() === p.id} fallback={<button type="button" class="name rowmain" aria-current={inFamily(p) || undefined} title="Double-click to rename" onDblClick={() => setRenaming(p.id)}>{p.name}</button>}>
                     <RenameInput
                       value={p.name}
                       save={(name) => renameProject(p.id, name || p.path.split(/[\\/]/).filter(Boolean).pop() || p.name)}

@@ -127,11 +127,11 @@ function StartPage(props: { project: Project; tab: Tab; missing: boolean; onNew:
         </Show>
         <For each={list()} fallback={<p class="muted">No Connections yet. They're saved in <code>.dev/databases.json</code>; passwords stay on {props.project.host === "local" ? "this machine" : props.project.host}.</p>}>
           {(c) => (
-            <div class="db-conn-row" role="button" tabindex="0" title={`Open ${c.name}`} onClick={() => setTabDb(props.project.id, props.tab.id, c.id)} onKeyDown={(e) => e.key === "Enter" && setTabDb(props.project.id, props.tab.id, c.id)}>
+            <div class="db-conn-row" title={`Open ${c.name}`} onClick={() => setTabDb(props.project.id, props.tab.id, c.id)}>
               <Icon name="database" size={15} />
-              <span class="db-grow">
+              <button type="button" class="db-grow rowmain">
                 <b>{c.name}</b> <span class="muted mono">{targetText(c.target)}</span>
-              </span>
+              </button>
               <Show when={c.readOnly}><span class="db-pill ro">read-only</span></Show>
               <Show when={c.tag === "prod"}><span class="db-pill prod">prod</span></Show>
               <span class={`db-kind ${kindChip(c).cls}`}>{kindChip(c).label}</span>
@@ -359,11 +359,11 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
             <For each={groups()}>
               {(g) => (
                 <>
-                  <div class="db-grp" classList={{ shut: w()?.shut.includes(g.name) }} onClick={() => toggleGroup(id, g.name)}>
+                  <button type="button" class="db-grp" classList={{ shut: w()?.shut.includes(g.name) }} aria-expanded={!w()?.shut.includes(g.name)} onClick={() => toggleGroup(id, g.name)}>
                     <Icon name="chevron-down" size={12} class="chev" />
                     {isSheet(props.conn) ? (isBookConn(props.conn) ? "sheets · " : "file · ") + props.conn.name : <>{props.conn.kind === "mongo" || props.conn.kind === "mysql" ? "database · " : props.conn.kind === "postgres" ? "schema · " : ""}{g.name}</>}
                     <span class="db-grow" /><span class="db-c">{g.objects.length}</span>
-                  </div>
+                  </button>
                   <Show when={!w()?.shut.includes(g.name)}>
                     <For each={g.objects}>
                       {(o) => (
@@ -464,8 +464,10 @@ function SavedTree(props: { project: Project; tabId: string; conn: DbConn; win: 
   return (
     <Show when={!props.filter || list().length}>
       <div class="db-grp" classList={{ shut: shut() }} onClick={() => toggleGroup(props.tabId, SAVED_GROUP)}>
-        <Icon name="chevron-down" size={12} class="chev" />
-        Saved queries
+        <button type="button" class="rowmain db-grp-lbl" aria-expanded={!shut()}>
+          <Icon name="chevron-down" size={12} class="chev" />
+          Saved queries
+        </button>
         <span class="db-grow" /><span class="db-c">{all().length || ""}</span>
         <button class="db-ib db-grp-add" title="New query" onClick={(e) => { e.stopPropagation(); newQuery(); }}><Icon name="plus" size={12} /></button>
       </div>

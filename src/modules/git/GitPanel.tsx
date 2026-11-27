@@ -243,7 +243,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             }}
           />
           <span class={`g-st s-${conflicted(fp.c) ? "C" : letter(fp.c, fp.inStaged)}`}>{conflicted(fp.c) ? "C" : letter(fp.c, fp.inStaged)}</span>
-          <span class="g-fp"><span class="d">{i >= 0 ? fp.c.path.slice(0, i + 1) : ""}</span>{fp.c.path.slice(i + 1)}</span>
+          <button type="button" class="g-fp rowmain" aria-current={sel() || undefined}><span class="d">{i >= 0 ? fp.c.path.slice(0, i + 1) : ""}</span>{fp.c.path.slice(i + 1)}</button>
           <RowStat n={fp.inStaged ? fp.c.index : fp.c.work} />
           <span class="g-racts" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
             <Show when={conflicted(fp.c)} fallback={
@@ -331,7 +331,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     }>
       <div class="g-srow pad" classList={{ sel: g().stash?.key === sp.st.sha }} title={`${sp.st.subject}\n${sp.st.when}`} onClick={() => void selectStash(p(), sp.st)}>
         <span class="ix">{sp.st.ref.replace(/^stash/, "")}</span>
-        <span class="s">{sp.st.subject}</span>
+        <button type="button" class="s rowmain" aria-current={g().stash?.key === sp.st.sha || undefined}>{sp.st.subject}</button>
         <span class="w">{sp.st.when}</span>
         <span class="g-racts" onClick={(e) => e.stopPropagation()}>
           <button class="txt" title="git stash apply: keep the stash" disabled={!!g().working} onClick={() => stashOp(p(), sp.st, "apply")}>Apply</button>
@@ -385,9 +385,11 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
       <div class="g-sec" classList={{ sub: lp.sub }}><Icon name="history" size={12} />Commits</div>
       <For each={s()?.commits ?? []}>
         {(c) => (
-          <div
+          <button
+            type="button"
             class="g-commit pad"
             classList={{ sel: g().commit?.key === c.sha }}
+            aria-current={g().commit?.key === c.sha || undefined}
             title={`${c.sha}\n${c.when}`}
             onClick={() => selectCommit(p(), c.sha)}
           >
@@ -395,7 +397,7 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
             <span class="w" classList={{ local: !c.pushed }} title={c.pushed ? undefined : "Not pushed"}>
               <Show when={!c.pushed}><Icon name="cloud-off" size={11} /></Show>{c.pushed ? c.when : "local"}
             </span>
-          </div>
+          </button>
         )}
       </For>
     </>
@@ -407,13 +409,13 @@ export default function GitPanel(props: { project: Project; tab: Tab; focused: b
     const n = () => rs()?.files.length ?? 0;
     return (
       <div class="g-reposec">
-        <div class="g-repohead" classList={{ on: active() }} title={`${rp.r.repo || p().name}${rs()?.branch ? ` · ${rs()!.branch}` : ""}`} onClick={() => selectRepo(p(), rp.r.repo)}>
+        <button type="button" class="g-repohead" classList={{ on: active() }} aria-expanded={active()} title={`${rp.r.repo || p().name}${rs()?.branch ? ` · ${rs()!.branch}` : ""}`} onClick={() => selectRepo(p(), rp.r.repo)}>
           <span class="cv"><Icon name={active() ? "chevron-down" : "chevron-right"} size={12} /></span>
           <b>{rp.r.repo || p().name}</b>
           <span class="br">{rs()?.branch ?? "—"}</span>
           <Show when={rs()?.ahead}><span class="ab">↑{rs()!.ahead}</span></Show>
           <span class="ct" classList={{ bad: !!rp.r.error }}>{rp.r.error ? "error" : n() ? `${n()} changed` : "clean"}</span>
-        </div>
+        </button>
         <Show when={active()} fallback={
           <Show when={n()}>
             <div class="g-reppeek">
