@@ -1,0 +1,432 @@
+# Codebase blueprint: one folder per module, `shared/` for cross-module use
+
+Status: proposed (2026-11-27). Nothing has moved yet.
+
+Today `src/` is flat: 193 files, with every window, dialog, store and helper side by side. `src-tauri/src/` is flat too, apart from `db/`. This blueprint gives each module a folder and an **interface** (its `index.ts` / `mod.rs`), and puts what several modules use in `shared/`.
+
+Terms follow the codebase-design vocabulary: a **module** has one **interface**; other modules cross its **seam** only there.
+
+## Rules
+
+1. **A module is a folder.** `src/modules/<name>/` holds the module's logic, its panels and dialogs, its CSS, its tests and its Settings page.
+2. **`index.ts` is the interface.** Another module imports `../<name>` (the folder), never a file inside it. Inside a module, files import each other freely.
+3. **`shared/` holds what two or more modules use.** It never imports from `modules/` or `app/`. When only one module uses a file, the file belongs in that module.
+4. **`app/` is the composition root.** It may import every module; no module imports `app/`. The window kinds (`Canvas.tsx`, `tabs.tsx`), the hotkeys, the Command Palette and the Settings shell live here because they assemble everything.
+5. **Settings pages live in their module.** `NewsSettings.tsx` goes to `modules/news/`; `app/settings/` only lays the pages out.
+6. **Tests sit beside the code they test** (`*.test.ts` in the same folder). `bun test ./src/` already finds them recursively.
+
+Rule 3 and 4 are enforced by a test (see [Enforcement](#enforcement)), as `keys.test.ts` already enforces Keycaps.
+
+## Frontend layout (`src/`)
+
+### `src/shared/`
+
+| Folder | Files | Why it is shared |
+|---|---|---|
+| `shared/state/` | `state.ts`, `movetab.test.ts`, `resume.test.ts`, `pageprofiles.test.ts` | The app store; every module reads it. |
+| `shared/ui/` | `ui.ts` (flash, toast, ask), `Modal.tsx`, `ctxmenu.tsx`, `lucide.tsx`, `icons.tsx`, `fileicons.ts`, `favicons.ts`, `clipboard.ts`, `enterkey.ts` | The UI kit: dialogs, menus, icons, copy. |
+| `shared/keys/` | `keymap.ts`, `modkey.ts`, `hints.ts`, `Keys.tsx`, `keys.test.ts`, `hints.test.ts` | The Keymap, Hotkey Modifier, Hold Hints and Keycap: drawn by every module. |
+| `shared/text/` | `diff.ts`, `DiffView.tsx`, `diff.css`, `markdown.ts`, `csv.ts`, `branchname.ts` | Pure parsers used by 2+ modules (diff: Editor, Git, state; csv: Editor, Database). |
+| `shared/codemirror/` | `cm.ts`, `langs.ts`, `grammars.ts`, `grammars.json`, `textmate.ts`, `tmparser.ts`, `LangPicker.tsx`, `LangSettings.tsx` | The CodeMirror kit and Grammar Catalog: Editor, Database and Calculator all build editors on it. |
+| `shared/` (top) | `look.ts`, `backdrop.ts`, `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts` (new) | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). |
+
+### `src/modules/`
+
+| Module | Files |
+|---|---|
+| `terminal/` | `terms.ts`, `agentwin.ts`, `demo.ts` |
+| `agents/` (Commands; `Agent` in code) | `agents.ts`, `agentkeys.ts`, `agenttarget.ts`, `agentsetup.ts`, `AgentsPanel.tsx`, `AgentSettings.tsx`, `SetupBanner.tsx`, `agents.css`, `agentsetup.css` |
+| `signals/` | `signals.ts`, `SignalSettings.tsx`, `SoundSelect.tsx` |
+| `browser/` | `browsers.ts`, `profiles.tsx`, `debugmenu.tsx`, `downloads.tsx`, `favs.tsx`, `tunnels.ts`, `tunnelmap.ts`, `tunnelui.tsx`, `shots.ts` |
+| `editor/` | `Editor.tsx`, `FileList.tsx`, `files.ts`, `MdPaper.tsx`, `mdexport.ts`, `files.css` |
+| `linked-folders/` | `links.ts`, `LinkFolder.tsx` |
+| `git/` | `git.ts`, `repos.ts`, `GitPanel.tsx`, `git.css`, `gitmarks.test.ts`, `marks.test.ts` |
+| `issues/` | `issues.ts`, `timeline.ts`, `IssuesPanel.tsx` |
+| `db/` | `db.ts`, `dbsql.ts`, `DbPanel.tsx`, `SheetView.tsx`, `db.css`, `sheet.css` |
+| `docker/` | `docker.ts`, `dockerdata.ts`, `DockerPanel.tsx`, `docker.css` |
+| `monitor/` | `monitor.ts`, `monitordata.ts`, `MonitorPanel.tsx`, `monitor.css` |
+| `news/` | `news.ts`, `newsdata.ts`, `NewsPanel.tsx`, `NewsSettings.tsx`, `news.css` |
+| `calc/` | `calc.ts`, `calcdata.ts`, `calclang.ts`, `CalcPanel.tsx`, `calc.css` |
+| `media/` | `media.ts`, `MediaDock.tsx`, `media.css` |
+| `environments/` | `EnvDialog.tsx`, `envform.ts`, `envlock.tsx`, `OpenProject.tsx`, `newfolder.ts` |
+| `worktrees/` | `worktrees.ts`, `agentworktree.ts`, `setup.ts`, `ignored.ts`, `NewWorktree.tsx`, `WorktreeDialog.tsx` |
+| `leftovers/` | `leftovers.ts`, `LeftoversPopover.tsx` |
+| `sandbox/` | `sandbox.ts`, `SandboxSettings.tsx`, `sandbox.css` |
+| `phone/` (Remote Control) | `phone.ts`, `phoneask.ts`, `RemoteSettings.tsx` |
+| `appearance/` | `Appearance.tsx` |
+| `welcome/` | `Welcome.tsx`, `welcomedata.ts`, `welcome.css` |
+| `tour/` | `Tour.tsx` |
+| `usage/` | `Usage.tsx`, `pace.ts` |
+
+### `src/app/`
+
+`index.tsx`, `App.tsx`, `Canvas.tsx`, `tabs.tsx`, `layout.ts`, `Sidebar.tsx`, `commands.ts`, `hotkeys.ts`, `Palette.tsx`, `About.tsx`, `Feedback.tsx`, `RestartDialog.tsx`, `updater.ts`, `styles.css`, `canvas.css`, `__selftest.ts`, `vite-env.d.ts`, plus:
+
+- `app/settings/`: `Settings.tsx`, `Backup.tsx`, `config.ts`, `HotkeySettings.tsx`
+- `app/cli/`: `cli.ts`, `clipaths.ts`, `CliSettings.tsx` (the tri Command)
+
+## Example tree
+
+The frontend after the move. Each module also gets a new `index.ts`, its interface (marked ◆).
+
+```
+src/
+├── app/                          composition root: may import anything
+│   ├── index.tsx                 entry (index.html points here)
+│   ├── App.tsx
+│   ├── Canvas.tsx
+│   ├── canvas.css                window frames, tiling, mono, split handle
+│   ├── tabs.tsx
+│   ├── layout.ts
+│   ├── layout.test.ts
+│   ├── Sidebar.tsx
+│   ├── commands.ts               Command Palette entries
+│   ├── hotkeys.ts
+│   ├── Palette.tsx
+│   ├── palette.css
+│   ├── About.tsx
+│   ├── Feedback.tsx
+│   ├── RestartDialog.tsx
+│   ├── restart.test.ts
+│   ├── updater.ts
+│   ├── app.css                   sidebar, toolbar, status line (from styles.css)
+│   ├── settings/
+│   │   ├── Settings.tsx          the shell: lays out each module's page
+│   │   ├── settings.css
+│   │   ├── Backup.tsx
+│   │   ├── config.ts
+│   │   ├── config.test.ts
+│   │   └── HotkeySettings.tsx
+│   └── cli/
+│       ├── cli.ts
+│       ├── cli.test.ts
+│       ├── clipaths.ts
+│       └── CliSettings.tsx
+│
+├── shared/                       used by 2+ modules; never imports modules/ or app/
+│   ├── styles/
+│   │   └── tokens.css            :root, themes (the one global import)
+│   ├── state/
+│   │   ├── state.ts
+│   │   ├── movetab.test.ts
+│   │   ├── resume.test.ts
+│   │   └── pageprofiles.test.ts
+│   ├── ui/
+│   │   ├── ui.ts                 flash, toast, ask, clock
+│   │   ├── ui.css
+│   │   ├── Modal.tsx
+│   │   ├── modal.css
+│   │   ├── ctxmenu.tsx
+│   │   ├── lucide.tsx
+│   │   ├── icons.tsx
+│   │   ├── fileicons.ts
+│   │   ├── fileicons.css
+│   │   ├── fileicons.test.ts
+│   │   ├── favicons.ts
+│   │   ├── clipboard.ts
+│   │   └── enterkey.ts
+│   ├── keys/
+│   │   ├── keymap.ts
+│   │   ├── modkey.ts
+│   │   ├── hints.ts
+│   │   ├── Keys.tsx              the Keycap
+│   │   ├── keys.css
+│   │   └── keys.test.ts
+│   ├── text/
+│   │   ├── diff.ts
+│   │   ├── DiffView.tsx
+│   │   ├── diff.css
+│   │   ├── markdown.ts
+│   │   ├── markdown.css
+│   │   ├── csv.ts
+│   │   └── branchname.ts
+│   ├── codemirror/
+│   │   ├── cm.ts
+│   │   ├── langs.ts
+│   │   ├── grammars.ts
+│   │   ├── grammars.json         scripts/grammar-catalog.ts writes here
+│   │   ├── textmate.ts
+│   │   ├── tmparser.ts
+│   │   ├── LangPicker.tsx
+│   │   └── LangSettings.tsx
+│   ├── look.ts
+│   ├── backdrop.ts
+│   ├── preview.ts
+│   ├── scope.ts
+│   ├── sigs.ts
+│   ├── nav.ts                    new: openSettings / settingsOpen
+│   └── layout.test.ts            new: enforces the folder rules
+│
+└── modules/                      each imports only shared/ and other modules' index.ts
+    ├── git/
+    │   ├── index.ts              ◆
+    │   ├── git.ts
+    │   ├── repos.ts
+    │   ├── GitPanel.tsx
+    │   ├── git.css
+    │   ├── gitmarks.test.ts
+    │   └── marks.test.ts
+    ├── issues/
+    │   ├── index.ts              ◆
+    │   ├── issues.ts
+    │   ├── timeline.ts
+    │   ├── IssuesPanel.tsx
+    │   ├── issues.css            from canvas.css
+    │   ├── issues.test.ts
+    │   └── timeline.test.ts
+    ├── news/
+    │   ├── index.ts              ◆
+    │   ├── news.ts
+    │   ├── newsdata.ts
+    │   ├── NewsPanel.tsx
+    │   ├── NewsSettings.tsx      its Settings page lives here
+    │   ├── news.css
+    │   └── newsdata.test.ts
+    ├── browser/
+    │   ├── index.ts              ◆
+    │   ├── browsers.ts
+    │   ├── profiles.tsx
+    │   ├── debugmenu.tsx
+    │   ├── downloads.tsx
+    │   ├── favs.tsx
+    │   ├── tunnels.ts
+    │   ├── tunnelmap.ts
+    │   ├── tunnelui.tsx
+    │   ├── shots.ts
+    │   ├── browser.css           from canvas.css + styles.css
+    │   └── …tests
+    ├── editor/
+    │   ├── index.ts              ◆
+    │   ├── Editor.tsx
+    │   ├── FileList.tsx
+    │   ├── files.ts
+    │   ├── MdPaper.tsx
+    │   ├── mdexport.ts
+    │   └── editor.css            what's left of files.css
+    ├── db/
+    │   └── …                     db.ts, dbsql.ts, DbPanel.tsx, SheetView.tsx, db.css, sheet.css
+    ├── terminal/                 terms.ts, agentwin.ts, demo.ts
+    ├── agents/                   agents.ts, agentkeys, agenttarget, agentsetup, AgentsPanel, AgentSettings, SetupBanner, *.css
+    ├── signals/                  signals.ts, SignalSettings.tsx, SoundSelect.tsx, signals.css
+    ├── environments/             EnvDialog, envform, envlock, OpenProject, newfolder, environments.css
+    ├── worktrees/                worktrees.ts, agentworktree, setup, ignored, NewWorktree, WorktreeDialog, worktrees.css
+    ├── linked-folders/           links.ts, LinkFolder.tsx, linked-folders.css
+    ├── leftovers/                leftovers.ts, LeftoversPopover.tsx
+    ├── sandbox/                  sandbox.ts, SandboxSettings.tsx, sandbox.css
+    ├── phone/                    phone.ts, phoneask.ts, RemoteSettings.tsx
+    ├── docker/                   docker.ts, dockerdata.ts, DockerPanel.tsx, docker.css
+    ├── monitor/                  monitor.ts, monitordata.ts, MonitorPanel.tsx, monitor.css
+    ├── calc/                     calc.ts, calcdata.ts, calclang.ts, CalcPanel.tsx, calc.css
+    ├── media/                    media.ts, MediaDock.tsx, media.css
+    ├── appearance/               Appearance.tsx, appearance.css
+    ├── welcome/                  Welcome.tsx, welcomedata.ts, welcome.css
+    ├── tour/                     Tour.tsx, tour.css
+    └── usage/                    Usage.tsx, pace.ts, usage.css
+```
+
+The backend, keeping single-file modules as files:
+
+```
+src-tauri/src/
+├── main.rs
+├── lib.rs                        mod lines, tray, invoke_handler
+├── shared/
+│   ├── mod.rs
+│   ├── spawn.rs
+│   ├── remote.rs
+│   ├── envssh.rs
+│   ├── store.rs
+│   ├── devfs.rs
+│   ├── fs.rs
+│   └── tunnel.rs                 from db/
+├── browser/
+│   ├── mod.rs                    was browser.rs
+│   ├── debug.rs
+│   ├── keys.rs
+│   ├── shot.rs
+│   ├── gtk.rs
+│   ├── downloads.rs
+│   ├── passwords.rs
+│   ├── passwords.js
+│   ├── pick.js
+│   ├── forward.rs
+│   └── mdpdf.rs
+├── git/
+│   ├── mod.rs                    was git.rs
+│   ├── worktree.rs               split out of git.rs
+│   ├── github.rs
+│   ├── folders.rs
+│   └── ignored.rs
+├── db/                           as today, minus tunnel.rs
+├── terminal/                     pty.rs, ptyd.rs
+├── agents/                       agent_setup.rs, agent_windows.rs, resume.rs
+├── environments/                 envs.rs, dirs.rs, newfolder.rs
+├── issues/                       plane.rs
+├── phone/                        mod.rs, push.rs
+├── appearance/                   bg.rs, fonts.rs, syssounds.rs
+├── docker.rs
+├── sbx.rs
+├── monitor.rs
+├── news.rs
+├── media.rs
+├── leftovers.rs
+├── grammars.rs
+├── usage.rs
+├── tour.rs
+├── cli.rs
+└── altspace.rs
+```
+
+An `index.ts` re-exports only what other modules use. For example, `modules/issues/index.ts`:
+
+```ts
+export { IssuesPanel } from "./IssuesPanel";
+export { dev, inProgress, slugOf, devOf, sourcesOf, stateOf, isActive, forgetProject } from "./issues";
+```
+
+`git.ts` then imports `from "../issues"`, never `"../issues/issues"`. An `index.ts` whose export list keeps growing marks a shallow module worth a second look.
+
+## Back-edges to cut first
+
+These imports break rules 3 and 4 today. Each needs a small change before (or as) its files move.
+
+| Edge | Fix |
+|---|---|
+| `state.ts` → `news/newsdata` (`NewsFeed` type) | Move the `NewsFeed` type into `shared/state` (state owns what it persists); `newsdata` imports it. |
+| `worktrees.ts`, `Tour.tsx` → `Sidebar` (`dropProject`) | `dropProject` is a store operation: move it into `shared/state`. |
+| `NewsPanel`, `NewWorktree`, `profiles`, `debugmenu` → `Settings` (`openSettings`) | Put `openSettings` / `settingsOpen` in `shared/nav.ts`; `Settings.tsx` reads that signal. |
+| `cli`, `LinkFolder`, `Welcome`, `Tour`, `Sidebar` → `OpenProject` (`openProjectDialog`, `openFolder`, `FolderPicker`) | Fine once `OpenProject` is `environments/`' interface. `FolderPicker` is used by Linked Folders too: export it from `environments/index.ts`. |
+| `signals` ↔ `phone` (`pushSignal` / `sigOf`) | `phone` already depends on `signals`. Turn it round: `signals` exposes `onAlert(fn)`, `phone` subscribes. `sigOf` already lives in `shared/sigs.ts`; point `phone` there. |
+| `agents` ↔ `browser` (`normalizeUrl` one way; `agentsetup`, `agenttarget` the other) | Move `normalizeUrl` to `shared/` (it is a URL helper). The browser → agents direction stays (Select element sends to an agent). |
+| `envlock` → `issues` (`clock`) | `clock` is a ticking-time signal, not an issue concept: move to `shared/ui`. |
+| `terms` → `signals` → `phone` → `terms` (cycle) | Cut by the `onAlert` change above. |
+
+## CSS
+
+There are 16 CSS files today. Twelve of them already belong to one module and just move with it. The other three (`styles.css`, `canvas.css`, `files.css`, about 2,500 lines between them) hold rules for many modules and get split.
+
+**Rule:** the CSS for a module sits in the module's folder and is imported by the component that uses those classes. Shared CSS is imported by the shared component it styles, so `Modal.tsx` imports `modal.css` and the rules travel with the component. Only the tokens and base rules are imported once, from `app/index.tsx`.
+
+### Files that move as they are
+
+| File | Goes to |
+|---|---|
+| `agents.css`, `agentsetup.css` | `modules/agents/` |
+| `calc.css` | `modules/calc/` |
+| `db.css`, `sheet.css` | `modules/db/` |
+| `docker.css` | `modules/docker/` |
+| `git.css` | `modules/git/` |
+| `media.css` | `modules/media/` |
+| `monitor.css` | `modules/monitor/` |
+| `news.css` | `modules/news/` |
+| `sandbox.css` | `modules/sandbox/` |
+| `welcome.css` | `modules/welcome/` |
+| `diff.css` | `shared/text/` (with `DiffView.tsx`) |
+
+### `styles.css` (1,406 lines), split by owner
+
+| Lines (today) | What | Goes to |
+|---|---|---|
+| 1–80 | Tokens: `:root`, dark theme, `data-theme` | `shared/styles/tokens.css` |
+| 80–121 | The Keycap, accent keys, keys in tiles | `shared/keys/keys.css` |
+| 742–781, 690–698, 1390–1399 | Modal, toast, px fields | `shared/ui/modal.css`, `shared/ui/ui.css` |
+| 122–376, 463–477, 555–641, 668–676, 699–740, 1400–1406 | Layout, sidebar, toolbar, Tab Strip, New Window Menu, stage, status line, Leftovers chip, Feedback, About, Restart | `app/app.css` (or split: `app/sidebar.css`, `app/toolbar.css`, `app/statusline.css`) |
+| 377–462 | Browser Profiles, Debug Menu, downloads list | `modules/browser/browser.css` |
+| 478–554, 1214–1233 | Project Appearance panel, Settings › Appearance | `modules/appearance/appearance.css` |
+| 202–228, 642–667, 1138–1179 | Agent Signals, signal settings | `modules/signals/signals.css` |
+| 677–689 | Pace line | `modules/usage/usage.css` |
+| 741, 947–1073 | Open Project dialog, Environment dialog | `modules/environments/environments.css` |
+| 782–821, 852–889 | New Worktree dialog | `modules/worktrees/worktrees.css` |
+| 822–851 | Link Folder dialog | `modules/linked-folders/linked-folders.css` |
+| 890–946 | Sandbox shield and toggle | `modules/sandbox/sandbox.css` |
+| 1074–1117 | Tour | `modules/tour/tour.css` |
+| 1118–1137, 1330–1389 | Settings shell, Settings › Hotkeys | `app/settings/settings.css` |
+| 1180–1213, 1234–1329 | Settings › News, Languages, Browser, Remote | the page's own module |
+
+The line ranges are rough because some sections sit inside others (the worktree rows at 229–289 are drawn by `Sidebar.tsx`, so they stay in `app/`). Split by section header, one owner per section.
+
+### `canvas.css` (766 lines)
+
+| Lines | What | Goes to |
+|---|---|---|
+| 1–89, 104–117, 334–364 | Window chrome, Transparency, Mono, Hold Hints on windows, title-bar mark, terminal body, split handle, empty workspace | `app/canvas.css` |
+| 64–66 | Sandbox shield on a terminal | `modules/sandbox/sandbox.css` |
+| 90–103, 118–333 | Browser window: page tabs, nav, load bar, profiles band, passwords, downloads, favourites, tunnels | `modules/browser/browser.css` |
+| 365–766 | Issues window, Timeline, State Pill, In Progress chips, sidebar issue widget | `modules/issues/issues.css` |
+
+### `files.css` (318 lines)
+
+`About.tsx`, `Palette.tsx` and `Settings.tsx` import it only for a few classes, so it splits three ways:
+
+| Lines | What | Goes to |
+|---|---|---|
+| 27–49 | File-type chip and File Icon Themes | `shared/ui/fileicons.css` (with `fileicons.ts`) |
+| 50–113 | Markdown and HTML preview (About's changelog uses it) | `shared/text/markdown.css` |
+| 114–157 | Command Palette | `app/palette.css` |
+| rest | Tree, tabs, editor, media, grammar offer, language picker, Diff mode, Linked Folder roots | `modules/editor/editor.css` |
+
+### What can break
+
+- **Cascade order.** Vite bundles CSS in import order. Today `styles.css` loads first and everything else after it. Once its rules are spread across modules, a rule that only won because it came later can lose: the `.body > *` rule in `canvas.css` that `LinkFolder` and `NewWorktree` work around is one known case. For each split PR, build before and after and diff the bundled CSS sorted by selector, so only the order can change, then check the affected windows in both themes.
+- **`keys.test.ts`** checks that no file except `styles.css` styles a `kbd`. After the move that should be `shared/keys/keys.css`, and the test has to read folders recursively.
+- **Class names stay global.** Moving files doesn't scope anything. That's fine for now, since most modules already prefix their classes (`.db-`, `.git-`, `.dock-`). The enforcement test could later check that a module's CSS only uses its own prefix, but that's out of scope here.
+- `src-tauri/phone/app.css` (the phone page) is not part of the Vite build and stays where it is. Its header comment that names `src/styles.css` needs the new paths.
+
+### Order
+
+CSS moves in the same PR as its module (rule 1). The three big files are split in their own PRs: `files.css` with `editor/`, `canvas.css` with `issues/` and `browser/`, and `styles.css` last, alongside `app/`. That way tokens and base rules stay put until everything else has left.
+
+## Backend layout (`src-tauri/src/`)
+
+A Rust file is already a module, so a single-file module keeps its `name.rs`; a module with two or more files becomes `name/mod.rs` + parts. `lib.rs` keeps only `mod` lines, the tray and the `invoke_handler`.
+
+| Folder | Files |
+|---|---|
+| `shared/` | `spawn.rs`, `remote.rs`, `envssh.rs`, `store.rs`, `devfs.rs` (Dev Directory client), `fs.rs`, `tunnel.rs` (from `db/tunnel.rs`: Docker and Remote Tunnels use it too) |
+| `browser/` | `mod.rs` (was `browser.rs`), `debug.rs`, `keys.rs`, `shot.rs`, `gtk.rs`, `downloads.rs`, `passwords.rs`, `passwords.js`, `pick.js`, `forward.rs` (Remote Tunnels), `mdpdf.rs` |
+| `terminal/` | `pty.rs`, `ptyd.rs` (stays `pub`: `main.rs` runs it) |
+| `agents/` | `agent_setup.rs`, `agent_windows.rs` (the MCP endpoint), `resume.rs` |
+| `git/` | `mod.rs` (was `git.rs`, 1386 lines; split worktree commands into `worktree.rs`), `github.rs`, `folders.rs` (Folder Copy), `ignored.rs` |
+| `issues/` | `plane.rs` |
+| `db/` | as today, minus `tunnel.rs` |
+| `environments/` | `envs.rs`, `dirs.rs`, `newfolder.rs` |
+| `phone/` | `mod.rs` (was `phone.rs`), `push.rs`; `src-tauri/phone/` assets stay where they are |
+| `appearance/` | `bg.rs`, `fonts.rs`, `syssounds.rs` |
+| single files | `docker.rs`, `sbx.rs`, `monitor.rs`, `news.rs`, `media.rs`, `leftovers.rs`, `grammars.rs`, `usage.rs`, `tour.rs`, `cli.rs`, `altspace.rs` |
+
+`include_str!` / `include_bytes!` paths are relative to the file, so moving `browser.rs`, `passwords.rs`, `phone.rs` and `tour.rs` means adding a `../` to each (`pick.js` and `passwords.js` move with their file, so theirs stay).
+
+## Things that hard-code paths today
+
+- `index.html`: `/src/index.tsx` → `/src/app/index.tsx`.
+- `scripts/grammar-catalog.ts`: writes `../src/grammars.json` → `../src/shared/codemirror/grammars.json`.
+- `keys.test.ts`: `readdirSync(import.meta.dir)` only reads its own folder. Make it walk `src/` recursively, or it will silently check nothing.
+- File-header comments naming `src/X.tsx` (most CSS files, several tests) and CONTEXT.md's file references: update in the same PR as each move.
+
+## Enforcement
+
+Add `src/shared/layout.test.ts` (bun test) that reads every `.ts`/`.tsx` under `src/`, parses its relative imports and fails when:
+
+- a file in `shared/` imports from `modules/` or `app/`;
+- a file in `modules/` imports from `app/`;
+- a file in `modules/a/` imports a path inside `modules/b/` other than the folder itself (`../b`);
+- a `src/` file sits outside `app/`, `shared/` and `modules/` (apart from those three folders).
+
+## Migration order
+
+One PR per step; each ends with `bun run typecheck`, `bun test ./src/`, `cargo check` and a launch.
+
+1. **Cut the back-edges** above, in place, with no moves. Small, reviewable, and it makes every later move mechanical.
+2. **`shared/`**: move the shared files and fix imports. Add the enforcement test with only the `shared/` rule on.
+3. **Leaf modules** (nothing else imports them except `app/`): `calc`, `monitor`, `news`, `docker`, `media`, `usage`, `db`, `sandbox`, `welcome`, `tour`.
+4. **Inner modules**: `issues`, `git`, `linked-folders`, `editor`, `environments`, `worktrees`, `leftovers`, `signals`, `phone`, `agents`, `terminal`, `browser`, `appearance`. Turn on the cross-module rule.
+5. **`app/`** last, then turn on the last rule.
+6. **Rust**: `shared/` first (most `crate::` paths change there), then each folder. `git.rs`'s split is its own PR.
+
+Use `git mv` so history follows the files.
+
+## Open questions
+
+- **`state.ts` (1347 lines, 177 exports)** stays one file in `shared/state/` for now. Later it could give each module its own slice (the Calculator's `calc`, the News `feeds`), owned by that module, with `state.ts` keeping persistence and migration only. That is a separate deepening, not part of this move.
+- **Module name `agents/` vs `commands/`**: CONTEXT.md calls them Commands, the code calls them agents, and `commands.ts` is the Command Palette. `agents/` keeps the code's name and avoids the clash.
+- **Rust single-file modules**: this keeps them as files. If every module should be a folder on both sides, they each become `name/mod.rs`; it changes nothing else.
