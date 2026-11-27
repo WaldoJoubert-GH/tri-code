@@ -1,21 +1,31 @@
-// bun test: every key the app draws is the one keycap (Keys.tsx, `kbd` in styles.css).
+// bun test: every key the app draws is the one keycap (Keys.tsx, `kbd` in src/styles.css).
 
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { splitKeys } from "./keymap";
 
-const files = (ext: string) => readdirSync(import.meta.dir).filter((f) => f.endsWith(ext));
-const read = (f: string) => readFileSync(join(import.meta.dir, f), "utf8");
+const src = join(import.meta.dir, "..", "..");
+/** Every file under src/ ending in `ext`, as a path relative to src/ with forward slashes. */
+const files = (ext: string) =>
+  (readdirSync(src, { recursive: true }) as string[])
+    .map((f) => f.replaceAll("\\", "/"))
+    .filter((f) => f.endsWith(ext));
+const read = (f: string) => readFileSync(join(src, f), "utf8");
 
 describe("the keycap", () => {
   test("only Keys.tsx writes a <kbd>, so no key can look different", () => {
-    const others = files(".tsx").filter((f) => f !== "Keys.tsx" && /<kbd[\s>]/.test(read(f)));
+    const tsx = files(".tsx");
+    expect(tsx).toContain("shared/keys/Keys.tsx");
+    const others = tsx.filter((f) => f !== "shared/keys/Keys.tsx" && /<kbd[\s>]/.test(read(f)));
     expect(others).toEqual([]);
   });
 
   test("only styles.css styles a kbd, so no panel can restyle one", () => {
-    const others = files(".css").filter((f) => f !== "styles.css" && /\bkbd\b[^{}]*\{/.test(read(f).replace(/:has\([^)]*\)/g, "")));
+    const css = files(".css");
+    expect(css).toContain("styles.css");
+    expect(css.length).toBeGreaterThan(10);
+    const others = css.filter((f) => f !== "styles.css" && /\bkbd\b[^{}]*\{/.test(read(f).replace(/:has\([^)]*\)/g, "")));
     expect(others).toEqual([]);
   });
 
