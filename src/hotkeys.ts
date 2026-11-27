@@ -39,7 +39,7 @@ import { nextSignal } from "./signals";
 import { closeSignals, signalsOpen } from "./SignalSettings";
 import { closeFeedback, feedbackOpen } from "./Feedback";
 import { closeLeftovers, leftoversOpen } from "./leftovers";
-import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./media";
+import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./modules/media";
 import { flash } from "./shared/ui/ui";
 import { hasSelection } from "./terms";
 import { ACTIONS, BROWSER_ACTIONS, actionFor, editorKey, isKey, keysOf } from "./shared/keys/keymap";

@@ -28,8 +28,8 @@ import { settingsOpen, toggleSettings } from "./shared/nav";
 import { LeftoverCount } from "./LeftoversPopover";
 import { endLeftover, staleCheckouts } from "./leftovers";
 import { sandboxOf } from "./sandbox";
-import { MediaDock } from "./MediaDock";
-import { mediaPopOpen } from "./media";
+import { MediaDock } from "./modules/media";
+import { mediaPopOpen } from "./modules/media";
 import { isEnter } from "./shared/ui/enterkey";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */

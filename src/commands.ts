@@ -35,7 +35,7 @@ import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updat
 import { startTour } from "./Tour";
 import { openWelcome } from "./Welcome";
 import { flash } from "./shared/ui/ui";
-import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./media";
+import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./modules/media";
 import { openLinkDialog } from "./LinkFolder";
 import { linksOn } from "./links";
 
