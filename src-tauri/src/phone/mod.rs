@@ -1,5 +1,5 @@
 //! Remote Control: tri-code on your phone. While it is on, a small web server serves the phone
-//! page (`phone/`) and a WebSocket. How a phone reaches it is the user's pick (`Reach`): by
+//! page (`src-tauri/phone/`) and a WebSocket. How a phone reaches it is the user's pick (`Reach`): by
 //! default it listens on 127.0.0.1 and `tailscale serve` puts it on the tailnet over HTTPS, which
 //! Web Push needs; or it listens on the local network over plain HTTP (no pushes); or only on
 //! 127.0.0.1, for a tunnel or reverse proxy of the user's own. The port is theirs to change too.
@@ -13,6 +13,8 @@
 //! only the token's hash is stored, beside the VAPID key, in `phone.json`. So is whether it is
 //! on, so it comes back on with the app (kept here, not in state.json, which every tri-code
 //! running on the machine rewrites).
+
+mod push;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -35,7 +37,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 use crate::terminal::pty::Ptys;
-use crate::push::{self, PushError, Subscription};
+use self::push::{PushError, Subscription};
 
 /// Where the server listens, and the tailnet HTTPS port `tailscale serve` maps to it, unless
 /// Settings › Remote picks others. Not 443, which is often serving something else on the machine.
@@ -457,19 +459,19 @@ fn asset(content_type: &'static str, body: &'static [u8]) -> Response {
 
 fn router(phone: Shared) -> Router {
     Router::new()
-        .route("/", get(|| async { asset("text/html; charset=utf-8", include_bytes!("../phone/index.html")) }))
-        .route("/app.js", get(|| async { asset("text/javascript", include_bytes!("../phone/app.js")) }))
-        .route("/app.css", get(|| async { asset("text/css", include_bytes!("../phone/app.css")) }))
-        .route("/sw.js", get(|| async { asset("text/javascript", include_bytes!("../phone/sw.js")) }))
-        .route("/icon.png", get(|| async { asset("image/png", include_bytes!("../icons/icon.png")) }))
-        .route("/icon.svg", get(|| async { asset("image/svg+xml", include_bytes!("../../assets/icon.svg")) }))
-        .route("/icon-192.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-192.png")) }))
-        .route("/icon-maskable.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-maskable.png")) }))
-        .route("/apple-touch-icon.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-apple-touch.png")) }))
-        .route("/badge.png", get(|| async { asset("image/png", include_bytes!("../icons/phone-badge.png")) }))
-        .route("/xterm.js", get(|| async { asset("text/javascript", include_bytes!("../../node_modules/@xterm/xterm/lib/xterm.js")) }))
-        .route("/xterm.css", get(|| async { asset("text/css", include_bytes!("../../node_modules/@xterm/xterm/css/xterm.css")) }))
-        .route("/addon-fit.js", get(|| async { asset("text/javascript", include_bytes!("../../node_modules/@xterm/addon-fit/lib/addon-fit.js")) }))
+        .route("/", get(|| async { asset("text/html; charset=utf-8", include_bytes!("../../phone/index.html")) }))
+        .route("/app.js", get(|| async { asset("text/javascript", include_bytes!("../../phone/app.js")) }))
+        .route("/app.css", get(|| async { asset("text/css", include_bytes!("../../phone/app.css")) }))
+        .route("/sw.js", get(|| async { asset("text/javascript", include_bytes!("../../phone/sw.js")) }))
+        .route("/icon.png", get(|| async { asset("image/png", include_bytes!("../../icons/icon.png")) }))
+        .route("/icon.svg", get(|| async { asset("image/svg+xml", include_bytes!("../../../assets/icon.svg")) }))
+        .route("/icon-192.png", get(|| async { asset("image/png", include_bytes!("../../icons/phone-192.png")) }))
+        .route("/icon-maskable.png", get(|| async { asset("image/png", include_bytes!("../../icons/phone-maskable.png")) }))
+        .route("/apple-touch-icon.png", get(|| async { asset("image/png", include_bytes!("../../icons/phone-apple-touch.png")) }))
+        .route("/badge.png", get(|| async { asset("image/png", include_bytes!("../../icons/phone-badge.png")) }))
+        .route("/xterm.js", get(|| async { asset("text/javascript", include_bytes!("../../../node_modules/@xterm/xterm/lib/xterm.js")) }))
+        .route("/xterm.css", get(|| async { asset("text/css", include_bytes!("../../../node_modules/@xterm/xterm/css/xterm.css")) }))
+        .route("/addon-fit.js", get(|| async { asset("text/javascript", include_bytes!("../../../node_modules/@xterm/addon-fit/lib/addon-fit.js")) }))
         .route("/manifest.webmanifest", get(manifest))
         .route("/api/pair", post(pair))
         .route("/api/push", post(subscribe))

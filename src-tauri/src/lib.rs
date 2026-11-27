@@ -17,7 +17,6 @@ mod leftovers;
 mod mdpdf;
 mod media;
 mod phone;
-mod push;
 mod sbx;
 mod shared;
 mod syssounds;
