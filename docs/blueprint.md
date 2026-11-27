@@ -269,21 +269,20 @@ src-tauri/src/
 │   ├── passwords.rs
 │   ├── passwords.js
 │   ├── pick.js
-│   ├── forward.rs
-│   └── mdpdf.rs
+│   └── forward.rs
 ├── git/
 │   ├── mod.rs                    was git.rs
-│   ├── worktree.rs               split out of git.rs
-│   ├── github.rs
+│   ├── worktree.rs               split out of git.rs (its own PR, after step 6)
 │   ├── folders.rs
 │   └── ignored.rs
-├── db/                           as today, minus tunnel.rs
-├── terminal/                     pty.rs, ptyd.rs
-├── agents/                       agent_setup.rs, agent_windows.rs, resume.rs
-├── environments/                 envs.rs, dirs.rs, newfolder.rs
-├── issues/                       plane.rs
+├── db/                           as before, minus tunnel.rs
+├── terminal/                     mod.rs, pty.rs, ptyd.rs
+├── agents/                       mod.rs, agent_setup.rs, agent_windows.rs, resume.rs
+├── environments/                 mod.rs, envs.rs, dirs.rs, newfolder.rs
+├── issues/                       mod.rs, plane.rs, github.rs
 ├── phone/                        mod.rs, push.rs
-├── appearance/                   bg.rs, fonts.rs, syssounds.rs
+├── appearance/                   mod.rs, bg.rs, fonts.rs, syssounds.rs
+├── mdpdf.rs
 ├── docker.rs
 ├── sbx.rs
 ├── monitor.rs
@@ -405,18 +404,18 @@ A Rust file is already a module, so a single-file module keeps its `name.rs`; a 
 | Folder | Files |
 |---|---|
 | `shared/` | `spawn.rs`, `remote.rs`, `envssh.rs`, `store.rs`, `devfs.rs` (Dev Directory client), `fs.rs`, `tunnel.rs` (from `db/tunnel.rs`: Docker and Remote Tunnels use it too) |
-| `browser/` | `mod.rs` (was `browser.rs`), `debug.rs`, `keys.rs`, `shot.rs`, `gtk.rs`, `downloads.rs`, `passwords.rs`, `passwords.js`, `pick.js`, `forward.rs` (Remote Tunnels), `mdpdf.rs` |
+| `browser/` | `mod.rs` (was `browser.rs`), `debug.rs`, `keys.rs`, `shot.rs`, `gtk.rs`, `downloads.rs`, `passwords.rs`, `passwords.js`, `pick.js`, `forward.rs` (Remote Tunnels) |
 | `terminal/` | `pty.rs`, `ptyd.rs` (stays `pub`: `main.rs` runs it) |
 | `agents/` | `agent_setup.rs`, `agent_windows.rs` (the MCP endpoint), `resume.rs` |
-| `git/` | `mod.rs` (was `git.rs`, 1386 lines; split worktree commands into `worktree.rs`), `github.rs`, `folders.rs` (Folder Copy), `ignored.rs` |
-| `issues/` | `plane.rs` |
-| `db/` | as today, minus `tunnel.rs` |
+| `git/` | `mod.rs` (was `git.rs`, 1386 lines; split worktree commands into `worktree.rs`), `folders.rs` (Folder Copy), `ignored.rs` |
+| `issues/` | `plane.rs`, `github.rs` (GitHub Issues) |
+| `db/` | as before, minus `tunnel.rs` |
 | `environments/` | `envs.rs`, `dirs.rs`, `newfolder.rs` |
 | `phone/` | `mod.rs` (was `phone.rs`), `push.rs`; `src-tauri/phone/` assets stay where they are |
 | `appearance/` | `bg.rs`, `fonts.rs`, `syssounds.rs` |
-| single files | `docker.rs`, `sbx.rs`, `monitor.rs`, `news.rs`, `media.rs`, `leftovers.rs`, `grammars.rs`, `usage.rs`, `tour.rs`, `cli.rs`, `altspace.rs` |
+| single files | `docker.rs`, `sbx.rs`, `monitor.rs`, `news.rs`, `media.rs`, `leftovers.rs`, `grammars.rs`, `usage.rs`, `tour.rs`, `cli.rs`, `altspace.rs`, `mdpdf.rs` (the Editor's Export PDF) |
 
-`include_str!` / `include_bytes!` paths are relative to the file, so moving `browser.rs`, `passwords.rs`, `phone.rs` and `tour.rs` means adding a `../` to each (`pick.js` and `passwords.js` move with their file, so theirs stay).
+`include_str!` / `include_bytes!` paths are relative to the file. Of the files that have them, only `phone/mod.rs` moved a level deeper, so its paths gained a `../`; `pick.js` and `passwords.js` moved with `browser/mod.rs` and `browser/passwords.rs`, and `tour.rs` stayed, so theirs are unchanged.
 
 ## Things that hard-code paths today
 
@@ -446,7 +445,7 @@ One PR per step; each ends with `bun run typecheck`, `bun test ./src/`, `cargo c
 3. **Leaf modules** (nothing else imports them except `app/`): `calc`, `monitor`, `news`, `docker`, `media`, `usage`, `db`, `sandbox`, `welcome`, `tour`. Done; see [Step 3: leaf modules](#step-3-leaf-modules).
 4. **Inner modules**: `issues`, `git`, `linked-folders`, `editor`, `environments`, `worktrees`, `leftovers`, `signals`, `phone`, `agents`, `terminal`, `browser`, `appearance`. Turn on the cross-module rule. Done; see [Step 4: inner modules](#step-4-inner-modules).
 5. **`app/`** last, then turn on the last rule. Done; see [Step 5: app](#step-5-app).
-6. **Rust**: `shared/` first (most `crate::` paths change there), then each folder. `git.rs`'s split is its own PR.
+6. **Rust**: `shared/` first (most `crate::` paths change there), then each folder. `git.rs`'s split is its own PR. Done; see [Step 6: Rust](#step-6-rust).
 
 Use `git mv` so history follows the files.
 
@@ -536,8 +535,37 @@ Three move commits (the app shell with the three stylesheets and the entry point
 - **Paths outside `src/`:** `index.html` loads `/src/app/index.tsx`; the header of `src-tauri/phone/app.css` names `src/app/styles.css`. `vite.config.ts`, `tauri.conf.json` (`frontendDist`, `devUrl`), `package.json` scripts (`bun test ./src/`), `scripts/`, `mcp/` and `.vscode/` name no file in `src/`. `src-tauri/src/tour.rs`'s `src/App.tsx` and `src/Settings.tsx`, the Terminal's demo lines and `favicons.test.ts`'s URL are sample text about another project, not paths into this one.
 - **CSS order unchanged.** The built CSS is byte-identical to the build of step 4's last commit (same file hash, 2,967 blocks in the same order): every stylesheet is still imported by the same files in the same order, only from new paths.
 
+### Step 6: Rust
+
+One commit per folder (`shared/`, `browser/`, `git/`, `terminal/`, `agents/`, `environments/`, `issues/`, `phone/`, `appearance/`), each passing `cargo check` and `cargo check --tests`, then a commit for the comments and docs that name Rust files. Every move is a `git mv`; nothing but paths and `mod` lines changed in the moved files. `git.rs` moved whole to `git/mod.rs`: splitting out `worktree.rs` is its own PR.
+
+```
+src-tauri/src/
+├── main.rs, lib.rs
+├── shared/         mod.rs, spawn.rs, remote.rs, envssh.rs, store.rs, devfs.rs, fs.rs, tunnel.rs
+├── browser/        mod.rs, debug.rs, keys.rs, shot.rs, gtk.rs, downloads.rs, passwords.rs, passwords.js, pick.js, forward.rs
+├── git/            mod.rs, folders.rs, ignored.rs
+├── issues/         mod.rs, plane.rs, github.rs
+├── terminal/       mod.rs, pty.rs, ptyd.rs
+├── agents/         mod.rs, agent_setup.rs, agent_windows.rs, resume.rs
+├── environments/   mod.rs, envs.rs, dirs.rs, newfolder.rs
+├── phone/          mod.rs, push.rs
+├── appearance/     mod.rs, bg.rs, fonts.rs, syssounds.rs
+├── db/             mod.rs, mongo.rs, mysql.rs, pg.rs, sheet.rs, sqlite.rs, target.rs, tls.rs
+└── altspace.rs, cli.rs, docker.rs, grammars.rs, leftovers.rs, mdpdf.rs, media.rs, monitor.rs, news.rs, sbx.rs, tour.rs, usage.rs
+```
+
+- **`github.rs` went to `issues/`, not `git/`.** It is GitHub Issues for the issues panel (sync, create, labels, comments, and the Feedback window's `gh_feedback`), the second source beside `plane.rs`, and `modules/issues/issues.ts` is what calls it. Its only tie to git is `git::exec` and `git::blocking`, which it calls through `crate::git`. The pull request commands (`gh_pr_*`) were already in `git.rs` and stay there.
+- **`mdpdf.rs` stayed a single file, not `browser/`.** It is the Editor's Export PDF (`modules/editor/mdexport.ts`): a hidden window, not a browser pane. It borrows `browser::debug::cdp_call` for WebView2's `Page.printToPDF`, which is why `browser::debug` is `pub(crate)`.
+- **Paths, not shims.** Every `crate::x` was rewritten to its new path (`crate::shared::spawn`, `crate::browser::debug`, …), including in the `#[cfg]`'d macOS and Linux code. Submodules are `pub(crate)` where something outside their folder uses them, private otherwise (`browser::shot`, `phone::push`). Each folder's `mod.rs` has only `mod` lines and a header, except the three that were files (`browser`, `git`, `phone`). The one re-export is `pub use terminal::ptyd;` in `lib.rs`, so `main.rs` still runs `tri_code_lib::ptyd::run_daemon`; `terminal/mod.rs` keeps `ptyd` `pub` and `pty` `pub(crate)`.
+- **Command names unchanged.** `generate_handler!` takes paths, so only the prefixes changed; the list of its last segments is the same 211 names in the same order as before (compared against step 5's `lib.rs`). It is the only `generate_handler!`, and no registration has a `#[cfg]`.
+- **`browser/gtk.rs` sits beside the `gtk` crate.** `browser/mod.rs` declares `mod gtk` on Linux and names the crate nowhere; `gtk.rs` and `shot.rs` use `gtk::` for the crate, which resolves to it since neither declares a `gtk` of its own.
+- **Edges worth a second look**, all older than the move: `shared/spawn.rs` uses `agents::resume` (the `Resume` a tab is launched with) and `sbx`; `docker.rs`, `sbx.rs`, `newfolder.rs` and `issues/github.rs` use `git::blocking` / `git::exec`, and `leftovers.rs` `git::parse_worktrees`: candidates for `shared/` when `git.rs` is split. `shared/store.rs` is used by no other Rust module; it is the backend of `src/shared/state`, so it stays in `shared/`.
+- **Not compiled here:** this was built and tested on Windows only. The macOS and Linux code paths were updated by the same textual rewrite and checked by reading: `browser/gtk.rs` (Linux only, whole file), the Linux `browser::gtk` calls in `browser/mod.rs` and `lib.rs`, the macOS `browser::passwords` calls in `browser/mod.rs`, and the macOS/Linux branches of `browser/shot.rs`, `browser/keys.rs`, `browser/passwords.rs` and `browser/downloads.rs` (whose paths didn't change). A grep finds no `crate::` path to a moved module left in any file.
+- **Comments and docs** that named a moved file now name it by folder (`browser/keys.rs`, `agents/resume.rs`, `src-tauri/src/git/mod.rs`): frontend comments, CONTEXT.md, Cargo.toml, `mcp/*.mjs`, the phone page, README's `src-tauri/src/` list. A file in the same folder is still named bare (`shot.rs` in `pick.js`). The ADRs keep their bare names as written, with ADR 0003's full path updated; `docs/diff-view-progress.md` is a dated log and is left as it was.
+
 ## Open questions
 
 - **`state.ts` (1347 lines, 177 exports)** stays one file in `shared/state/` for now. Later it could give each module its own slice (the Calculator's `calc`, the News `feeds`), owned by that module, with `state.ts` keeping persistence and migration only. That is a separate deepening, not part of this move.
 - **Module name `agents/` vs `commands/`**: CONTEXT.md calls them Commands, the code calls them agents, and `commands.ts` is the Command Palette. `agents/` keeps the code's name and avoids the clash.
-- **Rust single-file modules**: this keeps them as files. If every module should be a folder on both sides, they each become `name/mod.rs`; it changes nothing else.
+- **Rust single-file modules**: decided, they stay files (step 6). If every module should be a folder on both sides, they each become `name/mod.rs`; it changes nothing else.

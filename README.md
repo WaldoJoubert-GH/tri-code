@@ -156,17 +156,25 @@ Layout:
 
 `src-tauri/src/`
 
-- `main.rs`: binary entry point. Hides the console window in Windows release builds.
-- `lib.rs`: Tauri setup. Registers the commands and the shared PTY state.
-- `dirs.rs`: folder listing for the project picker (marking git repositories, listing `.code-workspace` files), local or over ssh.
-- `folders.rs`: worktrees for a folder that isn't a repo: the repos nested in it, copying it, what changed in the copy, and copying that back, local or over ssh.
-- `envs.rs`: `ssh_hosts` (the `Host` aliases in `~/.ssh/config`) and `scan_logos` (logo files in a project folder, as data URLs), local or over ssh.
-- `bg.rs`: background and icon images, stored as data URL files next to `state.json`.
-- `devfs.rs`: `dev_read` / `dev_write` for a project's `.dev/` folder, local or over ssh, with an atomic write. The first write into a `.dev/` adds a `.gitignore` of `*` there, as pi-todos does, so the folder never ends up in git.
-- `plane.rs`: the Plane.so REST calls the issues panel needs (sync, set state, set labels, set dates, create, comments, asset upload). The token is read from `~/.pi/agent/secrets/plane.json` on the project's host.
-- `github.rs`: the GitHub Issues calls, through `gh` on the project's host (sync, set state, labels, create, comments). No token: gh uses the host's login.
-- `remote.rs`: the shared non-interactive ssh command builder used by `dirs.rs`, `envs.rs` and `devfs.rs`.
-- `pty.rs`: PTY sessions (spawn, output channel, write, resize, kill) and remote session cleanup.
-- `spawn.rs`: builds the program and arguments for local and ssh tabs, including the shpool and tmux fallback. Contains the unit tests and the ignored SSH end-to-end test.
-- `store.rs`: loads and atomically saves `state.json`.
-- `tour.rs`: `tour_folder` writes the tour's sample files (from `src-tauri/tour/`) into the app config directory and makes it a git repo with one commit.
+A module with two or more files is a folder (`name/mod.rs` and its parts); a single-file module stays `name.rs`.
+
+- `main.rs`: binary entry point. Hides the console window in Windows release builds, and runs the terminal host (`terminal/ptyd.rs`) when started with `--pty-daemon`.
+- `lib.rs`: Tauri setup. The `mod` lines, the tray, and the `invoke_handler` that registers every command.
+- `shared/`: what several modules use.
+  - `spawn.rs`: builds the program and arguments for local and ssh tabs, including the shpool and tmux fallback. Contains the unit tests and the ignored SSH end-to-end test.
+  - `remote.rs`: the shared non-interactive ssh command builder.
+  - `envssh.rs`: each Environment's ssh options and the PIN lock, applied to every ssh call.
+  - `fs.rs`: the Editor's file commands (list, read, write, rename, delete), local or over ssh.
+  - `devfs.rs`: `dev_read` / `dev_write` for a project's `.dev/` folder, local or over ssh, with an atomic write. The first write into a `.dev/` adds a `.gitignore` of `*` there, as pi-todos does, so the folder never ends up in git.
+  - `store.rs`: loads and atomically saves `state.json`.
+  - `tunnel.rs`: ssh tunnels, for the Database Window, Docker and Remote Tunnels.
+- `terminal/`: `pty.rs`, PTY sessions (spawn, output channel, write, resize, kill) and remote session cleanup; `ptyd.rs`, the terminal host that owns the PTYs.
+- `agents/`: `agent_setup.rs` (installing Commands), `agent_windows.rs` (the MCP endpoint), `resume.rs` (reopening a conversation).
+- `browser/`: the browser panes (`mod.rs`), with DevTools and the console (`debug.rs`), the Browser keys (`keys.rs`), screenshots (`shot.rs`), Linux's GtkOverlay (`gtk.rs`), downloads, macOS passwords, Select element (`pick.js`) and Remote Tunnels (`forward.rs`).
+- `git/`: the git window's commands (`mod.rs`); `folders.rs`, worktrees for a folder that isn't a repo (the repos nested in it, copying it, what changed in the copy, and copying that back, local or over ssh); `ignored.rs`, the ignored files New worktree can copy.
+- `issues/`: `plane.rs`, the Plane.so REST calls the issues panel needs (sync, set state, set labels, set dates, create, comments, asset upload; the token is read from `~/.pi/agent/secrets/plane.json` on the project's host); `github.rs`, the GitHub Issues calls, through `gh` on the project's host (no token: gh uses the host's login).
+- `environments/`: `envs.rs`, `ssh_hosts` (the `Host` aliases in `~/.ssh/config`) and `scan_logos` (logo files in a project folder, as data URLs); `dirs.rs`, folder listing for the project picker (marking git repositories, listing `.code-workspace` files); `newfolder.rs`, the Open project dialog's New folder and Clone. All local or over ssh.
+- `phone/`: Remote Control's server (`mod.rs`; the page itself is in `src-tauri/phone/`) and Web Push (`push.rs`).
+- `appearance/`: `bg.rs` (background and icon images and uploaded sounds, stored as data URL files next to `state.json`), `fonts.rs`, `syssounds.rs`.
+- `db/`: the Database Window's drivers.
+- Single files: `docker.rs`, `sbx.rs`, `monitor.rs`, `news.rs`, `media.rs`, `leftovers.rs`, `grammars.rs`, `usage.rs`, `cli.rs`, `mdpdf.rs` (Export PDF of a Markdown file), `altspace.rs` (Windows only), and `tour.rs`: `tour_folder` writes the tour's sample files (from `src-tauri/tour/`) into the app config directory and makes it a git repo with one commit.
