@@ -18,7 +18,7 @@ use std::sync::Arc;
 use serde::Serialize;
 use sysinfo::{Pid, Process, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
-use crate::pty::Ptys;
+use crate::terminal::pty::Ptys;
 use crate::shared::remote;
 use crate::shared::spawn::{expand_home, remote_path};
 

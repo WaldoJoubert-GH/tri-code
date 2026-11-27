@@ -23,7 +23,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::agent_windows::{self, AgentWindows, Owner};
 use crate::shared::envssh;
-use crate::ptyd::{self, FromHost, Info, KIND_INPUT, KIND_JSON, KIND_OUTPUT, ToHost};
+use crate::terminal::ptyd::{self, FromHost, Info, KIND_INPUT, KIND_JSON, KIND_OUTPUT, ToHost};
 use crate::resume;
 use crate::shared::spawn::{self, SpawnSpec};
 

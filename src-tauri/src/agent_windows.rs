@@ -23,7 +23,7 @@ use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::oneshot;
 
-use crate::pty::Ptys;
+use crate::terminal::pty::Ptys;
 
 /// The endpoint's port, and the address every terminal is told in `TRICODE_URL`.
 const PORT: u16 = 7521;

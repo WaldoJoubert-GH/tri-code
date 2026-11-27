@@ -21,15 +21,17 @@ mod mdpdf;
 mod media;
 mod phone;
 mod plane;
-mod pty;
-pub mod ptyd;
 mod push;
 mod resume;
 mod sbx;
 mod shared;
 mod syssounds;
+mod terminal;
 mod tour;
 mod usage;
+
+/// The terminal host, which `main.rs` runs when started with `--pty-daemon`.
+pub use terminal::ptyd;
 
 use std::sync::Arc;
 
@@ -68,7 +70,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<TrayIcon> {
             "open" => show_main(app),
             "quit-keep" => app.exit(0),
             "quit-stop" => {
-                app.state::<Arc<pty::Ptys>>().kill_all();
+                app.state::<Arc<terminal::pty::Ptys>>().kill_all();
                 // The request has to leave before the process does.
                 std::thread::sleep(std::time::Duration::from_millis(200));
                 app.exit(0);
@@ -139,7 +141,7 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let app = window.app_handle();
-                let running = app.state::<Arc<pty::Ptys>>().running();
+                let running = app.state::<Arc<terminal::pty::Ptys>>().running();
                 if window.label() == "main" && running > 0 && let Some(tray) = app.try_state::<Tray>() {
                     api.prevent_close();
                     let _ = tray.0.set_tooltip(Some(format!("tri-code: {running} terminals running")));
@@ -152,14 +154,14 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .manage(Arc::new(pty::Ptys::default()))
+        .manage(Arc::new(terminal::pty::Ptys::default()))
         .manage(cli::Pending::default())
         .setup(|app| {
             // A first launch with paths (`tri .` with the app closed) opens them once the UI loads.
             if let Ok(cwd) = std::env::current_dir() {
                 cli::queue(app.handle(), &std::env::args_os().collect::<Vec<_>>(), &cwd);
             }
-            let ptys = Arc::clone(app.state::<Arc<pty::Ptys>>().inner());
+            let ptys = Arc::clone(app.state::<Arc<terminal::pty::Ptys>>().inner());
             let hub = agent_windows::AgentWindows::new(app.handle().clone(), Arc::clone(&ptys));
             agent_windows::serve(Arc::clone(&hub));
             ptys.configure(app.path().app_local_data_dir()?, Arc::clone(&hub));
@@ -205,12 +207,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            pty::pty_spawn,
-            pty::pty_write,
-            pty::pty_resize,
-            pty::pty_kill,
-            pty::pty_reap,
-            pty::remote_kill_session,
+            terminal::pty::pty_spawn,
+            terminal::pty::pty_write,
+            terminal::pty::pty_resize,
+            terminal::pty::pty_kill,
+            terminal::pty::pty_reap,
+            terminal::pty::remote_kill_session,
             leftovers::leftovers_local,
             leftovers::leftovers_end,
             leftovers::leftovers_remote,
@@ -423,7 +425,7 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 app.state::<Arc<phone::Phone>>().shutdown();
                 // Terminals carry on in the host; the next launch attaches to them.
-                app.state::<Arc<pty::Ptys>>().detach();
+                app.state::<Arc<terminal::pty::Ptys>>().detach();
                 db::close_all();
                 docker::close_all();
                 monitor::close_all();

@@ -34,7 +34,7 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
-use crate::pty::Ptys;
+use crate::terminal::pty::Ptys;
 use crate::push::{self, PushError, Subscription};
 
 /// Where the server listens, and the tailnet HTTPS port `tailscale serve` maps to it, unless
