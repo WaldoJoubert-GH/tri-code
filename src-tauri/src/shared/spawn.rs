@@ -21,7 +21,7 @@ pub struct SpawnSpec {
     pub session: String,
     /// The conversation to reopen, for a local agent whose process is gone.
     #[serde(default)]
-    pub resume: Option<crate::resume::Resume>,
+    pub resume: Option<crate::agents::resume::Resume>,
     /// A Sandboxed Worktree's sandbox: the command runs in it through `sbx` (sbx.rs), this machine's
     /// or, for an ssh host, that host's.
     #[serde(default)]

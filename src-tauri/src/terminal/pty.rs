@@ -21,10 +21,10 @@ use tauri::{AppHandle, Manager};
 use tauri::ipc::{Channel, InvokeResponseBody};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
-use crate::agent_windows::{self, AgentWindows, Owner};
+use crate::agents::agent_windows::{self, AgentWindows, Owner};
 use crate::shared::envssh;
 use crate::terminal::ptyd::{self, FromHost, Info, KIND_INPUT, KIND_JSON, KIND_OUTPUT, ToHost};
-use crate::resume;
+use crate::agents::resume;
 use crate::shared::spawn::{self, SpawnSpec};
 
 /// The webview's end of a session. Replaced when a reloaded page attaches again.

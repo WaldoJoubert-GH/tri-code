@@ -1,8 +1,7 @@
-mod agent_setup;
-mod agent_windows;
 #[cfg(windows)]
 mod altspace;
 mod bg;
+mod agents;
 mod browser;
 mod cli;
 mod db;
@@ -22,7 +21,6 @@ mod media;
 mod phone;
 mod plane;
 mod push;
-mod resume;
 mod sbx;
 mod shared;
 mod syssounds;
@@ -162,8 +160,8 @@ pub fn run() {
                 cli::queue(app.handle(), &std::env::args_os().collect::<Vec<_>>(), &cwd);
             }
             let ptys = Arc::clone(app.state::<Arc<terminal::pty::Ptys>>().inner());
-            let hub = agent_windows::AgentWindows::new(app.handle().clone(), Arc::clone(&ptys));
-            agent_windows::serve(Arc::clone(&hub));
+            let hub = agents::agent_windows::AgentWindows::new(app.handle().clone(), Arc::clone(&ptys));
+            agents::agent_windows::serve(Arc::clone(&hub));
             ptys.configure(app.path().app_local_data_dir()?, Arc::clone(&hub));
             app.manage(hub);
             match build_tray(app) {
@@ -222,13 +220,13 @@ pub fn run() {
             media::media_watch,
             media::media_unwatch,
             media::media_control,
-            agent_windows::agent_allowed,
-            agent_windows::agent_open_failed,
-            agent_windows::agent_worktree_made,
-            agent_setup::agent_setup_status,
-            agent_setup::agent_setup_install,
-            agent_setup::agent_setup_remove,
-            agent_setup::commands_present,
+            agents::agent_windows::agent_allowed,
+            agents::agent_windows::agent_open_failed,
+            agents::agent_windows::agent_worktree_made,
+            agents::agent_setup::agent_setup_status,
+            agents::agent_setup::agent_setup_install,
+            agents::agent_setup::agent_setup_remove,
+            agents::agent_setup::commands_present,
             cli::cli_take,
             cli::cli_status,
             cli::cli_install,

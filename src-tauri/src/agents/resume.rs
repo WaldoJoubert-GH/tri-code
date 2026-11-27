@@ -12,7 +12,7 @@
 use serde::Deserialize;
 use tauri::{AppHandle, Manager};
 
-use crate::agent_setup;
+use crate::agents::agent_setup;
 
 /// The conversation a tab last had, from `Tab.resume`.
 #[derive(Debug, Clone, Deserialize)]

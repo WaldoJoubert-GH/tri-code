@@ -458,7 +458,7 @@ async fn session(State(hub): State<Arc<AgentWindows>>, headers: HeaderMap, axum:
         .and_then(|v| v.strip_prefix("Bearer "))
         .and_then(|t| hub.reg.lock().unwrap().tokens.get(t).cloned())
         .ok_or_else(|| fail(StatusCode::UNAUTHORIZED, "not a tri-code terminal: TRICODE_TOKEN is missing or unknown"))?;
-    if !crate::resume::valid_id(&body.id) || body.kind != "claude" {
+    if !crate::agents::resume::valid_id(&body.id) || body.kind != "claude" {
         return Err(fail(StatusCode::BAD_REQUEST, "not a session id"));
     }
     hub.app
