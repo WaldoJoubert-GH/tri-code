@@ -1,4 +1,7 @@
-// URL helpers with no app imports, so the Browser, Commands and the phone can share them.
+// URL helpers with no app imports, so the Browser, Commands, the phone and the Docker Window can share them.
+
+/** Ports that don't speak HTTP, so a click copies the address rather than opening a page (Docker Window, Remote Tunnels). */
+export const NOT_HTTP = new Set([21, 22, 25, 53, 110, 143, 465, 587, 993, 995, 1025, 1433, 1521, 2181, 3306, 4222, 5432, 5672, 6379, 9042, 9092, 9229, 11211, 27017, 27018]);
 
 /** Normalise an address typed by the user: add a scheme when missing. */
 export function normalizeUrl(s: string): string {

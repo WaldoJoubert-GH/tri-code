@@ -3,7 +3,7 @@
 // from a local port that an ssh tunnel forwards there. The page keeps the remote address, so the
 // address bar, favourites and a restart all see that one.
 
-import { NOT_HTTP } from "./modules/docker";
+import { NOT_HTTP } from "./shared/urls";
 
 /** What a forward reaches on the remote: a port of its localhost, or a folder its file server serves. */
 export type Target = { kind: "port"; port: number } | { kind: "dir"; dir: string };

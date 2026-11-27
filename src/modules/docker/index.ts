@@ -1,5 +1,4 @@
-// The Docker Window's interface: the window, opening and closing it, and which ports aren't http (Remote Tunnels).
+// The Docker Window's interface: the window, and opening and closing it.
 
 export { default as DockerPanel } from "./DockerPanel";
 export { closeDockerWindow, openDockerPanel } from "./docker";
-export { NOT_HTTP } from "./dockerdata";
