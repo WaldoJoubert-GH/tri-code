@@ -6,15 +6,15 @@
 
 import { For, Show, createEffect, createSignal, on } from "solid-js";
 import "./sandbox.css";
-import { activeProject, addTab, app, focusTab, setSandboxSettings } from "./shared/state/state";
+import { activeProject, addTab, app, focusTab, setSandboxSettings } from "../../shared/state/state";
 import {
   type Blocked, type Box, type KeyHow, type Rule, type Secret, SERVICES,
   allowHost, hostKey, listBlocked, listBoxes, listRules, listSecrets, refreshSbx, removeRule, removeSandbox, removeSecret, sandboxHost, setSandboxHost,
   type Template, SIGNIN_BOX, connectGithub, listTemplates, removeTemplate, sandboxByDefault, signInBox, signOutClaude, sandboxFolders, sbxState, serviceLabel, setSecret, stopSandbox,
 } from "./sandbox";
-import { flash } from "./shared/ui/ui";
-import { closeSettings } from "./shared/nav";
-import { isEnter } from "./shared/ui/enterkey";
+import { flash } from "../../shared/ui/ui";
+import { closeSettings } from "../../shared/nav";
+import { isEnter } from "../../shared/ui/enterkey";
 
 const windows = /Windows/i.test(navigator.userAgent);
 const mac = /Mac/i.test(navigator.userAgent);

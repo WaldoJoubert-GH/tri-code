@@ -20,7 +20,7 @@ import { fwdOfPage, heldBy } from "./tunnels";
 import { RemoteStart, TunnelBar, TunnelChip, TunnelHeld } from "./tunnelui";
 import { Icon } from "./shared/ui/lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
-import { runsInSandbox, sandboxOf } from "./sandbox";
+import { runsInSandbox, sandboxOf } from "./modules/sandbox";
 import IssuesPanel from "./IssuesPanel";
 import { dirtyCount, dropEditor } from "./files";
 import { isEnter } from "./shared/ui/enterkey";

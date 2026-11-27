@@ -10,7 +10,7 @@ import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
 import { LeftoversChip, LeftoversPopover } from "./LeftoversPopover";
 import { leftoversOpen, watchLeftovers } from "./leftovers";
-import { adoptSandboxes } from "./sandbox";
+import { adoptSandboxes } from "./modules/sandbox";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { HoldBar, TabMenu, TabStrip, tabMenuOpen } from "./tabs";

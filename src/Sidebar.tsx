@@ -27,7 +27,7 @@ import { envLocked, lockEnv } from "./envlock";
 import { settingsOpen, toggleSettings } from "./shared/nav";
 import { LeftoverCount } from "./LeftoversPopover";
 import { endLeftover, staleCheckouts } from "./leftovers";
-import { sandboxOf } from "./sandbox";
+import { sandboxOf } from "./modules/sandbox";
 import { MediaDock } from "./modules/media";
 import { mediaPopOpen } from "./modules/media";
 import { isEnter } from "./shared/ui/enterkey";

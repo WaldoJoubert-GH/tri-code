@@ -21,7 +21,7 @@ import { dropProject } from "./projects";
 import { folderStatus, gitOf, peekStatus } from "./git";
 import { ask, flash } from "./shared/ui/ui";
 import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "./leftovers";
-import { ensureSandbox, newSandboxName, relativeGitdir, removeSandbox, sandboxOf } from "./sandbox";
+import { ensureSandbox, newSandboxName, relativeGitdir, removeSandbox, sandboxOf } from "./modules/sandbox";
 import type { IgnoredFile } from "./ignored";
 
 /** One entry of `git worktree list`. */

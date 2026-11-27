@@ -19,7 +19,7 @@ import { NewsPage } from "./modules/news";
 import { AgentsPage } from "./AgentSettings";
 import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
-import { SandboxPage } from "./SandboxSettings";
+import { SandboxPage } from "./modules/sandbox";
 import { LanguagesPage } from "./shared/codemirror/LangSettings";
 import { PREVIEWS, previewOn } from "./shared/preview";
 import { type SettingsPage, closeSettings, pageShown, setSettingsPage, settingsPage } from "./shared/nav";
