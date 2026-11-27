@@ -1,4 +1,4 @@
-/* The phone page: tri-code's own look (src/styles.css, canvas.css, git.css), the same tokens, rows,
+/* The phone page: tri-code's own look (src/app/styles.css, src/app/canvas.css, src/modules/git/git.css), the same tokens, rows,
    window frames and keycaps, made for touch: taller rows, bigger targets, the sidebar as the home screen.
    Follows the desktop's theme (data-theme from its Settings › Appearance), else the phone's. */
 :root {

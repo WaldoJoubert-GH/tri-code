@@ -147,14 +147,12 @@ Layout:
 
 `src/` (see `docs/blueprint.md` for the folder rules)
 
-- `index.tsx`, `App.tsx`, `Canvas.tsx`, `Sidebar.tsx`, `tabs.tsx`: the entry point, the app shell, the window frames and the tab strip. With `hotkeys.ts` (the keydown listener that runs Keymap actions), `commands.ts` and `Palette.tsx` (the Command Palette), `Settings.tsx` and its pages, `updater.ts`, `About.tsx` and the `tri` Command (`cli.ts`), they still sit at the top of `src/`; they move to `src/app/` next.
+- `app/`: the composition root, which may import everything and nothing imports. `index.tsx` (the entry point `index.html` loads), `App.tsx`, `Canvas.tsx`, `Sidebar.tsx`, `tabs.tsx`: the app shell, the window frames and the tab strip. With `hotkeys.ts` (the keydown listener that runs Keymap actions), `commands.ts` and `Palette.tsx` (the Command Palette), `updater.ts`, `About.tsx`, `Feedback.tsx` and `RestartDialog.tsx`. `app/settings/` holds the Settings shell, Backup (`config.ts`) and Settings › Hotkeys; `app/cli/` the `tri` Command (`cli.ts`, `clipaths.ts`, its Settings page). `styles.css`, `canvas.css` and `files.css` sit in `app/` too, as the shared stylesheets until they are split by module, and `vite-env.d.ts` holds the Vite type declarations.
 - `shared/`: what two or more modules use. `state/state.ts` (the Solid stores, loading and saving the state file, and `dropProject`), `ui/` (dialogs, menus, toasts, project and file icons), `keys/` (the Keymap, the Hotkey Modifier, Hold Hints and the Keycap), `text/` (diff, Markdown, CSV), `codemirror/` (the editor kit and Grammar Catalog), `links.ts` (Linked Folders), `nav.ts` (the open Settings page and New window menu), and the Look.
 - `modules/<name>/`: one folder per module, entered only through its `index.ts`. Each holds its logic, windows, dialogs, CSS, tests and Settings page:
   - `terminal/`: one xterm and one PTY per tab (`terms.ts`): output, resize, reconnect backoff, bell detection, OSC 7501 agent status, the WebGL renderer for the visible tab only; the tour's scripted terminals (`demo.ts`).
   - `agents/` (Commands), `signals/` (Agent Signals, the sounds, notifications and `Alt+U`), `browser/`, `editor/`, `git/`, `issues/` (the `.dev/` store, the Plane and GitHub syncs, Local issues, the issues window and its Timeline), `linked-folders/`, `environments/` (the Environment and Open Project dialogs, Environment Lock), `worktrees/` (`git worktree list` per repo, create and remove, the New Worktree dialog), `leftovers/`, `phone/` (Remote Control), `appearance/` (the Appearance panel and Backdrop).
   - `db/`, `docker/`, `monitor/`, `news/`, `calc/`, `media/`, `sandbox/`, `usage/`, `welcome/`, `tour/` (its six stops, the spotlight and the try-it checks).
-- `styles.css`, `canvas.css`, `files.css`: the shared stylesheets, until they are split by module.
-- `vite-env.d.ts`: Vite type declarations.
 
 `src-tauri/src/`
 

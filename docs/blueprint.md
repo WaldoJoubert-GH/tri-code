@@ -1,8 +1,8 @@
 # Codebase blueprint: one folder per module, `shared/` for cross-module use
 
-Status: in progress. Steps 1 (back-edges), 2 (`src/shared/`), 3 (leaf modules) and 4 (inner modules) of the [Migration order](#migration-order) are done; the `app/` files are still flat in `src/`.
+Status: in progress. Steps 1 (back-edges), 2 (`src/shared/`), 3 (leaf modules), 4 (inner modules) and 5 (`src/app/`) of the [Migration order](#migration-order) are done: `src/` holds only `app/`, `shared/` and `modules/`. Left: splitting `styles.css`, `canvas.css` and `files.css` (see [CSS](#css)), and the Rust side (step 6).
 
-Today `src/` is flat: 193 files, with every window, dialog, store and helper side by side. `src-tauri/src/` is flat too, apart from `db/`. This blueprint gives each module a folder and an **interface** (its `index.ts` / `mod.rs`), and puts what several modules use in `shared/`.
+Before step 1 `src/` was flat: 193 files, with every window, dialog, store and helper side by side. `src-tauri/src/` is flat too, apart from `db/`. This blueprint gives each module a folder and an **interface** (its `index.ts` / `mod.rs`), and puts what several modules use in `shared/`.
 
 Terms follow the codebase-design vocabulary: a **module** has one **interface**; other modules cross its **seam** only there.
 
@@ -28,7 +28,7 @@ Rule 3 and 4 are enforced by a test (see [Enforcement](#enforcement)), as `keys.
 | `shared/keys/` | `keymap.ts`, `modkey.ts`, `hints.ts`, `Keys.tsx`, `keys.test.ts`, `hints.test.ts` | The Keymap, Hotkey Modifier, Hold Hints and Keycap: drawn by every module. |
 | `shared/text/` | `diff.ts`, `DiffView.tsx`, `diff.css`, `markdown.ts`, `csv.ts`, `branchname.ts`, and the tests of `diff`, `markdown`, `csv` | Pure parsers used by 2+ modules (diff: Editor, Git, state; csv: Editor, Database). |
 | `shared/codemirror/` | `cm.ts`, `langs.ts`, `grammars.ts`, `grammars.json`, `textmate.ts`, `tmparser.ts`, `LangPicker.tsx`, `LangSettings.tsx`, `grammars.test.ts`, `tmparser.test.ts` | The CodeMirror kit and Grammar Catalog: Editor, Database and Calculator all build editors on it. |
-| `shared/` (top) | `look.ts`, `backdrop.ts` (each with its test), `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts`, `urls.ts`, `links.ts`, `links.test.ts`, `layout.test.ts` | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). `urls.ts` also holds `NOT_HTTP` (step 3): the Docker Window and Remote Tunnels (`tunnelmap.ts`) both use it. `nav.ts` also holds the New window menu's state and `runHotkey` (step 4). `links.ts` (step 4): which Linked Folder root a path is under, asked by the Editor, the Database Window, Remote Control and Welcome. |
+| `shared/` (top) | `look.ts`, `backdrop.ts` (each with its test), `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts`, `urls.ts`, `links.ts`, `links.test.ts`, `restart.test.ts`, `layout.test.ts` | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). `restart.test.ts` (step 5) tests `busySignals` in `sigs.ts`, so it sits here rather than with `RestartDialog.tsx`. `urls.ts` also holds `NOT_HTTP` (step 3): the Docker Window and Remote Tunnels (`tunnelmap.ts`) both use it. `nav.ts` also holds the New window menu's state and `runHotkey` (step 4). `links.ts` (step 4): which Linked Folder root a path is under, asked by the Editor, the Database Window, Remote Control and Welcome. |
 
 Done in step 2. `preview.test.ts` tests the preview flag through `sandbox.ts` (`sandboxOf`, `runsInSandbox`), so it moved to `modules/sandbox/` in step 3. `projects.ts` is gone (step 4): `dropProject` is in `shared/state/`.
 
@@ -64,14 +64,16 @@ Each module's tests sit with it. Step 3 also moved `preview.test.ts` to `sandbox
 
 ### `src/app/`
 
-`index.tsx`, `App.tsx`, `Canvas.tsx`, `tabs.tsx`, `layout.ts`, `Sidebar.tsx`, `commands.ts`, `hotkeys.ts`, `Palette.tsx`, `About.tsx`, `Feedback.tsx`, `RestartDialog.tsx`, `updater.ts`, `styles.css`, `canvas.css`, `__selftest.ts`, `vite-env.d.ts`, plus:
+`index.tsx`, `App.tsx`, `Canvas.tsx`, `tabs.tsx`, `layout.ts`, `layout.test.ts`, `Sidebar.tsx`, `commands.ts`, `hotkeys.ts`, `Palette.tsx`, `About.tsx`, `Feedback.tsx`, `RestartDialog.tsx`, `updater.ts`, `styles.css`, `canvas.css`, `files.css` (the last three until the CSS split), `__selftest.ts`, `vite-env.d.ts`, plus:
 
-- `app/settings/`: `Settings.tsx`, `Backup.tsx`, `config.ts`, `HotkeySettings.tsx`
-- `app/cli/`: `cli.ts`, `clipaths.ts`, `CliSettings.tsx` (the tri Command)
+- `app/settings/`: `Settings.tsx`, `Backup.tsx`, `config.ts`, `config.test.ts`, `HotkeySettings.tsx`
+- `app/cli/`: `cli.ts`, `cli.test.ts`, `clipaths.ts`, `CliSettings.tsx` (the tri Command)
+
+Done in step 5; see [Step 5: app](#step-5-app).
 
 ## Example tree
 
-The frontend after the move. Each module also gets a new `index.ts`, its interface (marked ◆).
+The frontend after the move and the CSS split. Each module also gets a new `index.ts`, its interface (marked ◆). Until the split, `app/` still holds `styles.css` and `files.css` whole, and `canvas.css` with the browser's and issues' rules, in place of `app.css`, `palette.css` and `settings.css`.
 
 ```
 src/
@@ -91,8 +93,9 @@ src/
 │   ├── About.tsx
 │   ├── Feedback.tsx
 │   ├── RestartDialog.tsx
-│   ├── restart.test.ts
 │   ├── updater.ts
+│   ├── __selftest.ts
+│   ├── vite-env.d.ts             Vite types, __APP_VERSION__
 │   ├── app.css                   sidebar, toolbar, status line (from styles.css)
 │   ├── settings/
 │   │   ├── Settings.tsx          the shell: lays out each module's page
@@ -168,6 +171,7 @@ src/
 │   ├── preview.ts
 │   ├── scope.ts
 │   ├── sigs.ts
+│   ├── restart.test.ts           busySignals, for the restart-to-update prompt
 │   ├── nav.ts                    the Settings page, New window menu, runHotkey
 │   ├── urls.ts                   normalizeUrl
 │   ├── links.ts                  Linked Folder roots (with links.test.ts)
@@ -386,9 +390,9 @@ The line ranges are rough because some sections sit inside others (the worktree 
 ### What can break
 
 - **Cascade order.** Vite bundles CSS in import order. Today `styles.css` loads first and everything else after it. Once its rules are spread across modules, a rule that only won because it came later can lose: the `.body > *` rule in `canvas.css` that `LinkFolder` and `NewWorktree` work around is one known case. For each split PR, build before and after and diff the bundled CSS sorted by selector, so only the order can change, then check the affected windows in both themes.
-- **`keys.test.ts`** checks that no file except `styles.css` styles a `kbd`. After the split that should be `shared/keys/keys.css`. The test already reads `src/` recursively (step 2).
+- **`keys.test.ts`** checks that no file except `app/styles.css` styles a `kbd`. After the split that should be `shared/keys/keys.css`. The test already reads `src/` recursively (step 2).
 - **Class names stay global.** Moving files doesn't scope anything. That's fine for now, since most modules already prefix their classes (`.db-`, `.git-`, `.dock-`). The enforcement test could later check that a module's CSS only uses its own prefix, but that's out of scope here.
-- `src-tauri/phone/app.css` (the phone page) is not part of the Vite build and stays where it is. Its header comment that names `src/styles.css` needs the new paths.
+- `src-tauri/phone/app.css` (the phone page) is not part of the Vite build and stays where it is. Its header comment names `src/app/styles.css` since step 5; it needs the new paths again after the split.
 
 ### Order
 
@@ -416,9 +420,9 @@ A Rust file is already a module, so a single-file module keeps its `name.rs`; a 
 
 ## Things that hard-code paths today
 
-- `index.html`: `/src/index.tsx` → `/src/app/index.tsx`.
+- `index.html`: `/src/index.tsx` → `/src/app/index.tsx` (done in step 5).
 - `scripts/grammar-catalog.ts`: writes `../src/shared/codemirror/grammars.json` (done in step 2).
-- `keys.test.ts`: walks all of `src/` recursively, by paths relative to `src/` (done in step 2). Its "only `styles.css` styles a kbd" rule names `styles.css` at the `src/` root: change it to `shared/keys/keys.css` when `styles.css` is split.
+- `keys.test.ts`: walks all of `src/` recursively, by paths relative to `src/` (done in step 2). Its "only `styles.css` styles a kbd" rule names `app/styles.css` since step 5: change it to `shared/keys/keys.css` when `styles.css` is split.
 - File-header comments naming `src/X.tsx` (most CSS files, several tests) and CONTEXT.md's file references: update in the same PR as each move.
 
 ## Enforcement
@@ -426,12 +430,12 @@ A Rust file is already a module, so a single-file module keeps its `name.rs`; a 
 Add `src/shared/layout.test.ts` (bun test) that reads every `.ts`/`.tsx` under `src/`, parses its relative imports and fails when:
 
 - a file in `shared/` imports from `modules/` or `app/` (on since step 2, as "imports only from `src/shared/`", which also catches a file still flat in `src/`);
-- a file in `modules/` imports from `app/` (on since step 4, as "imports nothing under `src/` outside `shared/` and `modules/`", so the `app/` files still at the root count; an explicit allowlist in the test holds the edges not cut yet);
+- a file in `modules/` imports from `app/` (on since step 4, as "imports nothing under `src/` outside `shared/` and `modules/`", so the `app/` files still at the root count; an explicit allowlist in the test holds the edges not cut yet). Since step 5 a separate check says it outright: nothing in `shared/` or `modules/` resolves into `src/app/`, with the same allowlist;
 - a file in `modules/a/` imports a path inside `modules/b/` other than the folder itself (`../b`) or its `index.ts` (on since step 3);
 - a file outside `modules/` imports a path inside `modules/x/` other than the folder or its `index.ts`, CSS included (on since step 3, while `app/` and the inner modules are still flat in `src/`);
-- a `src/` file sits outside `app/`, `shared/` and `modules/` (apart from those three folders).
+- a `src/` file sits outside `app/`, `shared/` and `modules/` (on since step 5: `src/` holds no other folder, and no `.ts`, `.tsx` or `.css` file beside them, unless the test's `ROOT_ALLOWED` list names it; the list is empty).
 
-The step 3 checks also assert that the modules are there (all 23 since step 4), each with an `index.ts`, and that files outside `modules/` import them, so they can't pass on an empty scan.
+The step 3 checks also assert that the modules are there (all 23 since step 4), each with an `index.ts`, and that files outside `modules/` import them, so they can't pass on an empty scan. The step 5 checks likewise assert that `app/index.tsx` exists, that `app/` has more than 20 files importing both `shared/` and the modules, that the scan of `shared/` and `modules/` sees more than 150 files, and that `src/` holds the three folders.
 
 ## Migration order
 
@@ -441,7 +445,7 @@ One PR per step; each ends with `bun run typecheck`, `bun test ./src/`, `cargo c
 2. **`shared/`**: move the shared files and fix imports. Add the enforcement test with only the `shared/` rule on. Done: no shared file imported a root one, so nothing had to change but paths.
 3. **Leaf modules** (nothing else imports them except `app/`): `calc`, `monitor`, `news`, `docker`, `media`, `usage`, `db`, `sandbox`, `welcome`, `tour`. Done; see [Step 3: leaf modules](#step-3-leaf-modules).
 4. **Inner modules**: `issues`, `git`, `linked-folders`, `editor`, `environments`, `worktrees`, `leftovers`, `signals`, `phone`, `agents`, `terminal`, `browser`, `appearance`. Turn on the cross-module rule. Done; see [Step 4: inner modules](#step-4-inner-modules).
-5. **`app/`** last, then turn on the last rule.
+5. **`app/`** last, then turn on the last rule. Done; see [Step 5: app](#step-5-app).
 6. **Rust**: `shared/` first (most `crate::` paths change there), then each folder. `git.rs`'s split is its own PR.
 
 Use `git mv` so history follows the files.
@@ -521,6 +525,16 @@ What turned out different from the plan:
 - **Allowlisted:** `editor/Editor.tsx` and `editor/FileList.tsx` → `../../files.css`. `files.css` also styles the palette, About and Settings, so it stays at the root until the CSS split. No other module imports an app file.
 - **CSS order.** An `index.ts` loads all of its module's files, so App's first imports (Feedback → `browser/` → `agents/` → `AgentSettings` → `welcome/` → …) now pull in most modules' CSS before `Canvas.tsx` loads `canvas.css`. Diffing the built CSS against the build before step 4 (same 2,967 blocks, same multiset): `welcome.css` and `files.css` moved from the end to before `diff.css`/`git.css`, and `agentsetup.css` up to just after `agents.css`. Two of those flips changed the cascade: `.fnote` (`files.css` 12px vs `canvas.css` 11px) and `.lucide.spin` (`git.css` vs `canvas.css`), so `index.tsx` now imports `canvas.css` right after `styles.css`, restoring both. With that, the remaining moved blocks (`welcome.css`, `files.css`, `agentsetup.css` earlier; `sandbox.css` after `canvas.css`) share no selector of equal specificity on the same element with a rule they now precede or follow; the only shared classes are state classes (`.on`, `.sel`, `.primary`) under different window prefixes.
 - **Old paths left on purpose:** `docs/diff-view-progress.md` is a dated progress log and keeps its flat paths, as it did through step 2.
+
+### Step 5: app
+
+Three move commits (the app shell with the three stylesheets and the entry point, then `app/settings/`, then `app/cli/`), each passing `bun run typecheck` and `bun test ./src/`, then the enforcement commit. Nothing but import paths changed in the moved files: no module imported an app file except the two allowlisted `files.css` edges, so no back-edge had to be cut.
+
+- **`restart.test.ts` went to `shared/`, not `app/`.** It imports only `shared/state` and `shared/sigs` and tests `busySignals` (rule 6: tests sit beside the code they test). `RestartDialog.tsx` itself is untested.
+- **`vite-env.d.ts` moved to `app/`.** It is an ambient declaration file (`/// <reference types="vite/client" />` and `__APP_VERSION__`), and tsconfig's `"include": ["src"]` picks it up anywhere under `src/`, so `tsc` sees it in `app/` as it did at the root. That left nothing for the root allowlist.
+- **The stylesheets moved whole** into `app/` (`styles.css`, `canvas.css`, `files.css`): they are app-owned until the split. `index.tsx` still imports `styles.css` then `canvas.css` first. The allowlisted edges are now `modules/editor/Editor.tsx` and `FileList.tsx` → `../../app/files.css`, and `keys.test.ts`'s kbd rule names `app/styles.css`.
+- **Paths outside `src/`:** `index.html` loads `/src/app/index.tsx`; the header of `src-tauri/phone/app.css` names `src/app/styles.css`. `vite.config.ts`, `tauri.conf.json` (`frontendDist`, `devUrl`), `package.json` scripts (`bun test ./src/`), `scripts/`, `mcp/` and `.vscode/` name no file in `src/`. `src-tauri/src/tour.rs`'s `src/App.tsx` and `src/Settings.tsx`, the Terminal's demo lines and `favicons.test.ts`'s URL are sample text about another project, not paths into this one.
+- **CSS order unchanged.** The built CSS is byte-identical to the build of step 4's last commit (same file hash, 2,967 blocks in the same order): every stylesheet is still imported by the same files in the same order, only from new paths.
 
 ## Open questions
 
