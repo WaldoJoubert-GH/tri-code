@@ -39,7 +39,7 @@ import DiffView, { diffKeys, stepHunk } from "./shared/text/DiffView";
 import { headText, repoEpoch, repoOfFile, type RepoRef } from "./repos";
 import { isBookPath, isCsvPath } from "./shared/text/csv";
 import { BookView, CsvTable, openSheetDb } from "./modules/db";
-import { asProject, hostAt, linkAt, relIn, rootAt, within } from "./links";
+import { asProject, hostAt, linkAt, relIn, rootAt, within } from "./shared/links";
 import { redo, undo } from "@codemirror/commands";
 import "./files.css";
 import { ctrlName } from "./shared/keys/modkey";

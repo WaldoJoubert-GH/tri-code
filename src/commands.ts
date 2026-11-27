@@ -37,7 +37,7 @@ import { openWelcome } from "./modules/welcome";
 import { flash } from "./shared/ui/ui";
 import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./modules/media";
 import { openLinkDialog } from "./LinkFolder";
-import { linksOn } from "./links";
+import { linksOn } from "./shared/links";
 
 export type Command = {
   /** Stable across openings, so the palette can remember recent picks. */

@@ -5,7 +5,7 @@
 
 import { Show, createSignal, onMount } from "solid-js";
 import { type LinkedFolder, type Project, addLink, envName, isRemote, projectById, repoOf, updateLink } from "./shared/state/state";
-import { linkName, linkProblem } from "./links";
+import { linkName, linkProblem } from "./shared/links";
 import { FolderPicker } from "./OpenProject";
 import { Icon } from "./shared/ui/lucide";
 import { Modal } from "./shared/ui/Modal";

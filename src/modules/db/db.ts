@@ -13,7 +13,7 @@ import {
   type Cell, type DbKind, type MongoOp, type Pending, type SqlOp, type Target, emptyPending, mongoOps, mongoText, pendingCount, rowKey, sqlOps,
 } from "./dbsql";
 import { flash } from "../../shared/ui/ui";
-import { hostAt, linkAt } from "../../links";
+import { hostAt, linkAt } from "../../shared/links";
 
 /** `sheet` is a CSV or workbook loaded into memory: never saved, made up from the window's id. */
 export type DbTarget = { env: string } | { url: string } | { file: string } | { sheet: string };

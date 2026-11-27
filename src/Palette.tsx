@@ -19,7 +19,7 @@ import { flash } from "./shared/ui/ui";
 import { Icon } from "./shared/ui/lucide";
 import "./files.css";
 import { Key, KeyList } from "./shared/keys/Keys";
-import { linkHost, linksOf, relIn, rootAt, within } from "./links";
+import { linkHost, linksOf, relIn, rootAt, within } from "./shared/links";
 import { isEnter } from "./shared/ui/enterkey";
 import { Modal } from "./shared/ui/Modal";
 

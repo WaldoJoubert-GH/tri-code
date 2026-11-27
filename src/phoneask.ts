@@ -12,7 +12,7 @@ import { envLocked } from "./envlock";
 import { offeredIn } from "./shared/scope";
 import { type Change, type GitStatus, type RepoStatus, repoRoot } from "./git";
 import type { FsList, FsText } from "./files";
-import { hostAt, rootsOf, within } from "./links";
+import { hostAt, rootsOf, within } from "./shared/links";
 import { iconSvg } from "./shared/ui/lucide";
 import { flash } from "./shared/ui/ui";
 

@@ -3,8 +3,12 @@
 // Environment) on this machine. Files carry only their path, so the root a path falls under says
 // which host reads and writes it. A Worktree shows its repo's links. Chosen from
 // design/linked-folders.html (variant A).
+//
+// In shared/ rather than modules/linked-folders/: the Editor, the Database Window, Remote Control
+// and Welcome all ask which root a path is under, and db.ts's test must load it without the Link
+// Folder dialog (bun can't load a .tsx).
 
-import { type LinkedFolder, type Project, app, repoOf } from "./shared/state/state";
+import { type LinkedFolder, type Project, app, repoOf } from "./state/state";
 
 /** The project's own folder or one of its Linked Folders. */
 export type Root = { id: string; name: string; host: string; path: string; link?: LinkedFolder };

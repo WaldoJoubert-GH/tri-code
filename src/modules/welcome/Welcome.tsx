@@ -22,7 +22,7 @@ import { openProjectDialog } from "../../OpenProject";
 import { startTour } from "../tour";
 import { Icon } from "../../shared/ui/lucide";
 import { Modal } from "../../shared/ui/Modal";
-import { linksOn } from "../../links";
+import { linksOn } from "../../shared/links";
 import { Caps, KeyList } from "../../shared/keys/Keys";
 import { metaName, modLabel } from "../../shared/keys/modkey";
 import { copyText } from "../../shared/ui/clipboard";

@@ -29,7 +29,7 @@ import { openWelcome } from "./modules/welcome";
 import { ICON_THEMES, type IconTheme } from "./shared/ui/fileicons";
 import { FileIcon } from "./FileList";
 import "./files.css";
-import { linksOn } from "./links";
+import { linksOn } from "./shared/links";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "appearance", name: "Appearance", icon: "palette" },
