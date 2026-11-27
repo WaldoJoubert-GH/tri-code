@@ -2,6 +2,10 @@
 import { render } from "solid-js/web";
 import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
+// Before any module's CSS, as when Canvas.tsx was the first to load it: a module's index.ts now loads
+// all of its files early, so files.css and git.css would otherwise come first and lose `.fnote` and
+// `.lucide.spin` to canvas.css. Goes when canvas.css is split.
+import "./canvas.css";
 import App from "./App";
 import { restoreLook } from "./shared/look";
 
