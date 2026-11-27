@@ -5,12 +5,10 @@ mod agents;
 mod browser;
 mod cli;
 mod db;
-mod dirs;
 mod docker;
+mod environments;
 mod monitor;
-mod newfolder;
 mod news;
-mod envs;
 mod fonts;
 mod git;
 mod grammars;
@@ -231,10 +229,10 @@ pub fn run() {
             cli::cli_status,
             cli::cli_install,
             cli::cli_remove,
-            dirs::list_dirs,
-            newfolder::make_folder,
-            newfolder::git_clone,
-            newfolder::git_clone_cancel,
+            environments::dirs::list_dirs,
+            environments::newfolder::make_folder,
+            environments::newfolder::git_clone,
+            environments::newfolder::git_clone_cancel,
             fonts::font_list,
             grammars::grammar_list,
             grammars::grammar_read,
@@ -247,8 +245,8 @@ pub fn run() {
             git::folders::folder_changes,
             git::folders::folder_finish,
             git::folders::worktree_dir_delete,
-            envs::ssh_hosts,
-            envs::scan_logos,
+            environments::envs::ssh_hosts,
+            environments::envs::scan_logos,
             shared::envssh::env_ssh_set,
             shared::envssh::env_pin_hash,
             shared::envssh::env_lock,
