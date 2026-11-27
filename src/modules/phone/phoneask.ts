@@ -6,15 +6,15 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { type Agent, type Project, addTab, isWebApp, projectById, sendTo, tabName } from "./shared/state/state";
-import { normalizeUrl } from "./shared/urls";
-import { envLocked } from "./modules/environments";
-import { offeredIn } from "./shared/scope";
-import { type Change, type GitStatus, type RepoStatus, repoRoot } from "./modules/git";
-import { type FsList, type FsText } from "./modules/editor";
-import { hostAt, rootsOf, within } from "./shared/links";
-import { iconSvg } from "./shared/ui/lucide";
-import { flash } from "./shared/ui/ui";
+import { type Agent, type Project, addTab, isWebApp, projectById, sendTo, tabName } from "../../shared/state/state";
+import { normalizeUrl } from "../../shared/urls";
+import { envLocked } from "../environments";
+import { offeredIn } from "../../shared/scope";
+import { type Change, type GitStatus, type RepoStatus, repoRoot } from "../git";
+import { type FsList, type FsText } from "../editor";
+import { hostAt, rootsOf, within } from "../../shared/links";
+import { iconSvg } from "../../shared/ui/lucide";
+import { flash } from "../../shared/ui/ui";
 
 /** A plain shell, offered first even when the commands list has none. */
 const SHELL: Agent = { id: "", name: "shell", command: "", icon: "square-terminal" };

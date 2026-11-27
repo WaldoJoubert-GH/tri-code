@@ -22,7 +22,7 @@ import { startAgentSetup } from "./agentsetup";
 import { startCli } from "./cli";
 import { trackAgentFocus } from "./agenttarget";
 import { SetupBanner } from "./SetupBanner";
-import { phoneStatus, startPhoneSync } from "./phone";
+import { phoneStatus, startPhoneSync } from "./modules/phone";
 import { MediaPopover } from "./modules/media";
 import { mediaPopOpen } from "./modules/media";
 import { AppearancePopover, Backdrop, appearanceOpen, setBgImage, toggleAppearance } from "./Appearance";

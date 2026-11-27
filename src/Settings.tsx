@@ -13,7 +13,7 @@ import { Icon } from "./shared/ui/lucide";
 import { Modal } from "./shared/ui/Modal";
 import { Caps, KeyList } from "./shared/keys/Keys";
 import { HotkeysPage } from "./HotkeySettings";
-import { RemotePage } from "./RemoteSettings";
+import { RemotePage } from "./modules/phone";
 import { BrowserPage } from "./profiles";
 import { NewsPage } from "./modules/news";
 import { AgentsPage } from "./AgentSettings";

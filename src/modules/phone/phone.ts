@@ -8,15 +8,15 @@
 import { createEffect, createSignal, on, onCleanup } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { type Project, type SoundEvent, type Tab, activePage, app, envIcon, envName, isLocalHost, live, repoOf, setSettings, tabIcon, tabName } from "./shared/state/state";
-import { onAlert } from "./modules/signals";
-import { sigOf } from "./shared/sigs";
-import { envLocked } from "./modules/environments";
-import { iconSvg } from "./shared/ui/lucide";
-import { screenTail } from "./terms";
-import { labelOf, tileLabel } from "./modules/worktrees";
+import { type Project, type SoundEvent, type Tab, activePage, app, envIcon, envName, isLocalHost, live, repoOf, setSettings, tabIcon, tabName } from "../../shared/state/state";
+import { onAlert } from "../signals";
+import { sigOf } from "../../shared/sigs";
+import { envLocked } from "../environments";
+import { iconSvg } from "../../shared/ui/lucide";
+import { screenTail } from "../../terms";
+import { labelOf, tileLabel } from "../worktrees";
 import { answerPhones, phoneCommands } from "./phoneask";
-import { flash } from "./shared/ui/ui";
+import { flash } from "../../shared/ui/ui";
 
 export type PhoneDevice = { id: string; name: string; added: number; seen: number; online: boolean; push: boolean };
 /** How a phone reaches tri-code: over Tailscale (HTTPS, pushes), the local network (HTTP, no
