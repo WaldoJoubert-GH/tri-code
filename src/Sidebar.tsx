@@ -5,7 +5,7 @@ import {
   Project, app, dropProject, envHeadersHidden, envIcon, envName, isLocalHost, isPinned, moveProject, projectById, removeEnvironment, renameProject, setApp, setEnvStyle,
   setSidebarCollapsed, togglePin, worktreesOf,
 } from "./shared/state/state";
-import { setBrowsersCovered } from "./browsers";
+import { setBrowsersCovered } from "./modules/browser";
 import { appearanceOpen, closeAppearance, openAppearance } from "./Appearance";
 import { dev, isActive, sourcesOf, stateOf } from "./modules/issues";
 import { IconFace } from "./shared/ui/icons";

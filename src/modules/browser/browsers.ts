@@ -12,19 +12,19 @@ import { createStore, produce } from "solid-js/store";
 import {
   type Agent, DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, isRemote, isWebApp, live, onProjectDropped, Page, pageProfile, Profile, Project,
   profileById, projectById, setFavIcon, setPageUrl, space, Tab, tabIcon, tabName, visibleTabs,
-} from "./shared/state/state";
-import { looksLikeUrl, agentTarget, agentWindows, rememberAgent, setupStatus } from "./modules/agents";
-import { normalizeUrl } from "./shared/urls";
-import { offeredIn } from "./shared/scope";
-import { sigOf } from "./shared/sigs";
-import { iconSvg } from "./shared/ui/lucide";
-import { pasteText } from "./modules/terminal";
-import { flash } from "./shared/ui/ui";
-import { copyText } from "./shared/ui/clipboard";
+} from "../../shared/state/state";
+import { looksLikeUrl, agentTarget, agentWindows, rememberAgent, setupStatus } from "../agents";
+import { normalizeUrl } from "../../shared/urls";
+import { offeredIn } from "../../shared/scope";
+import { sigOf } from "../../shared/sigs";
+import { iconSvg } from "../../shared/ui/lucide";
+import { pasteText } from "../terminal";
+import { flash } from "../../shared/ui/ui";
+import { copyText } from "../../shared/ui/clipboard";
 import { fillShots, setShotPref, shotPref } from "./shots";
 import { onReopened, pageFwd, releasePage, remoteUrl, resolveUrl } from "./tunnels";
 import { targetOf, toLocal } from "./tunnelmap";
-import { guessIcon, originOf } from "./shared/ui/favicons";
+import { guessIcon, originOf } from "../../shared/ui/favicons";
 
 export type BrowserInfo = {
   url: string; title: string; loading: boolean;

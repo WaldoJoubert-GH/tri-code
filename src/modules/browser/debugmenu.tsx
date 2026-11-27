@@ -4,17 +4,17 @@
 // is left out elsewhere. Chosen from design/browser-debug-profile.html.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { DEFAULT_PROFILE, activePage, app, pageProfile, projectById, updateProfile } from "./shared/state/state";
+import { DEFAULT_PROFILE, activePage, app, pageProfile, projectById, updateProfile } from "../../shared/state/state";
 import {
   THROTTLE_NAMES, type Throttle, browserInfo, clearSiteData, consoleErrors, debugPortOf, debugSupport, hardReload, openDevtools,
   pageDebug, pageOrigin, restartProfile, sendErrorsToAgent, setNoCache, setThrottle,
 } from "./browsers";
 import { ProfileAvatar } from "./profiles";
-import { Key } from "./shared/keys/Keys";
-import { Icon } from "./shared/ui/lucide";
-import { openSettings } from "./shared/nav";
-import { copyText } from "./shared/ui/clipboard";
-import { flash } from "./shared/ui/ui";
+import { Key } from "../../shared/keys/Keys";
+import { Icon } from "../../shared/ui/lucide";
+import { openSettings } from "../../shared/nav";
+import { copyText } from "../../shared/ui/clipboard";
+import { flash } from "../../shared/ui/ui";
 
 type Menu = { projectId: string; tabId: string; anchor: HTMLElement };
 const [menu, setMenu] = createSignal<Menu | null>(null);

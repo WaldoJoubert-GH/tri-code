@@ -15,11 +15,10 @@ import { closeWelcome, welcomeOpen } from "./modules/welcome";
 import { toggleSidebar } from "./Sidebar";
 import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./modules/worktrees";
 import { closeCtxMenu, ctxMenuOpen } from "./shared/ui/ctxmenu";
-import { closeFavEdit, favEditOpen } from "./favs";
-import { closeTunnelPop, tunnelPopOpen } from "./tunnelui";
-import { closeProfileMenu, profileMenuOpen } from "./profiles";
-import { closeDebugMenu, debugMenuOpen } from "./debugmenu";
-import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
+import {
+  closeFavEdit, favEditOpen, closeTunnelPop, tunnelPopOpen, closeProfileMenu, profileMenuOpen, closeDebugMenu,
+  debugMenuOpen, closeDownloadMenu, downloadMenuOpen, browserKeys, focusApp, nativeBrowsers, pageOfLabel,
+} from "./modules/browser";
 import { openIssuePanel } from "./modules/issues";
 import { openEditor } from "./modules/editor";
 import { openDockerPanel } from "./modules/docker";
@@ -40,7 +39,6 @@ import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./module
 import { flash } from "./shared/ui/ui";
 import { hasSelection } from "./modules/terminal";
 import { ACTIONS, BROWSER_ACTIONS, actionFor, editorKey, isKey, keysOf } from "./shared/keys/keymap";
-import { browserKeys, focusApp, nativeBrowsers, pageOfLabel } from "./browsers";
 import { createEffect, createRoot } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { hintChord, hintDown, hintsShown, hintUp, isHintModifier } from "./shared/keys/hints";

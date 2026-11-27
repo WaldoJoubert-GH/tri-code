@@ -4,20 +4,19 @@ import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isRemote, isTerminal, live, projectById, removePage,
   canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, pageProfile, toggleMono, visibleTabs,
 } from "./shared/state/state";
-import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
+import {
+  ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu, browserInfo, nativeBrowsers, closeBrowser, closePage,
+  browserBack, browserForward, browserReload, navigateBrowser, addressToUrl, answerPassword, openExternalIn,
+  passwordPrompts, pickElement, placeBrowser, screenshotPage, profilesSupported, setBrowsersSuspended, consoleErrors,
+  debugPortOf, debugSupport, profilesKey, browserKeys, focusApp, focusPage, DebugButton, fwdOfPage, heldBy, RemoteStart,
+  TunnelBar, TunnelChip, TunnelHeld, FavBar, StartPage, closeFavEdit, favEditFor, starPage, DownloadBar, DownloadButton,
+  forgetDownloads,
+} from "./modules/browser";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { clock, flash, showToast } from "./shared/ui/ui";
 import { hintKeys, withKey } from "./shared/keys/keymap";
 import { Caps, HintCaps } from "./shared/keys/Keys";
 import { hintsShown } from "./shared/keys/hints";
-import {
-  browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
-  addressToUrl, answerPassword, openExternalIn, passwordPrompts, pickElement, placeBrowser, screenshotPage, profilesSupported, setBrowsersSuspended,
-  consoleErrors, debugPortOf, debugSupport, profilesKey, browserKeys, focusApp, focusPage,
-} from "./browsers";
-import { DebugButton } from "./debugmenu";
-import { fwdOfPage, heldBy } from "./tunnels";
-import { RemoteStart, TunnelBar, TunnelChip, TunnelHeld } from "./tunnelui";
 import { Icon } from "./shared/ui/lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./modules/terminal";
 import { runsInSandbox, sandboxOf } from "./modules/sandbox";
@@ -34,8 +33,6 @@ import { NewsPanel } from "./modules/news";
 import { CalcPanel } from "./modules/calc";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./modules/db";
 import { SIG_TEXT, sigOf } from "./modules/signals";
-import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
-import { DownloadBar, DownloadButton, forgetDownloads } from "./downloads";
 import { hostHue, monogram } from "./shared/ui/favicons";
 
 /** "just now", "4m ago", "2h ago": how long an agent has been in its state. */

@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
-import { openExternal } from "./browsers";
+import { openExternal } from "./modules/browser";
 import { appVersion } from "./updater";
 import { flash, showToast } from "./shared/ui/ui";
 import { KeyText } from "./shared/keys/Keys";

@@ -8,7 +8,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { createStore, produce } from "solid-js/store";
-import { type Project, isRemote } from "./shared/state/state";
+import { type Project, isRemote } from "../../shared/state/state";
 import { type Target, targetOf, toLocal, toRemote } from "./tunnelmap";
 
 export type FwdState = "opening" | "open" | "reconnecting" | "failed";

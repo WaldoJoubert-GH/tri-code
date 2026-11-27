@@ -133,7 +133,7 @@
 @keyframes loadbar-trickle { 0% { width: 0; } 8% { width: 30%; } 100% { width: 88%; } }
 .nav button { width: 24px; height: 24px; border-radius: 4px; color: var(--muted); flex: none; }
 .nav button:hover { background: var(--hover); color: var(--text); }
-/* The window's Browser Profile (src/profiles.tsx): its avatar, and a band in its colour once there are two. */
+/* The window's Browser Profile (src/modules/browser/profiles.tsx): its avatar, and a band in its colour once there are two. */
 .nav .avbtn { display: grid; place-items: center; border-radius: 50%; }
 .win.profiled .bar { box-shadow: inset 0 2px 0 var(--pc); }
 /* macOS: offer to save a sign-in (passwords.rs). A row of the window, so the page moves down rather than hiding it. */
@@ -146,7 +146,7 @@
 .pwbar button { flex: none; padding: 2px 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--text); background: var(--bg); }
 .pwbar button:hover { background: var(--hover); }
 .pwbar button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-/* Downloads (src/downloads.tsx): the nav button with its progress ring, and the strip under the nav.
+/* Downloads (src/modules/browser/downloads.tsx): the nav button with its progress ring, and the strip under the nav.
    The strip is a row of the window like .pwbar, so the page moves down rather than hiding it. */
 .nav .dlbtn { position: relative; display: grid; place-items: center; }
 /* The Debug Menu's bug button: a red count of console errors, a green dot while agents can attach */
@@ -214,10 +214,10 @@
   border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; outline: none; user-select: text;
 }
 .url:focus { border-color: var(--accent); }
-/* Favourites: a star in the address field, a bar under the nav, tiles on a blank window (src/favs.tsx). */
+/* Favourites: a star in the address field, a bar under the nav, tiles on a blank window (src/modules/browser/favs.tsx). */
 .addr { flex: 1; min-width: 0; margin: 0 4px; position: relative; display: flex; }
 .addr .url { margin: 0; padding-right: 26px; }
-/* Remote browser tunnels (src/tunnelui.tsx): a chip at the start of the address field, joined to it. */
+/* Remote browser tunnels (src/modules/browser/tunnelui.tsx): a chip at the start of the address field, joined to it. */
 .addr.tunnelled .url { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .nav .tunchip {
   width: auto; height: auto; flex: none; display: flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 4px 0 0 4px;

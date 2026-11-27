@@ -3,12 +3,12 @@
 // to the project, so every browser window in it shows the same list. Chosen from design/canvas.html.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "./shared/state/state";
+import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "../../shared/state/state";
 import { browserInfo } from "./browsers";
-import { flash } from "./shared/ui/ui";
-import { guessIcon } from "./shared/ui/favicons";
-import { Key, KeyText } from "./shared/keys/Keys";
-import { isEnter } from "./shared/ui/enterkey";
+import { flash } from "../../shared/ui/ui";
+import { guessIcon } from "../../shared/ui/favicons";
+import { Key, KeyText } from "../../shared/keys/Keys";
+import { isEnter } from "../../shared/ui/enterkey";
 
 const ICON_COLOURS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#2ac3de", "#ff9e64", "#e0af68", "#73daca"];
 

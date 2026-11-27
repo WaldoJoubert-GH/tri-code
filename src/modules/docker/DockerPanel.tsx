@@ -12,7 +12,7 @@ import {
 } from "./dockerdata";
 import { isRunning, listBoxes, sandboxOf, sbxReady, startSandbox, stopSandbox } from "../sandbox";
 import { sandboxPreview } from "../../shared/preview";
-import { openUrlInProject } from "../../browsers";
+import { openUrlInProject } from "../browser";
 import { copyText } from "../../shared/ui/clipboard";
 import { Icon } from "../../shared/ui/lucide";
 import { ask, flash } from "../../shared/ui/ui";

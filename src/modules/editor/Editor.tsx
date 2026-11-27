@@ -13,7 +13,7 @@ import { createStore } from "solid-js/store";
 import type { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { type Project, type Tab, diffModeOf, focusTab, isRemote, setEditorTab, setProjectDiffMode } from "../../shared/state/state";
-import { fileUrlOf } from "../../tunnelmap";
+import { fileUrlOf, openExternal, openUrlInProject } from "../browser";
 import {
   CHANGED, type Doc, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
   markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor, watchFiles,
@@ -29,7 +29,6 @@ import { fileMarks, ignoredAt, markAt, peekStatus, headText, repoEpoch, repoOfFi
 import { enhance, hasScheme, renderMarkdown, resolvePath } from "../../shared/text/markdown";
 import { directPdf, exportMarkdownPdf, mdExportOf } from "./mdexport";
 import { MdPaper } from "./MdPaper";
-import { openExternal, openUrlInProject } from "../../browsers";
 import { capsOf, withKey } from "../../shared/keys/keymap";
 import { HoldKey, KeyList } from "../../shared/keys/Keys";
 import { ask, flash } from "../../shared/ui/ui";

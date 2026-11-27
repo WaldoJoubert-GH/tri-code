@@ -14,7 +14,7 @@ import {
 import { type NewsFeed, type NewsItem, absolute, ago, plain } from "./newsdata";
 import { openSettings } from "../../shared/nav";
 import { guessIcon, hostHue, hostOf, monogram } from "../../shared/ui/favicons";
-import { openExternal, openUrlInProject } from "../../browsers";
+import { openExternal, openUrlInProject } from "../browser";
 import { openCtxMenu } from "../../shared/ui/ctxmenu";
 import { copyText } from "../../shared/ui/clipboard";
 import { Icon } from "../../shared/ui/lucide";

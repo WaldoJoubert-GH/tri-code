@@ -16,7 +16,7 @@ import {
   runningEntry, saveSources, searchIssues, setDraftText, setIssueDates, setIssueState, setPendingIssue, shownIssues, slugOf, sourcesOf,
   statesFor, statusStopsOf, stateOf, syncDev, syncNow, toggleLabel, toggleTimer, updateIssue,
 } from "./issues";
-import { openUrlInProject } from "../../browsers";
+import { openUrlInProject } from "../browser";
 import { sendText } from "../terminal";
 import { Icon } from "../../shared/ui/lucide";
 import { clock, flash } from "../../shared/ui/ui";

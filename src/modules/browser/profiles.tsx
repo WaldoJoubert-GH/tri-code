@@ -7,14 +7,14 @@ import { For, Show, createResource, createSignal, onCleanup, onMount } from "sol
 import {
   DEFAULT_PROFILE, PROFILE_COLORS, Profile, activePage, addProfile, app, pageProfile, projectById, projectProfile, removeProfile,
   setDefaultProfile, setPageProfile, setProfileScope, setProjectProfile, setSettings, setTabProfile, tabName, tabProfile, updateProfile,
-} from "./shared/state/state";
+} from "../../shared/state/state";
 import { applyProfileAutofill, browserInfo, debugSupport, leaveProfile, nativeBrowsers, profilesSupported } from "./browsers";
 import { freePort, setDebugPort } from "./debugmenu";
-import { isMac } from "./shared/keys/modkey";
-import { Icon, toggleIconPicker } from "./shared/ui/lucide";
-import { openSettings } from "./shared/nav";
-import { flash } from "./shared/ui/ui";
-import { isEnter } from "./shared/ui/enterkey";
+import { isMac } from "../../shared/keys/modkey";
+import { Icon, toggleIconPicker } from "../../shared/ui/lucide";
+import { openSettings } from "../../shared/nav";
+import { flash } from "../../shared/ui/ui";
+import { isEnter } from "../../shared/ui/enterkey";
 
 /** A profile's colour as a CSS value; the --p-* tokens are tuned for light and dark. */
 export const profileColor = (p: Profile) => `var(--p-${p.color})`;

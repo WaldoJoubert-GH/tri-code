@@ -14,7 +14,7 @@ import { Modal } from "./shared/ui/Modal";
 import { Caps, KeyList } from "./shared/keys/Keys";
 import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./modules/phone";
-import { BrowserPage } from "./profiles";
+import { BrowserPage } from "./modules/browser";
 import { NewsPage } from "./modules/news";
 import { AgentsPage } from "./modules/agents";
 import { BackupPage } from "./Backup";

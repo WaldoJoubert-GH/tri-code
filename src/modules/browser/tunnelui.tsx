@@ -5,13 +5,13 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createResource, createSignal, onCleanup, onMount } from "solid-js";
-import { type Project, envName, isRemote, skipFolders } from "./shared/state/state";
+import { type Project, envName, isRemote, skipFolders } from "../../shared/state/state";
 import { type Fwd, fwdOfPage, fwds, reconnect, remoteLabel } from "./tunnels";
 import { type Listener, fileUrlOf, parseListening } from "./tunnelmap";
-import { copyText } from "./shared/ui/clipboard";
-import { Icon } from "./shared/ui/lucide";
-import { KeyText } from "./shared/keys/Keys";
-import { flash } from "./shared/ui/ui";
+import { copyText } from "../../shared/ui/clipboard";
+import { Icon } from "../../shared/ui/lucide";
+import { KeyText } from "../../shared/keys/Keys";
+import { flash } from "../../shared/ui/ui";
 
 const STATE_TEXT: Record<Fwd["state"], string> = { opening: "Opening", open: "Open", reconnecting: "Reconnecting", failed: "Failed" };
 

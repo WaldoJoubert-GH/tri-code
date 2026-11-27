@@ -32,12 +32,10 @@ import { LinkFolderDialog, linkDialogOpen } from "./modules/linked-folders";
 import { loadIcons } from "./shared/ui/icons";
 import { installHotkeys } from "./hotkeys";
 import { installClipboardFallback } from "./shared/ui/clipboard";
-import { openExternal, openExternalIn, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended } from "./browsers";
-import { FavPopover, favEditOpen } from "./favs";
-import { TunnelPopover, tunnelPopOpen } from "./tunnelui";
-import { ProfileMenu, profileMenuOpen } from "./profiles";
-import { DebugMenu, debugMenuOpen } from "./debugmenu";
-import { DownloadMenu, downloadMenuOpen } from "./downloads";
+import {
+  openExternal, openExternalIn, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended, FavPopover, favEditOpen,
+  TunnelPopover, tunnelPopOpen, ProfileMenu, profileMenuOpen, DebugMenu, debugMenuOpen, DownloadMenu, downloadMenuOpen,
+} from "./modules/browser";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./modules/tour";
 import { Welcome, openWelcome } from "./modules/welcome";

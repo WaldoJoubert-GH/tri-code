@@ -18,7 +18,7 @@ import {
 } from "./git";
 import { copyText } from "../../shared/ui/clipboard";
 import { openFile } from "../editor";
-import { openUrlInProject } from "../../browsers";
+import { openUrlInProject } from "../browser";
 import { removeWorktree } from "../worktrees";
 import { type DiffMode, diffStats, firstChange, parseUnified } from "../../shared/text/diff";
 import DiffView, { type Drill, diffKeys, stepHunk } from "../../shared/text/DiffView";

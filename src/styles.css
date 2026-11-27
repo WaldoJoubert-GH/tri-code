@@ -374,7 +374,7 @@ svg.lucide { flex: none; display: block; }
 .ctxmenu button:disabled:hover { background: none; color: var(--muted); }
 .ctxmenu button:focus-visible { outline: none; background: var(--hover); color: var(--text); }
 
-/* Browser Profiles (src/profiles.tsx): the avatar, and the menu under a browser window's avatar */
+/* Browser Profiles (src/modules/browser/profiles.tsx): the avatar, and the menu under a browser window's avatar */
 .pav { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background: var(--pc); color: #fff; }
 .profmenu {
   position: fixed; z-index: 10000; width: 260px; padding: 4px; display: grid;
@@ -404,7 +404,7 @@ svg.lucide { flex: none; display: block; }
 .profmenu .pm-confirm button.primary { color: var(--accent); border-color: var(--accent); }
 .profmenu button span:not(.pav) + .pm-port { flex: none; }
 .profmenu .pm-port { color: var(--muted); font: 11px var(--mono); }
-/* The Debug Menu under a browser window's bug button (src/debugmenu.tsx); shares the avatar menu's look */
+/* The Debug Menu under a browser window's bug button (src/modules/browser/debugmenu.tsx); shares the avatar menu's look */
 .dbgmenu {
   position: fixed; z-index: 10000; width: 310px; max-width: calc(100vw - 16px); padding: 4px; display: grid;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px -12px var(--shadow); font-size: 12.5px;
@@ -435,7 +435,7 @@ svg.lucide { flex: none; display: block; }
 .dbgmenu .dm-cdp code { flex: 1; min-width: 0; padding: 3px 6px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dbgmenu .dm-cdp button { color: var(--muted); padding: 3px; border-radius: 4px; display: grid; }
 .dbgmenu .dm-cdp button:hover { background: var(--hover); color: var(--text); }
-/* The downloads list under a browser window's download button (src/downloads.tsx); rows share .dlbar's text styles in canvas.css */
+/* The downloads list under a browser window's download button (src/modules/browser/downloads.tsx); rows share .dlbar's text styles in canvas.css */
 .dlmenu {
   position: fixed; z-index: 10000; width: 340px; max-width: calc(100vw - 16px); display: grid; font-size: 12px; overflow: hidden;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px -12px var(--shadow);
