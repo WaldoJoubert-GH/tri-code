@@ -336,3 +336,11 @@ _Avoid_: Port forward (in UI text), proxy.
 **Pending Edit**:
 A cell change, new row or deleted row in a Database Window that is staged and highlighted but not written. Apply shows the statements and runs them all in one transaction; a row is found by its primary key, `rowid` or `_id`, and an edit fails if the cell changed underneath.
 _Avoid_: Draft, unsaved change.
+
+**Saved Query**:
+A Query view text kept by name for one Connection, in `.dev/databases.json` beside the Connections (`queries`: id, Connection id, name, text) and removed with its Connection. They list above the tables in the Database Window's tree; a click puts one in the editor and runs it, landing on its rows in Data (asking first if the editor has unsaved text, and on a prod Connection before anything that writes); clicking the open one again shows its rows without running it. Right-click offers Run, Edit, Rename and Delete; a double-click renames. `Ctrl+S` saves over the open one, or asks a name for a new one; Save as… copies it. A dot marks unsaved edits. Chosen from design/query-save-export.html (variant A).
+_Avoid_: Snippet, favourite query, bookmark.
+
+**Query Result**:
+What a Query view run returns: every row (no 500-row cap), held by the Session in Rust up to 256 MB of cells, past which the statement is cancelled and the result says it stopped. The window is sent 500 rows at a time as the grid scrolls to its end. Run lands on the Data view, which then shows the Query Result in place of the picked table (with Edit query and Back to the table); the Query view shows the same result under the editor. Picking a table in the tree shows its rows again. Export CSV writes the held rows (all, or the loaded ones) to a file picked here, or copies the loaded ones; it never runs the query again, so a statement that writes can't run twice. Cells go whole into the CSV (the grid's 64 KB cut is for display only): NULL is empty, a Mongo ObjectId or date its value, other nested values JSON. Chosen from design/query-save-export.html (variant A).
+_Avoid_: Result page (a page is the Data view's).

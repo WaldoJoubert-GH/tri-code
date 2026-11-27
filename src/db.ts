@@ -1,11 +1,14 @@
-// The Database Window's store (ADR 0004). A project's Connections live in its repo's
-// `.dev/databases.json`, written only by tri-code; a URL Connection's password stays on the
+// The Database Window's store (ADR 0004). A project's Connections and Saved Queries live in its
+// repo's `.dev/databases.json`, written only by tri-code; a URL Connection's password stays on the
 // host (Rust's db/target.rs). Each window holds one Session, kept here rather than in the
 // component, so a window on another workspace keeps its connection, page and Pending Edits.
+// A query's full result is held by the Session (db/mod.rs); the window has the rows it has
+// scrolled to, a page at a time.
 
 import { invoke } from "@tauri-apps/api/core";
+import { save as pickSavePath } from "@tauri-apps/plugin-dialog";
 import { createStore, produce, unwrap } from "solid-js/store";
-import { type Project, type Tab, addTab, focusTab, repoOf } from "./state";
+import { type Project, type Tab, addTab, focusTab, newId, repoOf } from "./state";
 import {
   type Cell, type DbKind, type MongoOp, type Pending, type SqlOp, type Target, emptyPending, mongoOps, mongoText, pendingCount, rowKey, sqlOps,
 } from "./dbsql";
@@ -27,8 +30,13 @@ export type DbConn = {
   tag?: "prod";
 };
 
+/** A query kept by name for one Connection. */
+export type SavedQuery = { id: string; conn: string; name: string; text: string };
+
 export type Column = { name: string; type: string };
-export type ResultSet = { columns: Column[]; rows: Cell[][]; more: boolean; affected?: number; ms: number };
+/** `rows`: those loaded so far, of `total` held by the Session. `more`: the statement had more
+ *  rows than the Session holds (db/mod.rs HOLD), left behind. */
+export type ResultSet = { columns: Column[]; rows: Cell[][]; more: boolean; total: number; affected?: number; ms: number };
 export type ObjKind = "table" | "view" | "system" | "collection";
 export type Obj = { name: string; kind: ObjKind; count: number | null };
 export type Group = { name: string; objects: Obj[] };
@@ -51,6 +59,9 @@ export type Win = {
   shut: string[];
   obj?: Sel;
   view: View;
+  /** What the Data view shows: the picked table's rows, or the last Query Result. Run turns it
+   *  to `query`; picking a table in the tree turns it back. */
+  source: "table" | "query";
   structs: Record<string, Structure>;
   page?: Page;
   offset: number;
@@ -63,9 +74,19 @@ export type Win = {
   /** Pending Edits by `group.name`. */
   pending: Record<string, Pending>;
   query: string;
+  /** The Saved Query the editor holds, if any. */
+  savedId?: string;
+  /** The editor's text when it was last opened or saved: it has edits while `query` differs. */
+  clean?: string;
+  /** Bumped when the editor's text is replaced from outside (a Saved Query opened). */
+  queryRev: number;
+  /** The Session's name for `results`, which their next pages are asked by. */
+  run?: number;
   results?: ResultSet[];
   resTab: number;
   running: boolean;
+  /** A page of a result is on its way. */
+  paging: boolean;
   runError?: string;
   /** A nested value opened in the side panel. */
   doc?: { col: string; v: Cell };
@@ -79,6 +100,7 @@ const objKey = (s: Sel) => `${s.group}.${s.name}`;
 // ── Connections ─────────────────────────────────────────────────────
 
 const [conns, setConns] = createStore<Record<string, DbConn[] | undefined>>({});
+const [queries, setQueries] = createStore<Record<string, SavedQuery[] | undefined>>({});
 
 const fileOf = (p: Project) => `${repoOf(p).path.replace(/[\\/]+$/, "")}/.dev/databases.json`;
 /** Where `.env` and relative SQLite paths are read from, and what a password is filed under. */
@@ -114,38 +136,105 @@ export function openSheetDb(p: Project, path: string, after?: string): string {
   return tabId;
 }
 
-export async function loadConns(p: Project): Promise<DbConn[]> {
+type DbFile = { connections: DbConn[]; queries: SavedQuery[] };
+
+/** Read `.dev/databases.json` again: what another window wrote is kept when this one writes. */
+async function readFile(p: Project): Promise<DbFile> {
   const raw = await invoke<string | null>("dev_read", { host: p.host, path: fileOf(p) }).catch(() => null);
-  let list: DbConn[] = [];
+  let file: DbFile = { connections: [], queries: [] };
   try {
-    list = raw ? (JSON.parse(raw).connections ?? []) : [];
+    const j = raw ? JSON.parse(raw) : {};
+    file = { connections: j.connections ?? [], queries: j.queries ?? [] };
   } catch {
     flash(".dev/databases.json isn't valid JSON");
   }
-  setConns(repoOf(p).id, list);
-  return list;
+  setConns(repoOf(p).id, file.connections);
+  setQueries(repoOf(p).id, file.queries);
+  return file;
 }
 
-async function writeConns(p: Project, list: DbConn[]) {
-  await invoke("dev_write", { host: p.host, path: fileOf(p), contents: JSON.stringify({ connections: list }, null, 2) + "\n" });
-  setConns(repoOf(p).id, list);
+async function writeFile(p: Project, file: DbFile) {
+  const out: Partial<DbFile> = { connections: file.connections };
+  if (file.queries.length) out.queries = file.queries;
+  await invoke("dev_write", { host: p.host, path: fileOf(p), contents: JSON.stringify(out, null, 2) + "\n" });
+  setConns(repoOf(p).id, file.connections);
+  setQueries(repoOf(p).id, file.queries);
+}
+
+export async function loadConns(p: Project): Promise<DbConn[]> {
+  return (await readFile(p)).connections;
 }
 
 /** Save a Connection. `secret` keeps (a string) or forgets (null) its password; undefined leaves it. */
 export async function saveConn(p: Project, c: DbConn, secret?: string | null) {
-  const list = [...((await loadConns(p)) ?? [])];
-  const i = list.findIndex((x) => x.id === c.id);
-  if (i >= 0) list[i] = c;
-  else list.push(c);
+  const file = await readFile(p);
+  const i = file.connections.findIndex((x) => x.id === c.id);
+  if (i >= 0) file.connections[i] = c;
+  else file.connections.push(c);
   if (secret !== undefined) await invoke("db_secret_set", { host: p.host, root: rootOf(p), id: c.id, secret });
-  await writeConns(p, list);
+  await writeFile(p, file);
 }
 
+/** Remove a Connection, with its Saved Queries. */
 export async function removeConn(p: Project, id: string) {
-  const list = ((await loadConns(p)) ?? []).filter((c) => c.id !== id);
+  const file = await readFile(p);
   await invoke("db_secret_set", { host: p.host, root: rootOf(p), id, secret: null }).catch(() => {});
-  await writeConns(p, list);
+  await writeFile(p, { connections: file.connections.filter((c) => c.id !== id), queries: file.queries.filter((q) => q.conn !== id) });
 }
+
+// ── Saved Queries ───────────────────────────────────────────────────
+
+/** A Connection's Saved Queries, by name. */
+export const savedOf = (p: Project, conn: string | undefined): SavedQuery[] =>
+  (queries[repoOf(p).id] ?? []).filter((q) => q.conn === conn).sort((a, b) => a.name.localeCompare(b.name));
+export const savedById = (p: Project, id: string | undefined) => (id ? queries[repoOf(p).id]?.find((q) => q.id === id) : undefined);
+
+/** The editor has text not saved since it was opened. */
+export const queryDirty = (w: Win | undefined) => !!w && w.clean !== undefined && w.query !== w.clean;
+
+/** Save the editor's text: over the Saved Query it holds, or, given a name, as a new one. */
+export async function saveQuery(p: Project, tabId: string, conn: string, name?: string) {
+  const w = wins[tabId];
+  if (!w) return;
+  const file = await readFile(p);
+  const i = name === undefined ? file.queries.findIndex((q) => q.id === w.savedId) : -1;
+  let id: string;
+  if (i >= 0) {
+    file.queries[i] = { ...file.queries[i], text: w.query };
+    id = file.queries[i].id;
+  } else {
+    if (!name?.trim()) return;
+    id = newId();
+    file.queries.push({ id, conn, name: name.trim(), text: w.query });
+  }
+  await writeFile(p, file);
+  const text = w.query;
+  up(tabId, (x) => { x.savedId = id; x.clean = text; });
+  flash(`saved ${file.queries.find((q) => q.id === id)?.name}`);
+}
+
+export async function renameQuery(p: Project, id: string, name: string) {
+  if (!name.trim()) return;
+  const file = await readFile(p);
+  const q = file.queries.find((x) => x.id === id);
+  if (!q) return;
+  q.name = name.trim();
+  await writeFile(p, file);
+}
+
+export async function removeQuery(p: Project, id: string) {
+  const file = await readFile(p);
+  await writeFile(p, { ...file, queries: file.queries.filter((q) => q.id !== id) });
+  setWins(produce((all) => { for (const w of Object.values(all)) if (w.savedId === id) w.savedId = undefined; }));
+}
+
+/** Put text in the Query view's editor: a Saved Query (`savedId`) or a new, unsaved one. */
+export function openQueryText(tabId: string, text: string, savedId?: string) {
+  up(tabId, (x) => Object.assign(x, { query: text, clean: text, savedId, queryRev: x.queryRev + 1, view: "query" }));
+}
+
+/** The Query view's first text, which counts as nothing to save. */
+export const setStarter = (tabId: string, text: string) => up(tabId, (x) => { x.query = text; x.clean = text; });
 
 export type EnvVar = { key: string; kind: DbKind };
 export const envVars = (p: Project) => invoke<EnvVar[]>("db_env_vars", { host: p.host, root: rootOf(p) });
@@ -172,8 +261,8 @@ export async function testConn(p: Project, c: DbConn, secret?: string): Promise<
 export const [wins, setWins] = createStore<Record<string, Win>>({});
 
 const blank = (): Win => ({
-  status: "opening", groups: [], shut: [], view: "data", structs: {}, offset: 0, filter: "", loading: false,
-  sel: { r: 0, c: 0 }, pending: {}, query: "", resTab: 0, running: false,
+  status: "opening", groups: [], shut: [], view: "data", source: "table", structs: {}, offset: 0, filter: "", loading: false,
+  sel: { r: 0, c: 0 }, pending: {}, query: "", queryRev: 0, resTab: 0, running: false, paging: false,
 });
 
 const up = (tabId: string, fn: (w: Win) => void) => setWins(produce((all) => { if (all[tabId]) fn(all[tabId]); }));
@@ -186,7 +275,7 @@ export async function openSession(p: Project, tab: Tab, force = false) {
   const c = connOf(p, tab.db);
   if (!c) return;
   if (w?.session) await invoke("db_close", { session: w.session }).catch(() => {});
-  setWins(tab.id, { ...blank(), query: w?.query ?? "", pending: w?.pending ?? {} });
+  setWins(tab.id, { ...blank(), query: w?.query ?? "", savedId: w?.savedId, clean: w?.clean, queryRev: w?.queryRev ?? 0, pending: w?.pending ?? {} });
   try {
     // A spreadsheet is read (and a CSV written back) where the file is, not always on the project's host.
     const host = isSheet(c) ? hostAt(p, sheetPathOf(c)) : p.host;
@@ -224,7 +313,7 @@ export async function loadSchema(tabId: string) {
 }
 
 export async function openObj(tabId: string, sel: Sel) {
-  up(tabId, (x) => Object.assign(x, { obj: sel, sort: undefined, filter: "", offset: 0, sel: { r: 0, c: 0 }, doc: undefined, page: undefined, pageError: undefined }));
+  up(tabId, (x) => Object.assign(x, { obj: sel, source: "table", sort: undefined, filter: "", offset: 0, sel: { r: 0, c: 0 }, doc: undefined, page: undefined, pageError: undefined }));
   await ensureStruct(tabId, sel);
   await loadPage(tabId);
 }
@@ -296,6 +385,10 @@ export function turnPage(tabId: string, dir: 1 | -1) {
 }
 
 export const setView = (tabId: string, view: View) => up(tabId, (x) => { x.view = view; });
+/** Show the picked table's rows in the Data view again, in place of the Query Result. */
+export const showTable = (tabId: string) => up(tabId, (x) => { x.source = "table"; x.view = "data"; });
+/** Show the Query Result in the Data view. */
+export const showResult = (tabId: string) => up(tabId, (x) => { x.source = "query"; x.view = "data"; });
 export const setSelCell = (tabId: string, r: number, c: number) => up(tabId, (x) => { x.sel = { r, c }; });
 export const setDoc = (tabId: string, doc: Win["doc"]) => up(tabId, (x) => { x.doc = doc; });
 export const setQuery = (tabId: string, q: string) => up(tabId, (x) => { x.query = q; });
@@ -418,15 +511,67 @@ export async function apply(tabId: string, file?: string) {
 
 // ── Query ───────────────────────────────────────────────────────────
 
+/** Run `text` and show its result in the Data view (the Query view shows it too). */
 export async function runQuery(tabId: string, text: string) {
   const w = wins[tabId];
   if (!w?.session || w.running || !text.trim()) return;
-  up(tabId, (x) => Object.assign(x, { running: true, runError: undefined }));
+  up(tabId, (x) => Object.assign(x, { running: true, runError: undefined, view: "data", source: "query" }));
   try {
-    const results = await invoke<ResultSet[]>("db_run", { session: w.session, text, scope: w.obj?.group ?? null });
-    up(tabId, (x) => Object.assign(x, { results, resTab: 0, running: false }));
+    const r = await invoke<{ run: number; sets: ResultSet[] }>("db_run", { session: w.session, text, scope: w.obj?.group ?? null });
+    up(tabId, (x) => Object.assign(x, { run: r.run, results: r.sets, resTab: 0, running: false, paging: false }));
   } catch (e) {
-    up(tabId, (x) => Object.assign(x, { running: false, runError: errText(e), results: undefined }));
+    up(tabId, (x) => Object.assign(x, { running: false, runError: errText(e), run: undefined, results: undefined }));
+  }
+}
+
+/** The shown result's next page, from the rows the Session holds. */
+export async function moreRows(tabId: string) {
+  const w = wins[tabId];
+  const i = w?.resTab ?? 0;
+  const set = w?.results?.[i];
+  if (!w?.session || w.paging || !set || set.rows.length >= set.total) return;
+  const run = w.run;
+  up(tabId, (x) => { x.paging = true; });
+  try {
+    const rows = await invoke<Cell[][]>("db_result_rows", { session: w.session, run, set: i, offset: set.rows.length });
+    up(tabId, (x) => {
+      x.paging = false;
+      if (x.run === run) x.results?.[i]?.rows.push(...rows);
+    });
+  } catch (e) {
+    up(tabId, (x) => { x.paging = false; });
+    flash(errText(e));
+  }
+}
+
+/** Export the shown result as CSV: every row the Session holds, or the ones loaded. */
+export async function exportCsv(tabId: string, which: "all" | "loaded", name: string) {
+  const w = wins[tabId];
+  const i = w?.resTab ?? 0;
+  const set = w?.results?.[i];
+  if (!w?.session || !set) return;
+  const path = await pickSavePath({ title: "Export CSV", defaultPath: `${name.replace(/[\\/:*?"<>|]+/g, "-") || "query"}.csv`, filters: [{ name: "CSV", extensions: ["csv"] }] });
+  if (!path) return;
+  try {
+    const out = await invoke<{ rows: number }>("db_csv", { session: w.session, run: w.run, set: i, rows: which === "all" ? null : set.rows.length, path });
+    flash(`exported ${out.rows.toLocaleString()} ${out.rows === 1 ? "row" : "rows"} · ${path.split(/[\\/]/).pop()}`);
+  } catch (e) {
+    flash(errText(e));
+  }
+}
+
+/** The loaded rows of the shown result, as CSV, to the clipboard. */
+export async function copyCsv(tabId: string) {
+  const w = wins[tabId];
+  const i = w?.resTab ?? 0;
+  const set = w?.results?.[i];
+  if (!w?.session || !set) return;
+  try {
+    const out = await invoke<{ rows: number; text: string }>("db_csv", { session: w.session, run: w.run, set: i, rows: set.rows.length, path: null });
+    await navigator.clipboard.writeText(out.text);
+    flash(`copied ${out.rows.toLocaleString()} ${out.rows === 1 ? "row" : "rows"} as CSV`);
+  } catch (e) {
+    flash(errText(e));
   }
 }
 

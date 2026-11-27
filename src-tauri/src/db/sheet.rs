@@ -20,7 +20,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::sqlite::{self, Lite};
-use super::{Column, Group, Page, ResultSet, RowsReq, Structure, qi, text_cell};
+use super::{Column, Group, Limit, Page, ResultSet, RowsReq, Structure, qi, text_cell};
 use crate::fs::{CHANGED, read_bytes, stamp_of, write_checked};
 
 /// Largest file opened as a table.
@@ -560,8 +560,8 @@ impl Sheet {
     }
 
     /// The Query view runs on the in-memory copy; nothing it changes reaches the file.
-    pub async fn run(&self, text: &str, scope: Option<&str>, read_only: bool) -> Result<Vec<ResultSet>, String> {
-        self.lite.run(text, scope, read_only).await
+    pub async fn run(&self, text: &str, scope: Option<&str>, read_only: bool, limit: Limit) -> Result<Vec<ResultSet>, String> {
+        self.lite.run(text, scope, read_only, limit).await
     }
 
     /// Apply Pending Edits to the copy and write the CSV, in one go: if the file can't be
@@ -729,7 +729,7 @@ mod tests {
         let lite = sqlite::memory().unwrap();
         let tables = p.tables;
         lite.on(move |c| load(c, &tables, &[])).await.unwrap();
-        let sets = lite.run("SELECT count(*), sum(mrr) FROM customers WHERE mrr > 100", None, false).await.unwrap();
+        let sets = lite.run("SELECT count(*), sum(mrr) FROM customers WHERE mrr > 100", None, false, Limit::Bytes(super::super::HOLD)).await.unwrap();
         assert_eq!(sets[0].rows[0], [json!(1), json!(240.0)]);
         let s = lite.structure("main", "customers", "table").await.unwrap();
         assert_eq!(s.key, ["rowid"]);

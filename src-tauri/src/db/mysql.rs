@@ -1,4 +1,4 @@
-//! MySQL and MariaDB through mysql_async. Queries go over the text protocol, so every value is
+﻿//! MySQL and MariaDB through mysql_async. Queries go over the text protocol, so every value is
 //! the text the server prints (decimals keep their digits), and a script of several statements
 //! gives one result set each, like pg.rs. A MySQL database is a group, as a Mongo one is.
 //!
@@ -16,7 +16,7 @@ use mysql_async::{Conn, Opts, OptsBuilder, Row, SslOpts};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::{ColInfo, Column, Dialect, Group, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure, page_sql, text_cell};
+use super::{ColInfo, Column, Dialect, Fill, Group, Limit, Named, Obj, PAGE, PAGE_READ, Page, ResultSet, RowsReq, Structure, page_sql, text};
 
 const D: Dialect = Dialect::My;
 /// Databases of the server itself, left out of the tree.
@@ -198,13 +198,13 @@ fn cell(c: &mysql_async::Column, v: Option<&mysql_async::Value>) -> Value {
         Some(mysql_async::Value::Bytes(b)) => {
             let opaque = matches!(c.column_type(), ColumnType::MYSQL_TYPE_BIT | ColumnType::MYSQL_TYPE_GEOMETRY);
             match std::str::from_utf8(b) {
-                Ok(s) if !opaque => text_cell(s),
+                Ok(s) if !opaque => text(s),
                 _ if c.character_set() == 63 || opaque => json!({ "__blob": b.len() }),
-                _ => text_cell(&String::from_utf8_lossy(b)),
+                _ => text(&String::from_utf8_lossy(b)),
             }
         }
         // Only the binary protocol sends these; the text protocol sends bytes.
-        Some(v) => text_cell(v.as_sql(true).trim_matches('\'')),
+        Some(v) => text(v.as_sql(true).trim_matches('\'')),
     }
 }
 
@@ -280,7 +280,7 @@ impl My {
             .await
             .map_err(err)?;
 
-        // Indexes as SHOW CREATE TABLE writes them: PRIMARY KEY (…), UNIQUE KEY `x` (…), KEY `x` (…).
+        // Indexes as SHOW CREATE TABLE writes them: PRIMARY KEY (â€¦), UNIQUE KEY `x` (â€¦), KEY `x` (â€¦).
         let parts: Vec<(String, i64, Option<String>, String)> = conn
             .exec(
                 "SELECT INDEX_NAME, NON_UNIQUE, COLUMN_NAME, INDEX_TYPE FROM information_schema.STATISTICS
@@ -359,7 +359,7 @@ impl My {
         let from = format!("{}.{}", D.q(&req.group), D.q(&req.name));
         let sql = page_sql(D, &from, req, false)?;
         let mut conn = self.conn.lock().await;
-        let mut set = self.text(&mut conn, &sql, PAGE + 1).await?.into_iter().next().unwrap_or_default();
+        let mut set = self.text(&mut conn, &sql, PAGE_READ).await?.into_iter().next().unwrap_or_default();
         let more = set.rows.len() > PAGE;
         set.rows.truncate(PAGE);
         let total = if req.filter.trim().is_empty() {
@@ -380,16 +380,17 @@ impl My {
         Ok(Page { columns: set.columns, rows: set.rows, more, total })
     }
 
-    pub async fn run(&self, text: &str, _scope: Option<&str>, _read_only: bool) -> Result<Vec<ResultSet>, String> {
+    pub async fn run(&self, sql: &str, _scope: Option<&str>, _read_only: bool, limit: Limit) -> Result<Vec<ResultSet>, String> {
         let mut conn = self.conn.lock().await;
-        self.text(&mut conn, text, PAGE).await
+        self.text(&mut conn, sql, limit).await
     }
 
-    /// Run `sql` and keep at most `max` rows a set. Past that the query is killed, so a
+    /// Run `sql` and keep what fits in `limit`. Past that the query is killed, so a
     /// `SELECT *` on a huge table doesn't stream all of it; the set says `more`.
-    async fn text(&self, conn: &mut Conn, sql: &str, max: usize) -> Result<Vec<ResultSet>, String> {
+    async fn text(&self, conn: &mut Conn, sql: &str, limit: Limit) -> Result<Vec<ResultSet>, String> {
         let mut res = conn.query_iter(sql).await.map_err(err)?;
         let mut sets = Vec::new();
+        let mut fill = Fill::new(limit);
         let mut capped = false;
         loop {
             let mut stream = match res.stream::<Row>().await {
@@ -411,7 +412,7 @@ impl My {
                     Err(_) if capped => break,
                     Err(e) => return Err(err(e)),
                 };
-                if set.rows.len() >= max {
+                if fill.full() {
                     if !set.more {
                         set.more = true;
                         capped = true;
@@ -419,7 +420,9 @@ impl My {
                     }
                     continue;
                 }
-                set.rows.push(cols.iter().enumerate().map(|(i, c)| cell(c, row.as_ref(i))).collect());
+                let cells: Vec<Value> = cols.iter().enumerate().map(|(i, c)| cell(c, row.as_ref(i))).collect();
+                fill.add(&cells);
+                set.rows.push(cells);
             }
             sets.push(set);
             if capped {
@@ -457,6 +460,8 @@ impl My {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ALL: Limit = Limit::Bytes(super::super::HOLD);
 
     #[test]
     fn urls_and_tls() {
@@ -503,19 +508,19 @@ mod tests {
         let e = my.apply(vec![json!({ "sql": same, "expect": 1 }), json!({ "sql": gone, "expect": 1 })]).await.unwrap_err();
         assert!(e.contains("changed since"), "{e}");
 
-        let sets = my.run("SELECT 1 AS a; UPDATE users SET plan = plan WHERE id < 4; SELECT 'x' AS b", None, false).await.unwrap();
+        let sets = my.run("SELECT 1 AS a; UPDATE users SET plan = plan WHERE id < 4; SELECT 'x' AS b", None, false, ALL).await.unwrap();
         assert_eq!((sets.len(), sets[1].affected), (3, Some(3)));
         assert_eq!(sets[0].columns[0].ty, "bigint");
-        // 1.44M rows, cut at 500 and killed.
-        let big = my.run("SELECT a.id, b.id FROM users a CROSS JOIN users b", None, false).await.unwrap();
-        assert_eq!((big[0].rows.len(), big[0].more), (PAGE, true));
+        // 1.44M rows, cut at 1 MB and killed.
+        let big = my.run("SELECT a.id, b.id FROM users a CROSS JOIN users b", None, false, Limit::Bytes(1 << 20)).await.unwrap();
+        assert!(big[0].more && big[0].rows.len() < 1_440_000);
         // The connection is still usable after the kill.
-        assert_eq!(my.run("SELECT 2", None, false).await.unwrap()[0].rows[0][0], "2");
-        let bad = my.run("SELECT nope FROM users", None, false).await.unwrap_err();
+        assert_eq!(my.run("SELECT 2", None, false, ALL).await.unwrap()[0].rows[0][0], "2");
+        let bad = my.run("SELECT nope FROM users", None, false, ALL).await.unwrap_err();
         assert!(bad.starts_with("ERROR 1054"), "{bad}");
 
         let (ro, _) = connect(&url, true, None).await.unwrap();
-        let e = ro.run("UPDATE users SET plan = 'x' WHERE id = 1", None, true).await.unwrap_err();
+        let e = ro.run("UPDATE users SET plan = 'x' WHERE id = 1", None, true, ALL).await.unwrap_err();
         assert!(e.to_lowercase().contains("read only"), "{e}");
     }
 }

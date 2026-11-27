@@ -12,7 +12,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use tokio::sync::Notify;
 
-use super::{ColInfo, Column, Group, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure, cap};
+use super::{ColInfo, Column, Fill, Group, Limit, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure};
 
 pub struct Mongo {
     client: Client,
@@ -82,8 +82,27 @@ fn table(docs: Vec<Document>) -> (Vec<Column>, Vec<Vec<Value>>) {
             Column { name: n.clone(), ty: ty.into() }
         })
         .collect();
-    let rows = docs.into_iter().map(|d| names.iter().map(|n| d.get(n).cloned().map_or(Value::Null, |b| cap(b.into_relaxed_extjson()))).collect()).collect();
+    let rows = docs.into_iter().map(|d| names.iter().map(|n| d.get(n).cloned().map_or(Value::Null, Bson::into_relaxed_extjson)).collect()).collect();
     (columns, rows)
+}
+
+/// About what a document costs in memory, as `Fill` counts a row.
+fn doc_size(d: &Document) -> usize {
+    fn size(b: &Bson) -> usize {
+        32 + match b {
+            Bson::String(s) => s.len(),
+            Bson::Document(d) => d.iter().map(|(k, v)| k.len() + size(v)).sum(),
+            Bson::Array(a) => a.iter().map(size).sum(),
+            Bson::Binary(b) => b.bytes.len(),
+            _ => 0,
+        }
+    }
+    d.iter().map(|(k, v)| k.len() + size(v)).sum()
+}
+
+/// A cursor's `firstBatch` or `nextBatch`.
+fn batch(cursor: &Document, key: &str) -> Vec<Document> {
+    cursor.get_array(key).map(|a| a.iter().filter_map(|b| b.as_document().cloned()).collect()).unwrap_or_default()
 }
 
 fn type_name(b: &Bson) -> &'static str {
@@ -209,7 +228,8 @@ impl Mongo {
         Ok(Page { columns, rows, more, total })
     }
 
-    pub async fn run(&self, text: &str, scope: Option<&str>, read_only: bool) -> Result<Vec<ResultSet>, String> {
+    /// A command's reply, and for a cursor every batch after it (`getMore`) while they fit in `limit`.
+    pub async fn run(&self, text: &str, scope: Option<&str>, read_only: bool, limit: Limit) -> Result<Vec<ResultSet>, String> {
         let cmd = ejson_doc(text)?;
         let name = cmd.keys().next().cloned().ok_or("an empty command")?;
         let writes_out = name == "aggregate" && text.contains("\"$out\"") || text.contains("\"$merge\"");
@@ -217,17 +237,42 @@ impl Mongo {
             return Err(format!("{name} can write, and this Connection is read-only"));
         }
         let db = scope.map(str::to_string).or_else(|| self.db.clone()).ok_or("pick a database in the tree first")?;
-        let reply = self.stoppable(async { self.client.database(&db).run_command(cmd).await.map_err(err) }).await?;
-        let (docs, more) = match reply.get_document("cursor") {
-            Ok(c) => {
-                let batch = c.get_array("firstBatch").map(|a| a.iter().filter_map(|b| b.as_document().cloned()).collect()).unwrap_or_default();
-                (batch, c.get_i64("id").unwrap_or(0) != 0)
-            }
-            Err(_) => (vec![reply], false),
+        let database = self.client.database(&db);
+        let reply = self.stoppable(async { database.run_command(cmd).await.map_err(err) }).await?;
+        let Ok(cursor) = reply.get_document("cursor") else {
+            let (columns, rows) = table(vec![reply]);
+            return Ok(vec![ResultSet { columns, rows, ..Default::default() }]);
         };
-        let mut docs: Vec<Document> = docs;
-        let more = more || docs.len() > PAGE;
-        docs.truncate(PAGE);
+        // getMore names the collection: `ns` is `db.collection` (or `db.$cmd.aggregate`).
+        let coll = cursor.get_str("ns").ok().and_then(|ns| ns.split_once('.')).map(|(_, c)| c.to_string());
+        let mut id = cursor.get_i64("id").unwrap_or(0);
+        let mut fill = Fill::new(limit);
+        let mut docs = Vec::new();
+        let mut more = false;
+        let mut next = batch(cursor, "firstBatch");
+        loop {
+            for d in next {
+                if fill.full() {
+                    more = true;
+                    break;
+                }
+                fill.add_bytes(doc_size(&d));
+                docs.push(d);
+            }
+            let Some(coll) = coll.as_deref().filter(|_| id != 0 && !more) else { break };
+            let get = doc! { "getMore": id, "collection": coll };
+            let reply = self.stoppable(async { database.run_command(get).await.map_err(err) }).await?;
+            let c = reply.get_document("cursor").map_err(|e| e.to_string())?;
+            id = c.get_i64("id").unwrap_or(0);
+            next = batch(c, "nextBatch");
+        }
+        // Left open with rows still on the server: close it rather than wait for its timeout.
+        if id != 0 {
+            more = true;
+            if let Some(coll) = &coll {
+                let _ = database.run_command(doc! { "killCursors": coll, "cursors": [id] }).await;
+            }
+        }
         let (columns, rows) = table(docs);
         Ok(vec![ResultSet { columns, rows, more, ..Default::default() }])
     }
