@@ -5,24 +5,24 @@
 // was already open.
 
 import { For, Show, createMemo, onCleanup, onMount } from "solid-js";
-import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focusTab, lastMinimised, live, projectById, space, tabName, tabProfile, visibleTabs } from "./shared/state/state";
-import { profileColor, profilesInUse, nativeBrowsers } from "./modules/browser";
-import { openEditor } from "./modules/editor";
-import { openIssuePanel } from "./modules/issues";
-import { openGitPanel } from "./modules/git";
-import { openDbWindow } from "./modules/db";
-import { openDockerPanel } from "./modules/docker";
-import { openMonitorPanel } from "./modules/monitor";
-import { openNewsPanel } from "./modules/news";
-import { openCalcPanel } from "./modules/calc";
-import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "./modules/agents";
-import { Icon } from "./shared/ui/lucide";
-import { SIG_TEXT, sigOf } from "./modules/signals";
-import { flash } from "./shared/ui/ui";
-import { groupKeys, heldKeys } from "./shared/keys/keymap";
-import { Caps, HoldFace, KeyList } from "./shared/keys/Keys";
-import { hintsShown, holdMenuShown } from "./shared/keys/hints";
-import { type TabMenuAt, closeTabMenu, tabMenu, tabMenuOpen, toggleTabMenu } from "./shared/nav";
+import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focusTab, lastMinimised, live, projectById, space, tabName, tabProfile, visibleTabs } from "../shared/state/state";
+import { profileColor, profilesInUse, nativeBrowsers } from "../modules/browser";
+import { openEditor } from "../modules/editor";
+import { openIssuePanel } from "../modules/issues";
+import { openGitPanel } from "../modules/git";
+import { openDbWindow } from "../modules/db";
+import { openDockerPanel } from "../modules/docker";
+import { openMonitorPanel } from "../modules/monitor";
+import { openNewsPanel } from "../modules/news";
+import { openCalcPanel } from "../modules/calc";
+import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "../modules/agents";
+import { Icon } from "../shared/ui/lucide";
+import { SIG_TEXT, sigOf } from "../modules/signals";
+import { flash } from "../shared/ui/ui";
+import { groupKeys, heldKeys } from "../shared/keys/keymap";
+import { Caps, HoldFace, KeyList } from "../shared/keys/Keys";
+import { hintsShown, holdMenuShown } from "../shared/keys/hints";
+import { type TabMenuAt, closeTabMenu, tabMenu, tabMenuOpen, toggleTabMenu } from "../shared/nav";
 
 /** Glyphs of the windows that aren't terminals (those show their agent's icon). */
 const GLYPH: Record<Exclude<TabKind, "term">, string> = {

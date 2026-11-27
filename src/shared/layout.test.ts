@@ -78,8 +78,8 @@ const reachesApp = (p: string) => inside(src, p) && !inside(shared, p) && !insid
 const APP_ALLOWED = [
   // files.css styles the Editor Window but also the palette, About and Settings; it is split (and
   // the Editor's part moves into modules/editor/) with the other big stylesheets, after a visual check.
-  "modules/editor/Editor.tsx -> ../../files.css",
-  "modules/editor/FileList.tsx -> ../../files.css",
+  "modules/editor/Editor.tsx -> ../../app/files.css",
+  "modules/editor/FileList.tsx -> ../../app/files.css",
 ];
 
 describe("src/modules/", () => {

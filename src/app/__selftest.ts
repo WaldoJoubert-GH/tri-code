@@ -1,7 +1,7 @@
 // TEMPORARY: dev-only self-test of Export PDF. Removed before commit.
 import { invoke } from "@tauri-apps/api/core";
-import { enhance, renderMarkdown, titleOf } from "./shared/text/markdown";
-import { printDocument } from "./modules/editor";
+import { enhance, renderMarkdown, titleOf } from "../shared/text/markdown";
+import { printDocument } from "../modules/editor";
 
 const SRC = `---
 title: Release 2.4

@@ -1,4 +1,4 @@
-// bun test: every key the app draws is the one keycap (Keys.tsx, `kbd` in src/styles.css).
+// bun test: every key the app draws is the one keycap (Keys.tsx, `kbd` in src/app/styles.css).
 
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
@@ -21,11 +21,11 @@ describe("the keycap", () => {
     expect(others).toEqual([]);
   });
 
-  test("only styles.css styles a kbd, so no panel can restyle one", () => {
+  test("only app/styles.css styles a kbd, so no panel can restyle one", () => {
     const css = files(".css");
-    expect(css).toContain("styles.css");
+    expect(css).toContain("app/styles.css");
     expect(css.length).toBeGreaterThan(10);
-    const others = css.filter((f) => f !== "styles.css" && /\bkbd\b[^{}]*\{/.test(read(f).replace(/:has\([^)]*\)/g, "")));
+    const others = css.filter((f) => f !== "app/styles.css" && /\bkbd\b[^{}]*\{/.test(read(f).replace(/:has\([^)]*\)/g, "")));
     expect(others).toEqual([]);
   });
 

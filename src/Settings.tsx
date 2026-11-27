@@ -27,7 +27,7 @@ import { openEnvDialog } from "./modules/environments";
 import { openWelcome } from "./modules/welcome";
 import { ICON_THEMES, type IconTheme } from "./shared/ui/fileicons";
 import { FileIcon } from "./modules/editor";
-import "./files.css";
+import "./app/files.css";
 import { linksOn } from "./shared/links";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [

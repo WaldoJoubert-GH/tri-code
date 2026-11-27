@@ -4,55 +4,55 @@ import { For, Show, createEffect, createSignal, on, onCleanup, onMount, untrack 
 import {
   SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
   persistChanges, repoOf, sessionName, setLayout, space, tabName,
-} from "./shared/state/state";
-import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig, SignalsPopover, signalsOpen, toggleSignals } from "./modules/signals";
+} from "../shared/state/state";
+import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig, SignalsPopover, signalsOpen, toggleSignals } from "../modules/signals";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
-import { LeftoversChip, LeftoversPopover, leftoversOpen, watchLeftovers } from "./modules/leftovers";
-import { adoptSandboxes } from "./modules/sandbox";
+import { LeftoversChip, LeftoversPopover, leftoversOpen, watchLeftovers } from "../modules/leftovers";
+import { adoptSandboxes } from "../modules/sandbox";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { HoldBar, TabMenu, TabStrip } from "./tabs";
-import { CtxMenu, ctxMenuOpen } from "./shared/ui/ctxmenu";
-import { ClaudeUsage, CommandCodeUsage } from "./modules/usage";
-import { SettingsDialog } from "./Settings";
-import { hotkeysOpen, openSettings, settingsOpen, tabMenuOpen, toggleHotkeys } from "./shared/nav";
-import { startAgentWindows, applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "./modules/terminal";
-import { startAgentWorktrees, NewWorktreeDialog, WorktreeDialog, newWorktreeOpen } from "./modules/worktrees";
-import { startAgentSetup, trackAgentFocus, SetupBanner, seedAgentKeys } from "./modules/agents";
-import { startCli } from "./cli";
-import { phoneStatus, startPhoneSync } from "./modules/phone";
-import { MediaPopover } from "./modules/media";
-import { mediaPopOpen } from "./modules/media";
-import { AppearancePopover, Backdrop, appearanceOpen, setBgImage, toggleAppearance } from "./modules/appearance";
-import { clearLook } from "./shared/backdrop";
+import { CtxMenu, ctxMenuOpen } from "../shared/ui/ctxmenu";
+import { ClaudeUsage, CommandCodeUsage } from "../modules/usage";
+import { SettingsDialog } from "../Settings";
+import { hotkeysOpen, openSettings, settingsOpen, tabMenuOpen, toggleHotkeys } from "../shared/nav";
+import { startAgentWindows, applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "../modules/terminal";
+import { startAgentWorktrees, NewWorktreeDialog, WorktreeDialog, newWorktreeOpen } from "../modules/worktrees";
+import { startAgentSetup, trackAgentFocus, SetupBanner, seedAgentKeys } from "../modules/agents";
+import { startCli } from "../cli";
+import { phoneStatus, startPhoneSync } from "../modules/phone";
+import { MediaPopover } from "../modules/media";
+import { mediaPopOpen } from "../modules/media";
+import { AppearancePopover, Backdrop, appearanceOpen, setBgImage, toggleAppearance } from "../modules/appearance";
+import { clearLook } from "../shared/backdrop";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
-import { Icon, IconPicker, iconPickerOpen } from "./shared/ui/lucide";
-import { OpenProjectDialog, openProjectOpen, EnvDialog, envDialogOpen, PinPad, envLocked, syncEnvs } from "./modules/environments";
-import { LinkFolderDialog, linkDialogOpen } from "./modules/linked-folders";
-import { loadIcons } from "./shared/ui/icons";
+import { Icon, IconPicker, iconPickerOpen } from "../shared/ui/lucide";
+import { OpenProjectDialog, openProjectOpen, EnvDialog, envDialogOpen, PinPad, envLocked, syncEnvs } from "../modules/environments";
+import { LinkFolderDialog, linkDialogOpen } from "../modules/linked-folders";
+import { loadIcons } from "../shared/ui/icons";
 import { installHotkeys } from "./hotkeys";
-import { installClipboardFallback } from "./shared/ui/clipboard";
+import { installClipboardFallback } from "../shared/ui/clipboard";
 import {
   openExternal, openExternalIn, openUrlInProject, setBrowsersOverlaid, setBrowsersSuspended, FavPopover, favEditOpen,
   TunnelPopover, tunnelPopOpen, ProfileMenu, profileMenuOpen, DebugMenu, debugMenuOpen, DownloadMenu, downloadMenuOpen,
-} from "./modules/browser";
+} from "../modules/browser";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
-import { Tour, startTour, tourOpen } from "./modules/tour";
-import { Welcome, openWelcome } from "./modules/welcome";
-import { applyLook, themeOf } from "./shared/look";
-import { clock, closeToast, flash, flashMsg, startClock, toast, undoToast } from "./shared/ui/ui";
-import { keyOf, withKey } from "./shared/keys/keymap";
-import { Caps, HoldFace, HoldKey } from "./shared/keys/Keys";
-import { hintsShown, holdMenuShown } from "./shared/keys/hints";
+import { Tour, startTour, tourOpen } from "../modules/tour";
+import { Welcome, openWelcome } from "../modules/welcome";
+import { applyLook, themeOf } from "../shared/look";
+import { clock, closeToast, flash, flashMsg, startClock, toast, undoToast } from "../shared/ui/ui";
+import { keyOf, withKey } from "../shared/keys/keymap";
+import { Caps, HoldFace, HoldKey } from "../shared/keys/Keys";
+import { hintsShown, holdMenuShown } from "../shared/keys/hints";
 import { appVersion, askRestart, installUpdate, startUpdateChecks, updateReady } from "./updater";
 import { RestartDialog } from "./RestartDialog";
 import {
   type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel,
   peekStatus, unpushed,
-} from "./modules/git";
+} from "../modules/git";
 import {
   dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, stateOf, todayTotal,
-} from "./modules/issues";
+} from "../modules/issues";
 
 export default function App() {
   const [ready, setReady] = createSignal(false);

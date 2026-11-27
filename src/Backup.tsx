@@ -10,7 +10,7 @@ import { app, newId, setApp } from "./shared/state/state";
 import { setBgImage } from "./modules/appearance";
 import { loadIcons } from "./shared/ui/icons";
 import { reloadSound } from "./modules/signals";
-import { appVersion } from "./updater";
+import { appVersion } from "./app/updater";
 import { flash } from "./shared/ui/ui";
 
 const LOAD = { bg: "bg_load", icon: "icon_load", sound: "sound_load" } as const;

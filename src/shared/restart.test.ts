@@ -1,8 +1,8 @@
 // bun test: which agent signals count as busy for the restart-to-update prompt (busySignals in sigs.ts).
 
 import { beforeEach, describe, expect, test } from "bun:test";
-import { type Project, type Tab, setApp, setLive, live } from "./shared/state/state";
-import { busySignals } from "./shared/sigs";
+import { type Project, type Tab, setApp, setLive, live } from "./state/state";
+import { busySignals } from "./sigs";
 
 const tab = (id: string) => ({ id, kind: "terminal", space: 0 }) as unknown as Tab;
 const project = (id: string, tabs: Tab[]) => ({ id, name: id, host: "local", path: "~", tabs }) as unknown as Project;

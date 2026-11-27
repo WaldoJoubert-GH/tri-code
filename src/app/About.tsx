@@ -3,9 +3,9 @@
 // press Escape to close.
 
 import { Show, createSignal } from "solid-js";
-import changelog from "../CHANGELOG.md?raw";
-import { renderMarkdown } from "./shared/text/markdown";
-import { Modal } from "./shared/ui/Modal";
+import changelog from "../../CHANGELOG.md?raw";
+import { renderMarkdown } from "../shared/text/markdown";
+import { Modal } from "../shared/ui/Modal";
 import { appVersion, checkForUpdates, installUpdate, updateReady, updateStatus } from "./updater";
 import "./files.css";
 

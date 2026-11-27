@@ -4,9 +4,9 @@
 
 import { Show } from "solid-js";
 import { appVersion, askRestart, cancelRestart, installNow, updateReady } from "./updater";
-import { busySignals } from "./shared/sigs";
-import { Icon } from "./shared/ui/lucide";
-import { Modal } from "./shared/ui/Modal";
+import { busySignals } from "../shared/sigs";
+import { Icon } from "../shared/ui/lucide";
+import { Modal } from "../shared/ui/Modal";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 

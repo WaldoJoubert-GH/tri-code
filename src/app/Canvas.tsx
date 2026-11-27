@@ -3,7 +3,7 @@ import { type JSX, For, Match, Show, Switch, createEffect, createMemo, createSig
 import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isRemote, isTerminal, live, projectById, removePage,
   canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, pageProfile, toggleMono, visibleTabs,
-} from "./shared/state/state";
+} from "../shared/state/state";
 import {
   ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu, browserInfo, nativeBrowsers, closeBrowser, closePage,
   browserBack, browserForward, browserReload, navigateBrowser, addressToUrl, answerPassword, openExternalIn,
@@ -11,29 +11,29 @@ import {
   debugPortOf, debugSupport, profilesKey, browserKeys, focusApp, focusPage, DebugButton, fwdOfPage, heldBy, RemoteStart,
   TunnelBar, TunnelChip, TunnelHeld, FavBar, StartPage, closeFavEdit, favEditFor, starPage, DownloadBar, DownloadButton,
   forgetDownloads,
-} from "./modules/browser";
+} from "../modules/browser";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
-import { clock, flash, showToast } from "./shared/ui/ui";
-import { hintKeys, withKey } from "./shared/keys/keymap";
-import { Caps, HintCaps } from "./shared/keys/Keys";
-import { hintsShown } from "./shared/keys/hints";
-import { Icon } from "./shared/ui/lucide";
-import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./modules/terminal";
-import { runsInSandbox, sandboxOf } from "./modules/sandbox";
-import { IssuesPanel, dev, panelTitle } from "./modules/issues";
-import { Editor, dirtyCount, dropEditor } from "./modules/editor";
-import { isEnter } from "./shared/ui/enterkey";
+import { clock, flash, showToast } from "../shared/ui/ui";
+import { hintKeys, withKey } from "../shared/keys/keymap";
+import { Caps, HintCaps } from "../shared/keys/Keys";
+import { hintsShown } from "../shared/keys/hints";
+import { Icon } from "../shared/ui/lucide";
+import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "../modules/terminal";
+import { runsInSandbox, sandboxOf } from "../modules/sandbox";
+import { IssuesPanel, dev, panelTitle } from "../modules/issues";
+import { Editor, dirtyCount, dropEditor } from "../modules/editor";
+import { isEnter } from "../shared/ui/enterkey";
 
-import { GitPanel, gitOf } from "./modules/git";
-import { AgentsPanel } from "./modules/agents";
-import { DbPanel } from "./modules/db";
-import { DockerPanel, closeDockerWindow } from "./modules/docker";
-import { MonitorPanel } from "./modules/monitor";
-import { NewsPanel } from "./modules/news";
-import { CalcPanel } from "./modules/calc";
-import { closeSession as closeDbSession, dbTitle, isProd } from "./modules/db";
-import { SIG_TEXT, sigOf } from "./modules/signals";
-import { hostHue, monogram } from "./shared/ui/favicons";
+import { GitPanel, gitOf } from "../modules/git";
+import { AgentsPanel } from "../modules/agents";
+import { DbPanel } from "../modules/db";
+import { DockerPanel, closeDockerWindow } from "../modules/docker";
+import { MonitorPanel } from "../modules/monitor";
+import { NewsPanel } from "../modules/news";
+import { CalcPanel } from "../modules/calc";
+import { closeSession as closeDbSession, dbTitle, isProd } from "../modules/db";
+import { SIG_TEXT, sigOf } from "../modules/signals";
+import { hostHue, monogram } from "../shared/ui/favicons";
 
 /** "just now", "4m ago", "2h ago": how long an agent has been in its state. */
 const ago = (ms: number) => {

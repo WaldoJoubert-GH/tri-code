@@ -4,31 +4,31 @@ import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
   Project, app, dropProject, envHeadersHidden, envIcon, envName, isLocalHost, isPinned, moveProject, projectById, removeEnvironment, renameProject, setApp, setEnvStyle,
   setSidebarCollapsed, togglePin, worktreesOf,
-} from "./shared/state/state";
-import { setBrowsersCovered } from "./modules/browser";
-import { appearanceOpen, closeAppearance, openAppearance } from "./modules/appearance";
-import { dev, isActive, sourcesOf, stateOf } from "./modules/issues";
-import { IconFace } from "./shared/ui/icons";
-import { Icon, iconPickerOpen, toggleIconPicker } from "./shared/ui/lucide";
-import { Caps, HoldFace } from "./shared/keys/Keys";
-import { projectStepKey } from "./shared/keys/hints";
-import { openProjectDialog, envDialogOpen, openEnvDialog, envLocked, lockEnv } from "./modules/environments";
-import { SIG_TEXT, sigOf, sigSummary, topSig } from "./modules/signals";
+} from "../shared/state/state";
+import { setBrowsersCovered } from "../modules/browser";
+import { appearanceOpen, closeAppearance, openAppearance } from "../modules/appearance";
+import { dev, isActive, sourcesOf, stateOf } from "../modules/issues";
+import { IconFace } from "../shared/ui/icons";
+import { Icon, iconPickerOpen, toggleIconPicker } from "../shared/ui/lucide";
+import { Caps, HoldFace } from "../shared/keys/Keys";
+import { projectStepKey } from "../shared/keys/hints";
+import { openProjectDialog, envDialogOpen, openEnvDialog, envLocked, lockEnv } from "../modules/environments";
+import { SIG_TEXT, sigOf, sigSummary, topSig } from "../modules/signals";
 import {
   adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel,
   openWorktreeDialog,
-} from "./modules/worktrees";
-import { type CtxItem, openCtxMenu } from "./shared/ui/ctxmenu";
-import { folderStatus, peekStatus } from "./modules/git";
-import { ask, flash } from "./shared/ui/ui";
-import { withKey } from "./shared/keys/keymap";
-import { isMac } from "./shared/keys/modkey";
-import { settingsOpen, toggleSettings } from "./shared/nav";
-import { LeftoverCount, endLeftover, staleCheckouts } from "./modules/leftovers";
-import { sandboxOf } from "./modules/sandbox";
-import { MediaDock } from "./modules/media";
-import { mediaPopOpen } from "./modules/media";
-import { isEnter } from "./shared/ui/enterkey";
+} from "../modules/worktrees";
+import { type CtxItem, openCtxMenu } from "../shared/ui/ctxmenu";
+import { folderStatus, peekStatus } from "../modules/git";
+import { ask, flash } from "../shared/ui/ui";
+import { withKey } from "../shared/keys/keymap";
+import { isMac } from "../shared/keys/modkey";
+import { settingsOpen, toggleSettings } from "../shared/nav";
+import { LeftoverCount, endLeftover, staleCheckouts } from "../modules/leftovers";
+import { sandboxOf } from "../modules/sandbox";
+import { MediaDock } from "../modules/media";
+import { mediaPopOpen } from "../modules/media";
+import { isEnter } from "../shared/ui/enterkey";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
 const FULL = 220;

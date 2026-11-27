@@ -4,45 +4,45 @@
 // the terminal.
 
 import { listen } from "@tauri-apps/api/event";
-import { Project, Tab, activePage, activeProject, addTab, app, canvasTabs, focusedTab, setRatio, space } from "./shared/state/state";
+import { Project, Tab, activePage, activeProject, addTab, app, canvasTabs, focusedTab, setRatio, space } from "../shared/state/state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
-import { appearanceOpen, closeAppearance, toggleAppearance } from "./modules/appearance";
-import { closeSettings, closeTabMenu, setHotkeyRunner, settingsOpen, tabMenuOpen, toggleHotkeys } from "./shared/nav";
+import { appearanceOpen, closeAppearance, toggleAppearance } from "../modules/appearance";
+import { closeSettings, closeTabMenu, setHotkeyRunner, settingsOpen, tabMenuOpen, toggleHotkeys } from "../shared/nav";
 import { aboutOpen, setAboutOpen } from "./About";
-import { closeOpenProject, openProjectDialog, openProjectOpen, closeEnvDialog, envDialogOpen } from "./modules/environments";
-import { closeLinkDialog, linkDialogOpen } from "./modules/linked-folders";
-import { closeWelcome, welcomeOpen } from "./modules/welcome";
+import { closeOpenProject, openProjectDialog, openProjectOpen, closeEnvDialog, envDialogOpen } from "../modules/environments";
+import { closeLinkDialog, linkDialogOpen } from "../modules/linked-folders";
+import { closeWelcome, welcomeOpen } from "../modules/welcome";
 import { toggleSidebar } from "./Sidebar";
-import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./modules/worktrees";
-import { closeCtxMenu, ctxMenuOpen } from "./shared/ui/ctxmenu";
+import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "../modules/worktrees";
+import { closeCtxMenu, ctxMenuOpen } from "../shared/ui/ctxmenu";
 import {
   closeFavEdit, favEditOpen, closeTunnelPop, tunnelPopOpen, closeProfileMenu, profileMenuOpen, closeDebugMenu,
   debugMenuOpen, closeDownloadMenu, downloadMenuOpen, browserKeys, focusApp, nativeBrowsers, pageOfLabel,
-} from "./modules/browser";
-import { openIssuePanel } from "./modules/issues";
-import { openEditor } from "./modules/editor";
-import { openDockerPanel } from "./modules/docker";
-import { openMonitorPanel } from "./modules/monitor";
-import { openNewsPanel } from "./modules/news";
-import { openCalcPanel } from "./modules/calc";
-import { openGitPanel } from "./modules/git";
-import { openDbWindow } from "./modules/db";
-import { diffKeys } from "./shared/text/DiffView";
-import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./modules/agents";
-import { closeIconPicker, iconPickerOpen } from "./shared/ui/lucide";
+} from "../modules/browser";
+import { openIssuePanel } from "../modules/issues";
+import { openEditor } from "../modules/editor";
+import { openDockerPanel } from "../modules/docker";
+import { openMonitorPanel } from "../modules/monitor";
+import { openNewsPanel } from "../modules/news";
+import { openCalcPanel } from "../modules/calc";
+import { openGitPanel } from "../modules/git";
+import { openDbWindow } from "../modules/db";
+import { diffKeys } from "../shared/text/DiffView";
+import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "../modules/agents";
+import { closeIconPicker, iconPickerOpen } from "../shared/ui/lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";
 import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, stepGap, stepProject, stepWorkspace, workspace } from "./commands";
-import { nextSignal, closeSignals, signalsOpen } from "./modules/signals";
+import { nextSignal, closeSignals, signalsOpen } from "../modules/signals";
 import { closeFeedback, feedbackOpen } from "./Feedback";
-import { closeLeftovers, leftoversOpen } from "./modules/leftovers";
-import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./modules/media";
-import { flash } from "./shared/ui/ui";
-import { hasSelection } from "./modules/terminal";
-import { ACTIONS, BROWSER_ACTIONS, actionFor, editorKey, isKey, keysOf } from "./shared/keys/keymap";
+import { closeLeftovers, leftoversOpen } from "../modules/leftovers";
+import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "../modules/media";
+import { flash } from "../shared/ui/ui";
+import { hasSelection } from "../modules/terminal";
+import { ACTIONS, BROWSER_ACTIONS, actionFor, editorKey, isKey, keysOf } from "../shared/keys/keymap";
 import { createEffect, createRoot } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import { hintChord, hintDown, hintsShown, hintUp, isHintModifier } from "./shared/keys/hints";
-import { modDown } from "./shared/keys/modkey";
+import { hintChord, hintDown, hintsShown, hintUp, isHintModifier } from "../shared/keys/hints";
+import { modDown } from "../shared/keys/modkey";
 
 const DIRS: Record<string, [number, number]> = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
 

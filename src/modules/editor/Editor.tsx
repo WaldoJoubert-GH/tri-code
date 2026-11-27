@@ -39,7 +39,7 @@ import { isBookPath, isCsvPath } from "../../shared/text/csv";
 import { BookView, CsvTable, openSheetDb } from "../db";
 import { asProject, hostAt, linkAt, relIn, rootAt, within } from "../../shared/links";
 import { redo, undo } from "@codemirror/commands";
-import "../../files.css";
+import "../../app/files.css";
 import { ctrlName } from "../../shared/keys/modkey";
 
 /** What Preview shows: rendered Markdown, HTML or SVG, or a CSV as a table (Table mode). */

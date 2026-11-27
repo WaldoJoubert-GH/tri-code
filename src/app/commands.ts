@@ -5,38 +5,38 @@
 import {
   GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, app, focusTab, focusedTab, goSpace, isPinned, isRemote, live,
   lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, setMedia, setSettings, space, tabIcon, tabName, toggleMono, togglePin,
-} from "./shared/state/state";
-import { ICON_THEMES, type IconTheme, setPreviewTheme } from "./shared/ui/fileicons";
+} from "../shared/state/state";
+import { ICON_THEMES, type IconTheme, setPreviewTheme } from "../shared/ui/fileicons";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { requestClose } from "./Canvas";
-import { isMac } from "./shared/keys/modkey";
-import { openAppearance, toggleAppearance } from "./modules/appearance";
-import { nextSignal, toggleDnd, toggleSignals } from "./modules/signals";
-import { openSettings, toggleSettings } from "./shared/nav";
-import { chooseImport, exportConfig } from "./Backup";
-import { SECTIONS } from "./config";
-import { capsOf } from "./shared/keys/keymap";
+import { isMac } from "../shared/keys/modkey";
+import { openAppearance, toggleAppearance } from "../modules/appearance";
+import { nextSignal, toggleDnd, toggleSignals } from "../modules/signals";
+import { openSettings, toggleSettings } from "../shared/nav";
+import { chooseImport, exportConfig } from "../Backup";
+import { SECTIONS } from "../config";
+import { capsOf } from "../shared/keys/keymap";
 import { setAboutOpen } from "./About";
 import { toggleFeedback } from "./Feedback";
-import { openProjectDialog } from "./modules/environments";
+import { openProjectDialog } from "../modules/environments";
 import { toggleSidebar } from "./Sidebar";
-import { openIssuePanel } from "./modules/issues";
-import { openEditor } from "./modules/editor";
-import { openDockerPanel } from "./modules/docker";
-import { openMonitorPanel } from "./modules/monitor";
-import { openNewsPanel } from "./modules/news";
-import { openCalcPanel } from "./modules/calc";
-import { openGitPanel } from "./modules/git";
-import { connsOf, openDbWindow } from "./modules/db";
-import { labelOf, openNewWorktree, removeWorktree } from "./modules/worktrees";
-import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgentsPanel } from "./modules/agents";
+import { openIssuePanel } from "../modules/issues";
+import { openEditor } from "../modules/editor";
+import { openDockerPanel } from "../modules/docker";
+import { openMonitorPanel } from "../modules/monitor";
+import { openNewsPanel } from "../modules/news";
+import { openCalcPanel } from "../modules/calc";
+import { openGitPanel } from "../modules/git";
+import { connsOf, openDbWindow } from "../modules/db";
+import { labelOf, openNewWorktree, removeWorktree } from "../modules/worktrees";
+import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgentsPanel } from "../modules/agents";
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
-import { startTour } from "./modules/tour";
-import { openWelcome } from "./modules/welcome";
-import { flash } from "./shared/ui/ui";
-import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./modules/media";
-import { openLinkDialog } from "./modules/linked-folders";
-import { linksOn } from "./shared/links";
+import { startTour } from "../modules/tour";
+import { openWelcome } from "../modules/welcome";
+import { flash } from "../shared/ui/ui";
+import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "../modules/media";
+import { openLinkDialog } from "../modules/linked-folders";
+import { linksOn } from "../shared/links";
 
 export type Command = {
   /** Stable across openings, so the palette can remember recent picks. */

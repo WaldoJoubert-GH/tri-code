@@ -7,7 +7,7 @@ import "./styles.css";
 // `.lucide.spin` to canvas.css. Goes when canvas.css is split.
 import "./canvas.css";
 import App from "./App";
-import { restoreLook } from "./shared/look";
+import { restoreLook } from "../shared/look";
 
 restoreLook();
 // TEMPORARY self-test, removed before commit.

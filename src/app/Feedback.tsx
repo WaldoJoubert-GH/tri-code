@@ -7,10 +7,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
-import { openExternal } from "./modules/browser";
+import { openExternal } from "../modules/browser";
 import { appVersion } from "./updater";
-import { flash, showToast } from "./shared/ui/ui";
-import { KeyText } from "./shared/keys/Keys";
+import { flash, showToast } from "../shared/ui/ui";
+import { KeyText } from "../shared/keys/Keys";
 
 const REPO = "WaldoJoubert-GH/tri-code";
 const KINDS = { bug: { name: "Bug", label: "bug", ask: "What went wrong?" }, idea: { name: "Idea", label: "enhancement", ask: "What would you like?" } };
