@@ -13,8 +13,8 @@ import {
 } from "./shared/state/state";
 import { flash } from "./shared/ui/ui";
 import { keyOf } from "./shared/keys/keymap";
-import { type Sig, sigOf } from "./sigs";
-export { busySignals, sigOf, type Sig } from "./sigs";
+import { type Sig, sigOf } from "./shared/sigs";
+export { busySignals, sigOf, type Sig } from "./shared/sigs";
 
 export const SIG_RANK: Record<Sig, number> = { blocked: 3, error: 2, done: 1, working: 0 };
 export const SIG_TEXT: Record<Sig, string> = { working: "working", blocked: "needs you", done: "done", error: "error" };

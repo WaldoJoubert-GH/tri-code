@@ -17,7 +17,7 @@ import {
   duplicateAgent, hotkeyKeys, hotkeyProblem, launchAgent, looksLikeUrl, nameProblem, newAgent, reaches, recording, replaceNote,
   sameScope, scopeIcon, scopeLabel, setRecording, urlProblem,
 } from "./agents";
-import { normalizeUrl } from "./urls";
+import { normalizeUrl } from "./shared/urls";
 import { EVENTS, playFor, playSound, soundFor, soundName } from "./signals";
 import { SoundSelect } from "./SoundSelect";
 import { Icon, toggleIconPicker } from "./shared/ui/lucide";

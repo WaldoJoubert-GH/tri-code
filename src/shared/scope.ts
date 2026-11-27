@@ -2,7 +2,7 @@
 // or one project and its worktrees. The narrower command of the same name replaces the wider one
 // where both are offered. Pure rules over the store, so bun test can run them (agents.test.ts).
 
-import { type Agent, type Hotkey, type Project, type Scope, app, envName, projectById, repoOf } from "./shared/state/state";
+import { type Agent, type Hotkey, type Project, type Scope, app, envName, projectById, repoOf } from "./state/state";
 
 /** Everywhere 0, an Environment 1, a project 2. */
 const rank = (s?: Scope) => (!s ? 0 : "env" in s ? 1 : 2);

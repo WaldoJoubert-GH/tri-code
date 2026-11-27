@@ -3,7 +3,7 @@ import { render } from "solid-js/web";
 import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
 import App from "./App";
-import { restoreLook } from "./look";
+import { restoreLook } from "./shared/look";
 
 restoreLook();
 // TEMPORARY self-test, removed before commit.

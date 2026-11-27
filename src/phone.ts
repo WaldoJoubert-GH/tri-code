@@ -10,7 +10,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { type Project, type SoundEvent, type Tab, activePage, app, envIcon, envName, isLocalHost, live, repoOf, setSettings, tabIcon, tabName } from "./shared/state/state";
 import { onAlert } from "./signals";
-import { sigOf } from "./sigs";
+import { sigOf } from "./shared/sigs";
 import { envLocked } from "./envlock";
 import { iconSvg } from "./shared/ui/lucide";
 import { screenTail } from "./terms";

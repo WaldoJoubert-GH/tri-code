@@ -11,7 +11,7 @@ import {
   parseEvent, parseLogLine, phaseText, phaseTone, portUrl, rowName, sandboxStack, stoppedCleanly, withLevel,
 } from "./dockerdata";
 import { isRunning, listBoxes, sandboxOf, sbxReady, startSandbox, stopSandbox } from "./sandbox";
-import { sandboxPreview } from "./preview";
+import { sandboxPreview } from "./shared/preview";
 import { openUrlInProject } from "./browsers";
 import { copyText } from "./shared/ui/clipboard";
 import { Icon } from "./shared/ui/lucide";

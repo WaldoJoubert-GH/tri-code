@@ -2,7 +2,7 @@ import { createEffect, on } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 import type { DiffMode } from "../text/diff";
-import type { Clear, Fx } from "../../backdrop";
+import type { Clear, Fx } from "../backdrop";
 
 export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker" | "monitor" | "news" | "calc";
 

@@ -14,7 +14,7 @@ import { AlertMode, SoundEvent, addAgent, app, envIcon, envName, isLocalHost, ne
 import { type Known, KNOWN, NODE_INSTALL, commandOf, foundOf, lookups, ownCommand, platform, serverBlocker } from "./welcomedata";
 import { installAgent, refreshSetup, setupBusy, setupError, setupStatus } from "./agentsetup";
 import { looksLikeUrl } from "./agents";
-import { themeOf } from "./look";
+import { themeOf } from "./shared/look";
 import { EVENTS, playSound } from "./signals";
 import { SoundSelect } from "./SoundSelect";
 import { openEnvDialog } from "./EnvDialog";

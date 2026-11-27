@@ -14,11 +14,11 @@ import {
   profileById, projectById, setFavIcon, setPageUrl, space, Tab, tabIcon, tabName, visibleTabs,
 } from "./shared/state/state";
 import { looksLikeUrl } from "./agents";
-import { normalizeUrl } from "./urls";
+import { normalizeUrl } from "./shared/urls";
 import { agentTarget, agentWindows, rememberAgent } from "./agenttarget";
-import { offeredIn } from "./scope";
+import { offeredIn } from "./shared/scope";
 import { setupStatus } from "./agentsetup";
-import { sigOf } from "./sigs";
+import { sigOf } from "./shared/sigs";
 import { iconSvg } from "./shared/ui/lucide";
 import { pasteText } from "./terms";
 import { flash } from "./shared/ui/ui";

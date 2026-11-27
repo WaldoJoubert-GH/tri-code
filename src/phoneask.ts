@@ -7,9 +7,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { type Agent, type Project, addTab, isWebApp, projectById, sendTo, tabName } from "./shared/state/state";
-import { normalizeUrl } from "./urls";
+import { normalizeUrl } from "./shared/urls";
 import { envLocked } from "./envlock";
-import { offeredIn } from "./scope";
+import { offeredIn } from "./shared/scope";
 import { type Change, type GitStatus, type RepoStatus, repoRoot } from "./git";
 import type { FsList, FsText } from "./files";
 import { hostAt, rootsOf, within } from "./links";

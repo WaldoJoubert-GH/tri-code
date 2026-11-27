@@ -13,7 +13,7 @@ import {
   type Template, SIGNIN_BOX, connectGithub, listTemplates, removeTemplate, sandboxByDefault, signInBox, signOutClaude, sandboxFolders, sbxState, serviceLabel, setSecret, stopSandbox,
 } from "./sandbox";
 import { flash } from "./shared/ui/ui";
-import { closeSettings } from "./nav";
+import { closeSettings } from "./shared/nav";
 import { isEnter } from "./shared/ui/enterkey";
 
 const windows = /Windows/i.test(navigator.userAgent);

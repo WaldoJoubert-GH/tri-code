@@ -13,7 +13,7 @@ import { isMac } from "./shared/keys/modkey";
 import { openAppearance, toggleAppearance } from "./Appearance";
 import { nextSignal, toggleDnd } from "./signals";
 import { toggleSignals } from "./SignalSettings";
-import { openSettings, toggleSettings } from "./nav";
+import { openSettings, toggleSettings } from "./shared/nav";
 import { chooseImport, exportConfig } from "./Backup";
 import { SECTIONS } from "./config";
 import { capsOf } from "./shared/keys/keymap";

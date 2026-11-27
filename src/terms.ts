@@ -11,7 +11,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, repoOf, sessionName, setLive, setTabResume } from "./shared/state/state";
 import { onSandboxStep, readySandbox, runsInSandbox, sandboxOf } from "./sandbox";
-import { terminalFont } from "./look";
+import { terminalFont } from "./shared/look";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./shared/ui/clipboard";
 import { Demo, playDemo } from "./demo";

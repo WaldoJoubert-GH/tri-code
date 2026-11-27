@@ -1,7 +1,7 @@
 // Preview features: work that ships turned off, for whoever wants to try it. Settings › Preview
 // lists them, each with its own switch, off until turned on (state.ts `settings.preview`).
 
-import { app } from "./shared/state/state";
+import { app } from "./state/state";
 
 export type PreviewId = "sandbox";
 

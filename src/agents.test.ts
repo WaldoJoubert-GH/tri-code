@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 import { type Agent, type Project, app, setApp } from "./shared/state/state";
-import { chordHolder, nameProblem, offeredIn, reaches, replaceNote, scopesOverlap } from "./scope";
+import { chordHolder, nameProblem, offeredIn, reaches, replaceNote, scopesOverlap } from "./shared/scope";
 import { seedAgentKeys } from "./agentkeys";
 
 const project = (id: string, host: string, parent?: string) => ({ id, name: id, host, path: "~", tabs: [], ...(parent ? { parent } : {}) }) as unknown as Project;

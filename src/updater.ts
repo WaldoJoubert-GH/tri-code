@@ -5,7 +5,7 @@
 import { createSignal } from "solid-js";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { busySignals } from "./sigs";
+import { busySignals } from "./shared/sigs";
 import { flash } from "./shared/ui/ui";
 
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;

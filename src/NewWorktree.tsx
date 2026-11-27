@@ -15,9 +15,9 @@ import { dev, inProgress, slugOf } from "./issues";
 import { gitOf } from "./git";
 import { Icon } from "./shared/ui/lucide";
 import { Modal } from "./shared/ui/Modal";
-import { sandboxPreview } from "./preview";
+import { sandboxPreview } from "./shared/preview";
 import { canSandbox, hostKey, mountsFor, refreshSbx, sandboxByDefault, sandboxFolders, sbxReady, sbxState, setSandboxHost } from "./sandbox";
-import { openSettings } from "./nav";
+import { openSettings } from "./shared/nav";
 import { isEnter } from "./shared/ui/enterkey";
 
 export function NewWorktreeDialog() {

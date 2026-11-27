@@ -24,7 +24,7 @@ import { ask, flash } from "./shared/ui/ui";
 import { withKey } from "./shared/keys/keymap";
 import { isMac } from "./shared/keys/modkey";
 import { envLocked, lockEnv } from "./envlock";
-import { settingsOpen, toggleSettings } from "./nav";
+import { settingsOpen, toggleSettings } from "./shared/nav";
 import { LeftoverCount } from "./LeftoversPopover";
 import { endLeftover, staleCheckouts } from "./leftovers";
 import { sandboxOf } from "./sandbox";

@@ -8,7 +8,7 @@ import { createEffect } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { type Agent, type Project, app, focusTab, addTab, isWebApp, projectById, removeTab } from "./shared/state/state";
-import { offeredIn } from "./scope";
+import { offeredIn } from "./shared/scope";
 import { flash } from "./shared/ui/ui";
 
 /** Whether an agent in `p` may open `a`: a terminal Command with the Agent toggle on, that `p` offers. */
