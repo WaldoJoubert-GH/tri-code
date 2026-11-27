@@ -14,7 +14,7 @@ import { openGitPanel } from "./git";
 import { openDbWindow } from "./db";
 import { openDockerPanel } from "./docker";
 import { openMonitorPanel } from "./modules/monitor";
-import { openNewsPanel } from "./news";
+import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";
 import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "./agents";
 import { Icon } from "./shared/ui/lucide";

@@ -1,4 +1,4 @@
-/* News window. See src/NewsPanel.tsx; the look comes from design/rss-feed.html, variant A. */
+/* News window. See src/modules/news/NewsPanel.tsx; the look comes from design/rss-feed.html, variant A. */
 
 .mark.news { color: var(--p-marigold); }
 

@@ -33,7 +33,7 @@ import DbPanel from "./DbPanel";
 import DockerPanel from "./DockerPanel";
 import { closeDockerWindow } from "./docker";
 import { MonitorPanel } from "./modules/monitor";
-import NewsPanel from "./NewsPanel";
+import { NewsPanel } from "./modules/news";
 import { CalcPanel } from "./modules/calc";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./db";
 import { gitOf } from "./git";

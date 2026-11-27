@@ -6,22 +6,22 @@
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
 import DOMPurify from "dompurify";
-import { type Project, type Tab } from "./shared/state/state";
+import { type Project, type Tab } from "../../shared/state/state";
 import {
   addFeed, feedById, feeds, fetching, findArticleImage, isRead, lastFetched, loaded, markAllRead, moveFeed, news, refindIcon,
   refresh, removeFeed, setRead, topics as allTopics, unreadOf, updateFeed, watchNews,
 } from "./news";
 import { type NewsFeed, type NewsItem, absolute, ago, plain } from "./newsdata";
-import { openSettings } from "./shared/nav";
-import { guessIcon, hostHue, hostOf, monogram } from "./shared/ui/favicons";
-import { openExternal, openUrlInProject } from "./browsers";
-import { openCtxMenu } from "./shared/ui/ctxmenu";
-import { copyText } from "./shared/ui/clipboard";
-import { Icon } from "./shared/ui/lucide";
-import { Key } from "./shared/keys/Keys";
-import { flash } from "./shared/ui/ui";
+import { openSettings } from "../../shared/nav";
+import { guessIcon, hostHue, hostOf, monogram } from "../../shared/ui/favicons";
+import { openExternal, openUrlInProject } from "../../browsers";
+import { openCtxMenu } from "../../shared/ui/ctxmenu";
+import { copyText } from "../../shared/ui/clipboard";
+import { Icon } from "../../shared/ui/lucide";
+import { Key } from "../../shared/keys/Keys";
+import { flash } from "../../shared/ui/ui";
 import "./news.css";
-import { isEnter } from "./shared/ui/enterkey";
+import { isEnter } from "../../shared/ui/enterkey";
 
 /** Headlines listed at most, newest first. */
 const LIST_MAX = 400;

@@ -3,7 +3,7 @@
 // src-tauri/src/news.rs's.
 
 // The feed type lives in state.ts, which persists it; re-exported for the news files.
-export type { NewsFeed } from "./shared/state/state";
+export type { NewsFeed } from "../../shared/state/state";
 
 /** One item as the Rust side returns it. */
 export type RawItem = { id: string; title: string; link: string; html: string; image?: string | null; published: number; author?: string | null };

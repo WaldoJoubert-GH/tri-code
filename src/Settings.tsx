@@ -15,7 +15,7 @@ import { Caps, KeyList } from "./shared/keys/Keys";
 import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./RemoteSettings";
 import { BrowserPage } from "./profiles";
-import { NewsPage } from "./NewsSettings";
+import { NewsPage } from "./modules/news";
 import { AgentsPage } from "./AgentSettings";
 import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
