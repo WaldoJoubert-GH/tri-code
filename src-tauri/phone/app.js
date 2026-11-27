@@ -87,8 +87,10 @@ const icon = (name) => (snap.icons && snap.icons[name]) || "";
 function applyLook() {
   const look = snap.look || {};
   const root = document.documentElement;
-  if (look.theme === "light" || look.theme === "dark") root.dataset.theme = look.theme;
+  const pinned = look.theme === "light" || look.theme === "dark";
+  if (pinned) root.dataset.theme = look.theme;
   else delete root.dataset.theme;
+  document.querySelector('meta[name="color-scheme"]').content = pinned ? look.theme : "light dark";
   if (look.accentKeys) root.dataset.keys = "accent";
   else delete root.dataset.keys;
   store.set("tri-theme", look.theme || null);

@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <!-- The phone page of Remote Control (src-tauri/src/phone/mod.rs serves it). Plain JS, no build. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<!-- light dark follows the phone; app.js pins it to the desktop's theme. app.css sets color-scheme per data-theme too. -->
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#15171c" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f1f2f5" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +19,13 @@
   const code = new URLSearchParams(location.search).get("pair");
   if (code) document.getElementById("manifest").href = "/manifest.webmanifest?pair=" + encodeURIComponent(code);
   // The desktop's theme from the last visit, before the first paint (app.js keeps it current).
-  try { const t = localStorage.getItem("tri-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
+  try {
+    const t = localStorage.getItem("tri-theme");
+    if (t === "light" || t === "dark") {
+      document.documentElement.dataset.theme = t;
+      document.querySelector('meta[name="color-scheme"]').content = t;
+    }
+  } catch {}
 </script>
 <title>tri-code</title>
 <link rel="stylesheet" href="/xterm.css">

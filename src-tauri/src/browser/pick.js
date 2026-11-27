@@ -491,7 +491,7 @@
 
       function refresh() {
         composer.classList.toggle("on", sel.length > 0);
-        chips.innerHTML = "";
+        chips.replaceChildren();
         sel.forEach((t, i) => {
           const c = document.createElement("span");
           c.className = "chip";
@@ -510,7 +510,7 @@
       let thumbTimer = 0, busy = false, again = false;
       function wantThumbs() {
         clearTimeout(thumbTimer);
-        if (!shotOn || !sel.length) return void (thumbs.innerHTML = "");
+        if (!shotOn || !sel.length) return void thumbs.replaceChildren();
         thumbTimer = setTimeout(takeThumbs, 150);
       }
       function takeThumbs() {
@@ -522,7 +522,7 @@
           busy = false;
           if (again) return (again = false), takeThumbs();
           paint();
-          thumbs.innerHTML = "";
+          thumbs.replaceChildren();
           if (!bmp) return void (thumbs.innerHTML = `<span class="msg">Screenshot failed: ${esc(err || "")}</span>`);
           const s = bmp.width / innerWidth;
           taken.forEach((t, i) => {
@@ -759,7 +759,7 @@
 
       function paintNotes(focusLast) {
         const kept = new Map([...notesEl.querySelectorAll("input")].map((i) => [i.dataset.id, i.value]));
-        notesEl.innerHTML = "";
+        notesEl.replaceChildren();
         pins().forEach((m, i) => {
           if (kept.has(String(m.id))) m.note = kept.get(String(m.id));
           const row = document.createElement("div");
