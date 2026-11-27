@@ -18,7 +18,7 @@ import { focusSession, sendText } from "./terms";
 import { flash } from "./shared/ui/ui";
 import { Icon } from "./shared/ui/lucide";
 import "./files.css";
-import { Key, KeyList } from "./Keys";
+import { Key, KeyList } from "./shared/keys/Keys";
 import { linkHost, linksOf, relIn, rootAt, within } from "./links";
 import { isEnter } from "./shared/ui/enterkey";
 import { Modal } from "./shared/ui/Modal";

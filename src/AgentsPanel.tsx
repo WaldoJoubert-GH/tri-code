@@ -22,9 +22,9 @@ import { EVENTS, playFor, playSound, soundFor, soundName } from "./signals";
 import { SoundSelect } from "./SoundSelect";
 import { Icon, toggleIconPicker } from "./shared/ui/lucide";
 import { flash, showToast } from "./shared/ui/ui";
-import { ctrlName, modDown, modLabel } from "./modkey";
+import { ctrlName, modDown, modLabel } from "./shared/keys/modkey";
 import "./agents.css";
-import { KeyList } from "./Keys";
+import { KeyList } from "./shared/keys/Keys";
 import { isEnter } from "./shared/ui/enterkey";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph"]);

@@ -2,7 +2,7 @@
 // files start with them (defaultAgents); older ones get them once, here.
 
 import { FIRST_AGENT_KEYS, app, setAgentKeys, updateAgent } from "./shared/state/state";
-import { owner, sameChord } from "./keymap";
+import { owner, sameChord } from "./shared/keys/keymap";
 
 /** Once per state.json (after loadState): each of the first two commands gets its key if it has
  *  no hotkey and no action or other command holds that chord. A key removed later stays removed. */

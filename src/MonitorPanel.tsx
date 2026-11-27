@@ -9,7 +9,7 @@ import { endProcess, sample } from "./monitor";
 import { type Proc, type Scope, type Snapshot, type SortKey, bytes, descendants, duration, firstAsc, graphPaths, perSec, pushed, rowsOf, tone } from "./monitordata";
 import { copyText } from "./shared/ui/clipboard";
 import { Icon } from "./shared/ui/lucide";
-import { Key } from "./Keys";
+import { Key } from "./shared/keys/Keys";
 import { flash } from "./shared/ui/ui";
 import "./monitor.css";
 import { isEnter } from "./shared/ui/enterkey";

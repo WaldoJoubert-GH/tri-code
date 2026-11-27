@@ -30,8 +30,8 @@ import { enhance, hasScheme, renderMarkdown, resolvePath } from "./markdown";
 import { directPdf, exportMarkdownPdf, mdExportOf } from "./mdexport";
 import { MdPaper } from "./MdPaper";
 import { openExternal, openUrlInProject } from "./browsers";
-import { capsOf, withKey } from "./keymap";
-import { HoldKey, KeyList } from "./Keys";
+import { capsOf, withKey } from "./shared/keys/keymap";
+import { HoldKey, KeyList } from "./shared/keys/Keys";
 import { ask, flash } from "./shared/ui/ui";
 import { type DiffMode, changeMarks, diffStats, makePatch, parseUnified, sameText } from "./diff";
 import type { Change } from "./csv";
@@ -43,7 +43,7 @@ import { openSheetDb } from "./db";
 import { asProject, hostAt, linkAt, relIn, rootAt, within } from "./links";
 import { redo, undo } from "@codemirror/commands";
 import "./files.css";
-import { ctrlName } from "./modkey";
+import { ctrlName } from "./shared/keys/modkey";
 
 /** What Preview shows: rendered Markdown, HTML or SVG, or a CSV as a table (Table mode). */
 type Preview = "md" | "html" | "svg" | "csv";

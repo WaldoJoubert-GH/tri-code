@@ -18,7 +18,7 @@ import { openExternal, openUrlInProject } from "./browsers";
 import { openCtxMenu } from "./shared/ui/ctxmenu";
 import { copyText } from "./shared/ui/clipboard";
 import { Icon } from "./shared/ui/lucide";
-import { Key } from "./Keys";
+import { Key } from "./shared/keys/Keys";
 import { flash } from "./shared/ui/ui";
 import "./news.css";
 import { isEnter } from "./shared/ui/enterkey";

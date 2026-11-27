@@ -9,14 +9,14 @@ import {
 import { ICON_THEMES, type IconTheme, setPreviewTheme } from "./shared/ui/fileicons";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { requestClose } from "./Canvas";
-import { isMac } from "./modkey";
+import { isMac } from "./shared/keys/modkey";
 import { openAppearance, toggleAppearance } from "./Appearance";
 import { nextSignal, toggleDnd } from "./signals";
 import { toggleSignals } from "./SignalSettings";
 import { openSettings, toggleSettings } from "./nav";
 import { chooseImport, exportConfig } from "./Backup";
 import { SECTIONS } from "./config";
-import { capsOf } from "./keymap";
+import { capsOf } from "./shared/keys/keymap";
 import { setAboutOpen } from "./About";
 import { toggleFeedback } from "./Feedback";
 import { openProjectDialog } from "./OpenProject";

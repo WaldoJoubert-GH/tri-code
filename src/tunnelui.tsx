@@ -10,7 +10,7 @@ import { type Fwd, fwdOfPage, fwds, reconnect, remoteLabel } from "./tunnels";
 import { type Listener, fileUrlOf, parseListening } from "./tunnelmap";
 import { copyText } from "./shared/ui/clipboard";
 import { Icon } from "./shared/ui/lucide";
-import { KeyText } from "./Keys";
+import { KeyText } from "./shared/keys/Keys";
 import { flash } from "./shared/ui/ui";
 
 const STATE_TEXT: Record<Fwd["state"], string> = { opening: "Opening", open: "Open", reconnecting: "Reconnecting", failed: "Failed" };

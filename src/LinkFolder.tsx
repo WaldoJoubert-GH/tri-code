@@ -9,7 +9,7 @@ import { linkName, linkProblem } from "./links";
 import { FolderPicker } from "./OpenProject";
 import { Icon } from "./shared/ui/lucide";
 import { Modal } from "./shared/ui/Modal";
-import { Key } from "./Keys";
+import { Key } from "./shared/keys/Keys";
 import { flash } from "./shared/ui/ui";
 import { isEnter } from "./shared/ui/enterkey";
 

@@ -7,7 +7,7 @@ import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "./share
 import { browserInfo } from "./browsers";
 import { flash } from "./shared/ui/ui";
 import { guessIcon } from "./shared/ui/favicons";
-import { Key, KeyText } from "./Keys";
+import { Key, KeyText } from "./shared/keys/Keys";
 import { isEnter } from "./shared/ui/enterkey";
 
 const ICON_COLOURS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#2ac3de", "#ff9e64", "#e0af68", "#73daca"];

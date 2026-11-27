@@ -24,8 +24,8 @@ import { Icon } from "./shared/ui/lucide";
 import { highlight, theme } from "./cm";
 import { ask, flash } from "./shared/ui/ui";
 import "./db.css";
-import { Key, KeyText } from "./Keys";
-import { ctrlName } from "./modkey";
+import { Key, KeyText } from "./shared/keys/Keys";
+import { ctrlName } from "./shared/keys/modkey";
 import { isEnter } from "./shared/ui/enterkey";
 
 const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", mysql: "MYSQL", sqlite: "SQLITE", mongo: "MONGO" };

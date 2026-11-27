@@ -9,11 +9,11 @@ import { openProjectDialog } from "./OpenProject";
 import { dropProject } from "./projects";
 import { askDemo } from "./terms";
 import { flash } from "./shared/ui/ui";
-import { Caps, Key } from "./Keys";
-import { flashHints, hintsShown } from "./hints";
+import { Caps, Key } from "./shared/keys/Keys";
+import { flashHints, hintsShown } from "./shared/keys/hints";
 import { runHotkey } from "./hotkeys";
 import { tabMenuOpen, toggleTabMenu } from "./tabs";
-import { modLabel } from "./modkey";
+import { modLabel } from "./shared/keys/modkey";
 import { Modal } from "./shared/ui/Modal";
 
 const [step, setStep] = createSignal(0);

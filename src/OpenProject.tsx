@@ -15,7 +15,7 @@ import { Icon } from "./shared/ui/lucide";
 import { Modal } from "./shared/ui/Modal";
 import { autoIcon } from "./shared/ui/icons";
 import { flash } from "./shared/ui/ui";
-import { Key } from "./Keys";
+import { Key } from "./shared/keys/Keys";
 import { addLines, caselessPath, isRepoUrl, nameProblem, progress, repoFolder, shortUrl, type CloneLine } from "./newfolder";
 import { isEnter } from "./shared/ui/enterkey";
 

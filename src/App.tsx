@@ -54,9 +54,9 @@ import { applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } 
 import { applyLook, themeOf } from "./look";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { clock, closeToast, flash, flashMsg, startClock, toast, undoToast } from "./shared/ui/ui";
-import { keyOf, withKey } from "./keymap";
-import { Caps, HoldFace, HoldKey } from "./Keys";
-import { hintsShown, holdMenuShown } from "./hints";
+import { keyOf, withKey } from "./shared/keys/keymap";
+import { Caps, HoldFace, HoldKey } from "./shared/keys/Keys";
+import { hintsShown, holdMenuShown } from "./shared/keys/hints";
 import { appVersion, askRestart, installUpdate, startUpdateChecks, updateReady } from "./updater";
 import { RestartDialog } from "./RestartDialog";
 import { type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";

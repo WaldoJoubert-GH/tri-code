@@ -3,7 +3,7 @@
 // `settings.hotkeys` and the rest keep their defaults. Window actions are Hotkey Modifier chords
 // (modkey.ts); the text actions are plain Ctrl / Cmd chords that reach the focused window.
 
-import { type Chord, app, setHotkeys } from "./shared/state/state";
+import { type Chord, app, setHotkeys } from "../state/state";
 import { isMac, metaName, modDown, modLabel } from "./modkey";
 
 export type Action = { id: string; group: string; desc: string; def: Chord[]; text?: true; seq?: true };

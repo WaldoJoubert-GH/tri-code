@@ -15,8 +15,8 @@ import { terminalFont } from "./look";
 import { onSignal } from "./signals";
 import { copyText, readImagePng, readText } from "./shared/ui/clipboard";
 import { Demo, playDemo } from "./demo";
-import { isKey } from "./keymap";
-import { isMac } from "./modkey";
+import { isKey } from "./shared/keys/keymap";
+import { isMac } from "./shared/keys/modkey";
 import { rescanSoon } from "./leftovers";
 
 const SSH_CONNECTION_FAILED = 255;

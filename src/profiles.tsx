@@ -10,7 +10,7 @@ import {
 } from "./shared/state/state";
 import { applyProfileAutofill, browserInfo, debugSupport, leaveProfile, nativeBrowsers, profilesSupported } from "./browsers";
 import { freePort, setDebugPort } from "./debugmenu";
-import { isMac } from "./modkey";
+import { isMac } from "./shared/keys/modkey";
 import { Icon, toggleIconPicker } from "./shared/ui/lucide";
 import { openSettings } from "./nav";
 import { flash } from "./shared/ui/ui";

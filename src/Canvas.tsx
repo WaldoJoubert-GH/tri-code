@@ -7,9 +7,9 @@ import {
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
 import { clock, flash, showToast } from "./shared/ui/ui";
-import { hintKeys, withKey } from "./keymap";
-import { Caps, HintCaps } from "./Keys";
-import { hintsShown } from "./hints";
+import { hintKeys, withKey } from "./shared/keys/keymap";
+import { Caps, HintCaps } from "./shared/keys/Keys";
+import { hintsShown } from "./shared/keys/hints";
 import {
   browserInfo, nativeBrowsers, closeBrowser, closePage, browserBack, browserForward, browserReload, navigateBrowser,
   addressToUrl, answerPassword, openExternalIn, passwordPrompts, pickElement, placeBrowser, screenshotPage, profilesSupported, setBrowsersSuspended,

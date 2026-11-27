@@ -23,10 +23,10 @@ import { removeWorktree } from "./worktrees";
 import { type DiffMode, diffStats, firstChange, parseUnified } from "./diff";
 import DiffView, { type Drill, diffKeys, stepHunk } from "./DiffView";
 import { flash } from "./shared/ui/ui";
-import { withKey } from "./keymap";
-import { HoldKey, KeyText } from "./Keys";
+import { withKey } from "./shared/keys/keymap";
+import { HoldKey, KeyText } from "./shared/keys/Keys";
 import "./git.css";
-import { ctrlName } from "./modkey";
+import { ctrlName } from "./shared/keys/modkey";
 import { isEnter } from "./shared/ui/enterkey";
 import { Icon } from "./shared/ui/lucide";
 

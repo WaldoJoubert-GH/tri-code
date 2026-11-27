@@ -10,7 +10,7 @@ import {
   pageDebug, pageOrigin, restartProfile, sendErrorsToAgent, setNoCache, setThrottle,
 } from "./browsers";
 import { ProfileAvatar } from "./profiles";
-import { Key } from "./Keys";
+import { Key } from "./shared/keys/Keys";
 import { Icon } from "./shared/ui/lucide";
 import { openSettings } from "./nav";
 import { copyText } from "./shared/ui/clipboard";

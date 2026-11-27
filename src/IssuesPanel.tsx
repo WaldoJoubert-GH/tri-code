@@ -21,7 +21,7 @@ import { sendText } from "./terms";
 import { Icon } from "./shared/ui/lucide";
 import { clock, flash } from "./shared/ui/ui";
 import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";
-import { Key } from "./Keys";
+import { Key } from "./shared/keys/Keys";
 import { isEnter } from "./shared/ui/enterkey";
 
 // ── small presentational pieces ─────────────────────────────────────

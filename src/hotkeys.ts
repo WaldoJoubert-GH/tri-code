@@ -42,12 +42,12 @@ import { closeLeftovers, leftoversOpen } from "./leftovers";
 import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./media";
 import { flash } from "./shared/ui/ui";
 import { hasSelection } from "./terms";
-import { ACTIONS, BROWSER_ACTIONS, actionFor, editorKey, isKey, keysOf } from "./keymap";
+import { ACTIONS, BROWSER_ACTIONS, actionFor, editorKey, isKey, keysOf } from "./shared/keys/keymap";
 import { browserKeys, focusApp, nativeBrowsers, pageOfLabel } from "./browsers";
 import { createEffect, createRoot } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import { hintChord, hintDown, hintsShown, hintUp, isHintModifier } from "./hints";
-import { modDown } from "./modkey";
+import { hintChord, hintDown, hintsShown, hintUp, isHintModifier } from "./shared/keys/hints";
+import { modDown } from "./shared/keys/modkey";
 
 const DIRS: Record<string, [number, number]> = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
 

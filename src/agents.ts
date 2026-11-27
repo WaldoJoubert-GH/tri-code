@@ -7,8 +7,8 @@ import { createSignal } from "solid-js";
 import { Agent, Hotkey, Project, addAgent, addTab, app, focusTab, isWebApp, newId } from "./shared/state/state";
 import { normalizeUrl } from "./urls";
 import { flash } from "./shared/ui/ui";
-import { modDown } from "./modkey";
-import { actionById, chordKeys, chordProblem, chordText, owner, sameChord, withKey } from "./keymap";
+import { modDown } from "./shared/keys/modkey";
+import { actionById, chordKeys, chordProblem, chordText, owner, sameChord, withKey } from "./shared/keys/keymap";
 import { chordHolder, offeredIn, sameScope } from "./scope";
 
 export { nameProblem, offeredIn, offeredTogether, reaches, replaceNote, sameScope, scopeIcon, scopeLabel } from "./scope";

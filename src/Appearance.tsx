@@ -14,7 +14,7 @@ import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogo
 import { Icon, toggleIconPicker } from "./shared/ui/lucide";
 import { SignalsForm } from "./SignalSettings";
 import { flash } from "./shared/ui/ui";
-import { keyOf } from "./keymap";
+import { keyOf } from "./shared/keys/keymap";
 import { isEnter } from "./shared/ui/enterkey";
 
 const tint = (a: string, p: number) => `color-mix(in srgb, ${a} ${p}%, transparent)`;

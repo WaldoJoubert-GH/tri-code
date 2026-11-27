@@ -20,9 +20,9 @@ import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } fr
 import { Icon } from "./shared/ui/lucide";
 import { SIG_TEXT, sigOf } from "./signals";
 import { flash } from "./shared/ui/ui";
-import { groupKeys, heldKeys } from "./keymap";
-import { Caps, HoldFace, KeyList } from "./Keys";
-import { hintChord, hintsShown, holdMenuShown } from "./hints";
+import { groupKeys, heldKeys } from "./shared/keys/keymap";
+import { Caps, HoldFace, KeyList } from "./shared/keys/Keys";
+import { hintChord, hintsShown, holdMenuShown } from "./shared/keys/hints";
 
 /** Glyphs of the windows that aren't terminals (those show their agent's icon). */
 const GLYPH: Record<Exclude<TabKind, "term">, string> = {

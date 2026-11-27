@@ -10,7 +10,7 @@ import { createStore } from "solid-js/store";
 import { openExternal } from "./browsers";
 import { appVersion } from "./updater";
 import { flash, showToast } from "./shared/ui/ui";
-import { KeyText } from "./Keys";
+import { KeyText } from "./shared/keys/Keys";
 
 const REPO = "WaldoJoubert-GH/tri-code";
 const KINDS = { bug: { name: "Bug", label: "bug", ask: "What went wrong?" }, idea: { name: "Idea", label: "enhancement", ask: "What would you like?" } };

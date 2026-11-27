@@ -5,7 +5,7 @@
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Icon } from "./shared/ui/lucide";
-import { KeyList } from "./Keys";
+import { KeyList } from "./shared/keys/Keys";
 import {
   type MediaSession, clock, closeMediaPop, currentMedia, dismissMedia, mediaControl, mediaPopAnchor, mediaPopOpen, mediaSessions,
   mediaShown, pickMedia, positionOf, progressOf, toggleMediaPop,
