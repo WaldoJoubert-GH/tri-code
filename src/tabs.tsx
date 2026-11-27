@@ -9,7 +9,7 @@ import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focu
 import { profileColor, profilesInUse } from "./profiles";
 import { nativeBrowsers } from "./browsers";
 import { openEditor } from "./files";
-import { openIssuePanel } from "./issues";
+import { openIssuePanel } from "./modules/issues";
 import { openGitPanel } from "./git";
 import { openDbWindow } from "./modules/db";
 import { openDockerPanel } from "./modules/docker";

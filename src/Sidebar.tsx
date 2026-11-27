@@ -7,7 +7,7 @@ import {
 } from "./shared/state/state";
 import { setBrowsersCovered } from "./browsers";
 import { appearanceOpen, closeAppearance, openAppearance } from "./Appearance";
-import { dev, isActive, sourcesOf, stateOf } from "./issues";
+import { dev, isActive, sourcesOf, stateOf } from "./modules/issues";
 import { IconFace } from "./shared/ui/icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./shared/ui/lucide";
 import { Caps, HoldFace } from "./shared/keys/Keys";

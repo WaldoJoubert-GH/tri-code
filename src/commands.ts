@@ -21,7 +21,7 @@ import { setAboutOpen } from "./About";
 import { toggleFeedback } from "./Feedback";
 import { openProjectDialog } from "./OpenProject";
 import { toggleSidebar } from "./Sidebar";
-import { openIssuePanel } from "./issues";
+import { openIssuePanel } from "./modules/issues";
 import { openEditor } from "./files";
 import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";

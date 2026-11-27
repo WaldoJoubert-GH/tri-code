@@ -21,7 +21,7 @@ import { closeTunnelPop, tunnelPopOpen } from "./tunnelui";
 import { closeProfileMenu, profileMenuOpen } from "./profiles";
 import { closeDebugMenu, debugMenuOpen } from "./debugmenu";
 import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
-import { openIssuePanel } from "./issues";
+import { openIssuePanel } from "./modules/issues";
 import { openEditor } from "./files";
 import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";

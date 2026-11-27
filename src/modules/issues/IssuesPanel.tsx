@@ -4,8 +4,8 @@
 // terminal, so plain keys drive it while the window is focused.
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js";
-import { type Project, type Tab, focusTab, setTabTimeline, space, tabName } from "./shared/state/state";
-import { agentTarget } from "./agents";
+import { type Project, type Tab, focusTab, setTabTimeline, space, tabName } from "../../shared/state/state";
+import { agentTarget } from "../../agents";
 import {
   ACTIVE_GROUPS, DEFAULT_PROGRESS_LABEL, LEVEL_COLORS, PRIORITY_COLORS, SOURCES, SOURCE_NAMES, type DevState,
   type GithubIssue, type NewIssue, type PlaneIssue, type PlaneLabel, type PlaneState, type SortOrder, type Source, type SourceFilter,
@@ -16,13 +16,13 @@ import {
   runningEntry, saveSources, searchIssues, setDraftText, setIssueDates, setIssueState, setPendingIssue, shownIssues, slugOf, sourcesOf,
   statesFor, statusStopsOf, stateOf, syncDev, syncNow, toggleLabel, toggleTimer, updateIssue,
 } from "./issues";
-import { openUrlInProject } from "./browsers";
-import { sendText } from "./terms";
-import { Icon } from "./shared/ui/lucide";
-import { clock, flash } from "./shared/ui/ui";
+import { openUrlInProject } from "../../browsers";
+import { sendText } from "../../terms";
+import { Icon } from "../../shared/ui/lucide";
+import { clock, flash } from "../../shared/ui/ui";
 import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";
-import { Key } from "./shared/keys/Keys";
-import { isEnter } from "./shared/ui/enterkey";
+import { Key } from "../../shared/keys/Keys";
+import { isEnter } from "../../shared/ui/enterkey";
 
 // ── small presentational pieces ─────────────────────────────────────
 

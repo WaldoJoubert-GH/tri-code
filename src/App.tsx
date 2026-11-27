@@ -62,7 +62,7 @@ import { RestartDialog } from "./RestartDialog";
 import { type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
 import {
   dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, stateOf, todayTotal,
-} from "./issues";
+} from "./modules/issues";
 
 export default function App() {
   const [ready, setReady] = createSignal(false);

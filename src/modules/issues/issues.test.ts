@@ -1,5 +1,5 @@
 // bun test: the issues panel's list rules: the Status and Source filters, the search dropdown,
-// the created-date sort, and how assignees resolve to names (src/issues.ts).
+// the created-date sort, and how assignees resolve to names (src/modules/issues/issues.ts).
 
 import { describe, expect, test } from "bun:test";
 import { type DevState, type GithubIssue, type UnifiedIssue, assigneesOf, editOf, searchIssues, shownIssues, statusStopsOf } from "./issues";

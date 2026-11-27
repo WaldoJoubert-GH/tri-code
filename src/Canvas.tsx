@@ -21,7 +21,7 @@ import { RemoteStart, TunnelBar, TunnelChip, TunnelHeld } from "./tunnelui";
 import { Icon } from "./shared/ui/lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
 import { runsInSandbox, sandboxOf } from "./modules/sandbox";
-import IssuesPanel from "./IssuesPanel";
+import { IssuesPanel, dev, panelTitle } from "./modules/issues";
 import { dirtyCount, dropEditor } from "./files";
 import { isEnter } from "./shared/ui/enterkey";
 
@@ -36,7 +36,6 @@ import { NewsPanel } from "./modules/news";
 import { CalcPanel } from "./modules/calc";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./modules/db";
 import { gitOf } from "./git";
-import { dev, panelTitle } from "./issues";
 import { SIG_TEXT, sigOf } from "./signals";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
 import { DownloadBar, DownloadButton, forgetDownloads } from "./downloads";

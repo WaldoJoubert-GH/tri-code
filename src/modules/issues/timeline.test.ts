@@ -1,4 +1,4 @@
-// bun test: where the Issues Panel's Timeline puts each bar (src/timeline.ts).
+// bun test: where the Issues Panel's Timeline puts each bar (src/modules/issues/timeline.ts).
 
 import { describe, expect, test } from "bun:test";
 import { type DevState, type UnifiedIssue } from "./issues";

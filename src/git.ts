@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { createStore, produce } from "solid-js/store";
 import { type DraftKind, type Project, addTab, draftCommand, focusTab, repoOf } from "./shared/state/state";
 import { copyText } from "./shared/ui/clipboard";
-import { devOf, inProgress, slugOf } from "./issues";
+import { devOf, inProgress, slugOf } from "./modules/issues";
 import { flash, showToast } from "./shared/ui/ui";
 import { bumpRepoEpoch, invalidateRepos } from "./repos";
 

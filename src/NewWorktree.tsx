@@ -11,7 +11,7 @@ import { app, projectById, setBranchPrefix, setCopyIgnored, setWorktreeSetup, wo
 import { branches, cleanPrefix, closeNewWorktree, createWorktree, fetching, ignored, issueBranch, kinds, listed, newWorktreeFor, setupFor, toBranch, worktreeDir } from "./worktrees";
 import { BIG, fileSize, filterIgnored, splitPath, startingTicks } from "./ignored";
 import { SETUP_VARS } from "./setup";
-import { dev, inProgress, slugOf } from "./issues";
+import { dev, inProgress, slugOf } from "./modules/issues";
 import { gitOf } from "./git";
 import { Icon } from "./shared/ui/lucide";
 import { Modal } from "./shared/ui/Modal";
