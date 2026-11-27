@@ -1,4 +1,4 @@
-// Small shared UI signals: the status-line flash message and the undo toast.
+// Small shared UI signals: the status-line flash message, the undo toast and the 1s clock.
 
 import { createSignal } from "solid-js";
 import { confirm } from "@tauri-apps/plugin-dialog";
@@ -46,6 +46,15 @@ export function closeToast() {
   pendingExpire = undefined;
   setToastSig(null);
   f?.();
+}
+
+/** One shared 1s clock for the running timer, "synced Xm ago" and timed unlocks. */
+export const [clock, setClock] = createSignal(Date.now());
+let clockStarted = false;
+export function startClock() {
+  if (clockStarted) return;
+  clockStarted = true;
+  setInterval(() => setClock(Date.now()), 1000);
 }
 
 /** Called by the toast's Undo button. */

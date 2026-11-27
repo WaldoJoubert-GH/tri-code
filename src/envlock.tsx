@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { For, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
 import { app, envName } from "./state";
-import { clock } from "./issues";
+import { clock } from "./ui";
 import { Icon } from "./lucide";
 
 /** Unlocked hosts, until when (ms). Runtime only, so a restart locks every PIN'd environment again. */

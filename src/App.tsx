@@ -53,7 +53,7 @@ import { Welcome, openWelcome } from "./Welcome";
 import { applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
 import { applyLook, themeOf } from "./look";
 import { PinPad, envLocked, syncEnvs } from "./envlock";
-import { closeToast, flash, flashMsg, toast, undoToast } from "./ui";
+import { clock, closeToast, flash, flashMsg, startClock, toast, undoToast } from "./ui";
 import { keyOf, withKey } from "./keymap";
 import { Caps, HoldFace, HoldKey } from "./Keys";
 import { hintsShown, holdMenuShown } from "./hints";
@@ -61,7 +61,7 @@ import { appVersion, askRestart, installUpdate, startUpdateChecks, updateReady }
 import { RestartDialog } from "./RestartDialog";
 import { type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
 import {
-  clock, dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, startClock, stateOf, todayTotal,
+  dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, stateOf, todayTotal,
 } from "./issues";
 
 export default function App() {

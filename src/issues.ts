@@ -13,7 +13,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { type Project, addTab, focusTab } from "./state";
-import { flash } from "./ui";
+import { clock, flash } from "./ui";
 
 // ── types (the shapes in .dev/) ─────────────────────────────────────
 
@@ -434,15 +434,6 @@ const changeKey = (projectId: string, issue: TrackedIssue) => `${projectId}/${is
 export function changingTo(projectId: string, issue: TrackedIssue): PlaneState | undefined {
   const id = stateChanges[changeKey(projectId, issue)];
   return id ? statesFor(dev[projectId], issue.source).find((s) => s.id === id) : undefined;
-}
-
-/** One shared 1s clock for the running timer and "synced Xm ago". */
-export const [clock, setClock] = createSignal(Date.now());
-let clockStarted = false;
-export function startClock() {
-  if (clockStarted) return;
-  clockStarted = true;
-  setInterval(() => setClock(Date.now()), 1000);
 }
 
 /** The issue the toolbar or sidebar asked the panel to open; cleared by the panel. */

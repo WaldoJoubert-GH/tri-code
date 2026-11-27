@@ -6,7 +6,7 @@ import {
 } from "./state";
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
-import { flash, showToast } from "./ui";
+import { clock, flash, showToast } from "./ui";
 import { hintKeys, withKey } from "./keymap";
 import { Caps, HintCaps } from "./Keys";
 import { hintsShown } from "./hints";
@@ -37,7 +37,7 @@ import NewsPanel from "./NewsPanel";
 import CalcPanel from "./CalcPanel";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./db";
 import { gitOf } from "./git";
-import { clock, dev, panelTitle } from "./issues";
+import { dev, panelTitle } from "./issues";
 import { SIG_TEXT, sigOf } from "./signals";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
 import { DownloadBar, DownloadButton, forgetDownloads } from "./downloads";

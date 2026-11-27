@@ -10,7 +10,7 @@ import {
   ACTIVE_GROUPS, DEFAULT_PROGRESS_LABEL, LEVEL_COLORS, PRIORITY_COLORS, SOURCES, SOURCE_NAMES, type DevState,
   type GithubIssue, type NewIssue, type PlaneIssue, type PlaneLabel, type PlaneState, type SortOrder, type Source, type SourceFilter,
   type StatusFilter, type TrackedIssue, type UnifiedIssue,
-  accumulatedMs, addDraftImage, ago, assigneesOf, avatarColor, changingTo, clearDraft, clock, commentsOf, createIssue, dev,
+  accumulatedMs, addDraftImage, ago, assigneesOf, avatarColor, changingTo, clearDraft, commentsOf, createIssue, dev,
   draftOf, ensureComments, fgFor, filtersOf, formatDay, formatHm, formatHms, getDraft, guessRepo, initials, isActive,
   issueKey, issueLabels, labelOf, labelsFor, loadDev, membersFor, pendingIssue, postComment, priorityRank, removeDraftImage,
   runningEntry, saveSources, searchIssues, setDraftText, setIssueDates, setIssueState, setPendingIssue, shownIssues, slugOf, sourcesOf,
@@ -19,7 +19,7 @@ import {
 import { openUrlInProject } from "./browsers";
 import { sendText } from "./terms";
 import { Icon } from "./lucide";
-import { flash } from "./ui";
+import { clock, flash } from "./ui";
 import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";
 import { Key } from "./Keys";
 import { isEnter } from "./enterkey";
