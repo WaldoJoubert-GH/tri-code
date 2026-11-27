@@ -145,35 +145,15 @@ Frontend checks: `bun run typecheck` for TypeScript and `bun run build` for a Vi
 
 Layout:
 
-`src/`
+`src/` (see `docs/blueprint.md` for the folder rules)
 
-- `index.tsx`: entry point. Mounts the app and loads the xterm and app stylesheets.
-- `App.tsx`: sidebar, tab bar, terminal host.
-- `Sidebar.tsx`: projects grouped by environment, rename in place, and each repo's worktrees under it (stacked tiles on the rail).
-- `worktrees.ts`: worktrees: `git worktree list` per repo, the branch names, create and remove; a copy for a folder that isn't a repo, and finishing it.
-- `NewWorktree.tsx`: the New worktree dialog (`Alt+Shift+W`).
-- `OpenProject.tsx`: the Open project dialog (`Alt+O`): environments and the folder picker.
-- `EnvDialog.tsx`, `envform.ts`: the New and Edit environment dialog, and its rules.
-- `icons.tsx`: project icons: logo scan, auto pick, upload, and the icon face drawn in the sidebar.
-- `Appearance.tsx`: the Appearance panel: name, icon, accent, background, dim, and the project's Signals tab.
-- `signals.ts`: agent signals: what each window signals, the sounds (synthesized, or a project's uploaded file), desktop notifications, and `Alt+U`.
-- `SignalSettings.tsx`: the signals form, shared by the status line's bell (every project) and Appearance › Signals (one project).
-- `keymap.ts`: the Keymap: every hotkey action, its default keys and its keys now, and matching a key press to one.
-- `modkey.ts`: the Hotkey Modifier (Alt or Cmd / Win / Super).
-- `hotkeys.ts`: the window keydown listener that runs Keymap actions, and the modifier's hold (`hints.ts`).
-- `hints.ts`: the Hold Hints: holding the Hotkey Modifier turns each control's icon into its key (`HoldFace` in `Keys.tsx`).
-- `Keys.tsx`: the Keycap, the one way the app draws a key.
-- `Settings.tsx`: the Settings dialog (General, Windows, Hotkeys); `HotkeySettings.tsx` is its Hotkeys page. `look.ts` applies the theme and fonts from its Appearance page.
-- `state.ts`: Solid stores for projects, tabs, and live tab status. Loads and debounced-saves the state file.
-- `terms.ts`: one xterm and one PTY per tab. Handles output, resize, reconnect backoff, bell detection, OSC 7501 agent status (answering the probe, keeping the last report), and the WebGL renderer for the visible tab only.
-- `timeline.ts`: where the Timeline puts each issue's bar, in days (pure, tested).
-- `issues.ts`: the `.dev/` store, the Plane and GitHub syncs and Local issues, plus the pure helpers (each Source's States, sort order, State Pill contrast, Slug-ID).
-- `IssuesPanel.tsx`: the issues window: the list and its Timeline, the full-width drill-down, the State Dropdown, labels, the comment thread, and the Issue Sources form.
-- `updater.ts`: the update check (periodic and on demand), background download, and "Restart to update".
-- `About.tsx`: the About dialog: the running version, "Check for updates", and `CHANGELOG.md`.
-- `Tour.tsx`: the tour: its six stops, the spotlight and card, the try-it checks, and the closing card.
-- `demo.ts`: the tour's scripted terminals (claude, pi, a dev server), played into xterm in place of a PTY, with real OSC 7501 reports.
-- `styles.css`: application styles.
+- `index.tsx`, `App.tsx`, `Canvas.tsx`, `Sidebar.tsx`, `tabs.tsx`: the entry point, the app shell, the window frames and the tab strip. With `hotkeys.ts` (the keydown listener that runs Keymap actions), `commands.ts` and `Palette.tsx` (the Command Palette), `Settings.tsx` and its pages, `updater.ts`, `About.tsx` and the `tri` Command (`cli.ts`), they still sit at the top of `src/`; they move to `src/app/` next.
+- `shared/`: what two or more modules use. `state/state.ts` (the Solid stores, loading and saving the state file, and `dropProject`), `ui/` (dialogs, menus, toasts, project and file icons), `keys/` (the Keymap, the Hotkey Modifier, Hold Hints and the Keycap), `text/` (diff, Markdown, CSV), `codemirror/` (the editor kit and Grammar Catalog), `links.ts` (Linked Folders), `nav.ts` (the open Settings page and New window menu), and the Look.
+- `modules/<name>/`: one folder per module, entered only through its `index.ts`. Each holds its logic, windows, dialogs, CSS, tests and Settings page:
+  - `terminal/`: one xterm and one PTY per tab (`terms.ts`): output, resize, reconnect backoff, bell detection, OSC 7501 agent status, the WebGL renderer for the visible tab only; the tour's scripted terminals (`demo.ts`).
+  - `agents/` (Commands), `signals/` (Agent Signals, the sounds, notifications and `Alt+U`), `browser/`, `editor/`, `git/`, `issues/` (the `.dev/` store, the Plane and GitHub syncs, Local issues, the issues window and its Timeline), `linked-folders/`, `environments/` (the Environment and Open Project dialogs, Environment Lock), `worktrees/` (`git worktree list` per repo, create and remove, the New Worktree dialog), `leftovers/`, `phone/` (Remote Control), `appearance/` (the Appearance panel and Backdrop).
+  - `db/`, `docker/`, `monitor/`, `news/`, `calc/`, `media/`, `sandbox/`, `usage/`, `welcome/`, `tour/` (its six stops, the spotlight and the try-it checks).
+- `styles.css`, `canvas.css`, `files.css`: the shared stylesheets, until they are split by module.
 - `vite-env.d.ts`: Vite type declarations.
 
 `src-tauri/src/`
