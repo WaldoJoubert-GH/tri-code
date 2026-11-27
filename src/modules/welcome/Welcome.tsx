@@ -19,7 +19,7 @@ import { EVENTS, playSound } from "../../signals";
 import { SoundSelect } from "../../SoundSelect";
 import { openEnvDialog } from "../../EnvDialog";
 import { openProjectDialog } from "../../OpenProject";
-import { startTour } from "../../Tour";
+import { startTour } from "../tour";
 import { Icon } from "../../shared/ui/lucide";
 import { Modal } from "../../shared/ui/Modal";
 import { linksOn } from "../../links";

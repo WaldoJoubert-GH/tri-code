@@ -1071,7 +1071,7 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
   .bg { transition: none; }
 }
 
-/* Tour (src/Tour.tsx, design/tour.html): a spotlight over the app and a card
+/* Tour (src/modules/tour/Tour.tsx, design/tour.html): a spotlight over the app and a card
    beside it. Under the popovers (10000) and dialogs (9999), so the ones a stop opens stay usable;
    the spotlight lets clicks through, so you can try each stop while it is up. */
 .tour-spot {

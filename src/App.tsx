@@ -48,7 +48,7 @@ import { ProfileMenu, profileMenuOpen } from "./profiles";
 import { DebugMenu, debugMenuOpen } from "./debugmenu";
 import { DownloadMenu, downloadMenuOpen } from "./downloads";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
-import { Tour, startTour, tourOpen } from "./Tour";
+import { Tour, startTour, tourOpen } from "./modules/tour";
 import { Welcome, openWelcome } from "./modules/welcome";
 import { applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
 import { applyLook, themeOf } from "./shared/look";
