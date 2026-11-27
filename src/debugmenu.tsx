@@ -12,7 +12,7 @@ import {
 import { ProfileAvatar } from "./profiles";
 import { Key } from "./Keys";
 import { Icon } from "./lucide";
-import { openSettings } from "./Settings";
+import { openSettings } from "./nav";
 import { copyText } from "./clipboard";
 import { flash } from "./ui";
 

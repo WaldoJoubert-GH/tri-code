@@ -13,6 +13,7 @@ import {
   type Template, SIGNIN_BOX, connectGithub, listTemplates, removeTemplate, sandboxByDefault, signInBox, signOutClaude, sandboxFolders, sbxState, serviceLabel, setSecret, stopSandbox,
 } from "./sandbox";
 import { flash } from "./ui";
+import { closeSettings } from "./nav";
 import { isEnter } from "./enterkey";
 
 const windows = /Windows/i.test(navigator.userAgent);
@@ -33,7 +34,7 @@ async function inTerminal(host: string, name: string, command: string) {
   if (!p) return flash(`open a project on ${hostName(host)} first: the step runs in one of its terminals`);
   const id = addTab(p.id, "term", { agent: { id: `sbx-${name}`, name, command, icon: "shield" } });
   focusTab(p.id, id);
-  (await import("./Settings")).closeSettings();
+  closeSettings();
 }
 
 const INSTALL = windows ? "winget install -h Docker.sbx" : mac ? "brew trust docker/tap\nbrew install docker/tap/sbx" : "";

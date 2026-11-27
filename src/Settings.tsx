@@ -4,7 +4,7 @@
 // design/settings-appearance.html.
 
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, batch, createResource, createSignal } from "solid-js";
+import { For, Show, batch, createResource } from "solid-js";
 import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setMedia, setLinkedFolders, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./state";
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
@@ -21,7 +21,8 @@ import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
 import { SandboxPage } from "./SandboxSettings";
 import { LanguagesPage } from "./LangSettings";
-import { PREVIEWS, previewOn, sandboxPreview } from "./preview";
+import { PREVIEWS, previewOn } from "./preview";
+import { type SettingsPage, closeSettings, pageShown, setSettingsPage, settingsPage } from "./nav";
 import { SignalsForm } from "./SignalSettings";
 import { openEnvDialog } from "./EnvDialog";
 import { openWelcome } from "./Welcome";
@@ -29,11 +30,6 @@ import { ICON_THEMES, type IconTheme } from "./fileicons";
 import { FileIcon } from "./FileList";
 import "./files.css";
 import { linksOn } from "./links";
-
-export type SettingsPage = "appearance" | "windows" | "agents" | "environments" | "files" | "languages" | "git" | "sandbox" | "signals" | "browser" | "remote" | "cli" | "hotkeys" | "backup" | "preview" | "news";
-
-/** Pages that belong to a preview feature: listed only while it is on. */
-const shown = (p: SettingsPage) => p !== "sandbox" || sandboxPreview();
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "appearance", name: "Appearance", icon: "palette" },
@@ -53,23 +49,6 @@ const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "backup", name: "Backup", icon: "archive" },
   { page: "preview", name: "Preview", icon: "flask-conical" },
 ];
-
-const [page, setPage] = createSignal<SettingsPage | null>(null);
-let lastPage: SettingsPage = "windows";
-
-export const settingsOpen = () => page() !== null;
-export const hotkeysOpen = () => page() === "hotkeys";
-
-export function closeSettings() {
-  if (page()) lastPage = page()!;
-  setPage(null);
-}
-
-/** Open on `page`, or the page used last (Windows when that page is hidden now). */
-export function openSettings(p?: SettingsPage) {
-  const want = p ?? lastPage;
-  setPage(shown(want) ? want : "windows");
-}
 
 /** Settings › Preview: each preview feature with its own switch, all off until turned on. */
 function PreviewPage() {
@@ -98,18 +77,6 @@ function PreviewPage() {
       </For>
     </>
   );
-}
-
-/** The sidebar button and the palette: open on the last page, or close. */
-export function toggleSettings() {
-  if (settingsOpen()) closeSettings();
-  else openSettings();
-}
-
-/** The ? button and the "help" hotkey: open on Hotkeys, or close it. */
-export function toggleHotkeys() {
-  if (hotkeysOpen()) closeSettings();
-  else openSettings("hotkeys");
 }
 
 const THEMES: { theme: Theme; name: string; icon: string; title: string }[] = [
@@ -587,7 +554,7 @@ function WindowsPage() {
 /** Mount once (in App). Closes on a click outside it; Escape is handled in hotkeys.ts. */
 export function SettingsDialog() {
   return (
-    <Show when={page()}>
+    <Show when={settingsPage()}>
       {(p) => (
         <Modal label="Settings" onClose={closeSettings}>
           <div class="settings-dlg">
@@ -596,9 +563,9 @@ export function SettingsDialog() {
               <button type="button" class="x" title="Close (Esc)" aria-label="Close" onClick={closeSettings}>×</button>
             </header>
             <nav aria-label="Settings pages">
-              <For each={PAGES.filter((o) => shown(o.page))}>
+              <For each={PAGES.filter((o) => pageShown(o.page))}>
                 {(o) => (
-                  <button type="button" aria-current={p() === o.page ? "page" : undefined} onClick={() => setPage(o.page)}>
+                  <button type="button" aria-current={p() === o.page ? "page" : undefined} onClick={() => setSettingsPage(o.page)}>
                     <Icon name={o.icon} size={14} />
                     {o.name}
                     <Show when={o.page === "hotkeys"}><Caps id="help" /></Show>
@@ -618,7 +585,7 @@ export function SettingsDialog() {
               <Show when={p() === "files"}><FilesPage /></Show>
               <Show when={p() === "languages"}><LanguagesPage /></Show>
               <Show when={p() === "git"}><GitPage /></Show>
-              <Show when={p() === "sandbox" && shown("sandbox")}><SandboxPage /></Show>
+              <Show when={p() === "sandbox" && pageShown("sandbox")}><SandboxPage /></Show>
               <Show when={p() === "signals"}><SignalsPage /></Show>
               <Show when={p() === "browser"}><BrowserPage /></Show>
               <Show when={p() === "news"}><NewsPage /></Show>

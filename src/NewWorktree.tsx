@@ -17,7 +17,7 @@ import { Icon } from "./lucide";
 import { Modal } from "./Modal";
 import { sandboxPreview } from "./preview";
 import { canSandbox, hostKey, mountsFor, refreshSbx, sandboxByDefault, sandboxFolders, sbxReady, sbxState, setSandboxHost } from "./sandbox";
-import { openSettings } from "./Settings";
+import { openSettings } from "./nav";
 import { isEnter } from "./enterkey";
 
 export function NewWorktreeDialog() {

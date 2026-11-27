@@ -12,7 +12,7 @@ import {
   refresh, removeFeed, setRead, topics as allTopics, unreadOf, updateFeed, watchNews,
 } from "./news";
 import { type NewsFeed, type NewsItem, absolute, ago, plain } from "./newsdata";
-import { openSettings } from "./Settings";
+import { openSettings } from "./nav";
 import { guessIcon, hostHue, hostOf, monogram } from "./favicons";
 import { openExternal, openUrlInProject } from "./browsers";
 import { openCtxMenu } from "./ctxmenu";

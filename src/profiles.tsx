@@ -12,7 +12,7 @@ import { applyProfileAutofill, browserInfo, debugSupport, leaveProfile, nativeBr
 import { freePort, setDebugPort } from "./debugmenu";
 import { isMac } from "./modkey";
 import { Icon, toggleIconPicker } from "./lucide";
-import { openSettings } from "./Settings";
+import { openSettings } from "./nav";
 import { flash } from "./ui";
 import { isEnter } from "./enterkey";
 
