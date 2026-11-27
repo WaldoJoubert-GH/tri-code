@@ -1,6 +1,6 @@
 # Codebase blueprint: one folder per module, `shared/` for cross-module use
 
-Status: proposed (2026-11-27). Nothing has moved yet.
+Status: in progress. Steps 1 (back-edges) and 2 (`src/shared/`) of the [Migration order](#migration-order) are done; modules and `app/` are still flat in `src/`.
 
 Today `src/` is flat: 193 files, with every window, dialog, store and helper side by side. `src-tauri/src/` is flat too, apart from `db/`. This blueprint gives each module a folder and an **interface** (its `index.ts` / `mod.rs`), and puts what several modules use in `shared/`.
 
@@ -24,11 +24,13 @@ Rule 3 and 4 are enforced by a test (see [Enforcement](#enforcement)), as `keys.
 | Folder | Files | Why it is shared |
 |---|---|---|
 | `shared/state/` | `state.ts`, `movetab.test.ts`, `resume.test.ts`, `pageprofiles.test.ts` | The app store; every module reads it. |
-| `shared/ui/` | `ui.ts` (flash, toast, ask), `Modal.tsx`, `ctxmenu.tsx`, `lucide.tsx`, `icons.tsx`, `fileicons.ts`, `favicons.ts`, `clipboard.ts`, `enterkey.ts` | The UI kit: dialogs, menus, icons, copy. |
+| `shared/ui/` | `ui.ts` (flash, toast, ask, clock), `Modal.tsx`, `ctxmenu.tsx`, `lucide.tsx`, `icons.tsx`, `fileicons.ts`, `favicons.ts`, `clipboard.ts`, `enterkey.ts`, and the tests of the last three | The UI kit: dialogs, menus, icons, copy. |
 | `shared/keys/` | `keymap.ts`, `modkey.ts`, `hints.ts`, `Keys.tsx`, `keys.test.ts`, `hints.test.ts` | The Keymap, Hotkey Modifier, Hold Hints and Keycap: drawn by every module. |
-| `shared/text/` | `diff.ts`, `DiffView.tsx`, `diff.css`, `markdown.ts`, `csv.ts`, `branchname.ts` | Pure parsers used by 2+ modules (diff: Editor, Git, state; csv: Editor, Database). |
-| `shared/codemirror/` | `cm.ts`, `langs.ts`, `grammars.ts`, `grammars.json`, `textmate.ts`, `tmparser.ts`, `LangPicker.tsx`, `LangSettings.tsx` | The CodeMirror kit and Grammar Catalog: Editor, Database and Calculator all build editors on it. |
-| `shared/` (top) | `look.ts`, `backdrop.ts`, `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts` (new), `urls.ts` (new) | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). |
+| `shared/text/` | `diff.ts`, `DiffView.tsx`, `diff.css`, `markdown.ts`, `csv.ts`, `branchname.ts`, and the tests of `diff`, `markdown`, `csv` | Pure parsers used by 2+ modules (diff: Editor, Git, state; csv: Editor, Database). |
+| `shared/codemirror/` | `cm.ts`, `langs.ts`, `grammars.ts`, `grammars.json`, `textmate.ts`, `tmparser.ts`, `LangPicker.tsx`, `LangSettings.tsx`, `grammars.test.ts`, `tmparser.test.ts` | The CodeMirror kit and Grammar Catalog: Editor, Database and Calculator all build editors on it. |
+| `shared/` (top) | `look.ts`, `backdrop.ts` (each with its test), `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts`, `urls.ts`, `layout.test.ts` | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). |
+
+Done in step 2. `preview.test.ts` stays in `src/` for now: it tests the preview flag through `sandbox.ts` (`sandboxOf`, `runsInSandbox`), so it moves to `modules/sandbox/` with that module. `projects.ts` stays too (see Back-edges).
 
 ### `src/modules/`
 
@@ -123,39 +125,49 @@ src/
 │   │   ├── fileicons.css
 │   │   ├── fileicons.test.ts
 │   │   ├── favicons.ts
+│   │   ├── favicons.test.ts
 │   │   ├── clipboard.ts
-│   │   └── enterkey.ts
+│   │   ├── enterkey.ts
+│   │   └── enterkey.test.ts
 │   ├── keys/
 │   │   ├── keymap.ts
 │   │   ├── modkey.ts
 │   │   ├── hints.ts
+│   │   ├── hints.test.ts
 │   │   ├── Keys.tsx              the Keycap
 │   │   ├── keys.css
 │   │   └── keys.test.ts
 │   ├── text/
 │   │   ├── diff.ts
+│   │   ├── diff.test.ts
 │   │   ├── DiffView.tsx
 │   │   ├── diff.css
 │   │   ├── markdown.ts
+│   │   ├── markdown.test.ts
 │   │   ├── markdown.css
 │   │   ├── csv.ts
+│   │   ├── csv.test.ts
 │   │   └── branchname.ts
 │   ├── codemirror/
 │   │   ├── cm.ts
 │   │   ├── langs.ts
 │   │   ├── grammars.ts
+│   │   ├── grammars.test.ts
 │   │   ├── grammars.json         scripts/grammar-catalog.ts writes here
 │   │   ├── textmate.ts
 │   │   ├── tmparser.ts
+│   │   ├── tmparser.test.ts
 │   │   ├── LangPicker.tsx
 │   │   └── LangSettings.tsx
 │   ├── look.ts
+│   ├── look.test.ts
 │   ├── backdrop.ts
+│   ├── backdrop.test.ts
 │   ├── preview.ts
 │   ├── scope.ts
 │   ├── sigs.ts
-│   ├── nav.ts                    new: the Settings page state
-│   ├── urls.ts                   new: normalizeUrl
+│   ├── nav.ts                    the Settings page state
+│   ├── urls.ts                   normalizeUrl
 │   └── layout.test.ts            new: enforces the folder rules
 │
 └── modules/                      each imports only shared/ and other modules' index.ts
@@ -295,10 +307,10 @@ These imports break rules 3 and 4 today. Each needs a small change before (or as
 |---|---|
 | `state.ts` → `news/newsdata` (`NewsFeed` type) | Done: `NewsFeed` is defined in `state.ts`; `newsdata.ts` re-exports it. |
 | `worktrees.ts`, `Tour.tsx` → `Sidebar` (`dropProject`) | Done: moved to `src/projects.ts`. Not `shared/state`: it calls into browsers, terms, Appearance, icons, issues and signals, so in state it would add six back-edges. Before step 4's cross-module rule, give `state` an "on project dropped" hook each module registers with (as `onAlert`), leaving `dropProject` in state. |
-| `NewsPanel`, `NewWorktree`, `profiles`, `debugmenu`, `Sidebar`, `SandboxSettings`, `App`, `commands`, `hotkeys` → `Settings` | Done: `src/nav.ts` holds the whole Settings page state (`SettingsPage`, `settingsPage`, `openSettings`, `closeSettings`, `toggleSettings`, `settingsOpen`, `hotkeysOpen`, `toggleHotkeys`); `Settings.tsx` exports only `SettingsDialog`. |
+| `NewsPanel`, `NewWorktree`, `profiles`, `debugmenu`, `Sidebar`, `SandboxSettings`, `App`, `commands`, `hotkeys` → `Settings` | Done: `src/shared/nav.ts` holds the whole Settings page state (`SettingsPage`, `settingsPage`, `openSettings`, `closeSettings`, `toggleSettings`, `settingsOpen`, `hotkeysOpen`, `toggleHotkeys`); `Settings.tsx` exports only `SettingsDialog`. |
 | `cli`, `LinkFolder`, `Welcome`, `Tour`, `Sidebar` → `OpenProject` (`openProjectDialog`, `openFolder`, `FolderPicker`) | Fine once `OpenProject` is `environments/`' interface. `FolderPicker` is used by Linked Folders too: export it from `environments/index.ts`. |
 | `signals` ↔ `phone` (`pushSignal` / `sigOf`) | Done: `signals` exposes `onAlert(fn)` and `phone` registers with it at load; `phone` takes `sigOf` from `sigs.ts`. |
-| `agents`, `AgentsPanel`, `phoneask` ↔ `browser` (`normalizeUrl` one way; `agentsetup`, `agenttarget` the other) | Done: `normalizeUrl` is in `src/urls.ts` (→ `shared/`). The browser → agents direction stays (Select element sends to an agent). |
+| `agents`, `AgentsPanel`, `phoneask` ↔ `browser` (`normalizeUrl` one way; `agentsetup`, `agenttarget` the other) | Done: `normalizeUrl` is in `src/shared/urls.ts`. The browser → agents direction stays (Select element sends to an agent). |
 | `envlock` → `issues` (`clock`) | Done: `clock`, `setClock`, `startClock` are in `ui.ts`. |
 | `terms` → `signals` → `phone` → `terms` (cycle) | Cut by the `onAlert` change above. |
 
@@ -369,7 +381,7 @@ The line ranges are rough because some sections sit inside others (the worktree 
 ### What can break
 
 - **Cascade order.** Vite bundles CSS in import order. Today `styles.css` loads first and everything else after it. Once its rules are spread across modules, a rule that only won because it came later can lose: the `.body > *` rule in `canvas.css` that `LinkFolder` and `NewWorktree` work around is one known case. For each split PR, build before and after and diff the bundled CSS sorted by selector, so only the order can change, then check the affected windows in both themes.
-- **`keys.test.ts`** checks that no file except `styles.css` styles a `kbd`. After the move that should be `shared/keys/keys.css`, and the test has to read folders recursively.
+- **`keys.test.ts`** checks that no file except `styles.css` styles a `kbd`. After the split that should be `shared/keys/keys.css`. The test already reads `src/` recursively (step 2).
 - **Class names stay global.** Moving files doesn't scope anything. That's fine for now, since most modules already prefix their classes (`.db-`, `.git-`, `.dock-`). The enforcement test could later check that a module's CSS only uses its own prefix, but that's out of scope here.
 - `src-tauri/phone/app.css` (the phone page) is not part of the Vite build and stays where it is. Its header comment that names `src/styles.css` needs the new paths.
 
@@ -400,15 +412,15 @@ A Rust file is already a module, so a single-file module keeps its `name.rs`; a 
 ## Things that hard-code paths today
 
 - `index.html`: `/src/index.tsx` → `/src/app/index.tsx`.
-- `scripts/grammar-catalog.ts`: writes `../src/grammars.json` → `../src/shared/codemirror/grammars.json`.
-- `keys.test.ts`: `readdirSync(import.meta.dir)` only reads its own folder. Make it walk `src/` recursively, or it will silently check nothing.
+- `scripts/grammar-catalog.ts`: writes `../src/shared/codemirror/grammars.json` (done in step 2).
+- `keys.test.ts`: walks all of `src/` recursively, by paths relative to `src/` (done in step 2). Its "only `styles.css` styles a kbd" rule names `styles.css` at the `src/` root: change it to `shared/keys/keys.css` when `styles.css` is split.
 - File-header comments naming `src/X.tsx` (most CSS files, several tests) and CONTEXT.md's file references: update in the same PR as each move.
 
 ## Enforcement
 
 Add `src/shared/layout.test.ts` (bun test) that reads every `.ts`/`.tsx` under `src/`, parses its relative imports and fails when:
 
-- a file in `shared/` imports from `modules/` or `app/`;
+- a file in `shared/` imports from `modules/` or `app/` (on since step 2, as "imports only from `src/shared/`", which also catches a file still flat in `src/`);
 - a file in `modules/` imports from `app/`;
 - a file in `modules/a/` imports a path inside `modules/b/` other than the folder itself (`../b`);
 - a `src/` file sits outside `app/`, `shared/` and `modules/` (apart from those three folders).
@@ -417,8 +429,8 @@ Add `src/shared/layout.test.ts` (bun test) that reads every `.ts`/`.tsx` under `
 
 One PR per step; each ends with `bun run typecheck`, `bun test ./src/`, `cargo check` and a launch.
 
-1. **Cut the back-edges** above, in place, with no moves. Small, reviewable, and it makes every later move mechanical.
-2. **`shared/`**: move the shared files and fix imports. Add the enforcement test with only the `shared/` rule on.
+1. **Cut the back-edges** above, in place, with no moves. Small, reviewable, and it makes every later move mechanical. Done.
+2. **`shared/`**: move the shared files and fix imports. Add the enforcement test with only the `shared/` rule on. Done: no shared file imported a root one, so nothing had to change but paths.
 3. **Leaf modules** (nothing else imports them except `app/`): `calc`, `monitor`, `news`, `docker`, `media`, `usage`, `db`, `sandbox`, `welcome`, `tour`.
 4. **Inner modules**: `issues`, `git`, `linked-folders`, `editor`, `environments`, `worktrees`, `leftovers`, `signals`, `phone`, `agents`, `terminal`, `browser`, `appearance`. Turn on the cross-module rule.
 5. **`app/`** last, then turn on the last rule.
