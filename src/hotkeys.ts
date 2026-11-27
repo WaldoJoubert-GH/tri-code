@@ -27,7 +27,7 @@ import { openEditor } from "./files";
 import { openDockerPanel } from "./docker";
 import { openMonitorPanel } from "./monitor";
 import { openNewsPanel } from "./news";
-import { openCalcPanel } from "./calc";
+import { openCalcPanel } from "./modules/calc";
 import { openGitPanel } from "./git";
 import { openDbWindow } from "./db";
 import { diffKeys } from "./shared/text/DiffView";

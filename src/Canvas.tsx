@@ -34,7 +34,7 @@ import DockerPanel from "./DockerPanel";
 import { closeDockerWindow } from "./docker";
 import MonitorPanel from "./MonitorPanel";
 import NewsPanel from "./NewsPanel";
-import CalcPanel from "./CalcPanel";
+import { CalcPanel } from "./modules/calc";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./db";
 import { gitOf } from "./git";
 import { dev, panelTitle } from "./issues";

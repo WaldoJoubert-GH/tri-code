@@ -15,7 +15,7 @@ import { openDbWindow } from "./db";
 import { openDockerPanel } from "./docker";
 import { openMonitorPanel } from "./monitor";
 import { openNewsPanel } from "./news";
-import { openCalcPanel } from "./calc";
+import { openCalcPanel } from "./modules/calc";
 import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "./agents";
 import { Icon } from "./shared/ui/lucide";
 import { SIG_TEXT, sigOf } from "./signals";

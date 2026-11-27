@@ -1,4 +1,4 @@
-/* Calculator window. See src/CalcPanel.tsx; the look comes from design/calculator.html, variant B. */
+/* Calculator window. See src/modules/calc/CalcPanel.tsx; the look comes from design/calculator.html, variant B. */
 
 .mark.calc { color: var(--p-moss); }
 
