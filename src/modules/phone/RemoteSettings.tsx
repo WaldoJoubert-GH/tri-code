@@ -11,14 +11,10 @@ import {
 import { copyText } from "../../shared/ui/clipboard";
 import { Icon } from "../../shared/ui/lucide";
 import { flash } from "../../shared/ui/ui";
+import { ago as agoAt } from "../../shared/text/ago";
 
-function ago(secs: number) {
-  const s = Math.max(0, Date.now() / 1000 - secs);
-  if (s < 90) return "just now";
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  if (s < 86400 * 2) return `${Math.round(s / 3600)} h ago`;
-  return `${Math.round(s / 86400)} d ago`;
-}
+/** "5 minutes ago": when a phone was last seen, in seconds since the epoch. */
+const ago = (secs: number) => agoAt(secs * 1000, "long");
 
 function Pairing() {
   const [now, setNow] = createSignal(Date.now());

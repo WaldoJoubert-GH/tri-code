@@ -10,6 +10,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { type Project, app, isLocalHost, isTerminal, projectById, sessionName } from "../../shared/state/state";
+import { age } from "../../shared/text/ago";
 import { envLocked } from "../environments";
 import { ask, flash } from "../../shared/ui/ui";
 
@@ -58,7 +59,8 @@ const placeOfKey = (key: string) => app.projects.find((p) => key.startsWith(`tri
 /** The project whose folder `dir` is. */
 const placeOfDir = (host: string, dir: string) => app.projects.find((p) => p.host === host && samePath(dir, p.path))?.id ?? null;
 
-const ago = (secs: number) => (secs < 60 ? "now" : secs < 3600 ? `${Math.floor(secs / 60)}m` : secs < 86400 ? `${Math.floor(secs / 3600)}h` : `${Math.floor(secs / 86400)}d`);
+/** "now", "4m": a process's age in seconds. */
+const ago = (secs: number) => age(Date.now() - secs * 1000);
 
 const usable = (host: string) => !envLocked(host);
 

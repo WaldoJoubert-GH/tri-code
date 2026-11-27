@@ -14,6 +14,7 @@ import { createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { type Project, addTab, focusTab, onProjectDropped } from "../../shared/state/state";
 import { clock, flash } from "../../shared/ui/ui";
+import { ago as agoOf } from "../../shared/text/ago";
 
 // ── types (the shapes in .dev/) ─────────────────────────────────────
 
@@ -368,14 +369,10 @@ export function formatDay(iso?: string | null): string {
   return iso ? new Date(`${iso}T00:00`).toLocaleDateString("en", { month: "short", day: "numeric" }) : "—";
 }
 
+/** "5m ago" for a timestamp from either source (ms, or an ISO string), "—" without one. */
 export function ago(ts?: number | string): string {
   const t = typeof ts === "string" ? Date.parse(ts) : ts;
-  if (!t || Number.isNaN(t)) return "—";
-  const m = Math.floor((Date.now() - t) / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  if (m < 60 * 24) return `${Math.floor(m / 60)}h ago`;
-  return `${Math.floor(m / 1440)}d ago`;
+  return !t || Number.isNaN(t) ? "—" : agoOf(t);
 }
 
 export function initials(name: string): string {

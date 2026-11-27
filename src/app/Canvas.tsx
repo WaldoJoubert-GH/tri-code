@@ -34,12 +34,7 @@ import { CalcPanel } from "../modules/calc";
 import { closeSession as closeDbSession, dbTitle, isProd } from "../modules/db";
 import { SIG_TEXT, sigOf } from "../modules/signals";
 import { hostHue, monogram } from "../shared/ui/favicons";
-
-/** "just now", "4m ago", "2h ago": how long an agent has been in its state. */
-const ago = (ms: number) => {
-  const m = Math.floor(ms / 60000);
-  return m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`;
-};
+import { ago } from "../shared/text/ago";
 
 /** Loads shorter than this (HMR, cache) show no line at all, so they don't flicker. Matches .loadbar's delay. */
 const LOAD_SHOW_MS = 150;
@@ -535,7 +530,7 @@ export default function Canvas(props: { project: Project }) {
               <span class="ast" classList={{ [`s-${a().state}`]: true, seen: sigOf(tab) !== a().state }} title={a().msg}>
                 <span class={`sg s-${a().state}`} />
                 {SIG_TEXT[a().state]}
-                {a().state === "working" ? "" : ` · ${ago(clock() - a().at)}`}
+                {a().state === "working" ? "" : ` · ${ago(a().at, "narrow", clock())}`}
               </span>
             )}
           </Show>

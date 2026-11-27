@@ -5,6 +5,8 @@
 // The feed type lives in state.ts, which persists it; re-exported for the news files.
 export type { NewsFeed } from "../../shared/state/state";
 
+import { age, ago as agoOf } from "../../shared/text/ago";
+
 /** One item as the Rust side returns it. */
 export type RawItem = { id: string; title: string; link: string; html: string; image?: string | null; published: number; author?: string | null };
 
@@ -170,14 +172,10 @@ export function feedLinks(links: HeadLink[], base: string): string[] {
     .filter(Boolean);
 }
 
-/** "now", "12m", "3h", "2d", then a date. */
-export function ago(at: number, now: number): string {
-  const m = Math.max(0, Math.round((now - at) / 60_000));
-  if (m < 1) return "now";
-  if (m < 60) return `${m}m`;
-  if (m < 24 * 60) return `${Math.floor(m / 60)}h`;
-  if (m < 7 * 24 * 60) return `${Math.floor(m / 1440)}d`;
-  return new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+/** "now", "12m", "3h", "2d", then a date. With `withAgo`, "12m ago" (still "now", still a date). */
+export function ago(at: number, now: number, withAgo = false): string {
+  if (now - at >= 7 * 86_400_000) return new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return withAgo ? agoOf(at, "narrow", now) : age(at, now);
 }
 
 /** A new feed's id from its address, unique among `taken`. */

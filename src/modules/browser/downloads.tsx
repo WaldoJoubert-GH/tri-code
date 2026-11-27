@@ -9,6 +9,7 @@ import { createStore, produce } from "solid-js/store";
 import { pageOfLabel, redownload } from "./browsers";
 import { Icon } from "../../shared/ui/lucide";
 import { flash } from "../../shared/ui/ui";
+import { ago } from "../../shared/text/ago";
 
 export type Download = {
   id: number;
@@ -220,12 +221,6 @@ function place(el: HTMLElement, a: HTMLElement) {
   el.style.left = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, r.right - el.offsetWidth)) + "px";
   el.style.top = Math.min(window.innerHeight - el.offsetHeight - 8, r.bottom + 4) + "px";
 }
-
-/** "just now", "4 min ago", "2 h ago" */
-const ago = (at: number) => {
-  const m = Math.floor((Date.now() - at) / 60000);
-  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ago`;
-};
 
 /** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
 export function DownloadMenu() {

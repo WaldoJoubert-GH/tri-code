@@ -514,7 +514,7 @@ export default function NewsPanel(props: { project: Project; tab: Tab; focused: 
                   </span>
                 </Show>
                 <Show when={r().item.author}><span>· {r().item.author}</span></Show>
-                <span>· {ago(r().item.at, minute())}{r().item.at < minute() - 7 * 86_400_000 ? "" : " ago"}</span>
+                <span>· {ago(r().item.at, minute(), true)}</span>
               </div>
               <h2 class="nw-title">
                 <a href={r().item.link} onClick={(e) => { e.preventDefault(); openArticle(r(), e.ctrlKey || e.metaKey); }}>{r().item.title}</a>
@@ -545,7 +545,7 @@ export default function NewsPanel(props: { project: Project; tab: Tab; focused: 
         <span class="nw-count">{unreadTotal() ? `${unreadTotal()} unread` : "all read"}</span>
         <span class="nw-grow" />
         <span class="nw-updated">
-          <Show when={fetching()} fallback={lastFetched() ? `updated ${ago(lastFetched(), minute())}${lastFetched() > minute() - 60_000 ? "" : " ago"}` : ""}>
+          <Show when={fetching()} fallback={lastFetched() ? `updated ${ago(lastFetched(), minute(), true)}` : ""}>
             <Icon name="loader-circle" size={12} class="nw-spin" /> fetching…
           </Show>
         </span>
