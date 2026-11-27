@@ -16,19 +16,19 @@ import {
   repoRoot, review, select, selectCommit, selectRepo, selectStash, setBase, setField, setOpt, setPushTarget, stage, stashOp, stashPush, stepOf,
   toggleCtx, unpushed, unstage, untrack, upstreamOf,
 } from "./git";
-import { copyText } from "./clipboard";
+import { copyText } from "./shared/ui/clipboard";
 import { openFile } from "./files";
 import { openUrlInProject } from "./browsers";
 import { removeWorktree } from "./worktrees";
 import { type DiffMode, diffStats, firstChange, parseUnified } from "./diff";
 import DiffView, { type Drill, diffKeys, stepHunk } from "./DiffView";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 import { withKey } from "./keymap";
 import { HoldKey, KeyText } from "./Keys";
 import "./git.css";
 import { ctrlName } from "./modkey";
-import { isEnter } from "./enterkey";
-import { Icon } from "./lucide";
+import { isEnter } from "./shared/ui/enterkey";
+import { Icon } from "./shared/ui/lucide";
 
 // Icons and buttons follow design/git-panel.html (variant A, "Quiet"): Lucide icons throughout,
 // borderless icon buttons for row and section actions, labels kept on the main actions.

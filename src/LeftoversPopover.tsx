@@ -5,7 +5,7 @@ import { For, Show, onCleanup, onMount } from "solid-js";
 import { type Leftover, closeLeftovers, endAll, endLeftover, leftovers, leftoversAt, leftoversPop, toggleLeftovers } from "./leftovers";
 import { envName, projectById } from "./shared/state/state";
 import { labelOf } from "./worktrees";
-import { Icon } from "./lucide";
+import { Icon } from "./shared/ui/lucide";
 
 const KIND: Record<Leftover["kind"], { icon: string; name: string; verb: string }> = {
   ghost: { icon: "ghost", name: "Terminal with no window", verb: "End" },

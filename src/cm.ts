@@ -17,8 +17,8 @@ import { gotoLine, highlightSelectionMatches, openSearchPanel, search, searchKey
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
 import type { ChangeMarks } from "./diff";
-import type { CtxItem } from "./ctxmenu";
-import { copyText, readText } from "./clipboard";
+import type { CtxItem } from "./shared/ui/ctxmenu";
+import { copyText, readText } from "./shared/ui/clipboard";
 import { isMac } from "./modkey";
 import { isKey, keysOf, sameChord, setEditorKeys, textPress } from "./keymap";
 import type { Chord } from "./shared/state/state";

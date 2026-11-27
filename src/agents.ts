@@ -6,7 +6,7 @@
 import { createSignal } from "solid-js";
 import { Agent, Hotkey, Project, addAgent, addTab, app, focusTab, isWebApp, newId } from "./shared/state/state";
 import { normalizeUrl } from "./urls";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 import { modDown } from "./modkey";
 import { actionById, chordKeys, chordProblem, chordText, owner, sameChord, withKey } from "./keymap";
 import { chordHolder, offeredIn, sameScope } from "./scope";

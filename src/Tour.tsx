@@ -8,13 +8,13 @@ import { Project, Tab, addSampleProject, app, goSpace, live, setApp, setToured, 
 import { openProjectDialog } from "./OpenProject";
 import { dropProject } from "./projects";
 import { askDemo } from "./terms";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 import { Caps, Key } from "./Keys";
 import { flashHints, hintsShown } from "./hints";
 import { runHotkey } from "./hotkeys";
 import { tabMenuOpen, toggleTabMenu } from "./tabs";
 import { modLabel } from "./modkey";
-import { Modal } from "./Modal";
+import { Modal } from "./shared/ui/Modal";
 
 const [step, setStep] = createSignal(0);
 /** "tour" while walking the stops, "end" for the closing card. */

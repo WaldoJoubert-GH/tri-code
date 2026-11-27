@@ -9,11 +9,11 @@ import type { Project } from "./shared/state/state";
 import { hostAt } from "./links";
 import { type Change, addRowChange, columnNames, deleteRowChange, isNumber, parseCsv, setCellChange } from "./csv";
 import { type Cell, cellText } from "./dbsql";
-import { copyText } from "./clipboard";
-import { flash } from "./ui";
+import { copyText } from "./shared/ui/clipboard";
+import { flash } from "./shared/ui/ui";
 import "./db.css";
 import "./sheet.css";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 /** Row height in px: `.sheet-grid td` is drawn to exactly this. */
 const ROW = 24;

@@ -7,8 +7,8 @@ import { listen } from "@tauri-apps/api/event";
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { pageOfLabel, redownload } from "./browsers";
-import { Icon } from "./lucide";
-import { flash } from "./ui";
+import { Icon } from "./shared/ui/lucide";
+import { flash } from "./shared/ui/ui";
 
 export type Download = {
   id: number;

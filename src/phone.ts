@@ -12,11 +12,11 @@ import { type Project, type SoundEvent, type Tab, activePage, app, envIcon, envN
 import { onAlert } from "./signals";
 import { sigOf } from "./sigs";
 import { envLocked } from "./envlock";
-import { iconSvg } from "./lucide";
+import { iconSvg } from "./shared/ui/lucide";
 import { screenTail } from "./terms";
 import { labelOf, tileLabel } from "./worktrees";
 import { answerPhones, phoneCommands } from "./phoneask";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 
 export type PhoneDevice = { id: string; name: string; added: number; seen: number; online: boolean; push: boolean };
 /** How a phone reaches tri-code: over Tailscale (HTTPS, pushes), the local network (HTTP, no

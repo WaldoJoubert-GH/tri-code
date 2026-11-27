@@ -11,13 +11,13 @@ import { For, Match, Show, Switch, createEffect, createSignal, on, onCleanup, on
 import { addProject, app, envIcon, envName, isLocalHost, setApp } from "./shared/state/state";
 import { PinPad, envLocked } from "./envlock";
 import { openEnvDialog } from "./EnvDialog";
-import { Icon } from "./lucide";
-import { Modal } from "./Modal";
-import { autoIcon } from "./icons";
-import { flash } from "./ui";
+import { Icon } from "./shared/ui/lucide";
+import { Modal } from "./shared/ui/Modal";
+import { autoIcon } from "./shared/ui/icons";
+import { flash } from "./shared/ui/ui";
 import { Key } from "./Keys";
 import { addLines, caselessPath, isRepoUrl, nameProblem, progress, repoFolder, shortUrl, type CloneLine } from "./newfolder";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 type DirList = { path: string; dirs: string[]; repos: string[]; drives: string[]; workspaces: string[] };
 /** A row of the folder list: a folder, or a `.code-workspace` file (`ws`). */

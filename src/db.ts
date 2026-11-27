@@ -12,7 +12,7 @@ import { type Project, type Tab, addTab, focusTab, newId, repoOf } from "./share
 import {
   type Cell, type DbKind, type MongoOp, type Pending, type SqlOp, type Target, emptyPending, mongoOps, mongoText, pendingCount, rowKey, sqlOps,
 } from "./dbsql";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 import { hostAt, linkAt } from "./links";
 
 /** `sheet` is a CSV or workbook loaded into memory: never saved, made up from the window's id. */

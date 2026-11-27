@@ -7,12 +7,12 @@ import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-j
 import { createStore } from "solid-js/store";
 import { type EnvFields, type EnvKind, type EnvOriginal, emptyFields, envFormView, fieldsFrom, isSshCommand, optionsText, parseSsh, sshOf } from "./envform";
 import { envLocked, markUnlocked, moveUnlock, tryPin } from "./envlock";
-import { Icon, toggleIconPicker } from "./lucide";
-import { Modal } from "./Modal";
+import { Icon, toggleIconPicker } from "./shared/ui/lucide";
+import { Modal } from "./shared/ui/Modal";
 import { addEnvironment, app, envIcon, envName, isLocalHost, isTerminal, moveEnvironment, setEnvLock, setEnvSsh, setEnvStyle } from "./shared/state/state";
 import { moveSessions } from "./terms";
-import { flash } from "./ui";
-import { isEnter } from "./enterkey";
+import { flash } from "./shared/ui/ui";
+import { isEnter } from "./shared/ui/enterkey";
 
 /** `host` set = Edit it; unset = New. onAdded: where to go with a new Environment. */
 type Target = { host?: string; onAdded?: (host: string) => void };

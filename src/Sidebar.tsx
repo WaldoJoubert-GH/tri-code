@@ -8,8 +8,8 @@ import {
 import { setBrowsersCovered } from "./browsers";
 import { appearanceOpen, closeAppearance, openAppearance } from "./Appearance";
 import { dev, isActive, sourcesOf, stateOf } from "./issues";
-import { IconFace } from "./icons";
-import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
+import { IconFace } from "./shared/ui/icons";
+import { Icon, iconPickerOpen, toggleIconPicker } from "./shared/ui/lucide";
 import { Caps, HoldFace } from "./Keys";
 import { projectStepKey } from "./hints";
 import { openProjectDialog } from "./OpenProject";
@@ -18,9 +18,9 @@ import { SIG_TEXT, sigOf, sigSummary, topSig } from "./signals";
 import { dropProject } from "./projects";
 import { adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel } from "./worktrees";
 import { openWorktreeDialog } from "./WorktreeDialog";
-import { type CtxItem, openCtxMenu } from "./ctxmenu";
+import { type CtxItem, openCtxMenu } from "./shared/ui/ctxmenu";
 import { folderStatus, peekStatus } from "./git";
-import { ask, flash } from "./ui";
+import { ask, flash } from "./shared/ui/ui";
 import { withKey } from "./keymap";
 import { isMac } from "./modkey";
 import { envLocked, lockEnv } from "./envlock";
@@ -30,7 +30,7 @@ import { endLeftover, staleCheckouts } from "./leftovers";
 import { sandboxOf } from "./sandbox";
 import { MediaDock } from "./MediaDock";
 import { mediaPopOpen } from "./media";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 /** Width of the full sidebar, which the peek floats out to. Matches .app's first grid column. */
 const FULL = 220;

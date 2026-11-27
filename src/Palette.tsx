@@ -13,15 +13,15 @@ import { type Project, activeProject, focusTab, focusedTab, isRemote, skipFolder
 import { agentTarget } from "./agents";
 import { filesOf, openFile } from "./files";
 import { FileIcon, iconOpts } from "./FileList";
-import { iconSvg } from "./fileicons";
+import { iconSvg } from "./shared/ui/fileicons";
 import { focusSession, sendText } from "./terms";
-import { flash } from "./ui";
-import { Icon } from "./lucide";
+import { flash } from "./shared/ui/ui";
+import { Icon } from "./shared/ui/lucide";
 import "./files.css";
 import { Key, KeyList } from "./Keys";
 import { linkHost, linksOf, relIn, rootAt, within } from "./links";
-import { isEnter } from "./enterkey";
-import { Modal } from "./Modal";
+import { isEnter } from "./shared/ui/enterkey";
+import { Modal } from "./shared/ui/Modal";
 
 type FileIndex = { files: string[]; git: boolean; truncated: boolean };
 type IndexState = { loading: boolean; index?: FileIndex; error?: string };

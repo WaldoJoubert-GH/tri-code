@@ -19,14 +19,14 @@ import { agentTarget, agentWindows, rememberAgent } from "./agenttarget";
 import { offeredIn } from "./scope";
 import { setupStatus } from "./agentsetup";
 import { sigOf } from "./sigs";
-import { iconSvg } from "./lucide";
+import { iconSvg } from "./shared/ui/lucide";
 import { pasteText } from "./terms";
-import { flash } from "./ui";
-import { copyText } from "./clipboard";
+import { flash } from "./shared/ui/ui";
+import { copyText } from "./shared/ui/clipboard";
 import { fillShots, setShotPref, shotPref } from "./shots";
 import { onReopened, pageFwd, releasePage, remoteUrl, resolveUrl } from "./tunnels";
 import { targetOf, toLocal } from "./tunnelmap";
-import { guessIcon, originOf } from "./favicons";
+import { guessIcon, originOf } from "./shared/ui/favicons";
 
 export type BrowserInfo = {
   url: string; title: string; loading: boolean;

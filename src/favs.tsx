@@ -5,10 +5,10 @@
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "./shared/state/state";
 import { browserInfo } from "./browsers";
-import { flash } from "./ui";
-import { guessIcon } from "./favicons";
+import { flash } from "./shared/ui/ui";
+import { guessIcon } from "./shared/ui/favicons";
 import { Key, KeyText } from "./Keys";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 const ICON_COLOURS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#2ac3de", "#ff9e64", "#e0af68", "#73daca"];
 

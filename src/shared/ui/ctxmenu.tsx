@@ -3,7 +3,7 @@
 // window menu. Arrow keys move, Enter runs, Escape closes (hotkeys.ts).
 
 import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js";
-import { KeyText } from "./Keys";
+import { KeyText } from "../../Keys";
 
 export type CtxItem = { label: string; kbd?: string; disabled?: boolean; run: () => void } | "sep";
 type Menu = { x: number; y: number; items: CtxItem[] };

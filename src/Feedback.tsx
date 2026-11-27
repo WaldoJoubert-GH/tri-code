@@ -9,7 +9,7 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
 import { openExternal } from "./browsers";
 import { appVersion } from "./updater";
-import { flash, showToast } from "./ui";
+import { flash, showToast } from "./shared/ui/ui";
 import { KeyText } from "./Keys";
 
 const REPO = "WaldoJoubert-GH/tri-code";

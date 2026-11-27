@@ -6,7 +6,7 @@ import {
 } from "./shared/state/state";
 import { ProfileAvatar, profileColor, profilesInUse, toggleProfileMenu } from "./profiles";
 import { type Rect, neighbour, ratioAt, tile } from "./layout";
-import { clock, flash, showToast } from "./ui";
+import { clock, flash, showToast } from "./shared/ui/ui";
 import { hintKeys, withKey } from "./keymap";
 import { Caps, HintCaps } from "./Keys";
 import { hintsShown } from "./hints";
@@ -18,12 +18,12 @@ import {
 import { DebugButton } from "./debugmenu";
 import { fwdOfPage, heldBy } from "./tunnels";
 import { RemoteStart, TunnelBar, TunnelChip, TunnelHeld } from "./tunnelui";
-import { Icon } from "./lucide";
+import { Icon } from "./shared/ui/lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
 import { runsInSandbox, sandboxOf } from "./sandbox";
 import IssuesPanel from "./IssuesPanel";
 import { dirtyCount, dropEditor } from "./files";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 /** CodeMirror and its languages load the first time an editor window opens. */
 const Editor = lazy(() => import("./Editor"));
@@ -41,7 +41,7 @@ import { dev, panelTitle } from "./issues";
 import { SIG_TEXT, sigOf } from "./signals";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
 import { DownloadBar, DownloadButton, forgetDownloads } from "./downloads";
-import { hostHue, monogram } from "./favicons";
+import { hostHue, monogram } from "./shared/ui/favicons";
 
 /** "just now", "4m ago", "2h ago": how long an agent has been in its state. */
 const ago = (ms: number) => {

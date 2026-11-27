@@ -13,9 +13,9 @@ import {
 import { isRunning, listBoxes, sandboxOf, sbxReady, startSandbox, stopSandbox } from "./sandbox";
 import { sandboxPreview } from "./preview";
 import { openUrlInProject } from "./browsers";
-import { copyText } from "./clipboard";
-import { Icon } from "./lucide";
-import { ask, flash } from "./ui";
+import { copyText } from "./shared/ui/clipboard";
+import { Icon } from "./shared/ui/lucide";
+import { ask, flash } from "./shared/ui/ui";
 import "./docker.css";
 
 const TAIL = 500;

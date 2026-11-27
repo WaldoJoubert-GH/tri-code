@@ -7,7 +7,7 @@ import { type Project, isTerminal, removeProject } from "./shared/state/state";
 import { closeBrowser } from "./browsers";
 import { closeSession } from "./terms";
 import { forgetBgImage } from "./Appearance";
-import { forgetIcon } from "./icons";
+import { forgetIcon } from "./shared/ui/icons";
 import { forgetProject } from "./issues";
 import { forgetSounds } from "./signals";
 

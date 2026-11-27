@@ -18,15 +18,15 @@ import {
   removeQuery, renameQuery, review, rowObj, runQuery, saveConn, saveQuery, savedById, savedOf, setCell, setDoc, setStarter, sheetPathOf,
   setFilter, setQuery, setResTab, setSelCell, setView, showResult, showTable, structOf, testConn, toggleDelete, toggleGroup, toggleSort, turnPage, undo, wins,
 } from "./db";
-import { openCtxMenu } from "./ctxmenu";
+import { openCtxMenu } from "./shared/ui/ctxmenu";
 import { type Cell, type DbKind, cellText, editText, isNested, isOpaque, parseInput, pendingCount, rowKey, writes } from "./dbsql";
-import { Icon } from "./lucide";
+import { Icon } from "./shared/ui/lucide";
 import { highlight, theme } from "./cm";
-import { ask, flash } from "./ui";
+import { ask, flash } from "./shared/ui/ui";
 import "./db.css";
 import { Key, KeyText } from "./Keys";
 import { ctrlName } from "./modkey";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", mysql: "MYSQL", sqlite: "SQLITE", mongo: "MONGO" };
 const KIND_NAME: Record<DbKind, string> = { postgres: "PostgreSQL", mysql: "MySQL", sqlite: "SQLite", mongo: "MongoDB" };

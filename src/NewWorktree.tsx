@@ -13,12 +13,12 @@ import { BIG, fileSize, filterIgnored, splitPath, startingTicks } from "./ignore
 import { SETUP_VARS } from "./setup";
 import { dev, inProgress, slugOf } from "./issues";
 import { gitOf } from "./git";
-import { Icon } from "./lucide";
-import { Modal } from "./Modal";
+import { Icon } from "./shared/ui/lucide";
+import { Modal } from "./shared/ui/Modal";
 import { sandboxPreview } from "./preview";
 import { canSandbox, hostKey, mountsFor, refreshSbx, sandboxByDefault, sandboxFolders, sbxReady, sbxState, setSandboxHost } from "./sandbox";
 import { openSettings } from "./nav";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 export function NewWorktreeDialog() {
   return (

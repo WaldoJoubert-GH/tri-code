@@ -11,10 +11,10 @@ import {
 import { applyProfileAutofill, browserInfo, debugSupport, leaveProfile, nativeBrowsers, profilesSupported } from "./browsers";
 import { freePort, setDebugPort } from "./debugmenu";
 import { isMac } from "./modkey";
-import { Icon, toggleIconPicker } from "./lucide";
+import { Icon, toggleIconPicker } from "./shared/ui/lucide";
 import { openSettings } from "./nav";
-import { flash } from "./ui";
-import { isEnter } from "./enterkey";
+import { flash } from "./shared/ui/ui";
+import { isEnter } from "./shared/ui/enterkey";
 
 /** A profile's colour as a CSS value; the --p-* tokens are tuned for light and dark. */
 export const profileColor = (p: Profile) => `var(--p-${p.color})`;

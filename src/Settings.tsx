@@ -9,8 +9,8 @@ import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_
 import { type FontKind, type Theme, fontMissing, themeOf } from "./look";
 import { applySignalColors } from "./signals";
 import { keyOf } from "./keymap";
-import { Icon } from "./lucide";
-import { Modal } from "./Modal";
+import { Icon } from "./shared/ui/lucide";
+import { Modal } from "./shared/ui/Modal";
 import { Caps, KeyList } from "./Keys";
 import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./RemoteSettings";
@@ -26,7 +26,7 @@ import { type SettingsPage, closeSettings, pageShown, setSettingsPage, settingsP
 import { SignalsForm } from "./SignalSettings";
 import { openEnvDialog } from "./EnvDialog";
 import { openWelcome } from "./Welcome";
-import { ICON_THEMES, type IconTheme } from "./fileicons";
+import { ICON_THEMES, type IconTheme } from "./shared/ui/fileicons";
 import { FileIcon } from "./FileList";
 import "./files.css";
 import { linksOn } from "./links";

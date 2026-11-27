@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { type Project, addTab, app, focusTab, setApp } from "./shared/state/state";
-import { guessIcon, originOf } from "./favicons";
+import { guessIcon, originOf } from "./shared/ui/favicons";
 import {
   type FeedMeta, type HeadLink, type HeadMeta, type NewsCache, type NewsFeed, type NewsItem, type RawItem,
   TOPICS, bestIcon, emptyCache, feedId, feedLinks, merge, pageImage, pruneRead, readKey,

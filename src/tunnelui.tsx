@@ -8,10 +8,10 @@ import { For, Show, createResource, createSignal, onCleanup, onMount } from "sol
 import { type Project, envName, isRemote, skipFolders } from "./shared/state/state";
 import { type Fwd, fwdOfPage, fwds, reconnect, remoteLabel } from "./tunnels";
 import { type Listener, fileUrlOf, parseListening } from "./tunnelmap";
-import { copyText } from "./clipboard";
-import { Icon } from "./lucide";
+import { copyText } from "./shared/ui/clipboard";
+import { Icon } from "./shared/ui/lucide";
 import { KeyText } from "./Keys";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 
 const STATE_TEXT: Record<Fwd["state"], string> = { opening: "Opening", open: "Open", reconnecting: "Reconnecting", failed: "Failed" };
 

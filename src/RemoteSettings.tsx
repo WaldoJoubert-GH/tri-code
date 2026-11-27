@@ -8,9 +8,9 @@ import {
   type PhoneReach, cancelPairing, forgetPhone, pairPhone, phoneBusy, phoneError, phonePairing, phoneStatus, pushesFor, setPhoneConfig, setPushFor,
   startPhone, stopPhone, testPush,
 } from "./phone";
-import { copyText } from "./clipboard";
-import { Icon } from "./lucide";
-import { flash } from "./ui";
+import { copyText } from "./shared/ui/clipboard";
+import { Icon } from "./shared/ui/lucide";
+import { flash } from "./shared/ui/ui";
 
 function ago(secs: number) {
   const s = Math.max(0, Date.now() / 1000 - secs);

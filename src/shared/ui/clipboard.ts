@@ -5,7 +5,7 @@
 // those events. Use the async Clipboard API directly instead; it still works in
 // the webview.
 
-import { isKey } from "./keymap";
+import { isKey } from "../../keymap";
 
 /** Copy text to the system clipboard. Fails quietly when unavailable. */
 export function copyText(text: string): void {

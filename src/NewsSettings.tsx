@@ -5,7 +5,7 @@ import { For, Show, createSignal } from "solid-js";
 import { app } from "./shared/state/state";
 import { feeds, newTopic, removeTopic, renameTopic, resetTopics, shiftTopic, topics } from "./news";
 import { Caps } from "./Keys";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 export function NewsPage() {
   const [draft, setDraft] = createSignal("");

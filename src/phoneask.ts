@@ -13,8 +13,8 @@ import { offeredIn } from "./scope";
 import { type Change, type GitStatus, type RepoStatus, repoRoot } from "./git";
 import type { FsList, FsText } from "./files";
 import { hostAt, rootsOf, within } from "./links";
-import { iconSvg } from "./lucide";
-import { flash } from "./ui";
+import { iconSvg } from "./shared/ui/lucide";
+import { flash } from "./shared/ui/ui";
 
 /** A plain shell, offered first even when the commands list has none. */
 const SHELL: Agent = { id: "", name: "shell", command: "", icon: "square-terminal" };

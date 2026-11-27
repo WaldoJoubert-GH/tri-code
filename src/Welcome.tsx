@@ -20,12 +20,12 @@ import { SoundSelect } from "./SoundSelect";
 import { openEnvDialog } from "./EnvDialog";
 import { openProjectDialog } from "./OpenProject";
 import { startTour } from "./Tour";
-import { Icon } from "./lucide";
-import { Modal } from "./Modal";
+import { Icon } from "./shared/ui/lucide";
+import { Modal } from "./shared/ui/Modal";
 import { linksOn } from "./links";
 import { Caps, KeyList } from "./Keys";
 import { metaName, modLabel } from "./modkey";
-import { copyText } from "./clipboard";
+import { copyText } from "./shared/ui/clipboard";
 
 const PLATFORM = platform(navigator.userAgent);
 

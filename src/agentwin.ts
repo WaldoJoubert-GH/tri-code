@@ -9,7 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { type Agent, type Project, app, focusTab, addTab, isWebApp, projectById, removeTab } from "./shared/state/state";
 import { offeredIn } from "./scope";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 
 /** Whether an agent in `p` may open `a`: a terminal Command with the Agent toggle on, that `p` offers. */
 export const agentRunsIn = (p: Project, a: Agent) => !!a.agentRun && !isWebApp(a) && offeredIn(p).includes(a);

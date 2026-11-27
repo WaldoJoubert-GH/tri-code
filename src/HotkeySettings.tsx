@@ -11,7 +11,7 @@ import {
   ACTIONS, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,
 } from "./keymap";
 import { offeredTogether, recording, scopeLabel, setRecording } from "./agents";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 import { Key, KeyList } from "./Keys";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph", "OS"]);

@@ -11,10 +11,10 @@ import {
 } from "./browsers";
 import { ProfileAvatar } from "./profiles";
 import { Key } from "./Keys";
-import { Icon } from "./lucide";
+import { Icon } from "./shared/ui/lucide";
 import { openSettings } from "./nav";
-import { copyText } from "./clipboard";
-import { flash } from "./ui";
+import { copyText } from "./shared/ui/clipboard";
+import { flash } from "./shared/ui/ui";
 
 type Menu = { projectId: string; tabId: string; anchor: HTMLElement };
 const [menu, setMenu] = createSignal<Menu | null>(null);

@@ -13,7 +13,7 @@ import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, 
 import { onSandboxStep, readySandbox, runsInSandbox, sandboxOf } from "./sandbox";
 import { terminalFont } from "./look";
 import { onSignal } from "./signals";
-import { copyText, readImagePng, readText } from "./clipboard";
+import { copyText, readImagePng, readText } from "./shared/ui/clipboard";
 import { Demo, playDemo } from "./demo";
 import { isKey } from "./keymap";
 import { isMac } from "./modkey";

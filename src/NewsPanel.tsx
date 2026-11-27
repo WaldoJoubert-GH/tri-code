@@ -13,15 +13,15 @@ import {
 } from "./news";
 import { type NewsFeed, type NewsItem, absolute, ago, plain } from "./newsdata";
 import { openSettings } from "./nav";
-import { guessIcon, hostHue, hostOf, monogram } from "./favicons";
+import { guessIcon, hostHue, hostOf, monogram } from "./shared/ui/favicons";
 import { openExternal, openUrlInProject } from "./browsers";
-import { openCtxMenu } from "./ctxmenu";
-import { copyText } from "./clipboard";
-import { Icon } from "./lucide";
+import { openCtxMenu } from "./shared/ui/ctxmenu";
+import { copyText } from "./shared/ui/clipboard";
+import { Icon } from "./shared/ui/lucide";
 import { Key } from "./Keys";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 import "./news.css";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 /** Headlines listed at most, newest first. */
 const LIST_MAX = 400;

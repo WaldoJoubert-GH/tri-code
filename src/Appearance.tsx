@@ -10,12 +10,12 @@ import { CLEAR_MAX, type Clear, type Fx, type FxKind, fxOn, paintBackdrop } from
 import { createStore, produce } from "solid-js/store";
 import { ACCENTS, GAP_MAX, type MdExport, Project, activeProject, app, projectById, renameProject, repoOf, setAppearance, setGap, setIcon, setMdExport } from "./shared/state/state";
 import { CSS_HINT, DEFAULT_MARGIN, PAGES } from "./mdexport";
-import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./icons";
-import { Icon, toggleIconPicker } from "./lucide";
+import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./shared/ui/icons";
+import { Icon, toggleIconPicker } from "./shared/ui/lucide";
 import { SignalsForm } from "./SignalSettings";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 import { keyOf } from "./keymap";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 const tint = (a: string, p: number) => `color-mix(in srgb, ${a} ${p}%, transparent)`;
 

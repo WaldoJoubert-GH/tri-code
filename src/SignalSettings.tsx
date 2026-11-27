@@ -6,7 +6,7 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { AlertMode, Project, SoundEvent, app, setNotify, setProjectNotify } from "./shared/state/state";
 import { EVENTS, addMySound, desktopFor, playFor, playSound, removeMySound, soundName } from "./signals";
 import { SoundSelect } from "./SoundSelect";
-import { Icon } from "./lucide";
+import { Icon } from "./shared/ui/lucide";
 
 export function SignalsForm(props: { project?: Project }) {
   const p = () => props.project;

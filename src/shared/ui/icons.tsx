@@ -5,7 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { JSX, Match, Switch } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { Project, app, projectById, setIcon } from "./shared/state/state";
+import { Project, app, projectById, setIcon } from "../state/state";
 import { Icon } from "./lucide";
 import { flash } from "./ui";
 

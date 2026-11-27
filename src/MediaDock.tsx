@@ -4,7 +4,7 @@
 // the title, or the ring's badge, opens the popover beside the sidebar.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Icon } from "./lucide";
+import { Icon } from "./shared/ui/lucide";
 import { KeyList } from "./Keys";
 import {
   type MediaSession, clock, closeMediaPop, currentMedia, dismissMedia, mediaControl, mediaPopAnchor, mediaPopOpen, mediaSessions,

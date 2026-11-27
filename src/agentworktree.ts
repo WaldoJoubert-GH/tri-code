@@ -11,7 +11,7 @@ import { followAfterTurn, rehomeSession } from "./terms";
 import { agentBranch } from "./branchname";
 import { type Branch, adoptWorktrees, createWorktree, kinds } from "./worktrees";
 import { gitOf } from "./git";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 
 async function follow(project: string, tab: string, name: string): Promise<{ path: string; branch: string; setup?: string; project: string; restart: boolean }> {
   const from = projectById(project);

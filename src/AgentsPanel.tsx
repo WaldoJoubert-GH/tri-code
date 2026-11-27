@@ -20,12 +20,12 @@ import {
 import { normalizeUrl } from "./urls";
 import { EVENTS, playFor, playSound, soundFor, soundName } from "./signals";
 import { SoundSelect } from "./SoundSelect";
-import { Icon, toggleIconPicker } from "./lucide";
-import { flash, showToast } from "./ui";
+import { Icon, toggleIconPicker } from "./shared/ui/lucide";
+import { flash, showToast } from "./shared/ui/ui";
 import { ctrlName, modDown, modLabel } from "./modkey";
 import "./agents.css";
 import { KeyList } from "./Keys";
-import { isEnter } from "./enterkey";
+import { isEnter } from "./shared/ui/enterkey";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph"]);
 

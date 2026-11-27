@@ -6,7 +6,7 @@ import {
   GAPS, Layout, Project, SPACES, Tab, activePage, activeProject, addTab, app, focusTab, focusedTab, goSpace, isPinned, isRemote, live,
   lastMinimised, minimiseTab, promote, sendTo, setApp, setGap, setLayout, setMedia, setSettings, space, tabIcon, tabName, toggleMono, togglePin,
 } from "./shared/state/state";
-import { ICON_THEMES, type IconTheme, setPreviewTheme } from "./fileicons";
+import { ICON_THEMES, type IconTheme, setPreviewTheme } from "./shared/ui/fileicons";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { requestClose } from "./Canvas";
 import { isMac } from "./modkey";
@@ -34,7 +34,7 @@ import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgents
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
 import { startTour } from "./Tour";
 import { openWelcome } from "./Welcome";
-import { flash } from "./ui";
+import { flash } from "./shared/ui/ui";
 import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./media";
 import { openLinkDialog } from "./LinkFolder";
 import { linksOn } from "./links";

@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Icon } from "./lucide";
+import { Icon } from "./shared/ui/lucide";
 import { weekTarget } from "./pace";
 import { app } from "./shared/state/state";
 
