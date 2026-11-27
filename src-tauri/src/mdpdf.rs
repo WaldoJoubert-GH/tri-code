@@ -87,7 +87,7 @@ pub async fn md_pdf(app: AppHandle, html: String, path: Option<String>) -> Resul
 async fn print_to_file(window: &WebviewWindow, loaded: tokio::sync::oneshot::Receiver<()>, html: &str, path: &str) -> Result<(), String> {
     use base64::Engine as _;
 
-    use crate::browser_debug::cdp_call;
+    use crate::browser::debug::cdp_call;
 
     let webview = window.as_ref();
     // Writing before about:blank has loaded would be undone by it.

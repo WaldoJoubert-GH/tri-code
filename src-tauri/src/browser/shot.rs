@@ -123,7 +123,7 @@ fn b64(bytes: &[u8]) -> String {
 #[cfg(windows)]
 async fn capture(webview: &Webview) -> Result<Vec<u8>, String> {
     let params = r#"{"format":"png","captureBeyondViewport":false}"#.to_string();
-    let json = crate::browser_debug::cdp_call(webview, "Page.captureScreenshot".into(), params).await?;
+    let json = crate::browser::debug::cdp_call(webview, "Page.captureScreenshot".into(), params).await?;
     let v: serde_json::Value = serde_json::from_str(&json).map_err(|e| e.to_string())?;
     let data = v["data"].as_str().ok_or("the screenshot came back empty")?;
     base64::engine::general_purpose::STANDARD.decode(data).map_err(|e| e.to_string())

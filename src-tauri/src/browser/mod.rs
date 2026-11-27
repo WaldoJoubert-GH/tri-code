@@ -1,6 +1,15 @@
 //! Native browser panes: child webviews embedded in the main window and tiled
 //! by the frontend. Coordinates are logical pixels relative to the main window.
 
+pub(crate) mod debug;
+pub(crate) mod downloads;
+pub(crate) mod forward;
+#[cfg(target_os = "linux")]
+pub(crate) mod gtk;
+pub(crate) mod keys;
+pub(crate) mod passwords;
+mod shot;
+
 use std::path::PathBuf;
 
 use serde::Serialize;
@@ -136,7 +145,7 @@ pub(crate) fn find(app: &AppHandle, label: &str) -> Result<Webview, String> {
 /// On Linux Tauri ignores a child webview's bounds, so browser_gtk places it instead.
 #[cfg(target_os = "linux")]
 fn set_bounds(webview: &Webview, x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
-    crate::browser_gtk::place(webview, x, y, width, height)
+    crate::browser::gtk::place(webview, x, y, width, height)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -316,11 +325,11 @@ pub async fn browser_open(
                 return false;
             }
             if url.path() == "/capture" {
-                crate::browser_shot::on_capture(&bg_app, &bg_label, &param("k").unwrap_or_default());
+                crate::browser::shot::on_capture(&bg_app, &bg_label, &param("k").unwrap_or_default());
                 return false;
             }
             if url.path() == "/pick" {
-                let payload = crate::browser_shot::PickPayload {
+                let payload = crate::browser::shot::PickPayload {
                     label: bg_label.clone(),
                     text: param("d").unwrap_or_default(),
                     to: param("to").unwrap_or_default(),
@@ -330,11 +339,11 @@ pub async fn browser_open(
                     copy: param("copy").is_some_and(|v| v == "1"),
                     shot: param("shot").map(|v| v == "1"),
                 };
-                let rects = param("shots").and_then(|s| serde_json::from_str::<Vec<crate::browser_shot::Rect>>(&s).ok());
+                let rects = param("shots").and_then(|s| serde_json::from_str::<Vec<crate::browser::shot::Rect>>(&s).ok());
                 match rects.filter(|r| !r.is_empty()) {
                     Some(rects) => {
                         let vw = param("vw").and_then(|v| v.parse().ok()).unwrap_or(0.0);
-                        crate::browser_shot::on_send(&bg_app, &param("k").unwrap_or_default(), rects, vw, payload);
+                        crate::browser::shot::on_send(&bg_app, &param("k").unwrap_or_default(), rects, vw, payload);
                     }
                     None => {
                         let _ = bg_app.emit("browser-pick", payload);
@@ -375,7 +384,7 @@ pub async fn browser_open(
         .on_page_load(move |webview, payload| {
             #[cfg(target_os = "macos")]
             if payload.event() == PageLoadEvent::Finished {
-                crate::passwords::page_loaded(&webview, &nav_label, payload.url());
+                crate::browser::passwords::page_loaded(&webview, &nav_label, payload.url());
             }
             #[cfg(not(target_os = "macos"))]
             let _ = &webview;
@@ -392,7 +401,7 @@ pub async fn browser_open(
             let _ = title_app.emit("browser-title", TitlePayload { label: title_label.clone(), title });
         });
     #[cfg(not(windows))]
-    let builder = crate::downloads::watch(builder, &app, &label).initialization_script(FAVICON_SCRIPT);
+    let builder = crate::browser::downloads::watch(builder, &app, &label).initialization_script(FAVICON_SCRIPT);
     let profile = profile.unwrap_or_default();
     let (autofill, passwords) = (autofill.unwrap_or(true), passwords.unwrap_or(true));
     // DevTools for every page (F12, the Debug Menu); the app's own webview keeps them for debug builds.
@@ -409,7 +418,7 @@ pub async fn browser_open(
     // webview, whose arguments can't change: remote debugging is for the other profiles only.
     #[cfg(windows)]
     let builder = match debug_port {
-        Some(port) if profile_dir(&app, &profile)?.is_some() => builder.additional_browser_args(&crate::browser_debug::browser_args(port)),
+        Some(port) if profile_dir(&app, &profile)?.is_some() => builder.additional_browser_args(&crate::browser::debug::browser_args(port)),
         _ => builder,
     };
     #[cfg(not(windows))]
@@ -418,17 +427,17 @@ pub async fn browser_open(
         .add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
     #[cfg(target_os = "linux")]
-    crate::browser_gtk::adopt(&webview, x, y, width, height)?;
+    crate::browser::gtk::adopt(&webview, x, y, width, height)?;
     set_autofill(&webview, autofill, passwords)?;
     #[cfg(windows)]
-    crate::downloads::watch(&app, &webview, &label)?;
+    crate::browser::downloads::watch(&app, &webview, &label)?;
     #[cfg(windows)]
-    crate::browser_debug::watch_console(&app, &webview, &label)?;
+    crate::browser::debug::watch_console(&app, &webview, &label)?;
     #[cfg(windows)]
     watch_favicon(&app, &webview, &label)?;
-    crate::browser_keys::watch(&app, &webview, &label)?;
+    crate::browser::keys::watch(&app, &webview, &label)?;
     #[cfg(target_os = "macos")]
-    crate::passwords::install(&app, &webview, &label, &profile, passwords)?;
+    crate::browser::passwords::install(&app, &webview, &label, &profile, passwords)?;
     if hidden == Some(true) {
         webview.hide().map_err(|e| e.to_string())?;
     }
@@ -461,9 +470,9 @@ pub async fn browser_hide(app: AppHandle, label: String) -> Result<(), String> {
 /// Closes a browser webview. A missing one is not an error.
 #[tauri::command]
 pub async fn browser_close(app: AppHandle, label: String) -> Result<(), String> {
-    crate::browser_shot::forget(&label);
+    crate::browser::shot::forget(&label);
     #[cfg(target_os = "macos")]
-    crate::passwords::unwatch(&label);
+    crate::browser::passwords::unwatch(&label);
     match app.get_webview(&label) {
         Some(webview) => webview.close().map_err(|e| e.to_string()),
         None => Ok(()),
@@ -477,7 +486,7 @@ pub async fn browser_close_all(app: AppHandle) -> Result<(), String> {
     for (label, webview) in app.webviews() {
         if label.starts_with("browser-") {
             #[cfg(target_os = "macos")]
-            crate::passwords::unwatch(&label);
+            crate::browser::passwords::unwatch(&label);
             webview.close().map_err(|e| e.to_string())?;
         }
     }
@@ -488,7 +497,7 @@ pub async fn browser_close_all(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub async fn browser_autofill(app: AppHandle, label: String, autofill: bool, passwords: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    crate::passwords::set_enabled(&label, passwords);
+    crate::browser::passwords::set_enabled(&label, passwords);
     set_autofill(&find(&app, &label)?, autofill, passwords)
 }
 
@@ -516,7 +525,7 @@ pub async fn browser_profile_erase(app: AppHandle, profile: String) -> Result<()
 
 #[cfg(target_os = "macos")]
 async fn erase(app: &AppHandle, profile: &str, _dir: &std::path::Path) -> Result<(), String> {
-    crate::passwords::erase(profile)?;
+    crate::browser::passwords::erase(profile)?;
     if !stores_supported() {
         return Ok(()); // no store was ever made
     }
@@ -549,7 +558,7 @@ pub async fn browser_navigate(app: AppHandle, label: String, url: String) -> Res
 pub async fn browser_pick(app: AppHandle, label: String, mut opts: serde_json::Value) -> Result<(), String> {
     let webview = find(&app, &label)?;
     if let Some(o) = opts.as_object_mut() {
-        o.insert("token".into(), crate::browser_shot::new_token(&label).into());
+        o.insert("token".into(), crate::browser::shot::new_token(&label).into());
     }
     webview
         .eval(format!("window.__tricodePick && window.__tricodePick({opts})"))

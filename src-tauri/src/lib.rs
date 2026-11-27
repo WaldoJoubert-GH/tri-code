@@ -4,14 +4,8 @@ mod agent_windows;
 mod altspace;
 mod bg;
 mod browser;
-mod browser_debug;
-mod browser_keys;
-mod browser_shot;
-#[cfg(target_os = "linux")]
-mod browser_gtk;
 mod cli;
 mod db;
-mod downloads;
 mod dirs;
 mod docker;
 mod monitor;
@@ -20,7 +14,6 @@ mod news;
 mod envs;
 mod folders;
 mod fonts;
-mod forward;
 mod git;
 mod grammars;
 mod ignored;
@@ -28,7 +21,6 @@ mod github;
 mod leftovers;
 mod mdpdf;
 mod media;
-mod passwords;
 mod phone;
 mod plane;
 mod pty;
@@ -200,7 +192,7 @@ pub fn run() {
                 .disable_drag_drop_handler()
                 .devtools(cfg!(debug_assertions));
             #[cfg(target_os = "linux")]
-            let main = if browser_gtk::framed() {
+            let main = if browser::gtk::framed() {
                 main.initialization_script("window.__TRICODE_FRAMED_BROWSERS__ = true;")
             } else {
                 main
@@ -209,8 +201,8 @@ pub fn run() {
             #[cfg(windows)]
             altspace::forward(app.handle(), &_main);
             #[cfg(target_os = "linux")]
-            if !browser_gtk::framed() {
-                browser_gtk::install(&_main)?;
+            if !browser::gtk::framed() {
+                browser::gtk::install(&_main)?;
             }
             Ok(())
         })
@@ -344,10 +336,10 @@ pub fn run() {
             news::news_page,
             news::news_load,
             news::news_save,
-            forward::forward_port,
-            forward::forward_dir,
-            forward::forward_close,
-            forward::remote_listening,
+            browser::forward::forward_port,
+            browser::forward::forward_dir,
+            browser::forward::forward_close,
+            browser::forward::remote_listening,
             shared::devfs::dev_read,
             shared::devfs::dev_write,
             shared::devfs::save_pasted_image,
@@ -386,23 +378,23 @@ pub fn run() {
             browser::browser_autofill,
             browser::browser_profile_erase,
             browser::browser_profiles_supported,
-            passwords::browser_password_answer,
-            passwords::browser_passwords,
-            passwords::browser_password_forget,
+            browser::passwords::browser_password_answer,
+            browser::passwords::browser_passwords,
+            browser::passwords::browser_password_forget,
             browser::browser_pick,
             browser::browser_back,
             browser::browser_forward,
             browser::browser_reload,
             browser::browser_focus,
             browser::browser_focus_app,
-            browser_keys::browser_keys,
+            browser::keys::browser_keys,
             browser::browser_download,
-            browser_debug::browser_devtools,
-            browser_debug::browser_cdp,
-            downloads::download_open,
-            downloads::download_reveal,
-            downloads::download_cancel,
-            downloads::downloads_folder,
+            browser::debug::browser_devtools,
+            browser::debug::browser_cdp,
+            browser::downloads::download_open,
+            browser::downloads::download_reveal,
+            browser::downloads::download_cancel,
+            browser::downloads::downloads_folder,
             bg::bg_save,
             bg::bg_load,
             bg::bg_delete,
@@ -438,7 +430,7 @@ pub fn run() {
                 docker::close_all();
                 monitor::close_all();
                 media::media_unwatch();
-                forward::close_all();
+                browser::forward::close_all();
             }
         });
 }
