@@ -2,24 +2,8 @@
 // picture, choosing a feed's icon from a page's <link>s. The fetching is news.ts's, the commands
 // src-tauri/src/news.rs's.
 
-/** A feed the News Window reads. App-wide, in state.json (`app.feeds`). */
-export type NewsFeed = {
-  id: string;
-  /** The feed's own address (RSS, Atom or JSON Feed). */
-  url: string;
-  name: string;
-  /** The heading it lists under. */
-  topic: string;
-  /** The site's icon once found (feed <icon>, else the site's <link rel="icon">), remembered so it
-   *  is found once. Unset until the first fetch looks. */
-  icon?: string;
-  /** The feed's logo (RSS <image>): often a wide banner, so only used when no icon works. */
-  logo?: string;
-  /** The site the feed is for. */
-  site?: string;
-  /** Turned off: kept, but not fetched or shown. */
-  off?: true;
-};
+// The feed type lives in state.ts, which persists it; re-exported for the news files.
+export type { NewsFeed } from "./state";
 
 /** One item as the Rust side returns it. */
 export type RawItem = { id: string; title: string; link: string; html: string; image?: string | null; published: number; author?: string | null };

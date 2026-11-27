@@ -3,7 +3,6 @@ import { createStore, produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 import type { DiffMode } from "./diff";
 import type { Clear, Fx } from "./backdrop";
-import type { NewsFeed } from "./newsdata";
 
 export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker" | "monitor" | "news" | "calc";
 
@@ -362,6 +361,26 @@ export type Persisted = {
   feeds?: NewsFeed[];
   /** The News Window's topics, in order (Settings › News); unset is TOPICS (newsdata.ts). */
   newsTopics?: string[];
+};
+
+/** A feed the News Window reads. App-wide, in state.json (`app.feeds`). Here, not in newsdata.ts,
+ *  because state owns what it persists. */
+export type NewsFeed = {
+  id: string;
+  /** The feed's own address (RSS, Atom or JSON Feed). */
+  url: string;
+  name: string;
+  /** The heading it lists under. */
+  topic: string;
+  /** The site's icon once found (feed <icon>, else the site's <link rel="icon">), remembered so it
+   *  is found once. Unset until the first fetch looks. */
+  icon?: string;
+  /** The feed's logo (RSS <image>): often a wide banner, so only used when no icon works. */
+  logo?: string;
+  /** The site the feed is for. */
+  site?: string;
+  /** Turned off: kept, but not fetched or shown. */
+  off?: true;
 };
 
 export type Settings = {
