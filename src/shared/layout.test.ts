@@ -1,8 +1,8 @@
 // bun test: the folder rules of docs/blueprint.md. shared/ never imports anything outside src/shared/,
 // and a module is entered only through its folder (its index.ts), from another module or from a file
-// outside modules/; and a module imports only shared/ and other modules, never an app file (those
-// still at the src/ root, later src/app/). The last rule (nothing sits outside app/, shared/ and
-// modules/) is turned on in step 5, once app/ exists.
+// outside modules/; a module imports only shared/ and other modules, never an app file; nothing in
+// shared/ or modules/ imports src/app/ (the composition root); and src/ itself holds only app/,
+// shared/ and modules/.
 
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -11,6 +11,7 @@ import { dirname, join, relative, resolve } from "node:path";
 const shared = import.meta.dir;
 const src = dirname(shared);
 const modules = join(src, "modules");
+const app = join(src, "app");
 
 /** Every .ts/.tsx file under `dir`, as absolute paths. */
 const sources = (dir: string) =>
@@ -70,8 +71,8 @@ function crossesSeam(from: string, to: string): boolean {
   return ![dir, join(dir, "index.ts"), join(dir, "index.tsx")].includes(to);
 }
 
-/** Whether `p` is a file of the app: under src/ but outside shared/ and modules/ (today the src/ root,
- *  later src/app/). Files outside src/ (the repo's assets/) are not. */
+/** Whether `p` is a file of the app: under src/ but outside shared/ and modules/ (src/app/, or a stray
+ *  file at the src/ root, which the src/ test below also forbids). Files outside src/ (the repo's assets/) are not. */
 const reachesApp = (p: string) => inside(src, p) && !inside(shared, p) && !inside(modules, p);
 
 /** Module -> app edges not cut yet, each with its reason. Keep it short; the test above fails on a stale entry. */
@@ -120,9 +121,10 @@ describe("src/modules/", () => {
   });
 
   test("the app rule tells shared/ and modules/ from the root and app/", () => {
-    expect(reachesApp(join(src, "hotkeys.ts"))).toBe(true);
-    expect(reachesApp(join(src, "files.css"))).toBe(true);
-    expect(reachesApp(join(src, "app", "App.tsx"))).toBe(true);
+    expect(reachesApp(join(app, "hotkeys.ts"))).toBe(true);
+    expect(reachesApp(join(app, "files.css"))).toBe(true);
+    expect(reachesApp(join(app, "settings", "Settings.tsx"))).toBe(true);
+    expect(reachesApp(join(src, "stray.ts"))).toBe(true);
     expect(reachesApp(join(shared, "nav.ts"))).toBe(false);
     expect(reachesApp(join(modules, "git", "index.ts"))).toBe(false);
     expect(reachesApp(join(dirname(src), "assets", "icon.svg"))).toBe(false);
@@ -130,12 +132,56 @@ describe("src/modules/", () => {
 
   test("the seam rule tells the folder from a file inside it", () => {
     const m = (...p: string[]) => join(modules, ...p);
-    expect(crossesSeam(join(src, "App.tsx"), m("db", "index.ts"))).toBe(false);
-    expect(crossesSeam(join(src, "App.tsx"), m("db", "db.ts"))).toBe(true);
-    expect(crossesSeam(join(src, "App.tsx"), m("db", "db.css"))).toBe(true);
+    expect(crossesSeam(join(app, "App.tsx"), m("db", "index.ts"))).toBe(false);
+    expect(crossesSeam(join(app, "App.tsx"), m("db", "db.ts"))).toBe(true);
+    expect(crossesSeam(join(app, "App.tsx"), m("db", "db.css"))).toBe(true);
     expect(crossesSeam(m("docker", "DockerPanel.tsx"), m("sandbox", "index.ts"))).toBe(false);
     expect(crossesSeam(m("docker", "DockerPanel.tsx"), m("sandbox", "sandbox.ts"))).toBe(true);
     expect(crossesSeam(m("db", "DbPanel.tsx"), m("db", "dbsql.ts"))).toBe(false);
     expect(crossesSeam(m("db", "DbPanel.tsx"), join(shared, "ui", "ui.ts"))).toBe(false);
+  });
+});
+
+/** Files allowed directly in src/, beside app/, shared/ and modules/. None today: vite-env.d.ts lives
+ *  in app/, where tsconfig's "include": ["src"] still finds it. */
+const ROOT_ALLOWED: string[] = [];
+
+describe("src/app/", () => {
+  const files = sources(src).filter((f) => f !== import.meta.path);
+  const below = files.filter((f) => inside(shared, f) || inside(modules, f));
+
+  test("is scanned: app/ holds the entry point and imports shared/ and the modules", () => {
+    expect(existsSync(join(app, "index.tsx"))).toBe(true);
+    const own = files.filter((f) => inside(app, f));
+    expect(own.length).toBeGreaterThan(20);
+    const specs = own.flatMap((f) => imports(readFileSync(f, "utf8")).map((s) => resolveFrom(f, s)));
+    expect(specs.some((p) => inside(shared, p))).toBe(true);
+    expect(specs.some((p) => inside(modules, p))).toBe(true);
+    expect(below.length).toBeGreaterThan(150);
+  });
+
+  test("is imported by nothing in shared/ or modules/: it is the composition root", () => {
+    const out: string[] = [];
+    for (const f of below)
+      for (const spec of imports(readFileSync(f, "utf8"))) {
+        const edge = `${relative(src, f).replaceAll("\\", "/")} -> ${spec}`;
+        if (inside(app, resolveFrom(f, spec)) && !APP_ALLOWED.includes(edge)) out.push(edge);
+      }
+    expect(out).toEqual([]);
+  });
+});
+
+describe("src/", () => {
+  const entries = readdirSync(src, { withFileTypes: true });
+
+  test("is scanned: it holds app/, shared/ and modules/", () => {
+    expect(entries.filter((e) => e.isDirectory()).map((e) => e.name)).toEqual(expect.arrayContaining(["app", "shared", "modules"]));
+  });
+
+  test("holds only app/, shared/ and modules/: no other folder, and no code or CSS beside them", () => {
+    const stray = entries
+      .filter((e) => (e.isDirectory() ? !["app", "shared", "modules"].includes(e.name) : /\.(tsx?|css)$/.test(e.name) && !ROOT_ALLOWED.includes(e.name)))
+      .map((e) => e.name);
+    expect(stray).toEqual([]);
   });
 });
