@@ -26,6 +26,7 @@ import { openEditor } from "./files";
 import { openDockerPanel } from "./docker";
 import { openMonitorPanel } from "./monitor";
 import { openNewsPanel } from "./news";
+import { openCalcPanel } from "./calc";
 import { openGitPanel } from "./git";
 import { connsOf, openDbWindow } from "./db";
 import { labelOf, openNewWorktree, removeWorktree } from "./worktrees";
@@ -164,6 +165,7 @@ export function commands(): Command[] {
     add({ id: "docker", group: "New", title: "Docker", hint: "containers, ports and logs", icon: "container", keys: capsOf("docker"), run: () => void openDockerPanel(p) });
     add({ id: "monitor", group: "New", title: "Monitor", hint: "CPU, memory and processes", icon: "activity", keys: capsOf("monitor"), run: () => void openMonitorPanel(p) });
     add({ id: "news", group: "New", title: "News", hint: "RSS and Atom feeds", icon: "rss", keys: capsOf("news"), run: () => void openNewsPanel(p) });
+    add({ id: "calc", group: "New", title: "Calculator", hint: "a tape of sums", icon: "calculator", keys: capsOf("calc"), run: () => void openCalcPanel(p) });
     add({ id: "agents", group: "New", title: "Commands", hint: "edit the + menu", icon: "settings-2", keys: capsOf("agents"), run: () => void openAgentsPanel(p) });
 
     if (f) {

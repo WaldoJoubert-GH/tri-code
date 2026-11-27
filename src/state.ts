@@ -5,7 +5,7 @@ import type { DiffMode } from "./diff";
 import type { Clear, Fx } from "./backdrop";
 import type { NewsFeed } from "./newsdata";
 
-export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker" | "monitor" | "news";
+export type TabKind = "term" | "browser" | "issues" | "editor" | "git" | "agents" | "db" | "docker" | "monitor" | "news" | "calc";
 
 /** A Hotkey Modifier chord, matched on e.code like every window binding. The modifier is implied. */
 export type Hotkey = { code: string; shift?: boolean; ctrl?: boolean };
@@ -158,7 +158,7 @@ export const isTerminal = (t: Tab) => t.kind === "term";
 
 export const agentOf = (t: Tab) => (t.agent ? app.agents.find((a) => a.id === t.agent) : undefined);
 
-const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database", docker: "container", monitor: "activity", news: "rss" };
+const PANEL_ICON = { browser: "globe", issues: "list-todo", editor: "file-code", git: "git-branch", agents: "settings-2", db: "database", docker: "container", monitor: "activity", news: "rss", calc: "calculator" };
 
 /** A window's lucide icon: its agent's for a terminal or web app, else its kind's. */
 export const tabIcon = (t: Tab) =>
@@ -174,6 +174,7 @@ export const tabName = (t: Tab) =>
   : t.agent ? agentOf(t)?.name || t.name || t.kind
   : t.kind === "agents" ? "commands"
   : t.kind === "db" ? "database"
+  : t.kind === "calc" ? "calculator"
   : t.kind;
 
 export type Layout = "master" | "grid" | "mono";
@@ -271,6 +272,9 @@ export type Project = {
   /** Export PDF of a Markdown file: the page and the CSS laid over tri-code's print CSS (mdexport.ts).
    *  A Worktree uses its repo's. */
   mdExport?: MdExport;
+  /** The Calculator Window's Tape (calcdata.ts). Unset until the window is first opened, which
+   *  starts it with the sample; "" once cleared. Kept when the window closes. */
+  calc?: string;
 };
 
 /** A project's PDF export settings; a missing field is the default (A4, 18 mm, no CSS). `preview`
@@ -1194,6 +1198,11 @@ export function setEditorTab(projectId: string, tabId: string, patch: Partial<Pi
   });
 }
 
+/** The Calculator Window's Tape text, kept per project. */
+export function setCalcTape(projectId: string, text: string) {
+  edit(projectId, (p) => { p.calc = text; });
+}
+
 /** The git window's and the editor's diff orientation, kept per project. */
 export function setProjectDiffMode(projectId: string, mode: DiffMode) {
   edit(projectId, (p) => { p.diffMode = mode; });
@@ -1442,6 +1451,7 @@ export function migrate(raw: any): Persisted {
       ...(p.sample ? { sample: true } : {}),
       ...(p.links?.length ? { links: p.links } : {}),
       ...(p.mdExport ? { mdExport: p.mdExport } : {}),
+      ...(typeof p.calc === "string" ? { calc: p.calc } : {}),
     };
   });
   const resumes = new Set<string>();
