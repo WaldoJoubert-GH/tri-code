@@ -8,8 +8,7 @@ import {
 import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig } from "./signals";
 import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
-import { LeftoversChip, LeftoversPopover } from "./LeftoversPopover";
-import { leftoversOpen, watchLeftovers } from "./leftovers";
+import { LeftoversChip, LeftoversPopover, leftoversOpen, watchLeftovers } from "./modules/leftovers";
 import { adoptSandboxes } from "./modules/sandbox";
 import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";

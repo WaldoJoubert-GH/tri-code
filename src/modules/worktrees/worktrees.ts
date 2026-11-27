@@ -19,7 +19,7 @@ import { setupCommand, setupLines } from "./setup";
 import { launchAgent } from "../../agents";
 import { folderStatus, gitOf, peekStatus } from "../git";
 import { ask, flash } from "../../shared/ui/ui";
-import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "../../leftovers";
+import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "../leftovers";
 import { ensureSandbox, newSandboxName, relativeGitdir, removeSandbox, sandboxOf } from "../sandbox";
 import type { IgnoredFile } from "./ignored";
 

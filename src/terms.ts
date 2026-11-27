@@ -17,7 +17,7 @@ import { copyText, readImagePng, readText } from "./shared/ui/clipboard";
 import { Demo, playDemo } from "./demo";
 import { isKey } from "./shared/keys/keymap";
 import { isMac } from "./shared/keys/modkey";
-import { rescanSoon } from "./leftovers";
+import { rescanSoon } from "./modules/leftovers";
 
 const SSH_CONNECTION_FAILED = 255;
 const MAX_BACKOFF_MS = 10_000;

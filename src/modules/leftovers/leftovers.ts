@@ -9,9 +9,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { type Project, app, isLocalHost, isTerminal, projectById, sessionName } from "./shared/state/state";
-import { envLocked } from "./modules/environments";
-import { ask, flash } from "./shared/ui/ui";
+import { type Project, app, isLocalHost, isTerminal, projectById, sessionName } from "../../shared/state/state";
+import { envLocked } from "../environments";
+import { ask, flash } from "../../shared/ui/ui";
 
 export type LeftoverKind = "ghost" | "stray" | "remote" | "folder" | "prune";
 

@@ -36,7 +36,7 @@ import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, ste
 import { nextSignal } from "./signals";
 import { closeSignals, signalsOpen } from "./SignalSettings";
 import { closeFeedback, feedbackOpen } from "./Feedback";
-import { closeLeftovers, leftoversOpen } from "./leftovers";
+import { closeLeftovers, leftoversOpen } from "./modules/leftovers";
 import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./modules/media";
 import { flash } from "./shared/ui/ui";
 import { hasSelection } from "./terms";
