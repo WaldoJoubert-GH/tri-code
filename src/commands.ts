@@ -10,7 +10,7 @@ import { ICON_THEMES, type IconTheme, setPreviewTheme } from "./shared/ui/fileic
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { requestClose } from "./Canvas";
 import { isMac } from "./shared/keys/modkey";
-import { openAppearance, toggleAppearance } from "./Appearance";
+import { openAppearance, toggleAppearance } from "./modules/appearance";
 import { nextSignal, toggleDnd, toggleSignals } from "./modules/signals";
 import { openSettings, toggleSettings } from "./shared/nav";
 import { chooseImport, exportConfig } from "./Backup";

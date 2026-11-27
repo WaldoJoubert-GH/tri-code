@@ -7,7 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { type ConfigFile, type ImportPlan, type Section, SECTIONS, applyImport, assetKeys, assetName, buildExport, parseConfig, planImport } from "./config";
 import { app, newId, setApp } from "./shared/state/state";
-import { setBgImage } from "./Appearance";
+import { setBgImage } from "./modules/appearance";
 import { loadIcons } from "./shared/ui/icons";
 import { reloadSound } from "./modules/signals";
 import { appVersion } from "./updater";

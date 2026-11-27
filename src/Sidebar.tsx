@@ -6,7 +6,7 @@ import {
   setSidebarCollapsed, togglePin, worktreesOf,
 } from "./shared/state/state";
 import { setBrowsersCovered } from "./modules/browser";
-import { appearanceOpen, closeAppearance, openAppearance } from "./Appearance";
+import { appearanceOpen, closeAppearance, openAppearance } from "./modules/appearance";
 import { dev, isActive, sourcesOf, stateOf } from "./modules/issues";
 import { IconFace } from "./shared/ui/icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./shared/ui/lucide";

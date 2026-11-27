@@ -23,7 +23,7 @@ import { startCli } from "./cli";
 import { phoneStatus, startPhoneSync } from "./modules/phone";
 import { MediaPopover } from "./modules/media";
 import { mediaPopOpen } from "./modules/media";
-import { AppearancePopover, Backdrop, appearanceOpen, setBgImage, toggleAppearance } from "./Appearance";
+import { AppearancePopover, Backdrop, appearanceOpen, setBgImage, toggleAppearance } from "./modules/appearance";
 import { clearLook } from "./shared/backdrop";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./shared/ui/lucide";

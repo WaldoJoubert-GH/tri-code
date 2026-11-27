@@ -6,16 +6,16 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
-import { CLEAR_MAX, type Clear, type Fx, type FxKind, fxOn, paintBackdrop } from "./shared/backdrop";
+import { CLEAR_MAX, type Clear, type Fx, type FxKind, fxOn, paintBackdrop } from "../../shared/backdrop";
 import { createStore, produce } from "solid-js/store";
-import { ACCENTS, GAP_MAX, type MdExport, Project, activeProject, app, onProjectDropped, projectById, renameProject, repoOf, setAppearance, setGap, setIcon, setMdExport } from "./shared/state/state";
-import { CSS_HINT, DEFAULT_MARGIN, PAGES } from "./modules/editor";
-import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./shared/ui/icons";
-import { Icon, toggleIconPicker } from "./shared/ui/lucide";
-import { SignalsForm } from "./modules/signals";
-import { flash } from "./shared/ui/ui";
-import { keyOf } from "./shared/keys/keymap";
-import { isEnter } from "./shared/ui/enterkey";
+import { ACCENTS, GAP_MAX, type MdExport, Project, activeProject, app, onProjectDropped, projectById, renameProject, repoOf, setAppearance, setGap, setIcon, setMdExport } from "../../shared/state/state";
+import { CSS_HINT, DEFAULT_MARGIN, PAGES } from "../editor";
+import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "../../shared/ui/icons";
+import { Icon, toggleIconPicker } from "../../shared/ui/lucide";
+import { SignalsForm } from "../signals";
+import { flash } from "../../shared/ui/ui";
+import { keyOf } from "../../shared/keys/keymap";
+import { isEnter } from "../../shared/ui/enterkey";
 
 const tint = (a: string, p: number) => `color-mix(in srgb, ${a} ${p}%, transparent)`;
 
