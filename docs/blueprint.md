@@ -1,6 +1,6 @@
 # Codebase blueprint: one folder per module, `shared/` for cross-module use
 
-Status: in progress. Steps 1 (back-edges), 2 (`src/shared/`) and 3 (leaf modules) of the [Migration order](#migration-order) are done; the inner modules and `app/` are still flat in `src/`.
+Status: in progress. Steps 1 (back-edges), 2 (`src/shared/`), 3 (leaf modules) and 4 (inner modules) of the [Migration order](#migration-order) are done; the `app/` files are still flat in `src/`.
 
 Today `src/` is flat: 193 files, with every window, dialog, store and helper side by side. `src-tauri/src/` is flat too, apart from `db/`. This blueprint gives each module a folder and an **interface** (its `index.ts` / `mod.rs`), and puts what several modules use in `shared/`.
 
@@ -23,14 +23,14 @@ Rule 3 and 4 are enforced by a test (see [Enforcement](#enforcement)), as `keys.
 
 | Folder | Files | Why it is shared |
 |---|---|---|
-| `shared/state/` | `state.ts`, `movetab.test.ts`, `resume.test.ts`, `pageprofiles.test.ts` | The app store; every module reads it. |
+| `shared/state/` | `state.ts`, `movetab.test.ts`, `resume.test.ts`, `pageprofiles.test.ts` | The app store; every module reads it. Since step 4 it also holds `dropProject` and the `onProjectDropped` hook (see Back-edges). |
 | `shared/ui/` | `ui.ts` (flash, toast, ask, clock), `Modal.tsx`, `ctxmenu.tsx`, `lucide.tsx`, `icons.tsx`, `fileicons.ts`, `favicons.ts`, `clipboard.ts`, `enterkey.ts`, and the tests of the last three | The UI kit: dialogs, menus, icons, copy. |
 | `shared/keys/` | `keymap.ts`, `modkey.ts`, `hints.ts`, `Keys.tsx`, `keys.test.ts`, `hints.test.ts` | The Keymap, Hotkey Modifier, Hold Hints and Keycap: drawn by every module. |
 | `shared/text/` | `diff.ts`, `DiffView.tsx`, `diff.css`, `markdown.ts`, `csv.ts`, `branchname.ts`, and the tests of `diff`, `markdown`, `csv` | Pure parsers used by 2+ modules (diff: Editor, Git, state; csv: Editor, Database). |
 | `shared/codemirror/` | `cm.ts`, `langs.ts`, `grammars.ts`, `grammars.json`, `textmate.ts`, `tmparser.ts`, `LangPicker.tsx`, `LangSettings.tsx`, `grammars.test.ts`, `tmparser.test.ts` | The CodeMirror kit and Grammar Catalog: Editor, Database and Calculator all build editors on it. |
-| `shared/` (top) | `look.ts`, `backdrop.ts` (each with its test), `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts`, `urls.ts`, `layout.test.ts` | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). `urls.ts` also holds `NOT_HTTP` (step 3): the Docker Window and Remote Tunnels (`tunnelmap.ts`) both use it. |
+| `shared/` (top) | `look.ts`, `backdrop.ts` (each with its test), `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts`, `urls.ts`, `links.ts`, `links.test.ts`, `layout.test.ts` | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). `urls.ts` also holds `NOT_HTTP` (step 3): the Docker Window and Remote Tunnels (`tunnelmap.ts`) both use it. `nav.ts` also holds the New window menu's state and `runHotkey` (step 4). `links.ts` (step 4): which Linked Folder root a path is under, asked by the Editor, the Database Window, Remote Control and Welcome. |
 
-Done in step 2. `preview.test.ts` tests the preview flag through `sandbox.ts` (`sandboxOf`, `runsInSandbox`), so it moved to `modules/sandbox/` in step 3. `projects.ts` stays in `src/` (see Back-edges).
+Done in step 2. `preview.test.ts` tests the preview flag through `sandbox.ts` (`sandboxOf`, `runsInSandbox`), so it moved to `modules/sandbox/` in step 3. `projects.ts` is gone (step 4): `dropProject` is in `shared/state/`.
 
 ### `src/modules/`
 
@@ -40,8 +40,8 @@ Done in step 2. `preview.test.ts` tests the preview flag through `sandbox.ts` (`
 | `agents/` (Commands; `Agent` in code) | `agents.ts`, `agentkeys.ts`, `agenttarget.ts`, `agentsetup.ts`, `AgentsPanel.tsx`, `AgentSettings.tsx`, `SetupBanner.tsx`, `agents.css`, `agentsetup.css` |
 | `signals/` | `signals.ts`, `SignalSettings.tsx`, `SoundSelect.tsx` |
 | `browser/` | `browsers.ts`, `profiles.tsx`, `debugmenu.tsx`, `downloads.tsx`, `favs.tsx`, `tunnels.ts`, `tunnelmap.ts`, `tunnelui.tsx`, `shots.ts` |
-| `editor/` | `Editor.tsx`, `FileList.tsx`, `files.ts`, `MdPaper.tsx`, `mdexport.ts`, `files.css` |
-| `linked-folders/` | `links.ts`, `LinkFolder.tsx` |
+| `editor/` | `Editor.tsx`, `FileList.tsx`, `files.ts`, `MdPaper.tsx`, `mdexport.ts`, then its part of `files.css` once that is split |
+| `linked-folders/` | `LinkFolder.tsx` (`links.ts` went to `shared/` in step 4) |
 | `git/` | `git.ts`, `repos.ts`, `GitPanel.tsx`, `git.css`, `gitmarks.test.ts`, `marks.test.ts` |
 | `issues/` | `issues.ts`, `timeline.ts`, `IssuesPanel.tsx` |
 | `db/` | `db.ts`, `dbsql.ts`, `DbPanel.tsx`, `SheetView.tsx`, `db.css`, `sheet.css` |
@@ -60,7 +60,7 @@ Done in step 2. `preview.test.ts` tests the preview flag through `sandbox.ts` (`
 | `tour/` | `Tour.tsx` |
 | `usage/` | `Usage.tsx`, `pace.ts` |
 
-Each module's tests sit with it. Step 3 also moved `preview.test.ts` to `sandbox/`, and split `links.test.ts`'s `connOf` case into a new `db/db.test.ts` (see [step 3](#step-3-leaf-modules)).
+Each module's tests sit with it. Step 3 also moved `preview.test.ts` to `sandbox/`, and split `links.test.ts`'s `connOf` case into a new `db/db.test.ts` (see [step 3](#step-3-leaf-modules)). Done in steps 3 and 4.
 
 ### `src/app/`
 
@@ -168,8 +168,9 @@ src/
 │   ├── preview.ts
 │   ├── scope.ts
 │   ├── sigs.ts
-│   ├── nav.ts                    the Settings page state
+│   ├── nav.ts                    the Settings page, New window menu, runHotkey
 │   ├── urls.ts                   normalizeUrl
+│   ├── links.ts                  Linked Folder roots (with links.test.ts)
 │   └── layout.test.ts            new: enforces the folder rules
 │
 └── modules/                      each imports only shared/ and other modules' index.ts
@@ -225,7 +226,7 @@ src/
     ├── signals/                  signals.ts, SignalSettings.tsx, SoundSelect.tsx, signals.css
     ├── environments/             EnvDialog, envform, envlock, OpenProject, newfolder, environments.css
     ├── worktrees/                worktrees.ts, agentworktree, setup, ignored, NewWorktree, WorktreeDialog, worktrees.css
-    ├── linked-folders/           links.ts, LinkFolder.tsx, linked-folders.css
+    ├── linked-folders/           LinkFolder.tsx, linked-folders.css
     ├── leftovers/                leftovers.ts, LeftoversPopover.tsx
     ├── sandbox/                  sandbox.ts, SandboxSettings.tsx, sandbox.css
     ├── phone/                    phone.ts, phoneask.ts, RemoteSettings.tsx
@@ -295,8 +296,8 @@ src-tauri/src/
 An `index.ts` re-exports only what other modules use. For example, `modules/issues/index.ts`:
 
 ```ts
-export { IssuesPanel } from "./IssuesPanel";
-export { dev, inProgress, slugOf, devOf, sourcesOf, stateOf, isActive, forgetProject } from "./issues";
+export { default as IssuesPanel } from "./IssuesPanel";
+export { dev, devOf, inProgress, isActive, openIssuePanel, slugOf, sourcesOf, stateOf, /* …and the time tracking */ } from "./issues";
 ```
 
 `git.ts` then imports `from "../issues"`, never `"../issues/issues"`. An `index.ts` whose export list keeps growing marks a shallow module worth a second look.
@@ -308,14 +309,14 @@ These imports break rules 3 and 4 today. Each needs a small change before (or as
 | Edge | Fix |
 |---|---|
 | `state.ts` → `news/newsdata` (`NewsFeed` type) | Done: `NewsFeed` is defined in `state.ts`; `newsdata.ts` re-exports it. |
-| `worktrees.ts`, `Tour.tsx` → `Sidebar` (`dropProject`) | Done: moved to `src/projects.ts`. Not `shared/state`: it calls into browsers, terms, Appearance, icons, issues and signals, so in state it would add six back-edges. Before step 4's cross-module rule, give `state` an "on project dropped" hook each module registers with (as `onAlert`), leaving `dropProject` in state. |
+| `worktrees.ts`, `Tour.tsx` → `Sidebar` (`dropProject`) | Done: first moved to `src/projects.ts`; in step 4 `dropProject` went to `shared/state` with an `onProjectDropped(fn)` hook. The browser (closes its pages), terminal (sessions), Appearance (`bg_delete` and the image), `shared/ui/icons` (`forgetIcon`), issues and signals each register their cleanup at load, and `projects.ts` is gone. |
 | `NewsPanel`, `NewWorktree`, `profiles`, `debugmenu`, `Sidebar`, `SandboxSettings`, `App`, `commands`, `hotkeys` → `Settings` | Done: `src/shared/nav.ts` holds the whole Settings page state (`SettingsPage`, `settingsPage`, `openSettings`, `closeSettings`, `toggleSettings`, `settingsOpen`, `hotkeysOpen`, `toggleHotkeys`); `Settings.tsx` exports only `SettingsDialog`. |
 | `cli`, `LinkFolder`, `Welcome`, `Tour`, `Sidebar` → `OpenProject` (`openProjectDialog`, `openFolder`, `FolderPicker`) | Fine once `OpenProject` is `environments/`' interface. `FolderPicker` is used by Linked Folders too: export it from `environments/index.ts`. |
 | `signals` ↔ `phone` (`pushSignal` / `sigOf`) | Done: `signals` exposes `onAlert(fn)` and `phone` registers with it at load; `phone` takes `sigOf` from `sigs.ts`. |
 | `agents`, `AgentsPanel`, `phoneask` ↔ `browser` (`normalizeUrl` one way; `agentsetup`, `agenttarget` the other) | Done: `normalizeUrl` is in `src/shared/urls.ts`. The browser → agents direction stays (Select element sends to an agent). |
 | `envlock` → `issues` (`clock`) | Done: `clock`, `setClock`, `startClock` are in `ui.ts`. |
 | `terms` → `signals` → `phone` → `terms` (cycle) | Cut by the `onAlert` change above. |
-| `tour` → `hotkeys` (`runHotkey`), `tabs` (`tabMenuOpen`, `toggleTabMenu`) | Open: a module importing `app/`. Cut before step 5 turns on the `app/` rule, e.g. by letting `app/` hand the Tour those as callbacks. |
+| `tour` → `hotkeys` (`runHotkey`), `tabs` (`tabMenuOpen`, `toggleTabMenu`) | Done in step 4: the New window menu's signal (`tabMenu`, `tabMenuOpen`, `closeTabMenu`, `toggleTabMenu`) is in `shared/nav.ts`; `runHotkey` there calls the runner `hotkeys.ts` registers at load (`setHotkeyRunner`). |
 | `tunnelmap` → `docker` (`NOT_HTTP`) | Done in step 3: `NOT_HTTP` is in `shared/urls.ts`. Through `docker/index.ts` it would have pulled `DockerPanel.tsx` into `tunnelmap.test.ts`, which bun can't load (see step 3). |
 
 ## CSS
@@ -425,12 +426,12 @@ A Rust file is already a module, so a single-file module keeps its `name.rs`; a 
 Add `src/shared/layout.test.ts` (bun test) that reads every `.ts`/`.tsx` under `src/`, parses its relative imports and fails when:
 
 - a file in `shared/` imports from `modules/` or `app/` (on since step 2, as "imports only from `src/shared/`", which also catches a file still flat in `src/`);
-- a file in `modules/` imports from `app/`;
+- a file in `modules/` imports from `app/` (on since step 4, as "imports nothing under `src/` outside `shared/` and `modules/`", so the `app/` files still at the root count; an explicit allowlist in the test holds the edges not cut yet);
 - a file in `modules/a/` imports a path inside `modules/b/` other than the folder itself (`../b`) or its `index.ts` (on since step 3);
 - a file outside `modules/` imports a path inside `modules/x/` other than the folder or its `index.ts`, CSS included (on since step 3, while `app/` and the inner modules are still flat in `src/`);
 - a `src/` file sits outside `app/`, `shared/` and `modules/` (apart from those three folders).
 
-The step 3 checks also assert that the ten leaf modules are there, each with an `index.ts`, and that files outside `modules/` import them, so they can't pass on an empty scan.
+The step 3 checks also assert that the modules are there (all 23 since step 4), each with an `index.ts`, and that files outside `modules/` import them, so they can't pass on an empty scan.
 
 ## Migration order
 
@@ -439,7 +440,7 @@ One PR per step; each ends with `bun run typecheck`, `bun test ./src/`, `cargo c
 1. **Cut the back-edges** above, in place, with no moves. Small, reviewable, and it makes every later move mechanical. Done.
 2. **`shared/`**: move the shared files and fix imports. Add the enforcement test with only the `shared/` rule on. Done: no shared file imported a root one, so nothing had to change but paths.
 3. **Leaf modules** (nothing else imports them except `app/`): `calc`, `monitor`, `news`, `docker`, `media`, `usage`, `db`, `sandbox`, `welcome`, `tour`. Done; see [Step 3: leaf modules](#step-3-leaf-modules).
-4. **Inner modules**: `issues`, `git`, `linked-folders`, `editor`, `environments`, `worktrees`, `leftovers`, `signals`, `phone`, `agents`, `terminal`, `browser`, `appearance`. Turn on the cross-module rule.
+4. **Inner modules**: `issues`, `git`, `linked-folders`, `editor`, `environments`, `worktrees`, `leftovers`, `signals`, `phone`, `agents`, `terminal`, `browser`, `appearance`. Turn on the cross-module rule. Done; see [Step 4: inner modules](#step-4-inner-modules).
 5. **`app/`** last, then turn on the last rule.
 6. **Rust**: `shared/` first (most `crate::` paths change there), then each folder. `git.rs`'s split is its own PR.
 
@@ -465,10 +466,61 @@ Each `index.ts` re-exports only what files outside the module imported on the da
 What turned out different from the plan:
 
 - **Not all leaves.** The bold importers aren't `app/`: Editor uses the Database Window's grid for CSV and workbooks, Settings › Commands shares the Welcome window's + menu list, Welcome starts the Tour, and Docker Sandboxes are used by terminals, Worktrees and the Docker Window. They all go through `index.ts`, so nothing had to change. `sandbox/`'s interface is the widest (23 names): the shallow-module sign the Example tree warns about, worth a second look.
-- **Leaves still import root files** that become other modules in step 4: `news/` and `docker/` import `browsers`; `db/` imports `links`; `welcome/` imports `agentsetup`, `agents`, `signals`, `SoundSelect`, `EnvDialog`, `OpenProject` and `links`; `tour/` imports `OpenProject`, `projects`, `terms`, and the `app/` files `hotkeys` and `tabs` (see Back-edges). Step 4 turns these into folder imports as each one moves.
+- **Leaves still import root files** that become other modules in step 4: `news/` and `docker/` import `browsers`; `db/` imports `links`; `welcome/` imports `agentsetup`, `agents`, `signals`, `SoundSelect`, `EnvDialog`, `OpenProject` and `links`; `tour/` imports `OpenProject`, `projects`, `terms`, and the `app/` files `hotkeys` and `tabs` (see Back-edges). Step 4 turns these into folder imports as each one moves (done; `projects`, `hotkeys` and `tabs` were cut instead).
 - **bun can't load a `.tsx`** (Solid's JSX has no runtime under `bun test`). An `index.ts` that re-exports a component therefore can't be imported by anything a test loads. Two tests broke on it: `tunnelmap.test.ts` (fixed by moving `NOT_HTTP` to `shared/urls.ts`) and `links.test.ts`'s `connOf` case (moved to `modules/db/db.test.ts`, which imports `./db` from inside the module). Rule for later steps: a test of a module's logic lives in the module and imports its files directly; a tested pure file elsewhere takes what it needs from `shared/`, not from a module whose interface carries a component.
 - **CSS order moved twice.** An `index.ts` loads all of a module's files, so `SandboxSettings.tsx` (and `sandbox.css`) now loads with `App.tsx`'s import of `sandbox/` rather than with Settings, and `SheetView.tsx` with `sheet.css` left the lazy Editor chunk for the main one (Canvas imports `DbPanel` through `db/`). Diffing the built CSS before and after: those two blocks moved and nothing else changed; neither shares a selector of equal specificity with a rule it now precedes.
-- **README.md's `src/` file list** names files by their old flat paths; step 2 left it too. Update it when the layout settles.
+- **README.md's `src/` file list** names files by their old flat paths; step 2 left it too. Update it when the layout settles. (Done in step 4.)
+
+### Step 4: inner modules
+
+Done one module per commit, each passing `bun run typecheck` and `bun test ./src/`; the back-edge cuts, the enforcement test and the CSS fix are their own commits. Every outside import goes through the folder, default-exported components are re-exported by name, and `index.ts` lists only what files outside the module imported on the day.
+
+| Module | `index.ts` exports | Imported from |
+|---|---|---|
+| `issues/` (16) | `IssuesPanel`, `dev`, `devOf`, `formatHm`, `formatHms`, `inProgress`, `isActive`, `issueKey`, `loadDev`, `openIssuePanel`, `panelTitle`, `runningEntry`, `slugOf`, `sourcesOf`, `stateOf`, `todayTotal` | App, Canvas, Sidebar, commands, hotkeys, tabs, **git, worktrees** |
+| `git/` (21) | `GitPanel`, types `Change`, `FileMark`, `GitStatus`, `RepoStatus`, `RepoRef`; `branchStatus`, `fileMarks`, `folderStatus`, `gitOf`, `ignoredAt`, `isStaged`, `isUnstaged`, `markAt`, `openGitPanel`, `peekStatus`, `repoRoot`, `unpushed`, `headText`, `repoEpoch`, `repoOfFile` | App, Canvas, Sidebar, commands, hotkeys, tabs, **editor, worktrees, phone** |
+| `linked-folders/` (4) | `LinkFolderDialog`, `closeLinkDialog`, `linkDialogOpen`, `openLinkDialog` | App, commands, hotkeys, **editor** |
+| `editor/` (14) | `Editor` (lazy), `FileIcon`, `iconOpts`, types `FsList`, `FsText`; `dirtyCount`, `dropEditor`, `filesOf`, `openEditor`, `openFile`, `CSS_HINT`, `DEFAULT_MARGIN`, `PAGES`, `printDocument` | Canvas, Palette, Settings, commands, hotkeys, tabs, cli, `__selftest`, **git, phone, appearance** |
+| `environments/` (14) | `EnvDialog`, `closeEnvDialog`, `envDialogOpen`, `openEnvDialog`, `FolderPicker`, `OpenProjectDialog`, `closeOpenProject`, `openFolder`, `openProjectDialog`, `openProjectOpen`, `PinPad`, `envLocked`, `lockEnv`, `syncEnvs` | App, Sidebar, Settings, commands, hotkeys, cli, **linked-folders, leftovers, phone, tour, welcome** |
+| `worktrees/` (13) | `NewWorktreeDialog`, `WorktreeDialog`, `openWorktreeDialog`, `startAgentWorktrees`, `adoptWorktrees`, `closeNewWorktree`, `labelOf`, `loadWorktrees`, `newWorktreeOpen`, `openNewWorktree`, `removeWorktree`, `renameWorktree`, `tileLabel` | App, Sidebar, commands, hotkeys, **git, leftovers, phone** |
+| `leftovers/` (14) | `LeftoverCount`, `LeftoversChip`, `LeftoversPopover`, `closeLeftovers`, `endHolders`, `endLeftover`, `holderLine`, `holdersOf`, `leftoversOpen`, `rescanSoon`, `samePath`, `scanLeftovers`, `staleCheckouts`, `watchLeftovers` | App, Sidebar, hotkeys, **terminal, worktrees** |
+| `signals/` (21) | `SignalsForm`, `SignalsPopover`, `closeSignals`, `signalsOpen`, `toggleSignals`, `SoundSelect`, `EVENTS`, `SIG_TEXT`, `applySignalColors`, `nextSignal`, `onAlert`, `onSignal`, `playFor`, `playSound`, `reloadSound`, `sigOf`, `sigSummary`, `soundFor`, `soundName`, `toggleDnd`, `topSig` | App, Canvas, Sidebar, Settings, Backup, commands, hotkeys, tabs, **agents, appearance, phone, terminal, welcome** |
+| `phone/` (3) | `RemotePage`, `phoneStatus`, `startPhoneSync` | App, Settings |
+| `agents/` (26) | `AgentsPage`, `AgentsPanel`, `SetupBanner`, `seedAgentKeys`, `agentForKey`, `hotkeyKeys`, `hotkeyProblem`, `launchAgent`, `looksLikeUrl`, `newShell`, `offeredIn`, `offeredTogether`, `openAgentsPanel`, `recording`, `scopeLabel`, `setRecording`, `installAgent`, `refreshSetup`, `setupBusy`, `setupError`, `setupStatus`, `startAgentSetup`, `agentTarget`, `agentWindows`, `rememberAgent`, `trackAgentFocus` | App, Canvas, Palette, Settings, HotkeySettings, commands, hotkeys, tabs, **browser, issues, welcome, worktrees** |
+| `terminal/` (17) | `startAgentWindows`, `applyTerminalClear`, `applyTerminalLook`, `askDemo`, `closeSession`, `ensureSession`, `focusSession`, `followAfterTurn`, `hasSelection`, `mountSession`, `moveSessions`, `pasteText`, `rehomeSession`, `screenTail`, `sendText`, `setLinkHandler`, `unmountSession` | App, Canvas, Palette, hotkeys, **browser, environments, issues, phone, tour, worktrees** |
+| `browser/` (64) | `browsers.ts` 29 (pages and webviews: `placeBrowser`, `navigateBrowser`, `closeBrowser`, `openUrlInProject`, `openExternal`, `setBrowsersCovered`/`Overlaid`/`Suspended`, …), `profiles` 8, `favs` 7, `tunnelui` 7, `downloads` 6, `debugmenu` 4, `tunnels` 2 (`fwdOfPage`, `heldBy`), `tunnelmap` 1 (`fileUrlOf`) | App, Canvas, Sidebar, Settings, Feedback, hotkeys, tabs, **agents, docker, editor, git, issues, news** |
+| `appearance/` (7) | `AppearancePopover`, `Backdrop`, `appearanceOpen`, `closeAppearance`, `openAppearance`, `setBgImage`, `toggleAppearance` | App, Sidebar, Backup, commands, hotkeys |
+
+Module → module edges, all through `index.ts`, none new (each was a file-level import before the move; step 4 removed `db`, `phone` and `welcome` → `linked-folders` by moving `links.ts` to `shared/`):
+
+- `agents` → `browser`, `signals`, `welcome`
+- `appearance` → `editor`, `signals`
+- `browser` → `agents`, `terminal`
+- `docker` → `browser`, `sandbox`
+- `editor` → `browser`, `db`, `git`, `linked-folders`
+- `environments` → `terminal`
+- `git` → `browser`, `editor`, `issues`, `worktrees`
+- `issues` → `agents`, `browser`, `terminal`
+- `leftovers` → `environments`, `worktrees`
+- `linked-folders` → `environments`
+- `news` → `browser`
+- `phone` → `editor`, `environments`, `git`, `signals`, `terminal`, `worktrees`
+- `terminal` → `leftovers`, `sandbox`, `signals`
+- `tour` → `environments`, `terminal`
+- `welcome` → `agents`, `environments`, `signals`, `tour`
+- `worktrees` → `agents`, `git`, `issues`, `leftovers`, `sandbox`, `terminal`
+
+Cycles among them (all older than the move): `agents` ↔ `browser`, `agents` ↔ `welcome`, `editor` ↔ `git`, `git` ↔ `worktrees`, `leftovers` ↔ `worktrees`, and `terminal` → `leftovers` → `worktrees` → `terminal`. They work because every crossing is a function called later, not a value read at load, but each is a seam worth a second look.
+
+What turned out different from the plan:
+
+- **`links.ts` went to `shared/`, not `linked-folders/`.** `db.ts`'s test needs `linkAt`, and through `linked-folders/index.ts` it would load `LinkFolder.tsx`, which bun can't (step 3's rule). Four modules (Editor, Database, Remote Control, Welcome) ask which root a path is under, so it is shared by rule 3 anyway. `linked-folders/` is just the dialog.
+- **`git.ts`'s tests stub the issue store.** `git.ts` takes `devOf`, `inProgress` and `slugOf` from `issues/` for its ✦ drafts, and that index carries `IssuesPanel.tsx`. `marks.test.ts` and `gitmarks.test.ts` `mock.module("../issues", …)` before a dynamic `import("./git")`; they don't draft. Splitting the drafts out of `git.ts` would let them import it plainly.
+- **The Editor stays lazy.** `editor/index.ts` exports `Editor = lazy(() => import("./Editor"))`, so Canvas imports it from the folder and CodeMirror still loads with the first editor window (the `Editor-*.js` chunk is the same size before and after).
+- **Back-edges into the app files, cut:** the Tour's `runHotkey` and New window menu (to `shared/nav.ts`) and `dropProject` (to `shared/state`, with `onProjectDropped`). The hook runs each module's cleanup in registration order, then `removeProject`, so the project is still in the store while they run. One difference from the old loop: a project's browser windows are all closed before its terminals (or the other way round, by load order) rather than interleaved by tab; each close is independent. App imports every registering module at startup (browser, terminal, appearance, issues, signals through their folders, `shared/ui/icons` directly), before any project can be dropped.
+- **Allowlisted:** `editor/Editor.tsx` and `editor/FileList.tsx` → `../../files.css`. `files.css` also styles the palette, About and Settings, so it stays at the root until the CSS split. No other module imports an app file.
+- **CSS order.** An `index.ts` loads all of its module's files, so App's first imports (Feedback → `browser/` → `agents/` → `AgentSettings` → `welcome/` → …) now pull in most modules' CSS before `Canvas.tsx` loads `canvas.css`. Diffing the built CSS against the build before step 4 (same 2,967 blocks, same multiset): `welcome.css` and `files.css` moved from the end to before `diff.css`/`git.css`, and `agentsetup.css` up to just after `agents.css`. Two of those flips changed the cascade: `.fnote` (`files.css` 12px vs `canvas.css` 11px) and `.lucide.spin` (`git.css` vs `canvas.css`), so `index.tsx` now imports `canvas.css` right after `styles.css`, restoring both. With that, the remaining moved blocks (`welcome.css`, `files.css`, `agentsetup.css` earlier; `sandbox.css` after `canvas.css`) share no selector of equal specificity on the same element with a rule they now precede or follow; the only shared classes are state classes (`.on`, `.sel`, `.primary`) under different window prefixes.
+- **Old paths left on purpose:** `docs/diff-view-progress.md` is a dated progress log and keeps its flat paths, as it did through step 2.
 
 ## Open questions
 
