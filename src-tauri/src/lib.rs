@@ -1,7 +1,7 @@
 #[cfg(windows)]
 mod altspace;
-mod bg;
 mod agents;
+mod appearance;
 mod browser;
 mod cli;
 mod db;
@@ -9,7 +9,6 @@ mod docker;
 mod environments;
 mod monitor;
 mod news;
-mod fonts;
 mod git;
 mod grammars;
 mod issues;
@@ -19,7 +18,6 @@ mod media;
 mod phone;
 mod sbx;
 mod shared;
-mod syssounds;
 mod terminal;
 mod tour;
 mod usage;
@@ -231,7 +229,7 @@ pub fn run() {
             environments::newfolder::make_folder,
             environments::newfolder::git_clone,
             environments::newfolder::git_clone_cancel,
-            fonts::font_list,
+            appearance::fonts::font_list,
             grammars::grammar_list,
             grammars::grammar_read,
             grammars::grammar_install,
@@ -389,17 +387,17 @@ pub fn run() {
             browser::downloads::download_reveal,
             browser::downloads::download_cancel,
             browser::downloads::downloads_folder,
-            bg::bg_save,
-            bg::bg_load,
-            bg::bg_delete,
-            bg::icon_save,
-            bg::icon_load,
-            bg::icon_delete,
-            bg::sound_save,
-            bg::sound_load,
-            bg::sound_delete,
-            syssounds::system_sounds,
-            syssounds::system_sound_load,
+            appearance::bg::bg_save,
+            appearance::bg::bg_load,
+            appearance::bg::bg_delete,
+            appearance::bg::icon_save,
+            appearance::bg::icon_load,
+            appearance::bg::icon_delete,
+            appearance::bg::sound_save,
+            appearance::bg::sound_load,
+            appearance::bg::sound_delete,
+            appearance::syssounds::system_sounds,
+            appearance::syssounds::system_sound_load,
             usage::claude_usage,
             usage::command_code_usage,
             phone::phone_start,
