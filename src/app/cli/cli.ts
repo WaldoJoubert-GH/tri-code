@@ -6,10 +6,10 @@
 import { createSignal } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { type Project, app, isLocalHost, setApp } from "./shared/state/state";
-import { openFolder } from "./modules/environments";
-import { openFile } from "./modules/editor";
-import { flash } from "./shared/ui/ui";
+import { type Project, app, isLocalHost, setApp } from "../../shared/state/state";
+import { openFolder } from "../../modules/environments";
+import { openFile } from "../../modules/editor";
+import { flash } from "../../shared/ui/ui";
 import { editorPath, ownerOf, samePath } from "./clipaths";
 
 export type Target = { path: string; dir: boolean; root: string | null; line: number | null; col: number | null };

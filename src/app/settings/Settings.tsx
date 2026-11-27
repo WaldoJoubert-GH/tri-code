@@ -18,7 +18,7 @@ import { BrowserPage } from "../../modules/browser";
 import { NewsPage } from "../../modules/news";
 import { AgentsPage } from "../../modules/agents";
 import { BackupPage } from "./Backup";
-import { CliPage } from "../../CliSettings";
+import { CliPage } from "../cli/CliSettings";
 import { SandboxPage } from "../../modules/sandbox";
 import { LanguagesPage } from "../../shared/codemirror/LangSettings";
 import { PREVIEWS, previewOn } from "../../shared/preview";

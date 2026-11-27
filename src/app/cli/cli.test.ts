@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Project } from "./shared/state/state";
+import type { Project } from "../../shared/state/state";
 import { editorPath, ownerOf, samePath, within } from "./clipaths";
 
 const proj = (id: string, path: string, more: Partial<Project> = {}) => ({ id, host: "local", path, ...more }) as Project;

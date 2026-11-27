@@ -19,7 +19,7 @@ import { hotkeysOpen, openSettings, settingsOpen, tabMenuOpen, toggleHotkeys } f
 import { startAgentWindows, applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "../modules/terminal";
 import { startAgentWorktrees, NewWorktreeDialog, WorktreeDialog, newWorktreeOpen } from "../modules/worktrees";
 import { startAgentSetup, trackAgentFocus, SetupBanner, seedAgentKeys } from "../modules/agents";
-import { startCli } from "../cli";
+import { startCli } from "./cli/cli";
 import { phoneStatus, startPhoneSync } from "../modules/phone";
 import { MediaPopover } from "../modules/media";
 import { mediaPopOpen } from "../modules/media";
