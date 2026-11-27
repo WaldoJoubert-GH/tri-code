@@ -1,8 +1,8 @@
 // bun test: which commands a project offers, and the name and hotkey rules across scopes (src/shared/scope.ts).
 
 import { beforeEach, describe, expect, test } from "bun:test";
-import { type Agent, type Project, app, setApp } from "./shared/state/state";
-import { chordHolder, nameProblem, offeredIn, reaches, replaceNote, scopesOverlap } from "./shared/scope";
+import { type Agent, type Project, app, setApp } from "../../shared/state/state";
+import { chordHolder, nameProblem, offeredIn, reaches, replaceNote, scopesOverlap } from "../../shared/scope";
 import { seedAgentKeys } from "./agentkeys";
 
 const project = (id: string, host: string, parent?: string) => ({ id, name: id, host, path: "~", tabs: [], ...(parent ? { parent } : {}) }) as unknown as Project;

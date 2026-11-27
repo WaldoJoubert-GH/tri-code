@@ -29,7 +29,7 @@ import { openCalcPanel } from "./modules/calc";
 import { openGitPanel } from "./modules/git";
 import { openDbWindow } from "./modules/db";
 import { diffKeys } from "./shared/text/DiffView";
-import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";
+import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./modules/agents";
 import { closeIconPicker, iconPickerOpen } from "./shared/ui/lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";
 import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, stepGap, stepProject, stepWorkspace, workspace } from "./commands";

@@ -10,7 +10,7 @@ import { metaName, modLabel } from "./shared/keys/modkey";
 import {
   ACTIONS, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,
 } from "./shared/keys/keymap";
-import { offeredTogether, recording, scopeLabel, setRecording } from "./agents";
+import { offeredTogether, recording, scopeLabel, setRecording } from "./modules/agents";
 import { flash } from "./shared/ui/ui";
 import { Key, KeyList } from "./shared/keys/Keys";
 

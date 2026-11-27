@@ -26,7 +26,7 @@ import { Editor, dirtyCount, dropEditor } from "./modules/editor";
 import { isEnter } from "./shared/ui/enterkey";
 
 import { GitPanel, gitOf } from "./modules/git";
-import AgentsPanel from "./AgentsPanel";
+import { AgentsPanel } from "./modules/agents";
 import { DbPanel } from "./modules/db";
 import { DockerPanel, closeDockerWindow } from "./modules/docker";
 import { MonitorPanel } from "./modules/monitor";

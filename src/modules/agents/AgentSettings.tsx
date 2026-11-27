@@ -3,9 +3,9 @@
 // fits: install, update the path, remove, or ask again after Don't ask again.
 
 import { For, Show, onMount } from "solid-js";
-import { app } from "./shared/state/state";
-import { PlusMenuList, lookForAgents } from "./modules/welcome";
-import { Caps } from "./shared/keys/Keys";
+import { app } from "../../shared/state/state";
+import { PlusMenuList, lookForAgents } from "../welcome";
+import { Caps } from "../../shared/keys/Keys";
 import {
   AGENT_KEYS,
   AGENT_NAMES,

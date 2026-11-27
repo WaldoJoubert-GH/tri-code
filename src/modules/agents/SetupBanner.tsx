@@ -2,7 +2,7 @@
 // The rules and actions are in agentsetup.ts.
 
 import { For, Show } from "solid-js";
-import { activeProject, app, isRemote } from "./shared/state/state";
+import { activeProject, app, isRemote } from "../../shared/state/state";
 import { AGENT_NAMES, askAbout, deferredAgents, installAgent, neverAsk, notNow, setupBusy, setupError, setupStatus } from "./agentsetup";
 import "./agentsetup.css";
 

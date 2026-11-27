@@ -16,7 +16,7 @@ import { createStore } from "solid-js/store";
 import { type Agent, type Project, addTab, addWorktree, app, dropProject, focusTab, isLocalHost, projectById, repoOf, setApp, worktreesOf } from "../../shared/state/state";
 import { cleanPrefix, toBranch } from "../../shared/text/branchname";
 import { setupCommand, setupLines } from "./setup";
-import { launchAgent } from "../../agents";
+import { launchAgent } from "../agents";
 import { folderStatus, gitOf, peekStatus } from "../git";
 import { ask, flash } from "../../shared/ui/ui";
 import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "../leftovers";

@@ -10,7 +10,7 @@ import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup
 import { createStore } from "solid-js/store";
 import { type Choice, type Command, commands } from "./commands";
 import { type Project, activeProject, focusTab, focusedTab, isRemote, skipFolders, space, tabName } from "./shared/state/state";
-import { agentTarget } from "./agents";
+import { agentTarget } from "./modules/agents";
 import { filesOf, openFile, FileIcon, iconOpts } from "./modules/editor";
 import { iconSvg } from "./shared/ui/fileicons";
 import { focusSession, sendText } from "./terms";

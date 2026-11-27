@@ -4,14 +4,14 @@
 // Window (AgentsPanel.tsx); the list lives in state.json as `agents`, in + menu order.
 
 import { createSignal } from "solid-js";
-import { Agent, Hotkey, Project, addAgent, addTab, app, focusTab, isWebApp, newId } from "./shared/state/state";
-import { normalizeUrl } from "./shared/urls";
-import { flash } from "./shared/ui/ui";
-import { modDown } from "./shared/keys/modkey";
-import { actionById, chordKeys, chordProblem, chordText, owner, sameChord, withKey } from "./shared/keys/keymap";
-import { chordHolder, offeredIn, sameScope } from "./shared/scope";
+import { Agent, Hotkey, Project, addAgent, addTab, app, focusTab, isWebApp, newId } from "../../shared/state/state";
+import { normalizeUrl } from "../../shared/urls";
+import { flash } from "../../shared/ui/ui";
+import { modDown } from "../../shared/keys/modkey";
+import { actionById, chordKeys, chordProblem, chordText, owner, sameChord, withKey } from "../../shared/keys/keymap";
+import { chordHolder, offeredIn, sameScope } from "../../shared/scope";
 
-export { nameProblem, offeredIn, offeredTogether, reaches, replaceNote, sameScope, scopeIcon, scopeLabel } from "./shared/scope";
+export { nameProblem, offeredIn, offeredTogether, reaches, replaceNote, sameScope, scopeIcon, scopeLabel } from "../../shared/scope";
 
 /** The chord as <kbd> labels, the modifier first. */
 export const hotkeyKeys = (h: Hotkey) => chordKeys(h);

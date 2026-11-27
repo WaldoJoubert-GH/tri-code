@@ -16,7 +16,7 @@ import { HotkeysPage } from "./HotkeySettings";
 import { RemotePage } from "./modules/phone";
 import { BrowserPage } from "./profiles";
 import { NewsPage } from "./modules/news";
-import { AgentsPage } from "./AgentSettings";
+import { AgentsPage } from "./modules/agents";
 import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
 import { SandboxPage } from "./modules/sandbox";

@@ -5,8 +5,8 @@
 
 import { createEffect, createSignal, on } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import { app, isRemote, projectById, setAgentSetup, updateAgent } from "./shared/state/state";
-import { flash } from "./shared/ui/ui";
+import { app, isRemote, projectById, setAgentSetup, updateAgent } from "../../shared/state/state";
+import { flash } from "../../shared/ui/ui";
 
 export type AgentKey = "claude" | "pi";
 export type SetupState = "missing" | "installed" | "stale";

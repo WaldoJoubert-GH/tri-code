@@ -11,20 +11,20 @@ import { Portal } from "solid-js/web";
 import {
   type Agent, type Fav, type Project, type Scope, type SoundEvent, addAgent, app, envName, isWebApp, moveAgent, profileById,
   removeAgent, restoreAgent, updateAgent,
-} from "./shared/state/state";
-import { profilesInUse } from "./profiles";
+} from "../../shared/state/state";
+import { profilesInUse } from "../../profiles";
 import {
   duplicateAgent, hotkeyKeys, hotkeyProblem, launchAgent, looksLikeUrl, nameProblem, newAgent, reaches, recording, replaceNote,
   sameScope, scopeIcon, scopeLabel, setRecording, urlProblem,
 } from "./agents";
-import { normalizeUrl } from "./shared/urls";
-import { EVENTS, playFor, playSound, soundFor, soundName, SoundSelect } from "./modules/signals";
-import { Icon, toggleIconPicker } from "./shared/ui/lucide";
-import { flash, showToast } from "./shared/ui/ui";
-import { ctrlName, modDown, modLabel } from "./shared/keys/modkey";
+import { normalizeUrl } from "../../shared/urls";
+import { EVENTS, playFor, playSound, soundFor, soundName, SoundSelect } from "../signals";
+import { Icon, toggleIconPicker } from "../../shared/ui/lucide";
+import { flash, showToast } from "../../shared/ui/ui";
+import { ctrlName, modDown, modLabel } from "../../shared/keys/modkey";
 import "./agents.css";
-import { KeyList } from "./shared/keys/Keys";
-import { isEnter } from "./shared/ui/enterkey";
+import { KeyList } from "../../shared/keys/Keys";
+import { isEnter } from "../../shared/ui/enterkey";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph"]);
 

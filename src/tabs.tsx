@@ -16,7 +16,7 @@ import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";
 import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";
-import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "./agents";
+import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "./modules/agents";
 import { Icon } from "./shared/ui/lucide";
 import { SIG_TEXT, sigOf } from "./modules/signals";
 import { flash } from "./shared/ui/ui";

@@ -1,7 +1,7 @@
-// bun test: which windows count as agents, and which one "send to agent" picks (src/agenttarget.ts).
+// bun test: which windows count as agents, and which one "send to agent" picks (src/modules/agents/agenttarget.ts).
 
 import { beforeEach, describe, expect, test } from "bun:test";
-import { type Project, type Tab, live, setApp, setLive } from "./shared/state/state";
+import { type Project, type Tab, live, setApp, setLive } from "../../shared/state/state";
 import { agentTarget, agentWindows, rememberAgent } from "./agenttarget";
 
 const term = (id: string, cmd: string, space = 0, extra: Partial<Tab> = {}) => ({ id, kind: "term", space, cmd, ...extra }) as Tab;

@@ -13,11 +13,9 @@ import {
   type Agent, DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, isRemote, isWebApp, live, onProjectDropped, Page, pageProfile, Profile, Project,
   profileById, projectById, setFavIcon, setPageUrl, space, Tab, tabIcon, tabName, visibleTabs,
 } from "./shared/state/state";
-import { looksLikeUrl } from "./agents";
+import { looksLikeUrl, agentTarget, agentWindows, rememberAgent, setupStatus } from "./modules/agents";
 import { normalizeUrl } from "./shared/urls";
-import { agentTarget, agentWindows, rememberAgent } from "./agenttarget";
 import { offeredIn } from "./shared/scope";
-import { setupStatus } from "./agentsetup";
 import { sigOf } from "./shared/sigs";
 import { iconSvg } from "./shared/ui/lucide";
 import { pasteText } from "./terms";
