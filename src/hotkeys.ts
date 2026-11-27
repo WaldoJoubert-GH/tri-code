@@ -29,7 +29,7 @@ import { openMonitorPanel } from "./modules/monitor";
 import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";
 import { openGitPanel } from "./git";
-import { openDbWindow } from "./db";
+import { openDbWindow } from "./modules/db";
 import { diffKeys } from "./shared/text/DiffView";
 import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";
 import { closeIconPicker, iconPickerOpen } from "./shared/ui/lucide";

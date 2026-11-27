@@ -1,4 +1,4 @@
-// bun test: Pending Edits to statements, cells and typed input (src/dbsql.ts).
+// bun test: Pending Edits to statements, cells and typed input (src/modules/db/dbsql.ts).
 
 import { describe, expect, test } from "bun:test";
 import { type Pending, cellText, emptyPending, mongoOps, mongoText, parseInput, pendingCount, rowKey, sqlOps, writes } from "./dbsql";

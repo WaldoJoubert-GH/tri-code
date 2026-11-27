@@ -122,7 +122,7 @@ describe("the Linked folders setting", () => {
 
 describe("spreadsheets in a Linked Folder", () => {
   test("a CSV in a read-only link opens read-only in the Database Window; elsewhere it can be written", async () => {
-    const { connOf } = await import("./db");
+    const { connOf } = await import("./modules/db");
     expect(connOf(p("app"), "sheet:C:/Users/me/Design/brand/prices.csv")?.readOnly).toBe(true);
     expect(connOf(p("app"), "sheet:/home/me/shared-ui/data.csv")?.readOnly).toBeUndefined();
     expect(connOf(p("app"), "sheet:/home/me/app/report.xlsx")?.readOnly).toBe(true);

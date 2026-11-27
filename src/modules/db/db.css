@@ -1,4 +1,4 @@
-/* Database window. See src/DbPanel.tsx; the look comes from design/database-window.html. */
+/* Database window. See src/modules/db/DbPanel.tsx; the look comes from design/database-window.html. */
 
 .mark.db { color: var(--accent); }
 .win.prod > .bar { background: color-mix(in srgb, var(--bad) 16%, var(--panel)); border-bottom-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }

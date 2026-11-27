@@ -5,15 +5,15 @@
 
 import { For, Show, createMemo, createResource, createSignal, onCleanup, onMount, type JSX } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import type { Project } from "./shared/state/state";
-import { hostAt } from "./links";
-import { type Change, addRowChange, columnNames, deleteRowChange, isNumber, parseCsv, setCellChange } from "./shared/text/csv";
+import type { Project } from "../../shared/state/state";
+import { hostAt } from "../../links";
+import { type Change, addRowChange, columnNames, deleteRowChange, isNumber, parseCsv, setCellChange } from "../../shared/text/csv";
 import { type Cell, cellText } from "./dbsql";
-import { copyText } from "./shared/ui/clipboard";
-import { flash } from "./shared/ui/ui";
+import { copyText } from "../../shared/ui/clipboard";
+import { flash } from "../../shared/ui/ui";
 import "./db.css";
 import "./sheet.css";
-import { isEnter } from "./shared/ui/enterkey";
+import { isEnter } from "../../shared/ui/enterkey";
 
 /** Row height in px: `.sheet-grid td` is drawn to exactly this. */
 const ROW = 24;

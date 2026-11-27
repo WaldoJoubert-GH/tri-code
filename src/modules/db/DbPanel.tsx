@@ -11,22 +11,22 @@ import { syntaxHighlighting, bracketMatching } from "@codemirror/language";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { MariaSQL, MySQL, PostgreSQL, SQLite, sql } from "@codemirror/lang-sql";
 import { json } from "@codemirror/lang-json";
-import { type Project, type Tab, isRemote, newId, setTabDb } from "./shared/state/state";
+import { type Project, type Tab, isRemote, newId, setTabDb } from "../../shared/state/state";
 import {
   type DbConn, type DbTarget, type EnvVar, type Obj, type ResultSet, type SavedQuery, type Win, addRow, apply, cancelQuery, closeReview, connOf, connsOf, copyCsv, discard,
   envVars, exportCsv, isBookConn, isMaria, isSheet, loadConns, loadPage, loadSchema, moreRows, openObj, openQueryText, openSession, pendingOf, queryDirty, removeConn,
   removeQuery, renameQuery, review, rowObj, runQuery, saveConn, saveQuery, savedById, savedOf, setCell, setDoc, setStarter, sheetPathOf,
   setFilter, setQuery, setResTab, setSelCell, setView, showResult, showTable, structOf, testConn, toggleDelete, toggleGroup, toggleSort, turnPage, undo, wins,
 } from "./db";
-import { openCtxMenu } from "./shared/ui/ctxmenu";
+import { openCtxMenu } from "../../shared/ui/ctxmenu";
 import { type Cell, type DbKind, cellText, editText, isNested, isOpaque, parseInput, pendingCount, rowKey, writes } from "./dbsql";
-import { Icon } from "./shared/ui/lucide";
-import { highlight, theme } from "./shared/codemirror/cm";
-import { ask, flash } from "./shared/ui/ui";
+import { Icon } from "../../shared/ui/lucide";
+import { highlight, theme } from "../../shared/codemirror/cm";
+import { ask, flash } from "../../shared/ui/ui";
 import "./db.css";
-import { Key, KeyText } from "./shared/keys/Keys";
-import { ctrlName } from "./shared/keys/modkey";
-import { isEnter } from "./shared/ui/enterkey";
+import { Key, KeyText } from "../../shared/keys/Keys";
+import { ctrlName } from "../../shared/keys/modkey";
+import { isEnter } from "../../shared/ui/enterkey";
 
 const KIND_LABEL: Record<DbKind, string> = { postgres: "PG", mysql: "MYSQL", sqlite: "SQLITE", mongo: "MONGO" };
 const KIND_NAME: Record<DbKind, string> = { postgres: "PostgreSQL", mysql: "MySQL", sqlite: "SQLite", mongo: "MongoDB" };

@@ -8,12 +8,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save as pickSavePath } from "@tauri-apps/plugin-dialog";
 import { createStore, produce, unwrap } from "solid-js/store";
-import { type Project, type Tab, addTab, focusTab, newId, repoOf } from "./shared/state/state";
+import { type Project, type Tab, addTab, focusTab, newId, repoOf } from "../../shared/state/state";
 import {
   type Cell, type DbKind, type MongoOp, type Pending, type SqlOp, type Target, emptyPending, mongoOps, mongoText, pendingCount, rowKey, sqlOps,
 } from "./dbsql";
-import { flash } from "./shared/ui/ui";
-import { hostAt, linkAt } from "./links";
+import { flash } from "../../shared/ui/ui";
+import { hostAt, linkAt } from "../../links";
 
 /** `sheet` is a CSV or workbook loaded into memory: never saved, made up from the window's id. */
 export type DbTarget = { env: string } | { url: string } | { file: string } | { sheet: string };
