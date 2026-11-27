@@ -1,4 +1,4 @@
-// bun test: the weekly pace target (src/pace.ts).
+// bun test: the weekly pace target (src/modules/usage/pace.ts).
 
 import { describe, expect, test } from "bun:test";
 import { weekTarget } from "./pace";

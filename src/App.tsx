@@ -15,7 +15,7 @@ import Canvas from "./Canvas";
 import Sidebar, { sidebarPeek } from "./Sidebar";
 import { HoldBar, TabMenu, TabStrip, tabMenuOpen } from "./tabs";
 import { CtxMenu, ctxMenuOpen } from "./shared/ui/ctxmenu";
-import ClaudeUsage, { CommandCodeUsage } from "./Usage";
+import { ClaudeUsage, CommandCodeUsage } from "./modules/usage";
 import { SettingsDialog } from "./Settings";
 import { hotkeysOpen, openSettings, settingsOpen, toggleHotkeys } from "./shared/nav";
 import { startAgentWindows } from "./agentwin";
