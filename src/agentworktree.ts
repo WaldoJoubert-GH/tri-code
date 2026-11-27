@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { app, isLocalHost, moveTab, piCanFollow, projectById, repoOf, setApp } from "./shared/state/state";
 import { followAfterTurn, rehomeSession } from "./terms";
-import { agentBranch } from "./branchname";
+import { agentBranch } from "./shared/text/branchname";
 import { type Branch, adoptWorktrees, createWorktree, kinds } from "./worktrees";
 import { gitOf } from "./git";
 import { flash } from "./shared/ui/ui";

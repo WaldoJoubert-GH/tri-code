@@ -30,7 +30,7 @@ import { openNewsPanel } from "./news";
 import { openCalcPanel } from "./calc";
 import { openGitPanel } from "./git";
 import { openDbWindow } from "./db";
-import { diffKeys } from "./DiffView";
+import { diffKeys } from "./shared/text/DiffView";
 import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";
 import { closeIconPicker, iconPickerOpen } from "./shared/ui/lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";

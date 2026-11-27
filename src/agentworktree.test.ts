@@ -1,7 +1,7 @@
 // bun test: which branch an agent's create_worktree name means (branchname.ts).
 
 import { describe, expect, test } from "bun:test";
-import { agentBranch } from "./branchname";
+import { agentBranch } from "./shared/text/branchname";
 
 describe("agentBranch", () => {
   test("a new branch gets the repo's prefix and a clean name", () => {

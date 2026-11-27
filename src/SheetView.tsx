@@ -7,7 +7,7 @@ import { For, Show, createMemo, createResource, createSignal, onCleanup, onMount
 import { invoke } from "@tauri-apps/api/core";
 import type { Project } from "./shared/state/state";
 import { hostAt } from "./links";
-import { type Change, addRowChange, columnNames, deleteRowChange, isNumber, parseCsv, setCellChange } from "./csv";
+import { type Change, addRowChange, columnNames, deleteRowChange, isNumber, parseCsv, setCellChange } from "./shared/text/csv";
 import { type Cell, cellText } from "./dbsql";
 import { copyText } from "./shared/ui/clipboard";
 import { flash } from "./shared/ui/ui";

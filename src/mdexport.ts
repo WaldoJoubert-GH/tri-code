@@ -5,7 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
-import { enhance, renderMarkdown, titleOf } from "./markdown";
+import { enhance, renderMarkdown, titleOf } from "./shared/text/markdown";
 import { type MdExport, type Project, isRemote, repoOf } from "./shared/state/state";
 import { flash, showToast } from "./shared/ui/ui";
 
