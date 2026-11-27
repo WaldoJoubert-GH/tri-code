@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { untrack } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { EditorState, Text } from "@codemirror/state";
-import type { Body } from "./cm";
+import type { Body } from "./shared/codemirror/cm";
 import { type Project, type Tab, addTab, focusTab, setEditorTab } from "./shared/state/state";
 import { hostAt, rootsOf, within } from "./links";
 

@@ -18,10 +18,10 @@ import {
   CHANGED, type Doc, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
   markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor, watchFiles,
 } from "./files";
-import { createState, editorMenu, fromBody, indentText, keyOfState, languageKey, languageName, offerFor, relanguage, showChanges, toBody } from "./cm";
-import { downloadSize, kb } from "./grammars";
-import { installError, installLang, installedGrammars, installing, isInstalled, neverSuggest, notNow, offering, setNever } from "./langs";
-import LangPicker from "./LangPicker";
+import { createState, editorMenu, fromBody, indentText, keyOfState, languageKey, languageName, offerFor, relanguage, showChanges, toBody } from "./shared/codemirror/cm";
+import { downloadSize, kb } from "./shared/codemirror/grammars";
+import { installError, installLang, installedGrammars, installing, isInstalled, neverSuggest, notNow, offering, setNever } from "./shared/codemirror/langs";
+import LangPicker from "./shared/codemirror/LangPicker";
 import { type CtxItem, openCtxMenu } from "./shared/ui/ctxmenu";
 import { copyText } from "./shared/ui/clipboard";
 import FileTree, { FileIcon, MARK_TITLE } from "./FileList";

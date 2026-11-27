@@ -21,7 +21,7 @@ import {
 import { openCtxMenu } from "./shared/ui/ctxmenu";
 import { type Cell, type DbKind, cellText, editText, isNested, isOpaque, parseInput, pendingCount, rowKey, writes } from "./dbsql";
 import { Icon } from "./shared/ui/lucide";
-import { highlight, theme } from "./cm";
+import { highlight, theme } from "./shared/codemirror/cm";
 import { ask, flash } from "./shared/ui/ui";
 import "./db.css";
 import { Key, KeyText } from "./shared/keys/Keys";

@@ -1,4 +1,4 @@
-// Writes src/grammars.json, the Grammar Catalog: every TextMate grammar the editor can offer to
+// Writes src/shared/codemirror/grammars.json, the Grammar Catalog: every TextMate grammar the editor can offer to
 // install, from the tm-grammars package (the grammars VS Code extensions ship, collected by Shiki).
 // The package version is pinned in package.json, and the app downloads the same version's files, so
 // a grammar only changes when this script is run again after a bump.
@@ -235,7 +235,7 @@ for (const n of [...needed].sort()) {
 
 langs.sort((a, b) => a.name.localeCompare(b.name));
 const out = { version, grammars: table, langs };
-writeFileSync(new URL("../src/grammars.json", import.meta.url), JSON.stringify(out) + "\n");
+writeFileSync(new URL("../src/shared/codemirror/grammars.json", import.meta.url), JSON.stringify(out) + "\n");
 const total = (id: string) => [id, ...(table[id].deps ?? [])].reduce((s, n) => s + table[n].bytes, 0);
 const big = langs.map((l) => [l.id, total(l.id)] as const).sort((a, b) => b[1] - a[1]).slice(0, 8);
 console.log(`tm-grammars ${version}: ${langs.length} languages, ${Object.keys(table).length} grammars`);

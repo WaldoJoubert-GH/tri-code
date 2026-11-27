@@ -16,12 +16,12 @@ import {
 import { gotoLine, highlightSelectionMatches, openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
-import type { ChangeMarks } from "./shared/text/diff";
-import type { CtxItem } from "./shared/ui/ctxmenu";
-import { copyText, readText } from "./shared/ui/clipboard";
-import { isMac } from "./shared/keys/modkey";
-import { isKey, keysOf, sameChord, setEditorKeys, textPress } from "./shared/keys/keymap";
-import type { Chord } from "./shared/state/state";
+import type { ChangeMarks } from "../text/diff";
+import type { CtxItem } from "../ui/ctxmenu";
+import { copyText, readText } from "../ui/clipboard";
+import { isMac } from "../keys/modkey";
+import { isKey, keysOf, sameChord, setEditorKeys, textPress } from "../keys/keymap";
+import type { Chord } from "../state/state";
 import { type Lang, langById, langOfName } from "./grammars";
 import { isInstalled, loadInstalled, overrideOf } from "./langs";
 

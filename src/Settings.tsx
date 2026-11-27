@@ -20,7 +20,7 @@ import { AgentsPage } from "./AgentSettings";
 import { BackupPage } from "./Backup";
 import { CliPage } from "./CliSettings";
 import { SandboxPage } from "./SandboxSettings";
-import { LanguagesPage } from "./LangSettings";
+import { LanguagesPage } from "./shared/codemirror/LangSettings";
 import { PREVIEWS, previewOn } from "./preview";
 import { type SettingsPage, closeSettings, pageShown, setSettingsPage, settingsPage } from "./nav";
 import { SignalsForm } from "./SignalSettings";

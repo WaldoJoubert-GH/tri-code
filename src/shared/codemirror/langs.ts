@@ -10,7 +10,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
 import { produce } from "solid-js/store";
 import { VERSION, GRAMMARS, grammarsOf, langById, removable } from "./grammars";
-import { app, setApp } from "./shared/state/state";
+import { app, setApp } from "../state/state";
 
 const [installed, setInstalled] = createSignal<ReadonlySet<string>>(new Set());
 /** The grammar files on this machine, by name. Changes when one is installed or removed. */

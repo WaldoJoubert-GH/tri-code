@@ -7,7 +7,7 @@ import { Portal } from "solid-js/web";
 import { BUILTIN, type LangKey, autoKey, languageKey, offerFor } from "./cm";
 import { LANGS, downloadSize, kb } from "./grammars";
 import { installLang, installedGrammars, installing, installError, isInstalled, setOverride } from "./langs";
-import { isEnter } from "./shared/ui/enterkey";
+import { isEnter } from "../ui/enterkey";
 
 type Item = { key: LangKey; name: string; types: string; install?: string };
 

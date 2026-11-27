@@ -14,7 +14,7 @@ import {
 import { type Project, type Tab, setCalcTape } from "./shared/state/state";
 import { type Answer, CONSTS, FNS, KEYWORDS, SAMPLE, stripComment } from "./calcdata";
 import { answerAt, answers, tape } from "./calclang";
-import { theme } from "./cm";
+import { theme } from "./shared/codemirror/cm";
 import { copyText } from "./shared/ui/clipboard";
 import { Icon } from "./shared/ui/lucide";
 import { flash } from "./shared/ui/ui";
