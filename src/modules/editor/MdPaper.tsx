@@ -4,9 +4,9 @@
 // CSS swaps the iframe's style in place, so the page doesn't reload or lose its scroll.
 
 import { createEffect, createSignal, on, onCleanup } from "solid-js";
-import { enhance, renderMarkdown, titleOf } from "./shared/text/markdown";
+import { enhance, renderMarkdown, titleOf } from "../../shared/text/markdown";
 import { baseCss, printDocument, projectCss, screenCss } from "./mdexport";
-import type { MdExport } from "./shared/state/state";
+import type { MdExport } from "../../shared/state/state";
 
 export function MdPaper(props: {
   src: string;

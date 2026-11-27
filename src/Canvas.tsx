@@ -1,5 +1,5 @@
 import "./canvas.css";
-import { type JSX, For, Match, Show, Switch, createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
+import { type JSX, For, Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import {
   type Page, type Project, type Tab, activePage, addPage, agentOf, app, focusTab, isRemote, isTerminal, live, projectById, removePage,
   canvasTabs, minimiseTab, removeTab, repoOf, restoreTab, sendTo, setRatio, showPage, space, swapTabs, tabIcon, tabName, pageProfile, toggleMono, visibleTabs,
@@ -22,11 +22,9 @@ import { Icon } from "./shared/ui/lucide";
 import { closeSession, ensureSession, focusSession, mountSession, unmountSession } from "./terms";
 import { runsInSandbox, sandboxOf } from "./modules/sandbox";
 import { IssuesPanel, dev, panelTitle } from "./modules/issues";
-import { dirtyCount, dropEditor } from "./files";
+import { Editor, dirtyCount, dropEditor } from "./modules/editor";
 import { isEnter } from "./shared/ui/enterkey";
 
-/** CodeMirror and its languages load the first time an editor window opens. */
-const Editor = lazy(() => import("./Editor"));
 import { GitPanel, gitOf } from "./modules/git";
 import AgentsPanel from "./AgentsPanel";
 import { DbPanel } from "./modules/db";

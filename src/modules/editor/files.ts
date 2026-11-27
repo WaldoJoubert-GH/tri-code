@@ -5,9 +5,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { untrack } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { EditorState, Text } from "@codemirror/state";
-import type { Body } from "./shared/codemirror/cm";
-import { type Project, type Tab, addTab, focusTab, setEditorTab } from "./shared/state/state";
-import { hostAt, rootsOf, within } from "./shared/links";
+import type { Body } from "../../shared/codemirror/cm";
+import { type Project, type Tab, addTab, focusTab, setEditorTab } from "../../shared/state/state";
+import { hostAt, rootsOf, within } from "../../shared/links";
 
 export type FsEntry = { name: string; dir: boolean; size: number };
 export type FsList = { path: string; entries: FsEntry[] };

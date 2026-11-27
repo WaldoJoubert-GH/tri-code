@@ -27,7 +27,7 @@ import { SignalsForm } from "./SignalSettings";
 import { openEnvDialog } from "./EnvDialog";
 import { openWelcome } from "./modules/welcome";
 import { ICON_THEMES, type IconTheme } from "./shared/ui/fileicons";
-import { FileIcon } from "./FileList";
+import { FileIcon } from "./modules/editor";
 import "./files.css";
 import { linksOn } from "./shared/links";
 

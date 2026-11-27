@@ -22,7 +22,7 @@ import { closeProfileMenu, profileMenuOpen } from "./profiles";
 import { closeDebugMenu, debugMenuOpen } from "./debugmenu";
 import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
 import { openIssuePanel } from "./modules/issues";
-import { openEditor } from "./files";
+import { openEditor } from "./modules/editor";
 import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";
 import { openNewsPanel } from "./modules/news";

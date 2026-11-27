@@ -10,18 +10,18 @@
 // right-click renames, relinks, reorders or unlinks it. Chosen from design/linked-folders.html (A).
 
 import { For, Match, Show, Switch, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js";
-import { type LinkedFolder, type Project, app, isRemote, moveLink, removeLink, repoOf, updateLink } from "./shared/state/state";
-import { type Root, hostAt, linkAt, linksOn, relIn, rootAt, rootsOf, within } from "./shared/links";
-import { openLinkDialog } from "./modules/linked-folders";
-import { Icon } from "./shared/ui/lucide";
-import { type IconOpts, type IconTheme, iconSvg, previewTheme } from "./shared/ui/fileicons";
+import { type LinkedFolder, type Project, app, isRemote, moveLink, removeLink, repoOf, updateLink } from "../../shared/state/state";
+import { type Root, hostAt, linkAt, linksOn, relIn, rootAt, rootsOf, within } from "../../shared/links";
+import { openLinkDialog } from "../linked-folders";
+import { Icon } from "../../shared/ui/lucide";
+import { type IconOpts, type IconTheme, iconSvg, previewTheme } from "../../shared/ui/fileicons";
 import { type OpenHow, createFile, deletePath, dirState, renamePath, loadDir, refreshDir, refreshProject } from "./files";
-import { openCtxMenu } from "./shared/ui/ctxmenu";
-import { copyText } from "./shared/ui/clipboard";
-import { ask, flash } from "./shared/ui/ui";
-import { type FileMark, fileMarks, ignoredAt, markAt, peekStatus } from "./modules/git";
-import "./files.css";
-import { isEnter } from "./shared/ui/enterkey";
+import { openCtxMenu } from "../../shared/ui/ctxmenu";
+import { copyText } from "../../shared/ui/clipboard";
+import { ask, flash } from "../../shared/ui/ui";
+import { type FileMark, fileMarks, ignoredAt, markAt, peekStatus } from "../git";
+import "../../files.css";
+import { isEnter } from "../../shared/ui/enterkey";
 
 /** `draft` is the New File box, in the folder `path`; `root` is a root row (only drawn with Linked Folders). */
 type Row = { path: string; name: string; dir: boolean; depth: number; draft?: true; root?: Root };

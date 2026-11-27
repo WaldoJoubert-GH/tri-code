@@ -12,36 +12,36 @@ import { For, Show, createEffect, createMemo, createResource, createSignal, on, 
 import { createStore } from "solid-js/store";
 import type { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { type Project, type Tab, diffModeOf, focusTab, isRemote, setEditorTab, setProjectDiffMode } from "./shared/state/state";
-import { fileUrlOf } from "./tunnelmap";
+import { type Project, type Tab, diffModeOf, focusTab, isRemote, setEditorTab, setProjectDiffMode } from "../../shared/state/state";
+import { fileUrlOf } from "../../tunnelmap";
 import {
   CHANGED, type Doc, type Media, type FsText, type OpenHow, closeFileInTab, dirty, docsOf, filesOf, keepPreview, loadImage, loadMedia, loadText,
   markDirty, mediaType, openFile, reloadText, saveText, textState, touchEditor, watchFiles,
 } from "./files";
-import { createState, editorMenu, fromBody, indentText, keyOfState, languageKey, languageName, offerFor, relanguage, showChanges, toBody } from "./shared/codemirror/cm";
-import { downloadSize, kb } from "./shared/codemirror/grammars";
-import { installError, installLang, installedGrammars, installing, isInstalled, neverSuggest, notNow, offering, setNever } from "./shared/codemirror/langs";
-import LangPicker from "./shared/codemirror/LangPicker";
-import { type CtxItem, openCtxMenu } from "./shared/ui/ctxmenu";
-import { copyText } from "./shared/ui/clipboard";
+import { createState, editorMenu, fromBody, indentText, keyOfState, languageKey, languageName, offerFor, relanguage, showChanges, toBody } from "../../shared/codemirror/cm";
+import { downloadSize, kb } from "../../shared/codemirror/grammars";
+import { installError, installLang, installedGrammars, installing, isInstalled, neverSuggest, notNow, offering, setNever } from "../../shared/codemirror/langs";
+import LangPicker from "../../shared/codemirror/LangPicker";
+import { type CtxItem, openCtxMenu } from "../../shared/ui/ctxmenu";
+import { copyText } from "../../shared/ui/clipboard";
 import FileTree, { FileIcon, MARK_TITLE } from "./FileList";
-import { fileMarks, ignoredAt, markAt, peekStatus, headText, repoEpoch, repoOfFile, type RepoRef } from "./modules/git";
-import { enhance, hasScheme, renderMarkdown, resolvePath } from "./shared/text/markdown";
+import { fileMarks, ignoredAt, markAt, peekStatus, headText, repoEpoch, repoOfFile, type RepoRef } from "../git";
+import { enhance, hasScheme, renderMarkdown, resolvePath } from "../../shared/text/markdown";
 import { directPdf, exportMarkdownPdf, mdExportOf } from "./mdexport";
 import { MdPaper } from "./MdPaper";
-import { openExternal, openUrlInProject } from "./browsers";
-import { capsOf, withKey } from "./shared/keys/keymap";
-import { HoldKey, KeyList } from "./shared/keys/Keys";
-import { ask, flash } from "./shared/ui/ui";
-import { type DiffMode, changeMarks, diffStats, makePatch, parseUnified, sameText } from "./shared/text/diff";
-import type { Change } from "./shared/text/csv";
-import DiffView, { diffKeys, stepHunk } from "./shared/text/DiffView";
-import { isBookPath, isCsvPath } from "./shared/text/csv";
-import { BookView, CsvTable, openSheetDb } from "./modules/db";
-import { asProject, hostAt, linkAt, relIn, rootAt, within } from "./shared/links";
+import { openExternal, openUrlInProject } from "../../browsers";
+import { capsOf, withKey } from "../../shared/keys/keymap";
+import { HoldKey, KeyList } from "../../shared/keys/Keys";
+import { ask, flash } from "../../shared/ui/ui";
+import { type DiffMode, changeMarks, diffStats, makePatch, parseUnified, sameText } from "../../shared/text/diff";
+import type { Change } from "../../shared/text/csv";
+import DiffView, { diffKeys, stepHunk } from "../../shared/text/DiffView";
+import { isBookPath, isCsvPath } from "../../shared/text/csv";
+import { BookView, CsvTable, openSheetDb } from "../db";
+import { asProject, hostAt, linkAt, relIn, rootAt, within } from "../../shared/links";
 import { redo, undo } from "@codemirror/commands";
-import "./files.css";
-import { ctrlName } from "./shared/keys/modkey";
+import "../../files.css";
+import { ctrlName } from "../../shared/keys/modkey";
 
 /** What Preview shows: rendered Markdown, HTML or SVG, or a CSV as a table (Table mode). */
 type Preview = "md" | "html" | "svg" | "csv";

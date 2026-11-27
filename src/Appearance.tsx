@@ -9,7 +9,7 @@ import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid
 import { CLEAR_MAX, type Clear, type Fx, type FxKind, fxOn, paintBackdrop } from "./shared/backdrop";
 import { createStore, produce } from "solid-js/store";
 import { ACCENTS, GAP_MAX, type MdExport, Project, activeProject, app, onProjectDropped, projectById, renameProject, repoOf, setAppearance, setGap, setIcon, setMdExport } from "./shared/state/state";
-import { CSS_HINT, DEFAULT_MARGIN, PAGES } from "./mdexport";
+import { CSS_HINT, DEFAULT_MARGIN, PAGES } from "./modules/editor";
 import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./shared/ui/icons";
 import { Icon, toggleIconPicker } from "./shared/ui/lucide";
 import { SignalsForm } from "./SignalSettings";

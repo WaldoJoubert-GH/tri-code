@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { type Project, app, isLocalHost, setApp } from "./shared/state/state";
 import { openFolder } from "./OpenProject";
-import { openFile } from "./files";
+import { openFile } from "./modules/editor";
 import { flash } from "./shared/ui/ui";
 import { editorPath, ownerOf, samePath } from "./clipaths";
 

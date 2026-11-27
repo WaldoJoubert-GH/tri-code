@@ -17,7 +17,7 @@ import {
   toggleCtx, unpushed, unstage, untrack, upstreamOf,
 } from "./git";
 import { copyText } from "../../shared/ui/clipboard";
-import { openFile } from "../../files";
+import { openFile } from "../editor";
 import { openUrlInProject } from "../../browsers";
 import { removeWorktree } from "../../worktrees";
 import { type DiffMode, diffStats, firstChange, parseUnified } from "../../shared/text/diff";

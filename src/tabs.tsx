@@ -8,7 +8,7 @@ import { For, Show, createMemo, onCleanup, onMount } from "solid-js";
 import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focusTab, lastMinimised, live, projectById, space, tabName, tabProfile, visibleTabs } from "./shared/state/state";
 import { profileColor, profilesInUse } from "./profiles";
 import { nativeBrowsers } from "./browsers";
-import { openEditor } from "./files";
+import { openEditor } from "./modules/editor";
 import { openIssuePanel } from "./modules/issues";
 import { openGitPanel } from "./modules/git";
 import { openDbWindow } from "./modules/db";
