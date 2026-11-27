@@ -1,7 +1,8 @@
 // bun test: the folder rules of docs/blueprint.md. shared/ never imports anything outside src/shared/,
 // and a module is entered only through its folder (its index.ts), from another module or from a file
-// outside modules/. The rules for app/ (no module imports it; nothing sits outside app/, shared/ and
-// modules/) are turned on in later steps, once app/ exists.
+// outside modules/; and a module imports only shared/ and other modules, never an app file (those
+// still at the src/ root, later src/app/). The last rule (nothing sits outside app/, shared/ and
+// modules/) is turned on in step 5, once app/ exists.
 
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -69,12 +70,27 @@ function crossesSeam(from: string, to: string): boolean {
   return ![dir, join(dir, "index.ts"), join(dir, "index.tsx")].includes(to);
 }
 
+/** Whether `p` is a file of the app: under src/ but outside shared/ and modules/ (today the src/ root,
+ *  later src/app/). Files outside src/ (the repo's assets/) are not. */
+const reachesApp = (p: string) => inside(src, p) && !inside(shared, p) && !inside(modules, p);
+
+/** Module -> app edges not cut yet, each with its reason. Keep it short; the test above fails on a stale entry. */
+const APP_ALLOWED = [
+  // files.css styles the Editor Window but also the palette, About and Settings; it is split (and
+  // the Editor's part moves into modules/editor/) with the other big stylesheets, after a visual check.
+  "modules/editor/Editor.tsx -> ../../files.css",
+  "modules/editor/FileList.tsx -> ../../files.css",
+];
+
 describe("src/modules/", () => {
   const names = readdirSync(modules, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
   const files = sources(src).filter((f) => f !== import.meta.path);
 
   test("is scanned: each module has an index.ts, and files outside the modules import them", () => {
-    expect(names).toEqual(expect.arrayContaining(["calc", "db", "docker", "media", "monitor", "news", "sandbox", "tour", "usage", "welcome"]));
+    expect(names).toEqual(expect.arrayContaining([
+      "agents", "appearance", "browser", "calc", "db", "docker", "editor", "environments", "git", "issues", "leftovers", "linked-folders",
+      "media", "monitor", "news", "phone", "sandbox", "signals", "terminal", "tour", "usage", "welcome", "worktrees",
+    ]));
     for (const n of names) expect(existsSync(join(modules, n, "index.ts"))).toBe(true);
     const into = files.filter((f) => !moduleOf(f) && imports(readFileSync(f, "utf8")).some((s) => moduleOf(resolveFrom(f, s))));
     expect(into.length).toBeGreaterThan(5);
@@ -86,6 +102,30 @@ describe("src/modules/", () => {
       for (const spec of imports(readFileSync(f, "utf8")))
         if (crossesSeam(f, resolveFrom(f, spec))) out.push(`${relative(src, f).replaceAll("\\", "/")} -> ${spec}`);
     expect(out).toEqual([]);
+  });
+
+  test("import only shared/ and other modules, never a file at the src/ root or in app/", () => {
+    const out: string[] = [];
+    for (const f of files.filter((f) => moduleOf(f)))
+      for (const spec of imports(readFileSync(f, "utf8"))) {
+        const edge = `${relative(src, f).replaceAll("\\", "/")} -> ${spec}`;
+        if (reachesApp(resolveFrom(f, spec)) && !APP_ALLOWED.includes(edge)) out.push(edge);
+      }
+    expect(out).toEqual([]);
+  });
+
+  test("the allowlist holds only edges that are still there", () => {
+    const all = files.flatMap((f) => imports(readFileSync(f, "utf8")).map((s) => `${relative(src, f).replaceAll("\\", "/")} -> ${s}`));
+    expect(APP_ALLOWED.filter((e) => !all.includes(e))).toEqual([]);
+  });
+
+  test("the app rule tells shared/ and modules/ from the root and app/", () => {
+    expect(reachesApp(join(src, "hotkeys.ts"))).toBe(true);
+    expect(reachesApp(join(src, "files.css"))).toBe(true);
+    expect(reachesApp(join(src, "app", "App.tsx"))).toBe(true);
+    expect(reachesApp(join(shared, "nav.ts"))).toBe(false);
+    expect(reachesApp(join(modules, "git", "index.ts"))).toBe(false);
+    expect(reachesApp(join(dirname(src), "assets", "icon.svg"))).toBe(false);
   });
 
   test("the seam rule tells the folder from a file inside it", () => {
