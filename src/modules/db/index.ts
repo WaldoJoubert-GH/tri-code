@@ -3,4 +3,4 @@
 
 export { default as DbPanel } from "./DbPanel";
 export { BookView, CsvTable } from "./SheetView";
-export { closeSession, connOf, connsOf, dbTitle, isProd, openDbWindow, openSheetDb } from "./db";
+export { closeSession, connsOf, dbTitle, isProd, openDbWindow, openSheetDb } from "./db";
