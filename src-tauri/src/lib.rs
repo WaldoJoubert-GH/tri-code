@@ -12,12 +12,11 @@ mod news;
 mod fonts;
 mod git;
 mod grammars;
-mod github;
+mod issues;
 mod leftovers;
 mod mdpdf;
 mod media;
 mod phone;
-mod plane;
 mod push;
 mod sbx;
 mod shared;
@@ -339,26 +338,26 @@ pub fn run() {
             shared::devfs::dev_read,
             shared::devfs::dev_write,
             shared::devfs::save_pasted_image,
-            plane::plane_sync,
-            plane::plane_set_state,
-            plane::plane_set_labels,
-            plane::plane_create_issue,
-            plane::plane_update_issue,
-            plane::plane_set_dates,
-            plane::plane_comments,
-            plane::plane_add_comment,
-            plane::plane_upload_asset,
-            plane::plane_check_token,
-            github::gh_repo,
-            github::gh_issues_sync,
-            github::gh_issue_create,
-            github::gh_assignees,
-            github::gh_issue_set_state,
-            github::gh_issue_labels,
-            github::gh_issue_edit,
-            github::gh_issue_comments,
-            github::gh_issue_comment,
-            github::gh_feedback,
+            issues::plane::plane_sync,
+            issues::plane::plane_set_state,
+            issues::plane::plane_set_labels,
+            issues::plane::plane_create_issue,
+            issues::plane::plane_update_issue,
+            issues::plane::plane_set_dates,
+            issues::plane::plane_comments,
+            issues::plane::plane_add_comment,
+            issues::plane::plane_upload_asset,
+            issues::plane::plane_check_token,
+            issues::github::gh_repo,
+            issues::github::gh_issues_sync,
+            issues::github::gh_issue_create,
+            issues::github::gh_assignees,
+            issues::github::gh_issue_set_state,
+            issues::github::gh_issue_labels,
+            issues::github::gh_issue_edit,
+            issues::github::gh_issue_comments,
+            issues::github::gh_issue_comment,
+            issues::github::gh_feedback,
             shared::store::state_load,
             shared::store::state_save,
             shared::store::config_write,
