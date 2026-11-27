@@ -19,7 +19,7 @@ import { SECTIONS } from "./config";
 import { capsOf } from "./shared/keys/keymap";
 import { setAboutOpen } from "./About";
 import { toggleFeedback } from "./Feedback";
-import { openProjectDialog } from "./OpenProject";
+import { openProjectDialog } from "./modules/environments";
 import { toggleSidebar } from "./Sidebar";
 import { openIssuePanel } from "./modules/issues";
 import { openEditor } from "./modules/editor";

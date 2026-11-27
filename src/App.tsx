@@ -31,9 +31,8 @@ import { AppearancePopover, Backdrop, appearanceOpen, setBgImage, toggleAppearan
 import { clearLook } from "./shared/backdrop";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./shared/ui/lucide";
-import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
+import { OpenProjectDialog, openProjectOpen, EnvDialog, envDialogOpen, PinPad, envLocked, syncEnvs } from "./modules/environments";
 import { LinkFolderDialog, linkDialogOpen } from "./modules/linked-folders";
-import { EnvDialog, envDialogOpen } from "./EnvDialog";
 import { NewWorktreeDialog } from "./NewWorktree";
 import { WorktreeDialog } from "./WorktreeDialog";
 import { newWorktreeOpen } from "./worktrees";
@@ -52,7 +51,6 @@ import { Tour, startTour, tourOpen } from "./modules/tour";
 import { Welcome, openWelcome } from "./modules/welcome";
 import { applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
 import { applyLook, themeOf } from "./shared/look";
-import { PinPad, envLocked, syncEnvs } from "./envlock";
 import { clock, closeToast, flash, flashMsg, startClock, toast, undoToast } from "./shared/ui/ui";
 import { keyOf, withKey } from "./shared/keys/keymap";
 import { Caps, HoldFace, HoldKey } from "./shared/keys/Keys";

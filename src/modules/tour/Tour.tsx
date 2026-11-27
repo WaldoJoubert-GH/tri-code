@@ -5,7 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { For, JSX, Show, createEffect, createSignal, on, onCleanup } from "solid-js";
 import { Project, Tab, addSampleProject, app, dropProject, goSpace, live, setApp, setToured, worktreesOf } from "../../shared/state/state";
-import { openProjectDialog } from "../../OpenProject";
+import { openProjectDialog } from "../environments";
 import { askDemo } from "../../terms";
 import { flash } from "../../shared/ui/ui";
 import { Caps, Key } from "../../shared/keys/Keys";

@@ -24,7 +24,7 @@ import { LanguagesPage } from "./shared/codemirror/LangSettings";
 import { PREVIEWS, previewOn } from "./shared/preview";
 import { type SettingsPage, closeSettings, pageShown, setSettingsPage, settingsPage } from "./shared/nav";
 import { SignalsForm } from "./SignalSettings";
-import { openEnvDialog } from "./EnvDialog";
+import { openEnvDialog } from "./modules/environments";
 import { openWelcome } from "./modules/welcome";
 import { ICON_THEMES, type IconTheme } from "./shared/ui/fileicons";
 import { FileIcon } from "./modules/editor";
