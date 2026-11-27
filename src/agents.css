@@ -1,5 +1,5 @@
 /* Commands window, its scope and sound popovers, and the icon picker it opens. See
-   src/AgentsPanel.tsx, src/lucide.tsx; the look comes from design/commands.html (variant A). */
+   src/AgentsPanel.tsx, src/shared/ui/lucide.tsx; the look comes from design/commands.html (variant A). */
 
 .mark.agents { color: var(--muted); }
 

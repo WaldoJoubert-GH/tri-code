@@ -1,4 +1,4 @@
-//! Installed editor grammars (src/langs.ts): TextMate grammar files from the tm-grammars package,
+//! Installed editor grammars (src/shared/codemirror/langs.ts): TextMate grammar files from the tm-grammars package,
 //! one `<name>.json` per grammar in `<app_local_data_dir>/grammars`. Downloaded once from a CDN at
 //! the version the frontend's Grammar Catalog was made from, and checked against the catalog's
 //! SHA-256 before it is kept; after that the editor reads them offline.

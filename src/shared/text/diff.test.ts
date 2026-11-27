@@ -1,4 +1,4 @@
-// bun test: the diff parser, split alignment and change marks (src/diff.ts).
+// bun test: the diff parser, split alignment and change marks (src/shared/text/diff.ts).
 
 import { describe, expect, test } from "bun:test";
 import { changeMarks, diffStats, firstChange, makePatch, pairMarks, parseUnified, sameText, splitRows } from "./diff";

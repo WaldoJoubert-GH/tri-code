@@ -1,4 +1,4 @@
-// bun test: when the Hold Hints clock starts, and what cancels it (src/hints.ts).
+// bun test: when the Hold Hints clock starts, and what cancels it (src/shared/keys/hints.ts).
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { HINT_HOLD_MS, hintChord, hintDown, hintsShown, hintUp, holdMenuShown, isHintModifier, projectStepKey } from "./hints";

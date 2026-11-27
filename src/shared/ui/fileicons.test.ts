@@ -1,4 +1,4 @@
-// bun test: what kind a file name is, and how the File Icon Themes draw it (src/fileicons.ts).
+// bun test: what kind a file name is, and how the File Icon Themes draw it (src/shared/ui/fileicons.ts).
 
 import { describe, expect, test } from "bun:test";
 import { folderOf, iconSvg, kindOf, shade } from "./fileicons";

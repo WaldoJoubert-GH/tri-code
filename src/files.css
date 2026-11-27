@@ -1,4 +1,4 @@
-/* Editor window: file tree, file tabs, CodeMirror, previews. See src/Editor.tsx, src/FileList.tsx, src/cm.ts. */
+/* Editor window: file tree, file tabs, CodeMirror, previews. See src/Editor.tsx, src/FileList.tsx, src/shared/codemirror/cm.ts. */
 
 .mark.editor { color: var(--accent); }
 

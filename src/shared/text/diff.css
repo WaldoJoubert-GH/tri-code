@@ -1,4 +1,4 @@
-/* The shared diff body (src/DiffView.tsx): unified rows or two aligned halves. */
+/* The shared diff body (src/shared/text/DiffView.tsx): unified rows or two aligned halves. */
 
 .dv-scroll {
   flex: 1; min-height: 0; overflow: auto; font: 12px/17px var(--mono);
