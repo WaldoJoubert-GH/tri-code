@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::folders::HEAVY;
+use crate::git::folders::HEAVY;
 use crate::shared::remote;
 use crate::shared::spawn::{expand_home, remote_path, sq};
 

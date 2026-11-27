@@ -12,11 +12,9 @@ mod monitor;
 mod newfolder;
 mod news;
 mod envs;
-mod folders;
 mod fonts;
 mod git;
 mod grammars;
-mod ignored;
 mod github;
 mod leftovers;
 mod mdpdf;
@@ -242,13 +240,13 @@ pub fn run() {
             grammars::grammar_read,
             grammars::grammar_install,
             grammars::grammar_remove,
-            folders::folder_repos,
-            folders::folder_copy,
-            ignored::ignored_files,
-            ignored::ignored_copy,
-            folders::folder_changes,
-            folders::folder_finish,
-            folders::worktree_dir_delete,
+            git::folders::folder_repos,
+            git::folders::folder_copy,
+            git::ignored::ignored_files,
+            git::ignored::ignored_copy,
+            git::folders::folder_changes,
+            git::folders::folder_finish,
+            git::folders::worktree_dir_delete,
             envs::ssh_hosts,
             envs::scan_logos,
             shared::envssh::env_ssh_set,

@@ -2,6 +2,9 @@
 //! the ✦ drafts' commands (Settings › Git). Remote calls that need several git commands run them in one
 //! ssh round trip (see `multi`).
 
+pub(crate) mod folders;
+pub(crate) mod ignored;
+
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -343,7 +346,7 @@ pub async fn folder_status(host: String, path: String) -> Result<Vec<RepoStatus>
 }
 
 fn folder_statuses(host: &str, path: &str) -> Result<Vec<RepoStatus>, String> {
-    let repos = crate::folders::repos_in(host, path)?;
+    let repos = crate::git::folders::repos_in(host, path)?;
     if repos.is_empty() {
         return Ok(Vec::new());
     }
