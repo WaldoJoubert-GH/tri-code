@@ -32,7 +32,7 @@ import { clearLook } from "./shared/backdrop";
 import { AboutDialog, aboutOpen, setAboutOpen } from "./About";
 import { Icon, IconPicker, iconPickerOpen } from "./shared/ui/lucide";
 import { OpenProjectDialog, openProjectOpen } from "./OpenProject";
-import { LinkFolderDialog, linkDialogOpen } from "./LinkFolder";
+import { LinkFolderDialog, linkDialogOpen } from "./modules/linked-folders";
 import { EnvDialog, envDialogOpen } from "./EnvDialog";
 import { NewWorktreeDialog } from "./NewWorktree";
 import { WorktreeDialog } from "./WorktreeDialog";

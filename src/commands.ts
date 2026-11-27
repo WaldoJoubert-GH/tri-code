@@ -36,7 +36,7 @@ import { startTour } from "./modules/tour";
 import { openWelcome } from "./modules/welcome";
 import { flash } from "./shared/ui/ui";
 import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./modules/media";
-import { openLinkDialog } from "./LinkFolder";
+import { openLinkDialog } from "./modules/linked-folders";
 import { linksOn } from "./shared/links";
 
 export type Command = {

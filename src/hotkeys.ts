@@ -10,7 +10,7 @@ import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance"
 import { closeSettings, closeTabMenu, setHotkeyRunner, settingsOpen, tabMenuOpen, toggleHotkeys } from "./shared/nav";
 import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
-import { closeLinkDialog, linkDialogOpen } from "./LinkFolder";
+import { closeLinkDialog, linkDialogOpen } from "./modules/linked-folders";
 import { closeEnvDialog, envDialogOpen } from "./EnvDialog";
 import { closeWelcome, welcomeOpen } from "./modules/welcome";
 import { toggleSidebar } from "./Sidebar";

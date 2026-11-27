@@ -4,14 +4,14 @@
 // ("Change Folder…", or a click on one that is not found). Chosen from design/linked-folders.html.
 
 import { Show, createSignal, onMount } from "solid-js";
-import { type LinkedFolder, type Project, addLink, envName, isRemote, projectById, repoOf, updateLink } from "./shared/state/state";
-import { linkName, linkProblem } from "./shared/links";
-import { FolderPicker } from "./OpenProject";
-import { Icon } from "./shared/ui/lucide";
-import { Modal } from "./shared/ui/Modal";
-import { Key } from "./shared/keys/Keys";
-import { flash } from "./shared/ui/ui";
-import { isEnter } from "./shared/ui/enterkey";
+import { type LinkedFolder, type Project, addLink, envName, isRemote, projectById, repoOf, updateLink } from "../../shared/state/state";
+import { linkName, linkProblem } from "../../shared/links";
+import { FolderPicker } from "../../OpenProject";
+import { Icon } from "../../shared/ui/lucide";
+import { Modal } from "../../shared/ui/Modal";
+import { Key } from "../../shared/keys/Keys";
+import { flash } from "../../shared/ui/ui";
+import { isEnter } from "../../shared/ui/enterkey";
 
 /** The project the dialog links to, and the link it changes (unset: a new one). */
 const [target, setTarget] = createSignal<{ projectId: string; linkId?: string } | null>(null);
