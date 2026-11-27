@@ -28,7 +28,7 @@ Rule 3 and 4 are enforced by a test (see [Enforcement](#enforcement)), as `keys.
 | `shared/keys/` | `keymap.ts`, `modkey.ts`, `hints.ts`, `Keys.tsx`, `keys.test.ts`, `hints.test.ts` | The Keymap, Hotkey Modifier, Hold Hints and Keycap: drawn by every module. |
 | `shared/text/` | `diff.ts`, `DiffView.tsx`, `diff.css`, `markdown.ts`, `csv.ts`, `branchname.ts` | Pure parsers used by 2+ modules (diff: Editor, Git, state; csv: Editor, Database). |
 | `shared/codemirror/` | `cm.ts`, `langs.ts`, `grammars.ts`, `grammars.json`, `textmate.ts`, `tmparser.ts`, `LangPicker.tsx`, `LangSettings.tsx` | The CodeMirror kit and Grammar Catalog: Editor, Database and Calculator all build editors on it. |
-| `shared/` (top) | `look.ts`, `backdrop.ts`, `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts` (new) | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). |
+| `shared/` (top) | `look.ts`, `backdrop.ts`, `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts` (new), `urls.ts` (new) | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). |
 
 ### `src/modules/`
 
@@ -154,7 +154,8 @@ src/
 │   ├── preview.ts
 │   ├── scope.ts
 │   ├── sigs.ts
-│   ├── nav.ts                    new: openSettings / settingsOpen
+│   ├── nav.ts                    new: the Settings page state
+│   ├── urls.ts                   new: normalizeUrl
 │   └── layout.test.ts            new: enforces the folder rules
 │
 └── modules/                      each imports only shared/ and other modules' index.ts
@@ -292,13 +293,13 @@ These imports break rules 3 and 4 today. Each needs a small change before (or as
 
 | Edge | Fix |
 |---|---|
-| `state.ts` → `news/newsdata` (`NewsFeed` type) | Move the `NewsFeed` type into `shared/state` (state owns what it persists); `newsdata` imports it. |
-| `worktrees.ts`, `Tour.tsx` → `Sidebar` (`dropProject`) | `dropProject` is a store operation: move it into `shared/state`. |
-| `NewsPanel`, `NewWorktree`, `profiles`, `debugmenu` → `Settings` (`openSettings`) | Put `openSettings` / `settingsOpen` in `shared/nav.ts`; `Settings.tsx` reads that signal. |
+| `state.ts` → `news/newsdata` (`NewsFeed` type) | Done: `NewsFeed` is defined in `state.ts`; `newsdata.ts` re-exports it. |
+| `worktrees.ts`, `Tour.tsx` → `Sidebar` (`dropProject`) | Done: moved to `src/projects.ts`. Not `shared/state`: it calls into browsers, terms, Appearance, icons, issues and signals, so in state it would add six back-edges. Before step 4's cross-module rule, give `state` an "on project dropped" hook each module registers with (as `onAlert`), leaving `dropProject` in state. |
+| `NewsPanel`, `NewWorktree`, `profiles`, `debugmenu`, `Sidebar`, `SandboxSettings`, `App`, `commands`, `hotkeys` → `Settings` | Done: `src/nav.ts` holds the whole Settings page state (`SettingsPage`, `settingsPage`, `openSettings`, `closeSettings`, `toggleSettings`, `settingsOpen`, `hotkeysOpen`, `toggleHotkeys`); `Settings.tsx` exports only `SettingsDialog`. |
 | `cli`, `LinkFolder`, `Welcome`, `Tour`, `Sidebar` → `OpenProject` (`openProjectDialog`, `openFolder`, `FolderPicker`) | Fine once `OpenProject` is `environments/`' interface. `FolderPicker` is used by Linked Folders too: export it from `environments/index.ts`. |
-| `signals` ↔ `phone` (`pushSignal` / `sigOf`) | `phone` already depends on `signals`. Turn it round: `signals` exposes `onAlert(fn)`, `phone` subscribes. `sigOf` already lives in `shared/sigs.ts`; point `phone` there. |
-| `agents` ↔ `browser` (`normalizeUrl` one way; `agentsetup`, `agenttarget` the other) | Move `normalizeUrl` to `shared/` (it is a URL helper). The browser → agents direction stays (Select element sends to an agent). |
-| `envlock` → `issues` (`clock`) | `clock` is a ticking-time signal, not an issue concept: move to `shared/ui`. |
+| `signals` ↔ `phone` (`pushSignal` / `sigOf`) | Done: `signals` exposes `onAlert(fn)` and `phone` registers with it at load; `phone` takes `sigOf` from `sigs.ts`. |
+| `agents`, `AgentsPanel`, `phoneask` ↔ `browser` (`normalizeUrl` one way; `agentsetup`, `agenttarget` the other) | Done: `normalizeUrl` is in `src/urls.ts` (→ `shared/`). The browser → agents direction stays (Select element sends to an agent). |
+| `envlock` → `issues` (`clock`) | Done: `clock`, `setClock`, `startClock` are in `ui.ts`. |
 | `terms` → `signals` → `phone` → `terms` (cycle) | Cut by the `onAlert` change above. |
 
 ## CSS
