@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import { splitKeys } from "./keymap";
 
 const src = join(import.meta.dir, "..", "..");
