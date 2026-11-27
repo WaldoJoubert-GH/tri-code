@@ -9,26 +9,26 @@
 // the active repo owns the commit box, commits, PR and push (design/diff.html, folder of repos).
 
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
-import { type Project, type Tab, diffModeOf, isRemote, setProjectDiffMode } from "./shared/state/state";
+import { type Project, type Tab, diffModeOf, isRemote, setProjectDiffMode } from "../../shared/state/state";
 import {
   type Change, type CtxId, type Drawer, type RepoStatus, type Sel, type Stash, closeStash, commit, copyFinding, discard, draftCommit, draftPr, fetchRemotes,
   finishOp, gitOf, ignore, isStaged, isUnstaged, linkedIssue, loadBranches, loadPr, markOf, merge, openDrawer, openPr, pull, push, refresh,
   repoRoot, review, select, selectCommit, selectRepo, selectStash, setBase, setField, setOpt, setPushTarget, stage, stashOp, stashPush, stepOf,
   toggleCtx, unpushed, unstage, untrack, upstreamOf,
 } from "./git";
-import { copyText } from "./shared/ui/clipboard";
-import { openFile } from "./files";
-import { openUrlInProject } from "./browsers";
-import { removeWorktree } from "./worktrees";
-import { type DiffMode, diffStats, firstChange, parseUnified } from "./shared/text/diff";
-import DiffView, { type Drill, diffKeys, stepHunk } from "./shared/text/DiffView";
-import { flash } from "./shared/ui/ui";
-import { withKey } from "./shared/keys/keymap";
-import { HoldKey, KeyText } from "./shared/keys/Keys";
+import { copyText } from "../../shared/ui/clipboard";
+import { openFile } from "../../files";
+import { openUrlInProject } from "../../browsers";
+import { removeWorktree } from "../../worktrees";
+import { type DiffMode, diffStats, firstChange, parseUnified } from "../../shared/text/diff";
+import DiffView, { type Drill, diffKeys, stepHunk } from "../../shared/text/DiffView";
+import { flash } from "../../shared/ui/ui";
+import { withKey } from "../../shared/keys/keymap";
+import { HoldKey, KeyText } from "../../shared/keys/Keys";
 import "./git.css";
-import { ctrlName } from "./shared/keys/modkey";
-import { isEnter } from "./shared/ui/enterkey";
-import { Icon } from "./shared/ui/lucide";
+import { ctrlName } from "../../shared/keys/modkey";
+import { isEnter } from "../../shared/ui/enterkey";
+import { Icon } from "../../shared/ui/lucide";
 
 // Icons and buttons follow design/git-panel.html (variant A, "Quiet"): Lucide icons throughout,
 // borderless icon buttons for row and section actions, labels kept on the main actions.

@@ -10,7 +10,7 @@ import { profileColor, profilesInUse } from "./profiles";
 import { nativeBrowsers } from "./browsers";
 import { openEditor } from "./files";
 import { openIssuePanel } from "./modules/issues";
-import { openGitPanel } from "./git";
+import { openGitPanel } from "./modules/git";
 import { openDbWindow } from "./modules/db";
 import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";

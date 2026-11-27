@@ -10,7 +10,7 @@ import { app, isLocalHost, moveTab, piCanFollow, projectById, repoOf, setApp } f
 import { followAfterTurn, rehomeSession } from "./terms";
 import { agentBranch } from "./shared/text/branchname";
 import { type Branch, adoptWorktrees, createWorktree, kinds } from "./worktrees";
-import { gitOf } from "./git";
+import { gitOf } from "./modules/git";
 import { flash } from "./shared/ui/ui";
 
 async function follow(project: string, tab: string, name: string): Promise<{ path: string; branch: string; setup?: string; project: string; restart: boolean }> {

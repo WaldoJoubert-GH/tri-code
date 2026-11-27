@@ -4,7 +4,7 @@
 
 import { For, Show, createSignal } from "solid-js";
 import { type Project, projectById, repoOf } from "./shared/state/state";
-import { folderStatus } from "./git";
+import { folderStatus } from "./modules/git";
 import { Icon } from "./shared/ui/lucide";
 import { Modal } from "./shared/ui/Modal";
 import { cleanPrefix, labelOf, removeWorktree, renameWorktree, startNextFeature, toBranch } from "./worktrees";

@@ -59,7 +59,10 @@ import { Caps, HoldFace, HoldKey } from "./shared/keys/Keys";
 import { hintsShown, holdMenuShown } from "./shared/keys/hints";
 import { appVersion, askRestart, installUpdate, startUpdateChecks, updateReady } from "./updater";
 import { RestartDialog } from "./RestartDialog";
-import { type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel, peekStatus, unpushed } from "./git";
+import {
+  type Change, type GitStatus, type RepoStatus, branchStatus, folderStatus, isStaged, isUnstaged, openGitPanel,
+  peekStatus, unpushed,
+} from "./modules/git";
 import {
   dev, formatHm, formatHms, inProgress, issueKey, loadDev, openIssuePanel, runningEntry, slugOf, stateOf, todayTotal,
 } from "./modules/issues";

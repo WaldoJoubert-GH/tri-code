@@ -27,7 +27,7 @@ import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";
 import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";
-import { openGitPanel } from "./git";
+import { openGitPanel } from "./modules/git";
 import { connsOf, openDbWindow } from "./modules/db";
 import { labelOf, openNewWorktree, removeWorktree } from "./worktrees";
 import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgentsPanel } from "./agents";

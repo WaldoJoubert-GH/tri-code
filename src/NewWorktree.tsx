@@ -12,7 +12,7 @@ import { branches, cleanPrefix, closeNewWorktree, createWorktree, fetching, igno
 import { BIG, fileSize, filterIgnored, splitPath, startingTicks } from "./ignored";
 import { SETUP_VARS } from "./setup";
 import { dev, inProgress, slugOf } from "./modules/issues";
-import { gitOf } from "./git";
+import { gitOf } from "./modules/git";
 import { Icon } from "./shared/ui/lucide";
 import { Modal } from "./shared/ui/Modal";
 import { sandboxPreview } from "./shared/preview";

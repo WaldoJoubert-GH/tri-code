@@ -19,7 +19,7 @@ import { type OpenHow, createFile, deletePath, dirState, renamePath, loadDir, re
 import { openCtxMenu } from "./shared/ui/ctxmenu";
 import { copyText } from "./shared/ui/clipboard";
 import { ask, flash } from "./shared/ui/ui";
-import { type FileMark, fileMarks, ignoredAt, markAt, peekStatus } from "./git";
+import { type FileMark, fileMarks, ignoredAt, markAt, peekStatus } from "./modules/git";
 import "./files.css";
 import { isEnter } from "./shared/ui/enterkey";
 

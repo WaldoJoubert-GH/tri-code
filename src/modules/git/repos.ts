@@ -4,7 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
-import { type Project } from "./shared/state/state";
+import { type Project } from "../../shared/state/state";
 
 export type RepoRef = {
   /** The repo's path relative to the project; "" when the project folder is the repo. */

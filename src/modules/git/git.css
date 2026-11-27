@@ -1,4 +1,4 @@
-/* Git window. See src/GitPanel.tsx; the look comes from design/git.html (variant B),
+/* Git window. See src/modules/git/GitPanel.tsx; the look comes from design/git.html (variant B),
    the diff from design/diff.html (variant A). */
 
 .mark.git { color: var(--violet); }

@@ -18,7 +18,7 @@ import { SIG_TEXT, sigOf, sigSummary, topSig } from "./signals";
 import { adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel } from "./worktrees";
 import { openWorktreeDialog } from "./WorktreeDialog";
 import { type CtxItem, openCtxMenu } from "./shared/ui/ctxmenu";
-import { folderStatus, peekStatus } from "./git";
+import { folderStatus, peekStatus } from "./modules/git";
 import { ask, flash } from "./shared/ui/ui";
 import { withKey } from "./shared/keys/keymap";
 import { isMac } from "./shared/keys/modkey";

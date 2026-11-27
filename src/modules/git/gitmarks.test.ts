@@ -1,11 +1,11 @@
-// bun test: which tree rows and tabs .gitignore matches (src/git.ts ignoredAt).
+// bun test: which tree rows and tabs .gitignore matches (src/modules/git/git.ts ignoredAt).
 
 import { expect, mock, test } from "bun:test";
 import type { FileMarks } from "./git";
 
-// git.ts reads the issue store through modules/issues/index.ts, whose Issues panel bun can't load (.tsx):
+// git.ts reads the issue store through ../issues (its index.ts), whose Issues panel bun can't load (.tsx):
 // stubbed before git.ts loads, as in marks.test.ts.
-mock.module("./modules/issues", () => ({ devOf: () => undefined, inProgress: () => [], slugOf: () => "" }));
+mock.module("../issues", () => ({ devOf: () => undefined, inProgress: () => [], slugOf: () => "" }));
 const { ignoredAt } = await import("./git");
 
 const marks = (ignored: string[]): FileMarks => ({ files: new Map(), dirs: new Map(), untracked: [], ignored: new Set(ignored) });

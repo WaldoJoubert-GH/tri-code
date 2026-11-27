@@ -27,7 +27,7 @@ import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";
 import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";
-import { openGitPanel } from "./git";
+import { openGitPanel } from "./modules/git";
 import { openDbWindow } from "./modules/db";
 import { diffKeys } from "./shared/text/DiffView";
 import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "./agents";

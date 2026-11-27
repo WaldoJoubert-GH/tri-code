@@ -1,13 +1,13 @@
-// bun test: the editor's git marks for the file tree and tabs (fileMarks / markAt in src/git.ts).
+// bun test: the editor's git marks for the file tree and tabs (fileMarks / markAt in src/modules/git/git.ts).
 
 import { describe, expect, mock, test } from "bun:test";
 import type { Change } from "./git";
 
-// git.ts reads the issue store (for its drafts) through modules/issues/index.ts, which also exports the
+// git.ts reads the issue store (for its drafts) through ../issues (its index.ts), which also exports the
 // Issues panel: bun can't load its .tsx. These tests don't draft, so the store is stubbed before git.ts loads.
-mock.module("./modules/issues", () => ({ devOf: () => undefined, inProgress: () => [], slugOf: () => "" }));
+mock.module("../issues", () => ({ devOf: () => undefined, inProgress: () => [], slugOf: () => "" }));
 const { fileMarks, markAt, setBranchStatus, setFolderStatus } = await import("./git");
-import type { Project } from "./shared/state/state";
+import type { Project } from "../../shared/state/state";
 
 const ch = (path: string, x: string, y: string): Change => ({ path, x, y });
 const status = (files: Change[]) => ({ branch: "main", upstream: null, ahead: 0, behind: 0, base: "main", files, commits: [] });

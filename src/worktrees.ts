@@ -17,7 +17,7 @@ import { type Agent, type Project, addTab, addWorktree, app, dropProject, focusT
 import { cleanPrefix, toBranch } from "./shared/text/branchname";
 import { setupCommand, setupLines } from "./setup";
 import { launchAgent } from "./agents";
-import { folderStatus, gitOf, peekStatus } from "./git";
+import { folderStatus, gitOf, peekStatus } from "./modules/git";
 import { ask, flash } from "./shared/ui/ui";
 import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "./leftovers";
 import { ensureSandbox, newSandboxName, relativeGitdir, removeSandbox, sandboxOf } from "./modules/sandbox";
