@@ -34,6 +34,7 @@ import DockerPanel from "./DockerPanel";
 import { closeDockerWindow } from "./docker";
 import MonitorPanel from "./MonitorPanel";
 import NewsPanel from "./NewsPanel";
+import CalcPanel from "./CalcPanel";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./db";
 import { gitOf } from "./git";
 import { clock, dev, panelTitle } from "./issues";
@@ -209,7 +210,8 @@ export default function Canvas(props: { project: Project }) {
     const isDocker = tab.kind === "docker";
     const isMonitor = tab.kind === "monitor";
     const isNews = tab.kind === "news";
-    const isPanel = isIssues || isEditor || isGit || isAgents || isDb || isDocker || isMonitor || isNews;
+    const isCalc = tab.kind === "calc";
+    const isPanel = isIssues || isEditor || isGit || isAgents || isDb || isDocker || isMonitor || isNews || isCalc;
 
     let barEl!: HTMLDivElement;
     let termEl!: HTMLDivElement;
@@ -531,6 +533,7 @@ export default function Canvas(props: { project: Project }) {
               : isDocker ? "docker"
               : isMonitor ? "monitor"
               : isNews ? "news"
+              : isCalc ? "calc"
               : (live[id]?.status ?? "connecting")
             }`}
           />
@@ -733,6 +736,8 @@ export default function Canvas(props: { project: Project }) {
           <MonitorPanel project={props.project} tab={tab} focused={focused()} />
         ) : isNews ? (
           <NewsPanel project={props.project} tab={tab} focused={focused()} />
+        ) : isCalc ? (
+          <CalcPanel project={props.project} tab={tab} focused={focused()} />
         ) : (
           <div class="body" ref={termEl} />
         )}

@@ -54,6 +54,7 @@ export const ACTIONS: Action[] = [
   { id: "docker", group: "Windows and links", desc: "Docker", def: [k("KeyY")] },
   { id: "monitor", group: "Windows and links", desc: "Monitor: CPU, memory and processes", def: [k("KeyM")] },
   { id: "news", group: "Windows and links", desc: "News: RSS and Atom feeds", def: [sh("Slash")] },
+  { id: "calc", group: "Windows and links", desc: "Calculator: a tape of sums", def: [k("Equal")] },
   { id: "diff", group: "Windows and links", desc: "Editor: switch between Source and Diff. Git: open the file's diff in the editor", def: [k("KeyD")] },
   { id: "agents", group: "Windows and links", desc: "Commands window", def: [k("Semicolon")] },
   { id: "palette", group: "Windows and links", desc: "Command palette: run a command or open a file", def: [k("KeyX")] },

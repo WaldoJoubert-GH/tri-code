@@ -15,6 +15,7 @@ import { openDbWindow } from "./db";
 import { openDockerPanel } from "./docker";
 import { openMonitorPanel } from "./monitor";
 import { openNewsPanel } from "./news";
+import { openCalcPanel } from "./calc";
 import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "./agents";
 import { Icon } from "./lucide";
 import { SIG_TEXT, sigOf } from "./signals";
@@ -25,7 +26,7 @@ import { hintChord, hintsShown, holdMenuShown } from "./hints";
 
 /** Glyphs of the windows that aren't terminals (those show their agent's icon). */
 const GLYPH: Record<Exclude<TabKind, "term">, string> = {
-  browser: "◎", issues: "☑", editor: "▤", git: "±", agents: "⚙", db: "⛁", docker: "▣", monitor: "▥", news: "◉",
+  browser: "◎", issues: "☑", editor: "▤", git: "±", agents: "⚙", db: "⛁", docker: "▣", monitor: "▥", news: "◉", calc: "=",
 };
 
 /** The panels the New window menu offers under the agents, with the key that also opens one. */
@@ -38,6 +39,7 @@ const PANELS: { kind: Exclude<TabKind, "term">; /** The Keymap action that also 
   { kind: "docker", key: "docker" },
   { kind: "monitor", key: "monitor" },
   { kind: "news", key: "news" },
+  { kind: "calc", key: "calc" },
   { kind: "agents", key: "agents" },
 ];
 
@@ -71,6 +73,7 @@ function newPanel(p: Project, kind: (typeof PANELS)[number]["kind"]) {
   if (kind === "docker") return void openDockerPanel(p);
   if (kind === "monitor") return void openMonitorPanel(p);
   if (kind === "news") return void openNewsPanel(p);
+  if (kind === "calc") return void openCalcPanel(p);
   addTab(p.id, kind);
   flash(`new ${kind}`);
 }

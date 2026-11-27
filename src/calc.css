@@ -1,0 +1,33 @@
+/* Calculator window. See src/CalcPanel.tsx; the look comes from design/calculator.html, variant B. */
+
+.mark.calc { color: var(--p-moss); }
+
+.ca-root { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); font-size: 12.5px; }
+.ca-grow { flex: 1; }
+.ca-dim { color: var(--muted); }
+
+/* header */
+.ca-ph { height: 32px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; border-bottom: 1px solid var(--line); background: var(--panel); white-space: nowrap; overflow: hidden; font-size: 12px; }
+.ca-title { font-weight: 600; }
+.ca-ib { display: inline-grid; place-items: center; width: 26px; height: 22px; border-radius: 5px; color: var(--muted); flex: none; }
+.ca-ib:hover { background: var(--hover); color: var(--text); }
+
+/* the tape: text on the left, answers in the gutter after it */
+.ca-ed { flex: 1; min-height: 0; display: flex; }
+.ca-ed .cm-editor { flex: 1; min-width: 0; height: 100%; }
+.ca-ed .cm-editor .cm-scroller { font-size: 13px; line-height: 22px; }
+.ca-ed .cm-editor .cm-content { padding: 8px 0 40px; }
+.ca-ed .cm-editor .cm-line { padding: 0 8px 0 12px; }
+.ca-ed .cm-editor .cm-gutters.cm-gutters-after { background: var(--panel); border-left: 1px solid var(--line); }
+.ca-ed .cm-editor .ca-gutter { min-width: 118px; }
+.ca-ed .cm-editor .ca-gutter .cm-gutterElement { padding: 0 12px 0 14px; text-align: right; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ca-ed .cm-editor .ca-gutter .cm-gutterElement.cm-activeLineGutter { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ca-ans { font-weight: 600; color: var(--text); cursor: pointer; }
+.ca-ans:hover { color: var(--accent); }
+.ca-ans.ca-var { color: var(--ok); font-weight: 500; }
+.ca-ans.ca-sum { color: var(--ok); border-top: 1px solid color-mix(in srgb, var(--ok) 45%, transparent); }
+.ca-why { color: var(--bad); opacity: .7; cursor: help; }
+
+/* footer */
+.ca-foot { flex: none; display: flex; flex-wrap: wrap; gap: 4px 8px; padding: 6px 12px; border-top: 1px solid var(--line); color: var(--muted); }
+.ca-foot code { font: 11px var(--mono); background: var(--raised); border-radius: 4px; padding: 0 5px; }
