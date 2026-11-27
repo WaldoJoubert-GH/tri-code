@@ -1,4 +1,4 @@
-/* Docker window. See src/DockerPanel.tsx; the look comes from design/docker.html, variant A. */
+/* Docker window. See src/modules/docker/DockerPanel.tsx; the look comes from design/docker.html, variant A. */
 
 .mark.docker { color: var(--accent); }
 

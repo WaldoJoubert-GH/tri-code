@@ -12,7 +12,7 @@ import { openEditor } from "./files";
 import { openIssuePanel } from "./issues";
 import { openGitPanel } from "./git";
 import { openDbWindow } from "./db";
-import { openDockerPanel } from "./docker";
+import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";
 import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";

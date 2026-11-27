@@ -24,7 +24,7 @@ import { closeDebugMenu, debugMenuOpen } from "./debugmenu";
 import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
-import { openDockerPanel } from "./docker";
+import { openDockerPanel } from "./modules/docker";
 import { openMonitorPanel } from "./modules/monitor";
 import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";

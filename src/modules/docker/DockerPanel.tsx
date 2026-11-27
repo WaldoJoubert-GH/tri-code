@@ -4,18 +4,18 @@
 
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Project, type Tab, isRemote } from "./shared/state/state";
+import { type Project, type Tab, isRemote } from "../../shared/state/state";
 import { type Stop, containerAction, followEvents, followLogs, forwardPort, forwardedPorts, listContainers, portKey } from "./docker";
 import {
   type Container, type Level, type LogLine, type Port, type Stack, clockOf, containerOfPrefix, failureOf, groupStacks, isAlive, isUp, localAddr, matchesFind, needsLook, opensPage,
   parseEvent, parseLogLine, phaseText, phaseTone, portUrl, rowName, sandboxStack, stoppedCleanly, withLevel,
 } from "./dockerdata";
-import { isRunning, listBoxes, sandboxOf, sbxReady, startSandbox, stopSandbox } from "./sandbox";
-import { sandboxPreview } from "./shared/preview";
-import { openUrlInProject } from "./browsers";
-import { copyText } from "./shared/ui/clipboard";
-import { Icon } from "./shared/ui/lucide";
-import { ask, flash } from "./shared/ui/ui";
+import { isRunning, listBoxes, sandboxOf, sbxReady, startSandbox, stopSandbox } from "../../sandbox";
+import { sandboxPreview } from "../../shared/preview";
+import { openUrlInProject } from "../../browsers";
+import { copyText } from "../../shared/ui/clipboard";
+import { Icon } from "../../shared/ui/lucide";
+import { ask, flash } from "../../shared/ui/ui";
 import "./docker.css";
 
 const TAIL = 500;
