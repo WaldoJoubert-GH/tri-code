@@ -6,12 +6,12 @@ import { produce } from "solid-js/store";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { type ConfigFile, type ImportPlan, type Section, SECTIONS, applyImport, assetKeys, assetName, buildExport, parseConfig, planImport } from "./config";
-import { app, newId, setApp } from "./shared/state/state";
-import { setBgImage } from "./modules/appearance";
-import { loadIcons } from "./shared/ui/icons";
-import { reloadSound } from "./modules/signals";
-import { appVersion } from "./app/updater";
-import { flash } from "./shared/ui/ui";
+import { app, newId, setApp } from "../../shared/state/state";
+import { setBgImage } from "../../modules/appearance";
+import { loadIcons } from "../../shared/ui/icons";
+import { reloadSound } from "../../modules/signals";
+import { appVersion } from "../updater";
+import { flash } from "../../shared/ui/ui";
 
 const LOAD = { bg: "bg_load", icon: "icon_load", sound: "sound_load" } as const;
 const SAVE = { bg: "bg_save", icon: "icon_save", sound: "sound_save" } as const;

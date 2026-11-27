@@ -5,30 +5,30 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { For, Show, batch, createResource } from "solid-js";
-import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setMedia, setLinkedFolders, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "./shared/state/state";
-import { type FontKind, type Theme, fontMissing, themeOf } from "./shared/look";
-import { applySignalColors, SignalsForm } from "./modules/signals";
-import { keyOf } from "./shared/keys/keymap";
-import { Icon } from "./shared/ui/lucide";
-import { Modal } from "./shared/ui/Modal";
-import { Caps, KeyList } from "./shared/keys/Keys";
+import { AgentState, DRAFT_COMMAND, envIcon, envName, isLocalHost, GAP_MAX, GIT_TINT, GitColor, app, setSettings, setDraftCommand, setDiffDefault, setFont, setGap, setGitColor, setGitTint, setMonoGutter, setPreview, setClaudeUsage, setClaudeDailyTarget, setMedia, setLinkedFolders, setEnvHeaders, setClaudePace, setCommandCodeUsage, setSignalColor, setSkipFolders, setTheme, setWorktreeAgent, skipFolders, worktreeAgent } from "../../shared/state/state";
+import { type FontKind, type Theme, fontMissing, themeOf } from "../../shared/look";
+import { applySignalColors, SignalsForm } from "../../modules/signals";
+import { keyOf } from "../../shared/keys/keymap";
+import { Icon } from "../../shared/ui/lucide";
+import { Modal } from "../../shared/ui/Modal";
+import { Caps, KeyList } from "../../shared/keys/Keys";
 import { HotkeysPage } from "./HotkeySettings";
-import { RemotePage } from "./modules/phone";
-import { BrowserPage } from "./modules/browser";
-import { NewsPage } from "./modules/news";
-import { AgentsPage } from "./modules/agents";
+import { RemotePage } from "../../modules/phone";
+import { BrowserPage } from "../../modules/browser";
+import { NewsPage } from "../../modules/news";
+import { AgentsPage } from "../../modules/agents";
 import { BackupPage } from "./Backup";
-import { CliPage } from "./CliSettings";
-import { SandboxPage } from "./modules/sandbox";
-import { LanguagesPage } from "./shared/codemirror/LangSettings";
-import { PREVIEWS, previewOn } from "./shared/preview";
-import { type SettingsPage, closeSettings, pageShown, setSettingsPage, settingsPage } from "./shared/nav";
-import { openEnvDialog } from "./modules/environments";
-import { openWelcome } from "./modules/welcome";
-import { ICON_THEMES, type IconTheme } from "./shared/ui/fileicons";
-import { FileIcon } from "./modules/editor";
-import "./app/files.css";
-import { linksOn } from "./shared/links";
+import { CliPage } from "../../CliSettings";
+import { SandboxPage } from "../../modules/sandbox";
+import { LanguagesPage } from "../../shared/codemirror/LangSettings";
+import { PREVIEWS, previewOn } from "../../shared/preview";
+import { type SettingsPage, closeSettings, pageShown, setSettingsPage, settingsPage } from "../../shared/nav";
+import { openEnvDialog } from "../../modules/environments";
+import { openWelcome } from "../../modules/welcome";
+import { ICON_THEMES, type IconTheme } from "../../shared/ui/fileicons";
+import { FileIcon } from "../../modules/editor";
+import "../files.css";
+import { linksOn } from "../../shared/links";
 
 const PAGES: { page: SettingsPage; name: string; icon: string }[] = [
   { page: "appearance", name: "Appearance", icon: "palette" },

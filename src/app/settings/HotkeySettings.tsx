@@ -5,14 +5,14 @@
 // action back. Commands keep their one hotkey on the command (also edited in the commands window).
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { type Chord, type Hotkey, app, setSettings, updateAgent } from "./shared/state/state";
-import { metaName, modLabel } from "./shared/keys/modkey";
+import { type Chord, type Hotkey, app, setSettings, updateAgent } from "../../shared/state/state";
+import { metaName, modLabel } from "../../shared/keys/modkey";
 import {
   ACTIONS, actionById, changed, chordKeys, chordProblem, chordText, keysOf, owner, recorded, sameChord, setKeys,
-} from "./shared/keys/keymap";
-import { offeredTogether, recording, scopeLabel, setRecording } from "./modules/agents";
-import { flash } from "./shared/ui/ui";
-import { Key, KeyList } from "./shared/keys/Keys";
+} from "../../shared/keys/keymap";
+import { offeredTogether, recording, scopeLabel, setRecording } from "../../modules/agents";
+import { flash } from "../../shared/ui/ui";
+import { Key, KeyList } from "../../shared/keys/Keys";
 
 const MODIFIERS = new Set(["Alt", "Shift", "Control", "Meta", "AltGraph", "OS"]);
 const GROUPS = ["Focus", "Arrange", "Project", "Windows and links", "Signals", "Media", "Commands", "Editor", "Browser", "Text"];

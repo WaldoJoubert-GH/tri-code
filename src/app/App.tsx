@@ -14,7 +14,7 @@ import Sidebar, { sidebarPeek } from "./Sidebar";
 import { HoldBar, TabMenu, TabStrip } from "./tabs";
 import { CtxMenu, ctxMenuOpen } from "../shared/ui/ctxmenu";
 import { ClaudeUsage, CommandCodeUsage } from "../modules/usage";
-import { SettingsDialog } from "../Settings";
+import { SettingsDialog } from "./settings/Settings";
 import { hotkeysOpen, openSettings, settingsOpen, tabMenuOpen, toggleHotkeys } from "../shared/nav";
 import { startAgentWindows, applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "../modules/terminal";
 import { startAgentWorktrees, NewWorktreeDialog, WorktreeDialog, newWorktreeOpen } from "../modules/worktrees";
