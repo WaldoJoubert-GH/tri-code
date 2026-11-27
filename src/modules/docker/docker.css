@@ -72,7 +72,7 @@
 .dk-st.dk-bad { color: var(--bad); }
 .dk-off { --sc: var(--muted); }
 .dk-st.dk-off { color: var(--muted); }
-.dk-st.dk-warn i { animation: dk-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: no-preference) { .dk-st.dk-warn i { animation: dk-pulse 1.2s ease-in-out infinite; } }
 @keyframes dk-pulse { 50% { opacity: .3; } }
 
 /* Port chips */

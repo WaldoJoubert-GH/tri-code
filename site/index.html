@@ -34,7 +34,21 @@
     </div>
     <div class="meta">Windows &amp; macOS · updates itself</div>
     <div class="alpha"><strong>Alpha.</strong> Expect bugs and rough edges. tri-code is developed and tested on Windows; macOS and Linux aren't actively tested yet, so feedback from those platforms is especially welcome. <a href="https://github.com/WaldoJoubert-GH/tri-code/issues">Report an issue</a>.</div>
-    <video class="shot" src="screenshots/demo.mp4" poster="screenshots/demo-poster.jpg" width="1920" height="1080" autoplay muted loop playsinline aria-label="A 40-second tour: tri-code opens from a terminal, claude works in a worktree, agent signals show who needs you, worktrees, ✦ drafts a commit, the Command Palette opens the database window, and a recap of the editor, Commands and ssh"></video>
+    <video id="demo" class="shot" src="screenshots/demo.mp4" poster="screenshots/demo-poster.jpg" width="1920" height="1080" muted loop playsinline aria-label="A 40-second tour: tri-code opens from a terminal, claude works in a worktree, agent signals show who needs you, worktrees, ✦ drafts a commit, the Command Palette opens the database window, and a recap of the editor, Commands and ssh"></video>
+    <button id="demo-toggle" class="btn ghost demo-toggle" type="button" hidden>Pause demo</button>
+    <script>
+      // The demo plays by itself unless the visitor asked for less motion, and can always be paused (WCAG 2.2.2).
+      {
+        const v = document.getElementById("demo"), b = document.getElementById("demo-toggle");
+        const label = () => (b.textContent = v.paused ? "Play demo" : "Pause demo");
+        v.addEventListener("play", label);
+        v.addEventListener("pause", label);
+        b.addEventListener("click", () => (v.paused ? v.play() : v.pause()));
+        b.hidden = false;
+        label();
+        if (!matchMedia("(prefers-reduced-motion: reduce)").matches) v.play().catch(label);
+      }
+    </script>
   </div>
 </header>
 

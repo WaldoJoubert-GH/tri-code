@@ -273,7 +273,7 @@ body.dragging-project, body.dragging-project * { cursor: grabbing !important; }
   background: var(--sc); box-shadow: 0 0 0 2px var(--panel); color: var(--bg); font: 700 8.5px/12px var(--ui); text-align: center;
 }
 .wt > .sb:empty { min-width: 0; width: 8px; height: 8px; padding: 0; left: 25px; top: 0; }
-.wt > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: no-preference) { .wt > .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; } }
 .wt > .sb.s-working:empty { border-right-color: transparent; animation: spin .9s linear infinite; }
 .rail:not(.peek) .wt { justify-content: center; padding: 0; }
 .rail:not(.peek) .wt .bn, .rail:not(.peek) .wt .count, .rail:not(.peek) .wt .x, .rail:not(.peek) .wt .sub, .rail:not(.peek) .wt .pin, .rail:not(.peek) .wt .lk { display: none; }
@@ -1053,7 +1053,7 @@ aside h2 .env-lock.on { opacity: 1; color: var(--warn); }
 .pin-pad .keys button { height: 38px; border-radius: 8px; background: var(--panel); font-size: 15px; display: grid; place-items: center; }
 .pin-pad .keys button:hover:not(:disabled) { background: var(--hover); }
 .pin-pad .err { min-height: 16px; margin-top: 6px; color: var(--bad); font-size: 12px; }
-.pin-pad.shake { animation: pin-shake .3s; }
+@media (prefers-reduced-motion: no-preference) { .pin-pad.shake { animation: pin-shake .3s; } }
 @keyframes pin-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 .open-dlg .pane .pin-wrap { position: static; height: 100%; }
 

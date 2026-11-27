@@ -365,7 +365,7 @@
 /* Issues window: a view of the project's .dev/ (config.json, issues.json, plane-states.json),
    the same files pi-todos and dev-hub read and write. Plain HTML, not a terminal, so plain keys drive it. */
 .mark.plane { color: var(--violet); }
-.mark.plane.syncing { animation: syncp .7s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: no-preference) { .mark.plane.syncing { animation: syncp .7s ease-in-out infinite alternate; } }
 @keyframes syncp { to { opacity: .2; } }
 .iss { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
 .itools {
@@ -756,7 +756,8 @@ textarea.finput { resize: vertical; min-height: 74px; }
 .status .timer { flex: none; color: var(--muted); font: 11px var(--mono); }
 .status .timer b { color: var(--accent); font-weight: 600; }
 /* Running Entry marker. Only the <i>: Settings › Hotkeys and the commands window mark a key being recorded with .rec too. */
-i.rec { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; animation: syncp 1s ease-in-out infinite alternate; }
+i.rec { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+@media (prefers-reduced-motion: no-preference) { i.rec { animation: syncp 1s ease-in-out infinite alternate; } }
 
 /* Muted inline text inside the issue detail. */
 .c-m { color: var(--muted); }

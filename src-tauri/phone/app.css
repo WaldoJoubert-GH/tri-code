@@ -78,13 +78,19 @@ svg.lucide, .ico svg { display: block; flex: none; }
 /* signals (signals.ts): one colour per state, a dot, a ring while working, a pill in a window's bar */
 .s-working { --sc: var(--state-working); } .s-blocked { --sc: var(--state-blocked); } .s-done { --sc: var(--state-done); } .s-error { --sc: var(--state-error); }
 .sg { width: 7px; height: 7px; border-radius: 50%; background: var(--sc); flex: none; }
-.sg.s-working { width: 9px; height: 9px; background: none; border: 1.5px solid var(--sc); border-right-color: transparent; animation: spin .9s linear infinite; }
+.sg.s-working { width: 9px; height: 9px; background: none; border: 1.5px solid var(--sc); border-right-color: transparent; }
 .ast { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px; font: 600 11px var(--ui); color: var(--sc); background: color-mix(in srgb, var(--sc) 14%, transparent); white-space: nowrap; }
 .ast .sg { width: 6px; height: 6px; }
 .ast .sg.s-working { width: 8px; height: 8px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes sbp { 50% { box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px color-mix(in srgb, var(--sc) 28%, transparent); } }
 @keyframes bell { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-blocked) 22%, transparent); } }
+/* Only when the phone hasn't asked for less motion: the ring and the colour still say the state. */
+@media (prefers-reduced-motion: no-preference) {
+  .sg.s-working, .sb.s-working { animation: spin .9s linear infinite; }
+  .sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
+  .ag.s-blocked, .win.sig-blocked { animation: bell 1.6s ease-in-out infinite; }
+}
 
 /* ---------- pairing ---------- */
 .pair { flex: 1; overflow-y: auto; padding: 28px 20px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; background: var(--bg); }
@@ -147,8 +153,7 @@ svg.lucide, .ico svg { display: block; flex: none; }
   position: absolute; left: 30px; top: 3px; width: 11px; height: 11px; border-radius: 50%;
   background: var(--sc); box-shadow: 0 0 0 2px var(--panel);
 }
-.sb.s-blocked { animation: sbp 1.6s ease-in-out infinite; }
-.sb.s-working { background: var(--panel); border: 1.5px solid var(--sc); border-right-color: transparent; animation: spin .9s linear infinite; }
+.sb.s-working { background: var(--panel); border: 1.5px solid var(--sc); border-right-color: transparent; }
 .wts { position: relative; display: flex; flex-direction: column; gap: 1px; margin: 1px 0 4px; }
 .wts::before { content: ""; position: absolute; left: 22px; top: -3px; bottom: 18px; border-left: 1px solid var(--line); }
 .wt { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 8px 0 10px; border-radius: 6px; white-space: nowrap; font-size: 13px; }
@@ -170,7 +175,7 @@ svg.lucide, .ico svg { display: block; flex: none; }
 /* what needs you: a window's bar as a row */
 .ag { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 6px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); margin-bottom: 5px; }
 .ag:active { background: var(--hover); }
-.ag.s-blocked { border-color: var(--state-blocked); animation: bell 1.6s ease-in-out infinite; }
+.ag.s-blocked { border-color: var(--state-blocked); }
 .ag.s-error { border-color: var(--state-error); }
 .ag .mid { flex: 1; min-width: 0; }
 .ag .mid > span { display: block; }
@@ -201,7 +206,7 @@ svg.lucide, .ico svg { display: block; flex: none; }
 .win { min-width: 0; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .win:active { border-color: var(--accent); }
 .win.big { grid-column: 1 / -1; grid-row: span 2; }
-.win.sig-blocked { border-color: var(--state-blocked); animation: bell 1.6s ease-in-out infinite; }
+.win.sig-blocked { border-color: var(--state-blocked); }
 .win.sig-error { border-color: var(--state-error); }
 .win.sig-done { border-color: color-mix(in srgb, var(--state-done) 70%, var(--line)); }
 .win.min, .win.off { opacity: .55; }
