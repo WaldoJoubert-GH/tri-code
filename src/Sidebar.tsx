@@ -2,20 +2,20 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
-  Project, app, envHeadersHidden, envIcon, envName, isLocalHost, isPinned, isTerminal, moveProject, projectById, removeEnvironment, removeProject, renameProject, setApp, setEnvStyle,
+  Project, app, envHeadersHidden, envIcon, envName, isLocalHost, isPinned, moveProject, projectById, removeEnvironment, renameProject, setApp, setEnvStyle,
   setSidebarCollapsed, togglePin, worktreesOf,
 } from "./state";
-import { closeBrowser, setBrowsersCovered } from "./browsers";
-import { closeSession } from "./terms";
-import { appearanceOpen, closeAppearance, forgetBgImage, openAppearance } from "./Appearance";
-import { dev, forgetProject, isActive, sourcesOf, stateOf } from "./issues";
-import { IconFace, forgetIcon } from "./icons";
+import { setBrowsersCovered } from "./browsers";
+import { appearanceOpen, closeAppearance, openAppearance } from "./Appearance";
+import { dev, isActive, sourcesOf, stateOf } from "./issues";
+import { IconFace } from "./icons";
 import { Icon, iconPickerOpen, toggleIconPicker } from "./lucide";
 import { Caps, HoldFace } from "./Keys";
 import { projectStepKey } from "./hints";
 import { openProjectDialog } from "./OpenProject";
 import { envDialogOpen, openEnvDialog } from "./EnvDialog";
-import { SIG_TEXT, forgetSounds, sigOf, sigSummary, topSig } from "./signals";
+import { SIG_TEXT, sigOf, sigSummary, topSig } from "./signals";
+import { dropProject } from "./projects";
 import { adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel } from "./worktrees";
 import { openWorktreeDialog } from "./WorktreeDialog";
 import { type CtxItem, openCtxMenu } from "./ctxmenu";
@@ -88,20 +88,6 @@ export function toggleSidebar() {
   setPeek(false);
   setSidebarCollapsed(collapsed);
   flash(collapsed ? "sidebar collapsed" : "sidebar expanded");
-}
-
-/** End a project's windows and drop everything stored for it. */
-export function dropProject(p: Project) {
-  for (const t of p.tabs) {
-    if (t.kind === "browser") closeBrowser(t);
-    else if (isTerminal(t)) closeSession(t.id);
-  }
-  invoke("bg_delete", { projectId: p.id }).catch((e) => console.error("bg_delete failed:", e));
-  forgetBgImage(p.id);
-  forgetIcon(p.id);
-  forgetProject(p.id);
-  forgetSounds(p.id);
-  removeProject(p.id);
 }
 
 /** Show the project's folder in Explorer or Finder. Only a folder on this machine can be shown. */

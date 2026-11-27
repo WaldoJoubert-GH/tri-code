@@ -17,7 +17,7 @@ import { type Agent, type Project, addTab, addWorktree, app, focusTab, isLocalHo
 import { cleanPrefix, toBranch } from "./branchname";
 import { setupCommand, setupLines } from "./setup";
 import { launchAgent } from "./agents";
-import { dropProject } from "./Sidebar";
+import { dropProject } from "./projects";
 import { folderStatus, gitOf, peekStatus } from "./git";
 import { ask, flash } from "./ui";
 import { endHolders, holderLine, holdersOf, samePath, scanLeftovers } from "./leftovers";
