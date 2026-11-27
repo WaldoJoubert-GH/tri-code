@@ -4,7 +4,7 @@
 // took about 330px of the 34px toolbar — the widest thing in it — and said nothing about what
 // was already open.
 
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createMemo, onCleanup, onMount } from "solid-js";
 import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focusTab, lastMinimised, live, projectById, space, tabName, tabProfile, visibleTabs } from "./shared/state/state";
 import { profileColor, profilesInUse } from "./profiles";
 import { nativeBrowsers } from "./browsers";
@@ -22,7 +22,8 @@ import { SIG_TEXT, sigOf } from "./signals";
 import { flash } from "./shared/ui/ui";
 import { groupKeys, heldKeys } from "./shared/keys/keymap";
 import { Caps, HoldFace, KeyList } from "./shared/keys/Keys";
-import { hintChord, hintsShown, holdMenuShown } from "./shared/keys/hints";
+import { hintsShown, holdMenuShown } from "./shared/keys/hints";
+import { type TabMenuAt, closeTabMenu, tabMenu, tabMenuOpen, toggleTabMenu } from "./shared/nav";
 
 /** Glyphs of the windows that aren't terminals (those show their agent's icon). */
 const GLYPH: Record<Exclude<TabKind, "term">, string> = {
@@ -78,22 +79,6 @@ function newPanel(p: Project, kind: (typeof PANELS)[number]["kind"]) {
   flash(`new ${kind}`);
 }
 
-type Menu = { projectId: string; anchor: HTMLElement };
-const [menu, setMenu] = createSignal<Menu | null>(null);
-
-export const tabMenuOpen = () => menu() !== null;
-
-export function closeTabMenu() {
-  setMenu(null);
-  hintChord(); // a pick from the menu the hold opened closes it too
-}
-
-/** Open the New window menu under its `+` button, or close it if it is already open. */
-export function toggleTabMenu(anchor: HTMLElement, projectId: string) {
-  if (menu()) closeTabMenu();
-  else setMenu({ projectId, anchor });
-}
-
 /** Put the menu under its button, kept inside the window (the toolbar is 34px tall). */
 function placeMenu(el: HTMLElement, a: HTMLElement) {
   const r = a.getBoundingClientRect();
@@ -104,14 +89,14 @@ function placeMenu(el: HTMLElement, a: HTMLElement) {
 /** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
 export function TabMenu() {
   const onDown = (e: PointerEvent) => {
-    if (menu() && !(e.target as Element).closest(".tabmenu, .tab-add")) closeTabMenu();
+    if (tabMenu() && !(e.target as Element).closest(".tabmenu, .tab-add")) closeTabMenu();
   };
   onMount(() => document.addEventListener("pointerdown", onDown));
   onCleanup(() => document.removeEventListener("pointerdown", onDown));
 
   /** The menu a click opened, or the one holding the modifier opens under the `+`. */
-  const shown = createMemo((): Menu | null => {
-    const open = menu();
+  const shown = createMemo((): TabMenuAt | null => {
+    const open = tabMenu();
     if (open) return open;
     const p = holdMenuShown() ? activeProject() : undefined;
     const anchor = p && document.querySelector<HTMLElement>(".tab-add");

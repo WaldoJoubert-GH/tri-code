@@ -7,7 +7,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Project, Tab, activePage, activeProject, addTab, app, canvasTabs, focusedTab, setRatio, space } from "./shared/state/state";
 import { focusDir, requestClose, swapDir } from "./Canvas";
 import { appearanceOpen, closeAppearance, toggleAppearance } from "./Appearance";
-import { closeSettings, settingsOpen, toggleHotkeys } from "./shared/nav";
+import { closeSettings, closeTabMenu, setHotkeyRunner, settingsOpen, tabMenuOpen, toggleHotkeys } from "./shared/nav";
 import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
 import { closeLinkDialog, linkDialogOpen } from "./LinkFolder";
@@ -15,7 +15,6 @@ import { closeEnvDialog, envDialogOpen } from "./EnvDialog";
 import { closeWelcome, welcomeOpen } from "./modules/welcome";
 import { toggleSidebar } from "./Sidebar";
 import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees";
-import { closeTabMenu, tabMenuOpen } from "./tabs";
 import { closeCtxMenu, ctxMenuOpen } from "./shared/ui/ctxmenu";
 import { closeFavEdit, favEditOpen } from "./favs";
 import { closeTunnelPop, tunnelPopOpen } from "./tunnelui";
@@ -286,11 +285,13 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-/** Run a Keymap action as its key would, for the active project: the tour's keys can be clicked. */
-export function runHotkey(id: string): boolean {
+/** Run a Keymap action as its key would, for the active project: the tour's keys can be clicked
+ *  (through shared/nav's `runHotkey`, so the Tour doesn't import this file). */
+function runHotkey(id: string): boolean {
   const p = activeProject();
   return runAnywhere(id) || (!!p && run(id, p, focusedTab(p)));
 }
+setHotkeyRunner(runHotkey);
 
 let installed = false;
 

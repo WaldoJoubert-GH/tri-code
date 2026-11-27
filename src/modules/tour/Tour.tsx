@@ -11,8 +11,7 @@ import { askDemo } from "../../terms";
 import { flash } from "../../shared/ui/ui";
 import { Caps, Key } from "../../shared/keys/Keys";
 import { flashHints, hintsShown } from "../../shared/keys/hints";
-import { runHotkey } from "../../hotkeys";
-import { tabMenuOpen, toggleTabMenu } from "../../tabs";
+import { runHotkey, tabMenuOpen, toggleTabMenu } from "../../shared/nav";
 import { modLabel } from "../../shared/keys/modkey";
 import { Modal } from "../../shared/ui/Modal";
 
