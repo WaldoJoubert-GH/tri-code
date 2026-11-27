@@ -23,6 +23,7 @@ import { type Cell, type DbKind, cellText, editText, isNested, isOpaque, parseIn
 import { Icon } from "../../shared/ui/lucide";
 import { highlight, theme } from "../../shared/codemirror/cm";
 import { ask, flash } from "../../shared/ui/ui";
+import { useWindowModal } from "../../shared/ui/windowModal";
 import "./db.css";
 import { Key, KeyText } from "../../shared/keys/Keys";
 import { ctrlName } from "../../shared/keys/modkey";
@@ -818,13 +819,15 @@ function CellInput(props: { value: string; placeholder: string; onDone: (text: s
 function Review(props: { project: Project; tabId: string; conn: DbConn; review: NonNullable<Win["review"]> }): JSX.Element {
   const [busy, setBusy] = createSignal(false);
   let goEl!: HTMLButtonElement;
+  let scrimEl: HTMLDivElement | undefined;
+  useWindowModal(() => scrimEl);
   onMount(() => goEl.focus());
   const prod = () => props.conn.tag === "prod";
   const sheet = () => isSheet(props.conn);
   const go = async () => { setBusy(true); await apply(props.tabId, sheet() ? props.conn.name : undefined); setBusy(false); };
   return (
-    <div class="db-scrim" onClick={(e) => e.target === e.currentTarget && closeReview(props.tabId)} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); closeReview(props.tabId); } }}>
-      <div class="db-dlg">
+    <div class="db-scrim" ref={scrimEl} onClick={(e) => e.target === e.currentTarget && closeReview(props.tabId)} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); closeReview(props.tabId); } }}>
+      <div class="db-dlg" role="dialog" aria-label="Review changes">
         <div class="db-dlg-h"><Icon name="check" size={14} /><b class="db-grow">Review {props.review.ops.length} {props.review.ops.length === 1 ? "change" : "changes"}</b><button class="db-ib" onClick={() => closeReview(props.tabId)}><Icon name="x" size={13} /></button></div>
         <div class="db-dlg-b">
           <Show when={prod()}>

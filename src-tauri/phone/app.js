@@ -344,7 +344,7 @@ function render() {
     const hit = findWindow(view.tab);
     if (hit) winHeader(hit);
   }
-  if (view.screen === "proj" && !$("sheet").hidden) renderSheet();
+  if (view.screen === "proj" && $("sheet").open) renderSheet();
   if (open) {
     const hit = findWindow(open.tab);
     if (!hit || hit.w.pty === undefined) ended();
@@ -728,18 +728,22 @@ function renderSheet() {
 }
 
 function closeSheet() {
-  $("sheet").hidden = true;
-  $("sheet-msg").textContent = "";
+  if ($("sheet").open) $("sheet").close();
 }
 
 $("new").addEventListener("click", () => {
   if (view.screen !== "proj") return;
   renderSheet();
-  $("sheet").hidden = false;
+  $("sheet").showModal();
 });
 $("sheet-cancel").addEventListener("click", closeSheet);
+// A tap on the scrim (the <dialog> itself, outside the sheet) closes it.
 $("sheet").addEventListener("click", (e) => {
   if (e.target === $("sheet")) closeSheet();
+});
+// However it closed (Cancel, the scrim, Escape, the back gesture), the next one starts clean.
+$("sheet").addEventListener("close", () => {
+  $("sheet-msg").textContent = "";
 });
 $("sheet-list").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-cmd]");

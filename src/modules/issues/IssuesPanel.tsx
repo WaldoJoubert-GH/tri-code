@@ -20,6 +20,7 @@ import { openUrlInProject } from "../browser";
 import { sendText } from "../terminal";
 import { Icon } from "../../shared/ui/lucide";
 import { clock, flash } from "../../shared/ui/ui";
+import { useWindowModal } from "../../shared/ui/windowModal";
 import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";
 import { Key } from "../../shared/keys/Keys";
 import { isEnter } from "../../shared/ui/enterkey";
@@ -782,7 +783,9 @@ function IssueModal(props: {
   const [people, setPeople] = createSignal<string[]>(start?.assignees ?? []);
   const [busy, setBusy] = createSignal(false);
   let titleEl: HTMLInputElement | undefined;
+  let backEl: HTMLDivElement | undefined;
 
+  useWindowModal(() => backEl);
   onMount(() => requestAnimationFrame(() => titleEl?.focus()));
 
   const labelPool = () => labelsFor(props.state, dest());
@@ -814,7 +817,7 @@ function IssueModal(props: {
   }
 
   return (
-    <div class="mback" onMouseDown={(e) => { if (e.target === e.currentTarget) props.onClose(); }}>
+    <div class="mback" ref={backEl} onMouseDown={(e) => { if (e.target === e.currentTarget) props.onClose(); }}>
       <form
         class="modal"
         role="dialog"

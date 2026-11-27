@@ -125,16 +125,17 @@
   </section>
 
   <!-- The New window menu: a shell, the project's commands and web apps. -->
-  <div id="sheet" class="sheet-wrap" hidden>
+  <!-- A modal <dialog>: the page behind goes inert, and Escape or the back gesture closes it. -->
+  <dialog id="sheet" class="sheet-wrap" aria-labelledby="sheet-title">
     <div class="sheet">
       <div class="grab"></div>
-      <h2>New window</h2>
+      <h2 id="sheet-title">New window</h2>
       <p id="sheet-sub" class="dim"></p>
       <div id="sheet-list" class="sheet-list"></div>
       <p id="sheet-msg" class="msg"></p>
       <button id="sheet-cancel" type="button" class="cta ghost">Cancel</button>
     </div>
-  </div>
+  </dialog>
 
   <script src="/xterm.js"></script>
   <script src="/addon-fit.js"></script>
