@@ -49,7 +49,7 @@ import { DebugMenu, debugMenuOpen } from "./debugmenu";
 import { DownloadMenu, downloadMenuOpen } from "./downloads";
 import { Palette, paletteOpen, togglePalette } from "./Palette";
 import { Tour, startTour, tourOpen } from "./Tour";
-import { Welcome, openWelcome } from "./Welcome";
+import { Welcome, openWelcome } from "./modules/welcome";
 import { applyTerminalClear, applyTerminalLook, ensureSession, setLinkHandler } from "./terms";
 import { applyLook, themeOf } from "./shared/look";
 import { PinPad, envLocked, syncEnvs } from "./envlock";

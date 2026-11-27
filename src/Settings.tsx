@@ -25,7 +25,7 @@ import { PREVIEWS, previewOn } from "./shared/preview";
 import { type SettingsPage, closeSettings, pageShown, setSettingsPage, settingsPage } from "./shared/nav";
 import { SignalsForm } from "./SignalSettings";
 import { openEnvDialog } from "./EnvDialog";
-import { openWelcome } from "./Welcome";
+import { openWelcome } from "./modules/welcome";
 import { ICON_THEMES, type IconTheme } from "./shared/ui/fileicons";
 import { FileIcon } from "./FileList";
 import "./files.css";

@@ -33,7 +33,7 @@ import { labelOf, openNewWorktree, removeWorktree } from "./worktrees";
 import { hotkeyKeys, hotkeyProblem, launchAgent, newShell, offeredIn, openAgentsPanel } from "./agents";
 import { appVersion, checkForUpdates, installUpdate, updateReady } from "./updater";
 import { startTour } from "./Tour";
-import { openWelcome } from "./Welcome";
+import { openWelcome } from "./modules/welcome";
 import { flash } from "./shared/ui/ui";
 import { currentMedia, mediaOn, mediaPlayPause, mediaSkip } from "./modules/media";
 import { openLinkDialog } from "./LinkFolder";

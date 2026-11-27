@@ -12,7 +12,7 @@ import { aboutOpen, setAboutOpen } from "./About";
 import { closeOpenProject, openProjectDialog, openProjectOpen } from "./OpenProject";
 import { closeLinkDialog, linkDialogOpen } from "./LinkFolder";
 import { closeEnvDialog, envDialogOpen } from "./EnvDialog";
-import { closeWelcome, welcomeOpen } from "./Welcome";
+import { closeWelcome, welcomeOpen } from "./modules/welcome";
 import { toggleSidebar } from "./Sidebar";
 import { closeNewWorktree, newWorktreeOpen, openNewWorktree } from "./worktrees";
 import { closeTabMenu, tabMenuOpen } from "./tabs";

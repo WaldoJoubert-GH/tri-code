@@ -4,7 +4,7 @@
 
 import { For, Show, onMount } from "solid-js";
 import { app } from "./shared/state/state";
-import { PlusMenuList, lookForAgents } from "./Welcome";
+import { PlusMenuList, lookForAgents } from "./modules/welcome";
 import { Caps } from "./shared/keys/Keys";
 import {
   AGENT_KEYS,
