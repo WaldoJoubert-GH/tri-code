@@ -10,7 +10,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { batch, createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import {
-  type Agent, DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, isRemote, isWebApp, live, Page, pageProfile, Profile, Project,
+  type Agent, DEFAULT_PROFILE, activePage, addPage, addTab, app, focusTab, isRemote, isWebApp, live, onProjectDropped, Page, pageProfile, Profile, Project,
   profileById, projectById, setFavIcon, setPageUrl, space, Tab, tabIcon, tabName, visibleTabs,
 } from "./shared/state/state";
 import { looksLikeUrl } from "./agents";
@@ -737,6 +737,9 @@ export function closeBrowser(tab: Tab): void {
   for (const page of tab.pages ?? []) closePage(page.id);
   lastUsed.delete(tab.id);
 }
+onProjectDropped((p) => {
+  for (const t of p.tabs) if (t.kind === "browser") closeBrowser(t);
+});
 
 /** Re-place the shown webviews against the current overlays. */
 function reapply() {

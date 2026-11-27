@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { CLEAR_MAX, type Clear, type Fx, type FxKind, fxOn, paintBackdrop } from "./shared/backdrop";
 import { createStore, produce } from "solid-js/store";
-import { ACCENTS, GAP_MAX, type MdExport, Project, activeProject, app, projectById, renameProject, repoOf, setAppearance, setGap, setIcon, setMdExport } from "./shared/state/state";
+import { ACCENTS, GAP_MAX, type MdExport, Project, activeProject, app, onProjectDropped, projectById, renameProject, repoOf, setAppearance, setGap, setIcon, setMdExport } from "./shared/state/state";
 import { CSS_HINT, DEFAULT_MARGIN, PAGES } from "./mdexport";
 import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./shared/ui/icons";
 import { Icon, toggleIconPicker } from "./shared/ui/lucide";
@@ -49,6 +49,10 @@ export function forgetBgImage(projectId: string) {
   setBgImages(produce((s) => { delete s[projectId]; }));
   if (old) URL.revokeObjectURL(old);
 }
+onProjectDropped((p) => {
+  invoke("bg_delete", { projectId: p.id }).catch((e) => console.error("bg_delete failed:", e));
+  forgetBgImage(p.id);
+});
 
 /** CSS `background` for a project's backdrop layer. */
 export function backgroundCss(p: Project): string {

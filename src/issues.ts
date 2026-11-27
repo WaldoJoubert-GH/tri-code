@@ -12,7 +12,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { type Project, addTab, focusTab } from "./shared/state/state";
+import { type Project, addTab, focusTab, onProjectDropped } from "./shared/state/state";
 import { clock, flash } from "./shared/ui/ui";
 
 // ── types (the shapes in .dev/) ─────────────────────────────────────
@@ -1038,3 +1038,4 @@ export function forgetProject(projectId: string): void {
     for (const key of Object.keys(s)) if (key.startsWith(`${projectId}/`)) delete s[key];
   }));
 }
+onProjectDropped((p) => forgetProject(p.id));

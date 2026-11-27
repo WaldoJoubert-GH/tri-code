@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import {
-  Project, app, envHeadersHidden, envIcon, envName, isLocalHost, isPinned, moveProject, projectById, removeEnvironment, renameProject, setApp, setEnvStyle,
+  Project, app, dropProject, envHeadersHidden, envIcon, envName, isLocalHost, isPinned, moveProject, projectById, removeEnvironment, renameProject, setApp, setEnvStyle,
   setSidebarCollapsed, togglePin, worktreesOf,
 } from "./shared/state/state";
 import { setBrowsersCovered } from "./browsers";
@@ -15,7 +15,6 @@ import { projectStepKey } from "./shared/keys/hints";
 import { openProjectDialog } from "./OpenProject";
 import { envDialogOpen, openEnvDialog } from "./EnvDialog";
 import { SIG_TEXT, sigOf, sigSummary, topSig } from "./signals";
-import { dropProject } from "./projects";
 import { adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel } from "./worktrees";
 import { openWorktreeDialog } from "./WorktreeDialog";
 import { type CtxItem, openCtxMenu } from "./shared/ui/ctxmenu";

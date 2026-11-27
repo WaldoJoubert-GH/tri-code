@@ -746,6 +746,22 @@ export function removeProject(id: string) {
   }));
 }
 
+const dropHooks: ((p: Project) => void)[] = [];
+
+/** Run `fn` on each project as it is dropped, while it is still in the store. The modules that keep
+ *  something per project or per window register their cleanup here at load (the browser closes its
+ *  pages, the terminal its sessions, Appearance the backdrop, and so on), so this file needn't
+ *  import them. App imports every one of them at startup, before a project can be dropped. */
+export function onProjectDropped(fn: (p: Project) => void) {
+  dropHooks.push(fn);
+}
+
+/** End a project's windows and drop everything stored for it. */
+export function dropProject(p: Project) {
+  for (const fn of dropHooks) fn(p);
+  removeProject(p.id);
+}
+
 /** Add a window on the active workspace and focus it. `after` inserts it right after that tab. */
 export function addTab(projectId: string, kind: TabKind, opts: { url?: string; path?: string; after?: string; agent?: Agent; by?: "agent"; db?: string; once?: true } = {}) {
   const id = newId();

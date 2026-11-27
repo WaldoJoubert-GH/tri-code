@@ -5,7 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { JSX, Match, Switch } from "solid-js";
 import { createStore, produce } from "solid-js/store";
-import { Project, app, projectById, setIcon } from "../state/state";
+import { Project, app, onProjectDropped, projectById, setIcon } from "../state/state";
 import { Icon } from "./lucide";
 import { flash } from "./ui";
 
@@ -116,6 +116,7 @@ export function forgetIcon(projectId: string) {
   setIconImages(produce((s) => { delete s[projectId]; }));
   invoke("icon_delete", { projectId }).catch((e) => console.error("icon_delete failed:", e));
 }
+onProjectDropped((p) => forgetIcon(p.id));
 
 /** The icon's content: an <img>, a lucide icon, an old glyph or the letter. The caller draws the tile. */
 export function IconFace(props: { project: Project }): JSX.Element {

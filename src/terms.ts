@@ -9,7 +9,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, removeTab, repoOf, sessionName, setLive, setTabResume } from "./shared/state/state";
+import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, onProjectDropped, removeTab, repoOf, sessionName, setLive, setTabResume } from "./shared/state/state";
 import { onSandboxStep, readySandbox, runsInSandbox, sandboxOf } from "./modules/sandbox";
 import { terminalFont } from "./shared/look";
 import { onSignal } from "./signals";
@@ -869,6 +869,9 @@ export function closeSession(tabId: string) {
   // What it started may outlive it; the sidebar says so.
   rescanSoon();
 }
+onProjectDropped((p) => {
+  for (const t of p.tabs) if (isTerminal(t)) closeSession(t.id);
+});
 
 export function setLinkHandler(fn: (url: string, tabId: string, external: boolean) => void): void {
   linkHandler = fn;

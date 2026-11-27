@@ -9,7 +9,7 @@ import { isPermissionGranted, onAction, requestPermission, sendNotification } fr
 import { createSignal } from "solid-js";
 import { produce } from "solid-js/store";
 import {
-  AgentState, AlertMode, Project, SoundEvent, Tab, agentOf, app, defaultNotify, focusTab, live, newId, projectById, repoOf, setApp, setNotify, space, tabName,
+  AgentState, AlertMode, Project, SoundEvent, Tab, agentOf, app, defaultNotify, focusTab, live, newId, onProjectDropped, projectById, repoOf, setApp, setNotify, space, tabName,
 } from "./shared/state/state";
 import { flash } from "./shared/ui/ui";
 import { keyOf } from "./shared/keys/keymap";
@@ -223,6 +223,7 @@ export function forgetSounds(projectId: string) {
     invoke("sound_delete", { key }).catch((e) => console.warn("sound_delete failed:", e));
   }
 }
+onProjectDropped((p) => forgetSounds(p.id));
 
 let permission: Promise<boolean> | undefined;
 
