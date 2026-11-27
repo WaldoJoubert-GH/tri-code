@@ -1,6 +1,6 @@
 # Codebase blueprint: one folder per module, `shared/` for cross-module use
 
-Status: in progress. Steps 1 (back-edges) and 2 (`src/shared/`) of the [Migration order](#migration-order) are done; modules and `app/` are still flat in `src/`.
+Status: in progress. Steps 1 (back-edges), 2 (`src/shared/`) and 3 (leaf modules) of the [Migration order](#migration-order) are done; the inner modules and `app/` are still flat in `src/`.
 
 Today `src/` is flat: 193 files, with every window, dialog, store and helper side by side. `src-tauri/src/` is flat too, apart from `db/`. This blueprint gives each module a folder and an **interface** (its `index.ts` / `mod.rs`), and puts what several modules use in `shared/`.
 
@@ -28,9 +28,9 @@ Rule 3 and 4 are enforced by a test (see [Enforcement](#enforcement)), as `keys.
 | `shared/keys/` | `keymap.ts`, `modkey.ts`, `hints.ts`, `Keys.tsx`, `keys.test.ts`, `hints.test.ts` | The Keymap, Hotkey Modifier, Hold Hints and Keycap: drawn by every module. |
 | `shared/text/` | `diff.ts`, `DiffView.tsx`, `diff.css`, `markdown.ts`, `csv.ts`, `branchname.ts`, and the tests of `diff`, `markdown`, `csv` | Pure parsers used by 2+ modules (diff: Editor, Git, state; csv: Editor, Database). |
 | `shared/codemirror/` | `cm.ts`, `langs.ts`, `grammars.ts`, `grammars.json`, `textmate.ts`, `tmparser.ts`, `LangPicker.tsx`, `LangSettings.tsx`, `grammars.test.ts`, `tmparser.test.ts` | The CodeMirror kit and Grammar Catalog: Editor, Database and Calculator all build editors on it. |
-| `shared/` (top) | `look.ts`, `backdrop.ts` (each with its test), `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts`, `urls.ts`, `layout.test.ts` | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). |
+| `shared/` (top) | `look.ts`, `backdrop.ts` (each with its test), `preview.ts`, `scope.ts`, `sigs.ts`, `nav.ts`, `urls.ts`, `layout.test.ts` | Look, Backdrop, preview flags, Command Scope, the signal rules, and app-level navigation (see Back-edges). `urls.ts` also holds `NOT_HTTP` (step 3): the Docker Window and Remote Tunnels (`tunnelmap.ts`) both use it. |
 
-Done in step 2. `preview.test.ts` stays in `src/` for now: it tests the preview flag through `sandbox.ts` (`sandboxOf`, `runsInSandbox`), so it moves to `modules/sandbox/` with that module. `projects.ts` stays too (see Back-edges).
+Done in step 2. `preview.test.ts` tests the preview flag through `sandbox.ts` (`sandboxOf`, `runsInSandbox`), so it moved to `modules/sandbox/` in step 3. `projects.ts` stays in `src/` (see Back-edges).
 
 ### `src/modules/`
 
@@ -59,6 +59,8 @@ Done in step 2. `preview.test.ts` stays in `src/` for now: it tests the preview 
 | `welcome/` | `Welcome.tsx`, `welcomedata.ts`, `welcome.css` |
 | `tour/` | `Tour.tsx` |
 | `usage/` | `Usage.tsx`, `pace.ts` |
+
+Each module's tests sit with it. Step 3 also moved `preview.test.ts` to `sandbox/`, and split `links.test.ts`'s `connOf` case into a new `db/db.test.ts` (see [step 3](#step-3-leaf-modules)).
 
 ### `src/app/`
 
@@ -313,6 +315,8 @@ These imports break rules 3 and 4 today. Each needs a small change before (or as
 | `agents`, `AgentsPanel`, `phoneask` ↔ `browser` (`normalizeUrl` one way; `agentsetup`, `agenttarget` the other) | Done: `normalizeUrl` is in `src/shared/urls.ts`. The browser → agents direction stays (Select element sends to an agent). |
 | `envlock` → `issues` (`clock`) | Done: `clock`, `setClock`, `startClock` are in `ui.ts`. |
 | `terms` → `signals` → `phone` → `terms` (cycle) | Cut by the `onAlert` change above. |
+| `tour` → `hotkeys` (`runHotkey`), `tabs` (`tabMenuOpen`, `toggleTabMenu`) | Open: a module importing `app/`. Cut before step 5 turns on the `app/` rule, e.g. by letting `app/` hand the Tour those as callbacks. |
+| `tunnelmap` → `docker` (`NOT_HTTP`) | Done in step 3: `NOT_HTTP` is in `shared/urls.ts`. Through `docker/index.ts` it would have pulled `DockerPanel.tsx` into `tunnelmap.test.ts`, which bun can't load (see step 3). |
 
 ## CSS
 
@@ -422,8 +426,11 @@ Add `src/shared/layout.test.ts` (bun test) that reads every `.ts`/`.tsx` under `
 
 - a file in `shared/` imports from `modules/` or `app/` (on since step 2, as "imports only from `src/shared/`", which also catches a file still flat in `src/`);
 - a file in `modules/` imports from `app/`;
-- a file in `modules/a/` imports a path inside `modules/b/` other than the folder itself (`../b`);
+- a file in `modules/a/` imports a path inside `modules/b/` other than the folder itself (`../b`) or its `index.ts` (on since step 3);
+- a file outside `modules/` imports a path inside `modules/x/` other than the folder or its `index.ts`, CSS included (on since step 3, while `app/` and the inner modules are still flat in `src/`);
 - a `src/` file sits outside `app/`, `shared/` and `modules/` (apart from those three folders).
+
+The step 3 checks also assert that the ten leaf modules are there, each with an `index.ts`, and that files outside `modules/` import them, so they can't pass on an empty scan.
 
 ## Migration order
 
@@ -431,12 +438,37 @@ One PR per step; each ends with `bun run typecheck`, `bun test ./src/`, `cargo c
 
 1. **Cut the back-edges** above, in place, with no moves. Small, reviewable, and it makes every later move mechanical. Done.
 2. **`shared/`**: move the shared files and fix imports. Add the enforcement test with only the `shared/` rule on. Done: no shared file imported a root one, so nothing had to change but paths.
-3. **Leaf modules** (nothing else imports them except `app/`): `calc`, `monitor`, `news`, `docker`, `media`, `usage`, `db`, `sandbox`, `welcome`, `tour`.
+3. **Leaf modules** (nothing else imports them except `app/`): `calc`, `monitor`, `news`, `docker`, `media`, `usage`, `db`, `sandbox`, `welcome`, `tour`. Done; see [Step 3: leaf modules](#step-3-leaf-modules).
 4. **Inner modules**: `issues`, `git`, `linked-folders`, `editor`, `environments`, `worktrees`, `leftovers`, `signals`, `phone`, `agents`, `terminal`, `browser`, `appearance`. Turn on the cross-module rule.
 5. **`app/`** last, then turn on the last rule.
 6. **Rust**: `shared/` first (most `crate::` paths change there), then each folder. `git.rs`'s split is its own PR.
 
 Use `git mv` so history follows the files.
+
+### Step 3: leaf modules
+
+Each `index.ts` re-exports only what files outside the module imported on the day. A component that was a default export is re-exported by name (`export { default as DbPanel }`), so importers write `import { DbPanel } from "./modules/db"`.
+
+| Module | `index.ts` exports | Imported from |
+|---|---|---|
+| `calc/` | `CalcPanel`, `openCalcPanel` | Canvas, commands, hotkeys, tabs |
+| `monitor/` | `MonitorPanel`, `openMonitorPanel` | Canvas, commands, hotkeys, tabs |
+| `news/` | `NewsPanel`, `openNewsPanel`, `NewsPage` | Canvas, commands, hotkeys, tabs, Settings |
+| `docker/` | `DockerPanel`, `openDockerPanel`, `closeDockerWindow` | Canvas, commands, hotkeys, tabs |
+| `media/` | `MediaDock`, `MediaPopover`, `closeMediaPop`, `currentMedia`, `mediaOn`, `mediaPlayPause`, `mediaPopOpen`, `mediaSkip` | App, Sidebar, commands, hotkeys |
+| `usage/` | `ClaudeUsage`, `CommandCodeUsage` | App |
+| `db/` | `DbPanel`, `BookView`, `CsvTable`, `closeSession`, `connsOf`, `dbTitle`, `isProd`, `openDbWindow`, `openSheetDb` | Canvas, commands, hotkeys, tabs, **Editor** |
+| `sandbox/` | `SandboxPage` and 22 more: `adoptSandboxes`, `canSandbox`, `ensureSandbox`, `hostKey`, `isRunning`, `listBoxes`, `mountsFor`, `newSandboxName`, `onSandboxStep`, `readySandbox`, `refreshSbx`, `relativeGitdir`, `removeSandbox`, `runsInSandbox`, `sandboxByDefault`, `sandboxFolders`, `sandboxOf`, `sbxReady`, `sbxState`, `setSandboxHost`, `startSandbox`, `stopSandbox` | App, Canvas, Sidebar, Settings, **terms, worktrees, NewWorktree, docker/** |
+| `welcome/` | `Welcome`, `openWelcome`, `closeWelcome`, `welcomeOpen`, `PlusMenuList`, `lookForAgents` | App, commands, hotkeys, Settings, **AgentSettings** |
+| `tour/` | `Tour`, `startTour`, `tourOpen` | App, commands, **welcome/** |
+
+What turned out different from the plan:
+
+- **Not all leaves.** The bold importers aren't `app/`: Editor uses the Database Window's grid for CSV and workbooks, Settings › Commands shares the Welcome window's + menu list, Welcome starts the Tour, and Docker Sandboxes are used by terminals, Worktrees and the Docker Window. They all go through `index.ts`, so nothing had to change. `sandbox/`'s interface is the widest (23 names): the shallow-module sign the Example tree warns about, worth a second look.
+- **Leaves still import root files** that become other modules in step 4: `news/` and `docker/` import `browsers`; `db/` imports `links`; `welcome/` imports `agentsetup`, `agents`, `signals`, `SoundSelect`, `EnvDialog`, `OpenProject` and `links`; `tour/` imports `OpenProject`, `projects`, `terms`, and the `app/` files `hotkeys` and `tabs` (see Back-edges). Step 4 turns these into folder imports as each one moves.
+- **bun can't load a `.tsx`** (Solid's JSX has no runtime under `bun test`). An `index.ts` that re-exports a component therefore can't be imported by anything a test loads. Two tests broke on it: `tunnelmap.test.ts` (fixed by moving `NOT_HTTP` to `shared/urls.ts`) and `links.test.ts`'s `connOf` case (moved to `modules/db/db.test.ts`, which imports `./db` from inside the module). Rule for later steps: a test of a module's logic lives in the module and imports its files directly; a tested pure file elsewhere takes what it needs from `shared/`, not from a module whose interface carries a component.
+- **CSS order moved twice.** An `index.ts` loads all of a module's files, so `SandboxSettings.tsx` (and `sandbox.css`) now loads with `App.tsx`'s import of `sandbox/` rather than with Settings, and `SheetView.tsx` with `sheet.css` left the lazy Editor chunk for the main one (Canvas imports `DbPanel` through `db/`). Diffing the built CSS before and after: those two blocks moved and nothing else changed; neither shares a selector of equal specificity with a rule it now precedes.
+- **README.md's `src/` file list** names files by their old flat paths; step 2 left it too. Update it when the layout settles.
 
 ## Open questions
 
