@@ -18,8 +18,7 @@ import {
   sameScope, scopeIcon, scopeLabel, setRecording, urlProblem,
 } from "./agents";
 import { normalizeUrl } from "./shared/urls";
-import { EVENTS, playFor, playSound, soundFor, soundName } from "./signals";
-import { SoundSelect } from "./SoundSelect";
+import { EVENTS, playFor, playSound, soundFor, soundName, SoundSelect } from "./modules/signals";
 import { Icon, toggleIconPicker } from "./shared/ui/lucide";
 import { flash, showToast } from "./shared/ui/ui";
 import { ctrlName, modDown, modLabel } from "./shared/keys/modkey";

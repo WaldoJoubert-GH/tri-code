@@ -13,7 +13,7 @@ import { Icon, iconPickerOpen, toggleIconPicker } from "./shared/ui/lucide";
 import { Caps, HoldFace } from "./shared/keys/Keys";
 import { projectStepKey } from "./shared/keys/hints";
 import { openProjectDialog, envDialogOpen, openEnvDialog, envLocked, lockEnv } from "./modules/environments";
-import { SIG_TEXT, sigOf, sigSummary, topSig } from "./signals";
+import { SIG_TEXT, sigOf, sigSummary, topSig } from "./modules/signals";
 import {
   adoptWorktrees, labelOf, loadWorktrees, openNewWorktree, removeWorktree, renameWorktree, tileLabel,
   openWorktreeDialog,

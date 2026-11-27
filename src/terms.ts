@@ -12,7 +12,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { AgentState, Live, Project, Tab, TabStatus, app, becomeShell, isRemote, isTerminal, live, markTyped, onProjectDropped, removeTab, repoOf, sessionName, setLive, setTabResume } from "./shared/state/state";
 import { onSandboxStep, readySandbox, runsInSandbox, sandboxOf } from "./modules/sandbox";
 import { terminalFont } from "./shared/look";
-import { onSignal } from "./signals";
+import { onSignal } from "./modules/signals";
 import { copyText, readImagePng, readText } from "./shared/ui/clipboard";
 import { Demo, playDemo } from "./demo";
 import { isKey } from "./shared/keys/keymap";

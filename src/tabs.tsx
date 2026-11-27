@@ -18,7 +18,7 @@ import { openNewsPanel } from "./modules/news";
 import { openCalcPanel } from "./modules/calc";
 import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } from "./agents";
 import { Icon } from "./shared/ui/lucide";
-import { SIG_TEXT, sigOf } from "./signals";
+import { SIG_TEXT, sigOf } from "./modules/signals";
 import { flash } from "./shared/ui/ui";
 import { groupKeys, heldKeys } from "./shared/keys/keymap";
 import { Caps, HoldFace, KeyList } from "./shared/keys/Keys";

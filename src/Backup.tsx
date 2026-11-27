@@ -9,7 +9,7 @@ import { type ConfigFile, type ImportPlan, type Section, SECTIONS, applyImport, 
 import { app, newId, setApp } from "./shared/state/state";
 import { setBgImage } from "./Appearance";
 import { loadIcons } from "./shared/ui/icons";
-import { reloadSound } from "./signals";
+import { reloadSound } from "./modules/signals";
 import { appVersion } from "./updater";
 import { flash } from "./shared/ui/ui";
 

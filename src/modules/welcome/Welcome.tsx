@@ -15,8 +15,7 @@ import { type Known, KNOWN, NODE_INSTALL, commandOf, foundOf, lookups, ownComman
 import { installAgent, refreshSetup, setupBusy, setupError, setupStatus } from "../../agentsetup";
 import { looksLikeUrl } from "../../agents";
 import { themeOf } from "../../shared/look";
-import { EVENTS, playSound } from "../../signals";
-import { SoundSelect } from "../../SoundSelect";
+import { EVENTS, playSound, SoundSelect } from "../signals";
 import { openEnvDialog, openProjectDialog } from "../environments";
 import { startTour } from "../tour";
 import { Icon } from "../../shared/ui/lucide";

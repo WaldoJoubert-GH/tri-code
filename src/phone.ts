@@ -9,7 +9,7 @@ import { createEffect, createSignal, on, onCleanup } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { type Project, type SoundEvent, type Tab, activePage, app, envIcon, envName, isLocalHost, live, repoOf, setSettings, tabIcon, tabName } from "./shared/state/state";
-import { onAlert } from "./signals";
+import { onAlert } from "./modules/signals";
 import { sigOf } from "./shared/sigs";
 import { envLocked } from "./modules/environments";
 import { iconSvg } from "./shared/ui/lucide";

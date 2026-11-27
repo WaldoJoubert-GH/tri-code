@@ -5,8 +5,7 @@ import {
   SPACES, activeProject, app, goSpace, isRemote, isTerminal, loadState,
   persistChanges, repoOf, sessionName, setLayout, space, tabName,
 } from "./shared/state/state";
-import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig } from "./signals";
-import { SignalsPopover, signalsOpen, toggleSignals } from "./SignalSettings";
+import { SIG_TEXT, applySignalColors, nextSignal, sigOf, topSig, SignalsPopover, signalsOpen, toggleSignals } from "./modules/signals";
 import { FeedbackPopover, feedbackOpen, toggleFeedback } from "./Feedback";
 import { LeftoversChip, LeftoversPopover, leftoversOpen, watchLeftovers } from "./modules/leftovers";
 import { adoptSandboxes } from "./modules/sandbox";

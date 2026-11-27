@@ -33,7 +33,7 @@ import { MonitorPanel } from "./modules/monitor";
 import { NewsPanel } from "./modules/news";
 import { CalcPanel } from "./modules/calc";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./modules/db";
-import { SIG_TEXT, sigOf } from "./signals";
+import { SIG_TEXT, sigOf } from "./modules/signals";
 import { FavBar, StartPage, closeFavEdit, favEditFor, starPage } from "./favs";
 import { DownloadBar, DownloadButton, forgetDownloads } from "./downloads";
 import { hostHue, monogram } from "./shared/ui/favicons";

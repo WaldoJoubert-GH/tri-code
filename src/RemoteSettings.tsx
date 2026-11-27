@@ -3,7 +3,7 @@
 // Chosen from design/remote-control.html (desktop variant B).
 
 import { For, Show, createSignal, onCleanup } from "solid-js";
-import { EVENTS } from "./signals";
+import { EVENTS } from "./modules/signals";
 import {
   type PhoneReach, cancelPairing, forgetPhone, pairPhone, phoneBusy, phoneError, phonePairing, phoneStatus, pushesFor, setPhoneConfig, setPushFor,
   startPhone, stopPhone, testPush,

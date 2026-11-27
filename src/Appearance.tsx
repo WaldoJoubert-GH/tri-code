@@ -12,7 +12,7 @@ import { ACCENTS, GAP_MAX, type MdExport, Project, activeProject, app, onProject
 import { CSS_HINT, DEFAULT_MARGIN, PAGES } from "./modules/editor";
 import { IconFace, Logo, PROJECT_ICONS, autoIcon, iconImages, letterOf, scanLogos, uploadIcon, useLogo } from "./shared/ui/icons";
 import { Icon, toggleIconPicker } from "./shared/ui/lucide";
-import { SignalsForm } from "./SignalSettings";
+import { SignalsForm } from "./modules/signals";
 import { flash } from "./shared/ui/ui";
 import { keyOf } from "./shared/keys/keymap";
 import { isEnter } from "./shared/ui/enterkey";

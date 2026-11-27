@@ -33,8 +33,7 @@ import { agentForKey, launchAgent, newShell, openAgentsPanel, recording } from "
 import { closeIconPicker, iconPickerOpen } from "./shared/ui/lucide";
 import { closePalette, paletteOpen, togglePalette } from "./Palette";
 import { cycleLayout, makeMain, maximize, minimise, restoreLast, sendWindow, stepGap, stepProject, stepWorkspace, workspace } from "./commands";
-import { nextSignal } from "./signals";
-import { closeSignals, signalsOpen } from "./SignalSettings";
+import { nextSignal, closeSignals, signalsOpen } from "./modules/signals";
 import { closeFeedback, feedbackOpen } from "./Feedback";
 import { closeLeftovers, leftoversOpen } from "./modules/leftovers";
 import { closeMediaPop, mediaPlayPause, mediaPopOpen, mediaSkip } from "./modules/media";
