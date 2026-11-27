@@ -13,7 +13,6 @@ import {
 } from "./state";
 import { flash } from "./ui";
 import { keyOf } from "./keymap";
-import { pushSignal } from "./phone";
 import { type Sig, sigOf } from "./sigs";
 export { busySignals, sigOf, type Sig } from "./sigs";
 
@@ -241,10 +240,19 @@ async function notify(title: string, body: string, extra: NotifyTarget) {
 
 const WHAT: Record<SoundEvent, string> = { blocked: "needs input", done: "is done", error: "stopped with an error" };
 
+type AlertListener = (ev: SoundEvent, tab: Tab, title: string, body: string) => void;
+const alertListeners: AlertListener[] = [];
+
+/** Hear each signal that alerts, as the desktop notification words it. Remote Control (phone.ts)
+ *  pushes them to phones this way, so this module doesn't import it. */
+export function onAlert(fn: AlertListener) {
+  alertListeners.push(fn);
+}
+
 /**
  * A tab's agent changed state (terms.ts). `looking`: its window was on screen in a focused app.
  * Working never alerts; the rest play the project's sound and notify, by its alert setting, and
- * push to paired phones (phone.ts).
+ * tell the onAlert listeners (paired phones, phone.ts).
  */
 export function onSignal(projectId: string, t: Tab, state: AgentState, msg: string, looking: boolean) {
   const p = projectById(projectId);
@@ -256,7 +264,7 @@ export function onSignal(projectId: string, t: Tab, state: AgentState, msg: stri
   const head = `${tabName(t)} ${WHAT[state]}`;
   const body = [p.name, title, msg && msg !== title ? msg : ""].filter(Boolean).join(" · ");
   if (desktopFor(p)) void notify(head, body, { projectId, tabId: t.id });
-  pushSignal(state, t, head, body);
+  for (const fn of alertListeners) fn(state, t, head, body);
 }
 
 // A click on a notification raises the app and focuses the agent it was about. Notifications only

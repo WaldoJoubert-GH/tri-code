@@ -9,7 +9,8 @@ import { createEffect, createSignal, on, onCleanup } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { type Project, type SoundEvent, type Tab, activePage, app, envIcon, envName, isLocalHost, live, repoOf, setSettings, tabIcon, tabName } from "./state";
-import { sigOf } from "./signals";
+import { onAlert } from "./signals";
+import { sigOf } from "./sigs";
 import { envLocked } from "./envlock";
 import { iconSvg } from "./lucide";
 import { screenTail } from "./terms";
@@ -126,10 +127,10 @@ export function forgetPhone(d: PhoneDevice) {
 
 /** A signal alerted on the desktop (signals.ts): push it to the phones too, unless Settings ›
  *  Remote leaves this signal out. */
-export function pushSignal(ev: SoundEvent, tab: Tab, title: string, body: string) {
+onAlert((ev, tab, title, body) => {
   if (!status().url || !pushesFor(ev)) return;
   push(title, body, tab.id);
-}
+});
 
 function push(title: string, body: string, tab: string) {
   invoke("phone_push", { title, body, tab }).catch((e) => flash(`couldn't push to the phone: ${e}`));
