@@ -4,15 +4,15 @@
 
 import { Index, For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
-import { type Project, type Tab, isRemote } from "./shared/state/state";
+import { type Project, type Tab, isRemote } from "../../shared/state/state";
 import { endProcess, sample } from "./monitor";
 import { type Proc, type Scope, type Snapshot, type SortKey, bytes, descendants, duration, firstAsc, graphPaths, perSec, pushed, rowsOf, tone } from "./monitordata";
-import { copyText } from "./shared/ui/clipboard";
-import { Icon } from "./shared/ui/lucide";
-import { Key } from "./shared/keys/Keys";
-import { flash } from "./shared/ui/ui";
+import { copyText } from "../../shared/ui/clipboard";
+import { Icon } from "../../shared/ui/lucide";
+import { Key } from "../../shared/keys/Keys";
+import { flash } from "../../shared/ui/ui";
 import "./monitor.css";
-import { isEnter } from "./shared/ui/enterkey";
+import { isEnter } from "../../shared/ui/enterkey";
 
 const RETRY = 10_000;
 const RATES = [1, 2, 5];

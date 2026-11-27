@@ -1,4 +1,4 @@
-/* Monitor window. See src/MonitorPanel.tsx; the look comes from design/monitor.html, variant A. */
+/* Monitor window. See src/modules/monitor/MonitorPanel.tsx; the look comes from design/monitor.html, variant A. */
 
 .mark.monitor { color: var(--p-moss); }
 

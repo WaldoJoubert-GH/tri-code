@@ -32,7 +32,7 @@ import AgentsPanel from "./AgentsPanel";
 import DbPanel from "./DbPanel";
 import DockerPanel from "./DockerPanel";
 import { closeDockerWindow } from "./docker";
-import MonitorPanel from "./MonitorPanel";
+import { MonitorPanel } from "./modules/monitor";
 import NewsPanel from "./NewsPanel";
 import { CalcPanel } from "./modules/calc";
 import { closeSession as closeDbSession, dbTitle, isProd } from "./db";

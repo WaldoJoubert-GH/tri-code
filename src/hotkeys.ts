@@ -25,7 +25,7 @@ import { closeDownloadMenu, downloadMenuOpen } from "./downloads";
 import { openIssuePanel } from "./issues";
 import { openEditor } from "./files";
 import { openDockerPanel } from "./docker";
-import { openMonitorPanel } from "./monitor";
+import { openMonitorPanel } from "./modules/monitor";
 import { openNewsPanel } from "./news";
 import { openCalcPanel } from "./modules/calc";
 import { openGitPanel } from "./git";
