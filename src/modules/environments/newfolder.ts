@@ -1,6 +1,6 @@
 // The pure parts of the Open project dialog's New folder and Clone tabs: what counts as a
 // repository URL, the folder name a clone gets, whether a name can be made, and folding git's
-// progress output into lines and a percentage. The Rust side is newfolder.rs.
+// progress output into lines and a percentage. The Rust side is environments/newfolder.rs.
 
 /** A piece of git's output; `partial` ones are progress the next piece redraws. */
 export type CloneLine = { text: string; partial: boolean };
@@ -20,7 +20,7 @@ export function repoFolder(url: string): string {
 /** The URL without its scheme or `.git`, for showing. */
 export const shortUrl = (url: string) => url.trim().replace(/^[a-z]+:\/\//, "").replace(/\.git$/, "");
 
-/** Why `name` can't be made in a folder holding `dirs`, or "" when it can. Matches newfolder.rs `check_name`. */
+/** Why `name` can't be made in a folder holding `dirs`, or "" when it can. Matches environments/newfolder.rs `check_name`. */
 export function nameProblem(name: string, dirs: string[], caseless: boolean): string {
   if (!name) return "";
   if (name.trim() !== name.trimStart() || name === "." || name === ".." || /[ .]$/.test(name) || /[\\/:*?"<>|\x00-\x1f]/.test(name))

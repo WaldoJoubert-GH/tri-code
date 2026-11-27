@@ -1,5 +1,5 @@
 // Remote browser tunnels: in a remote project, a browser window's `localhost:5173` is the remote's,
-// and a `file:///…` its file. Each such address opens a Forward (forward.rs): an ssh tunnel to the
+// and a `file:///…` its file. Each such address opens a Forward (browser/forward.rs): an ssh tunnel to the
 // port, or a static server on the remote for the folder plus a tunnel to it. One Forward per host
 // and target, shared by every page that uses it, on the same local port when that is free so the
 // origin (cookies, HMR, OAuth redirects) stays `localhost:5173`. A dropped one reopens on its old

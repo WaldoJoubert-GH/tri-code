@@ -15,7 +15,7 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# devtools: DevTools for browser windows in release builds (browser_debug.rs); the app's own webview turns them off.
+# devtools: DevTools for browser windows in release builds (browser/debug.rs); the app's own webview turns them off.
 tauri = { version = "2", features = ["unstable", "tray-icon", "devtools"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -25,7 +25,7 @@ tauri-plugin-notification = "2"
 ureq = { version = "3", features = ["json", "multipart"] }
 base64 = "0.22"
 sha2 = "0.10"
-# Remote Control (phone.rs): the phone page's server, and Web Push (push.rs).
+# Remote Control (phone/mod.rs): the phone page's server, and Web Push (phone/push.rs).
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "ws"] }
 tokio = { version = "1", features = ["macros", "net", "sync", "time"] }
 p256 = { version = "0.13", features = ["ecdh", "ecdsa"] }
@@ -53,7 +53,7 @@ fontdb = "0.24.0"
 # Leftovers (leftovers.rs): each process's working folder, command line and environment, on every OS.
 # The Monitor Window (monitor.rs) adds disks, network interfaces and user names.
 sysinfo = { version = "0.40.1", default-features = false, features = ["system", "disk", "network", "user"] }
-# Browser screenshots (browser_shot.rs): cropping a page's snapshot. Already in the tree through Tauri.
+# Browser screenshots (browser/shot.rs): cropping a page's snapshot. Already in the tree through Tauri.
 png = "0.17"
 # The News Window (news.rs): RSS 0.9-2.0, Atom and JSON Feed, with Media RSS images, into one shape.
 feed-rs = "3"
@@ -73,7 +73,7 @@ opt-level = 3
 panic = "abort"
 strip = true
 
-# Browser Profiles: password saving is only reachable through WebView2's own settings (browser.rs).
+# Browser Profiles: password saving is only reachable through WebView2's own settings (browser/mod.rs).
 # Same versions as wry's, so the controller Tauri hands out is this crate's type.
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
@@ -83,23 +83,23 @@ windows-registry = "0.6"
 # The Win32 features: altspace.rs hands Alt+Space to the page instead of the window menu.
 windows = { version = "0.62", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams", "Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
-# Browser Profiles on macOS: WKWebView can't save passwords, so passwords.rs does, in the
+# Browser Profiles on macOS: WKWebView can't save passwords, so browser/passwords.rs does, in the
 # Keychain. Same versions as wry's.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSObject", "NSString", "NSData", "NSDictionary", "NSError"] }
 objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "objc2-app-kit", "block2", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKContentWorld", "WKScriptMessage", "WKScriptMessageHandler", "WKFrameInfo", "WKSecurityOrigin", "WKSnapshotConfiguration"] }
 # Browser screenshots: WKWebView's snapshot is an NSImage, turned into a PNG. Hotkeys in browser
-# pages (browser_keys.rs): an NSEvent key monitor and the window's first responder.
+# pages (browser/keys.rs): an NSEvent key monitor and the window's first responder.
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "block2", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSEvent", "NSResponder", "NSView", "NSWindow"] }
 block2 = "0.6"
 security-framework = "3"
 
-# Browser panes on Linux: browser_gtk.rs places them on a GtkOverlay, since Tauri ignores child
+# Browser panes on Linux: browser/gtk.rs places them on a GtkOverlay, since Tauri ignores child
 # webview bounds there. Same version as Tauri's.
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18", features = ["v3_24"] }
-# Browser screenshots: the page's snapshot (browser_shot.rs). Same version as wry's.
+# Browser screenshots: the page's snapshot (browser/shot.rs). Same version as wry's.
 webkit2gtk = "2.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

@@ -61,7 +61,7 @@ export const desktopFor = (p: Project) => repoOf(p).notify?.desktop ?? app.notif
 
 let ctx: AudioContext | undefined;
 
-/** Loaded audio files as blob: URLs, by `system:<name>` or the bg.rs key of an uploaded file. */
+/** Loaded audio files as blob: URLs, by `system:<name>` or the appearance/bg.rs key of an uploaded file. */
 const loaded = new Map<string, Promise<string | undefined>>();
 
 function loadUrl(key: string, load: () => Promise<string | null>): Promise<string | undefined> {
@@ -137,7 +137,7 @@ export async function playFor(p: Project, ev: SoundEvent, t?: Tab) {
   playSound(id, id === "custom" ? fileUrl(soundKey(repoOf(p).id, ev)) : undefined);
 }
 
-/** The OS's alert sounds by name (syssounds.rs), asked for once, when a sound picker first shows. */
+/** The OS's alert sounds by name (appearance/syssounds.rs), asked for once, when a sound picker first shows. */
 const [systemList, setSystemList] = createSignal<string[]>([]);
 let systemAsked = false;
 export function loadSystemSounds() {

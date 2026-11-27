@@ -1,4 +1,4 @@
-// Agent windows, on the webview's side (agent_windows.rs has the endpoint). The Commands an agent
+// Agent windows, on the webview's side (agents/agent_windows.rs has the endpoint). The Commands an agent
 // may open are the terminal Commands with the Agent toggle on that a project offers; they are
 // pushed to Rust, which checks them again before it asks for a window. The endpoint's open and close
 // requests arrive as events: an open adds a terminal tab, which spawns its PTY and answers the

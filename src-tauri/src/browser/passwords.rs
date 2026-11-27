@@ -1,5 +1,5 @@
 //! Saved passwords for Browser Profiles on macOS, where WKWebView has no password AutoFill of its
-//! own (WebView2 on Windows saves and fills them itself; see browser.rs). passwords.js runs in a
+//! own (WebView2 on Windows saves and fills them itself; see browser/mod.rs). passwords.js runs in a
 //! WKContentWorld of its own, which page scripts can't see or post from: it reports sign-ins and
 //! fills saved logins. Passwords stay in this process and the macOS Keychain (one item per
 //! profile) and never reach tri-code's HTML, which only learns the site and the username.

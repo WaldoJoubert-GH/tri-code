@@ -1,7 +1,7 @@
 // Browser windows are native child webviews drawn over a placeholder element, one webview per
 // page; only the window's shown page is visible. Everything here is keyed by page id.
 // Native views always paint above HTML, so they are hidden while overlays are open.
-// On Linux they are placed on a GtkOverlay (browser_gtk.rs). Started with
+// On Linux they are placed on a GtkOverlay (browser/gtk.rs). Started with
 // TRICODE_FRAMED_BROWSERS=1, Linux shows pages in an iframe instead ("framed" mode).
 
 import { invoke } from "@tauri-apps/api/core";
@@ -44,7 +44,7 @@ export const [browserInfo, setBrowserInfo] = createStore<Record<string, BrowserI
 export const [profilesSupported, setProfilesSupported] = createSignal(true);
 invoke<boolean>("browser_profiles_supported").then(setProfilesSupported).catch((e) => console.warn("browser_profiles_supported failed:", e));
 
-/** What the Debug Menu can do here (browser_debug.rs): DevTools on Windows and macOS; the DevTools
+/** What the Debug Menu can do here (browser/debug.rs): DevTools on Windows and macOS; the DevTools
  *  protocol (console errors, cache, throttling, site data, remote debugging) on Windows only. */
 export type DebugSupport = { devtools: boolean; protocol: boolean };
 /** Known up front rather than asked for: a page made before the answer came would open without its
@@ -63,7 +63,7 @@ export type Throttle = "fast4g" | "slow3g" | "offline";
 export type PageDebug = { noCache?: true; throttle?: Throttle };
 export const [pageDebug, setPageDebug] = createStore<Record<string, PageDebug>>({});
 
-/** macOS: a sign-in the page's profile could save, by page id. The password stays native (passwords.rs). */
+/** macOS: a sign-in the page's profile could save, by page id. The password stays native (browser/passwords.rs). */
 export type PasswordPrompt = { origin: string; user: string; update: boolean };
 export const [passwordPrompts, setPasswordPrompts] = createStore<Record<string, PasswordPrompt>>({});
 
@@ -298,7 +298,7 @@ listen<{ label: string; url: string; background: boolean }>("browser-open", (e) 
 
 type PickResult = {
   label: string; text: string; to: string; new: string;
-  /** Screenshots as base64 PNGs, for the text's ⟦shot N⟧ (browser_shot.rs). */
+  /** Screenshots as base64 PNGs, for the text's ⟦shot N⟧ (browser/shot.rs). */
   images?: string[]; error?: string;
   /** Copy instead of typing into an agent. */
   copy?: boolean;

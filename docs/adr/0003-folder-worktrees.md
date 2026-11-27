@@ -22,7 +22,7 @@ Worktrees (`git worktree add` into `<repo>.worktrees/<branch>`) let several agen
 
 5. **Finishing copies back what git can't carry.** When the copy is made, a hash of every other file goes in `<folder>.worktrees/.<branch>.copy.json`. Finish compares the copy and the folder with it: a file changed only in the copy is copied back, one deleted only in the copy is deleted, and one changed on both sides is a conflict, where you pick which version wins (there is no git to merge them). Then the nested worktrees are removed (`--force`, after warning about uncommitted changes), their branch is deleted where git says it is merged, and the copy and its snapshot are deleted.
 
-6. **The copying runs on the project's host**: `std::fs` locally, one `sh` script over ssh (`tar` to copy, `cksum` to hash) remotely, in `src-tauri/src/folders.rs`.
+6. **The copying runs on the project's host**: `std::fs` locally, one `sh` script over ssh (`tar` to copy, `cksum` to hash) remotely, in `src-tauri/src/git/folders.rs`.
 
 ## Consequences
 

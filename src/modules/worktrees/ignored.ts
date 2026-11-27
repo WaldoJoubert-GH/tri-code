@@ -1,7 +1,7 @@
-// The ignored files New worktree can copy into a new checkout (ignored.rs lists them): which start
+// The ignored files New worktree can copy into a new checkout (git/ignored.rs lists them): which start
 // ticked, and how the dialog shows and filters them. Chosen from design/worktree-gitignore.html (variant B).
 
-/** One file `ignored_files` found in the repo's folder (ignored.rs `IgnoredFile`). */
+/** One file `ignored_files` found in the repo's folder (git/ignored.rs `IgnoredFile`). */
 export type IgnoredFile = { path: string; size: number };
 /** What a repo project keeps from the last Create (state.ts `copyIgnored`). */
 export type CopyIgnored = { ticked: string[]; known: string[] };

@@ -10,7 +10,7 @@ use std::process::{Command, Output, Stdio};
 use crate::shared::envssh;
 
 /// `ssh` Command that runs `script` on `host` with no TTY and no prompts. Callers
-/// check `envssh::check` first: `run*` here do, and so does git.rs.
+/// check `envssh::check` first: `run*` here do, and so does git/mod.rs.
 pub fn command(host: &str, script: &str) -> Command {
     let mut cmd = Command::new("ssh");
     cmd.args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=5"])

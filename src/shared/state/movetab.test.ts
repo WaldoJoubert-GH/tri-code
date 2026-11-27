@@ -23,7 +23,7 @@ describe("piCanFollow", () => {
     expect(piCanFollow({ cmd: "pi.cmd --model opus", resume })).toBe(true);
   });
 
-  test("anything resume.rs would run as typed can't: it would lose the conversation", () => {
+  test("anything agents/resume.rs would run as typed can't: it would lose the conversation", () => {
     for (const cmd of ["pi --no-session", "pi -c", "pi --fork=x", "pi && echo hi", "pi\nnpm test", "my-pi", ""]) {
       expect(piCanFollow({ cmd, resume })).toBe(false);
     }

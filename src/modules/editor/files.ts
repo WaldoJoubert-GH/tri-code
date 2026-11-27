@@ -170,7 +170,7 @@ async function poll(w: { project: Project; busy: boolean }) {
   }
 }
 
-/** What a save fails with when the file changed on disk since it was read (fs.rs `CHANGED`). */
+/** What a save fails with when the file changed on disk since it was read (shared/fs.rs `CHANGED`). */
 export const CHANGED = "changed on disk";
 
 /** Write `text` over the file on disk, make it the cached body and return its new stamp. With the
@@ -340,7 +340,7 @@ export type Doc = {
   body: Body;
   /** The text as last read or saved; the file is modified while the editor's differs. */
   base: Text;
-  /** The file's stamp when `base` was read or saved, sent with a save (see fs.rs). */
+  /** The file's stamp when `base` was read or saved, sent with a save (see shared/fs.rs). */
   stamp: string;
   /** Scroll position, put back when the tab is shown again. */
   top: number;

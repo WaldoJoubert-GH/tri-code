@@ -143,7 +143,7 @@ export type Tab = {
   demo?: DemoKind;
 };
 
-/** An agent's own session id, which its CLI can reopen (resume.rs builds the command). */
+/** An agent's own session id, which its CLI can reopen (agents/resume.rs builds the command). */
 export type AgentSession = { kind: string; id: string };
 
 /** The tour's scripted terminals: claude at work, pi waiting to ask, a dev server. */
@@ -298,7 +298,7 @@ export type LinkedFolder = {
 export type SoundEvent = "blocked" | "done" | "error";
 /** When a signal plays its sound and shows a desktop notification: only while you aren't looking at that window, always, or never (badges only). */
 export type AlertMode = "away" | "always" | "badge";
-/** An uploaded file in My sounds, stored as `my_<id>` (bg.rs); any signal anywhere can play it. */
+/** An uploaded file in My sounds, stored as `my_<id>` (appearance/bg.rs); any signal anywhere can play it. */
 export type MySound = { id: string; name: string };
 /**
  * A sound per signal: a built-in name (see SOUNDS in signals.ts), `system:<name>` for one of the OS's
@@ -1038,7 +1038,7 @@ export function setCommandCodeUsage(on: boolean) {
   setApp("settings", "commandCodeUsage", on ? undefined : false);
 }
 
-/** Go to File's default skip list; the same as `fs::SKIP` in fs.rs. `.git` is always skipped. */
+/** Go to File's default skip list; the same as `fs::SKIP` in shared/fs.rs. `.git` is always skipped. */
 export const SKIP_FOLDERS = ["node_modules", "target", "dist", "build", ".venv", "venv", "__pycache__", ".next", ".cache"];
 
 export const skipFolders = () => app.settings.skipFolders ?? SKIP_FOLDERS;
@@ -1105,7 +1105,7 @@ export function setTabResume(projectId: string, tabId: string, resume: AgentSess
 }
 
 /** Whether tri-code can start this tab's pi over in another folder with its conversation: a plain
- *  `pi` it launched itself, which resume.rs can add flags to (`agent_of`), with a session id. */
+ *  `pi` it launched itself, which agents/resume.rs can add flags to (`agent_of`), with a session id. */
 export function piCanFollow(t: Pick<Tab, "cmd" | "resume" | "once">): boolean {
   const cmd = t.cmd?.trim() ?? "";
   if (t.once || t.resume?.kind !== "pi" || /[&|;<>`$%^()\n"']/.test(cmd)) return false;

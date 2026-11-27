@@ -136,7 +136,7 @@
 /* The window's Browser Profile (src/modules/browser/profiles.tsx): its avatar, and a band in its colour once there are two. */
 .nav .avbtn { display: grid; place-items: center; border-radius: 50%; }
 .win.profiled .bar { box-shadow: inset 0 2px 0 var(--pc); }
-/* macOS: offer to save a sign-in (passwords.rs). A row of the window, so the page moves down rather than hiding it. */
+/* macOS: offer to save a sign-in (browser/passwords.rs). A row of the window, so the page moves down rather than hiding it. */
 .pwbar {
   flex: none; display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; font-size: 12px; color: var(--text);
   background: color-mix(in srgb, var(--accent) 10%, var(--panel)); border-bottom: 1px solid var(--line);

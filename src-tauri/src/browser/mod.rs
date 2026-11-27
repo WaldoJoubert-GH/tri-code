@@ -54,7 +54,7 @@ fn icon_ok(icon: &str) -> bool {
 /// the page reports them as a navigation to this host instead, which on_navigation cancels:
 /// `/open?u=` for a background page, `/pick?d=&to=&new=` for a Select element or Screenshot
 /// result (with `&shots=&vw=&k=` when it carries screenshots), `/capture?k=` for a snapshot
-/// (browser_shot.rs).
+/// (shot.rs).
 const BG_HOST: &str = "tricode.invalid";
 
 /// Select element: dormant until browser_pick starts it.

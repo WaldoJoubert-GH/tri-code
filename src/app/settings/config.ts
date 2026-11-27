@@ -42,7 +42,7 @@ export type ConfigFile = {
   assets: Record<string, string>;
 };
 
-/** Where an asset is stored: the bg.rs command family and its key there. */
+/** Where an asset is stored: the appearance/bg.rs command family and its key there. */
 export type AssetRef = { kind: "bg" | "icon" | "sound"; key: string };
 /** The file's key for an asset. */
 export const assetName = (a: AssetRef) => `${a.kind}/${a.key}`;
@@ -50,7 +50,7 @@ export const assetName = (a: AssetRef) => `${a.kind}/${a.key}`;
 /** Projects that travel: not Worktrees, not the Sample Project. */
 export const exportable = (s: Pick<Persisted, "projects">) => s.projects.filter((p) => !p.parent && !p.sample);
 
-/** The uploaded files a project has, by the key bg.rs stores them under. */
+/** The uploaded files a project has, by the key appearance/bg.rs stores them under. */
 export function assetsOf(p: Pick<Project, "id" | "bg" | "icon" | "notify">): AssetRef[] {
   const out: AssetRef[] = [];
   if (p.bg === "image") out.push({ kind: "bg", key: p.id });

@@ -1,7 +1,7 @@
 // The git window's state and actions: one runtime record per project (never persisted).
 // A project is one repo or, when its folder holds several, a list of repos with one active;
 // Status, selection, commit message and PR are per active repo, and every action runs in it.
-// The backend is src-tauri/src/git.rs; ✦ drafts run the Draft Command set for their kind in Settings › Git on the project's host, with
+// The backend is src-tauri/src/git/mod.rs; ✦ drafts run the Draft Command set for their kind in Settings › Git on the project's host, with
 // the context the user has switched on (the "context chips").
 
 import { invoke } from "@tauri-apps/api/core";

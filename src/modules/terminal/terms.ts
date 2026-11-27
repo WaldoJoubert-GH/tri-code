@@ -739,7 +739,7 @@ function decodeBase64(b64: string): string {
 
 const sessions = new Map<string, TermSession>();
 
-/** PTYs a phone is watching (phone.rs), which keep the phone's size meanwhile. */
+/** PTYs a phone is watching (phone/mod.rs), which keep the phone's size meanwhile. */
 const phoneHeld = new Set<number>();
 listen<{ pty: number; held: boolean }>("phone-hold", ({ payload }) => {
   if (payload.held) return void phoneHeld.add(payload.pty);
@@ -747,7 +747,7 @@ listen<{ pty: number; held: boolean }>("phone-hold", ({ payload }) => {
   for (const s of sessions.values()) s.restoreSize(payload.pty);
 }).catch((e) => console.warn("phone-hold unavailable:", e));
 
-/** Claude's hook reported its session id (agent_windows.rs): the tab keeps it to reopen the conversation. */
+/** Claude's hook reported its session id (agents/agent_windows.rs): the tab keeps it to reopen the conversation. */
 listen<{ tab: string; kind: string; id: string }>("agent-session", ({ payload }) => {
   const p = app.projects.find((x) => x.tabs.some((t) => t.id === payload.tab));
   if (p) setTabResume(p.id, payload.tab, { kind: payload.kind, id: payload.id });

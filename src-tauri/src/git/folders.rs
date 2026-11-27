@@ -5,7 +5,7 @@
 //! When the copy is made, a snapshot of every other file's hash goes in a sidecar next to it
 //! (`<folder>.worktrees/.<name>.copy.json`). Finishing compares the copy and the folder with
 //! that snapshot: what changed only in the copy goes back, what changed in both is a conflict.
-//! Local paths use `std::fs`; remote ones run one `sh` script over ssh, like `dirs.rs`.
+//! Local paths use `std::fs`; remote ones run one `sh` script over ssh, like `environments/dirs.rs`.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

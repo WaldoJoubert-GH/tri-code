@@ -113,7 +113,7 @@ pub fn describe(event: &str, json: &str) -> Option<String> {
 #[cfg(windows)]
 pub use win::watch_console;
 
-/// A DevTools protocol call on a page, for screenshots (browser_shot.rs).
+/// A DevTools protocol call on a page, for screenshots (shot.rs).
 #[cfg(windows)]
 pub(crate) use win::call as cdp_call;
 

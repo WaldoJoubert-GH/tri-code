@@ -1,4 +1,4 @@
-// Remote Control: tri-code on your phone. phone.rs serves the phone page over Tailscale;
+// Remote Control: tri-code on your phone. phone/mod.rs serves the phone page over Tailscale;
 // this module turns it on and off (Settings › Remote), keeps it fed with a snapshot of the
 // projects, their windows and signals (and the terminals' last lines for the tiles), and pushes
 // a signal to paired phones when one alerts.

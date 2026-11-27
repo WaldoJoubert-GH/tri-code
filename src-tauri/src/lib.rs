@@ -1,20 +1,20 @@
+mod agents;
 #[cfg(windows)]
 mod altspace;
-mod agents;
 mod appearance;
 mod browser;
 mod cli;
 mod db;
 mod docker;
 mod environments;
-mod monitor;
-mod news;
 mod git;
 mod grammars;
 mod issues;
 mod leftovers;
 mod mdpdf;
 mod media;
+mod monitor;
+mod news;
 mod phone;
 mod sbx;
 mod shared;
@@ -178,7 +178,7 @@ pub fn run() {
             let size = window.inner_size()?.to_logical::<f64>(window.scale_factor()?);
             // Without the native drop handler, HTML drag and drop works on Windows too: reordering
             // commands and favourites, dropping images on an issue.
-            // The `devtools` feature is for browser windows (browser_debug.rs); the app's own DevTools stay in debug builds.
+            // The `devtools` feature is for browser windows (browser/debug.rs); the app's own DevTools stay in debug builds.
             let main = WebviewBuilder::new("main", WebviewUrl::App(Default::default()))
                 .auto_resize()
                 .disable_drag_drop_handler()

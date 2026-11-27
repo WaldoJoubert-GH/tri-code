@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Claude's SessionStart hook, added to tri-code's own launches with --settings (src-tauri/src/resume.rs).
+// Claude's SessionStart hook, added to tri-code's own launches with --settings (src-tauri/src/agents/resume.rs).
 // Reports the session id to tri-code so the tab can reopen this conversation after a restart. It reads
 // the hook's JSON on stdin. A failure here must never get in Claude's way, so it always exits 0 quietly.
 

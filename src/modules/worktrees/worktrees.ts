@@ -1,12 +1,12 @@
 // Worktrees: more checkouts of a project's repo, each on its own branch in a sibling folder
 // (`<repo>.worktrees/<branch>`), so several agents can work on different branches at once.
 // A Worktree is a Project with a `parent`: its own windows, workspaces and signals, listed
-// under the repo's row in the sidebar. The backend is git_worktree_* in src-tauri/src/git.rs.
+// under the repo's row in the sidebar. The backend is git_worktree_* in src-tauri/src/git/mod.rs.
 //
 // A folder that is not a repo (several repos side by side, or no git at all) gets the same
 // thing by copying: the folder goes to the same `<folder>.worktrees/<branch>`, each repo nested
 // in it is added back as a git worktree on the branch, and finishing copies what changed outside
-// git back. The copying is folder_* in src-tauri/src/folders.rs. Chosen from
+// git back. The copying is folder_* in src-tauri/src/git/folders.rs. Chosen from
 // design/folder-worktrees.html; see ADR 0003.
 
 import { invoke } from "@tauri-apps/api/core";
@@ -202,7 +202,7 @@ export function worktreeDir(repo: Project, branch: string, prefix = repo.branchP
 export const [newWorktreeFor, setNewWorktreeFor] = createSignal<string | null>(null);
 export const newWorktreeOpen = () => newWorktreeFor() !== null;
 
-/** A branch New worktree can check out (git.rs `Branch`): `remote` when only a remote has it. */
+/** A branch New worktree can check out (git/mod.rs `Branch`): `remote` when only a remote has it. */
 export type Branch = { name: string; remote: string | null };
 /** Each repo project's branches, by its id, as of the last New worktree. Runtime only. */
 export const [branches, setBranches] = createStore<Record<string, Branch[]>>({});
@@ -228,7 +228,7 @@ async function fetchBranches(repo: Project): Promise<void> {
   }
 }
 
-/** Each repo project's ignored files New worktree offers to copy (ignored.rs), by its id; undefined
+/** Each repo project's ignored files New worktree offers to copy (git/ignored.rs), by its id; undefined
  *  while they are being listed. Runtime only. */
 export const [ignored, setIgnored] = createStore<Record<string, IgnoredFile[] | undefined>>({});
 
@@ -327,7 +327,7 @@ async function copyFolder(repo: Project, dir: string, branch: string, repos: str
   return made;
 }
 
-/** What finishing a copy would carry back to its folder (folders.rs `Changes`). */
+/** What finishing a copy would carry back to its folder (git/folders.rs `Changes`). */
 type Changes = { changed: string[]; deleted: string[]; conflicts: string[] };
 
 const listed8 = (files: string[]) => files.slice(0, 8).map((f) => `\n  ${f}`).join("") + (files.length > 8 ? `\n  …and ${files.length - 8} more` : "");

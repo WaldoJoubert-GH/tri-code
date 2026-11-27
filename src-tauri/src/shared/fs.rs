@@ -1,5 +1,5 @@
 //! File listing and reading for the files window, local or over ssh.
-//! Mirrors `dirs.rs`: local paths via `std::fs`, remote paths over one `ssh` call.
+//! Mirrors `environments/dirs.rs`: local paths via `std::fs`, remote paths over one `ssh` call.
 
 use std::io::Read;
 

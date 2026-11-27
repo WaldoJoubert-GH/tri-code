@@ -3,7 +3,7 @@
 //! The PTYs themselves live in the terminal host (ptyd.rs), so they outlive the app. This is the
 //! app's connection to it. Output goes to the webview over a Tauri `Channel` as raw bytes (an
 //! `ArrayBuffer` on the JS side), so there is no JSON or base64 on the hot path. Each session also
-//! keeps its recent output and hands a copy of new output to phones watching it (phone.rs), so a
+//! keeps its recent output and hands a copy of new output to phones watching it (phone/mod.rs), so a
 //! phone can join a running agent.
 
 use std::collections::{HashMap, VecDeque};

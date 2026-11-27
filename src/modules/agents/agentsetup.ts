@@ -1,5 +1,5 @@
 // Agent setup: when a local project opens, tri-code checks whether Claude and pi have the agent-windows
-// server (agent_setup.rs). An agent that is installed but not set up gets one banner in the project,
+// server (agents/agent_setup.rs). An agent that is installed but not set up gets one banner in the project,
 // with an install button for each. The answer is kept in state.json, so it is asked once. "Not now"
 // lasts until the next launch. Settings › Agents shows the same state and the way back.
 

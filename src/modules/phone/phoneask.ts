@@ -1,4 +1,4 @@
-// Remote Control: what a phone asks of tri-code beyond watching terminals. phone.rs passes each
+// Remote Control: what a phone asks of tri-code beyond watching terminals. phone/mod.rs passes each
 // question on (`phone-ask`) and the answer back (`phone_reply`), so the phone uses the same git,
 // file and window code as the desktop, ssh projects included. Every question names a project,
 // which must be in an unlocked Environment; files must be under the project's folders.

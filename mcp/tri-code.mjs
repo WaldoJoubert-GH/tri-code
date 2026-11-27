@@ -3,7 +3,7 @@
 // type into, wait on and close the terminal windows of its own project, and make a Worktree and
 // move there. It speaks MCP over stdio
 // with no dependencies. tri-code sets TRICODE_URL and TRICODE_TOKEN in every terminal; the
-// endpoint (src-tauri/src/agent_windows.rs) decides what the token may see.
+// endpoint (src-tauri/src/agents/agent_windows.rs) decides what the token may see.
 
 const URL_BASE = process.env.TRICODE_URL;
 const TOKEN = process.env.TRICODE_TOKEN;

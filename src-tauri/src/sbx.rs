@@ -1,7 +1,7 @@
 //! Docker Sandboxes (`sbx`): a Sandboxed Worktree's terminals run in a microVM that sees only its
 //! checkout, the repo's `.git` and the folders Settings › Sandbox adds. This finds the `sbx` binary,
 //! runs its management commands for the app (sandbox.ts parses their JSON) and turns a terminal's
-//! command into the `sbx` call that runs it inside the sandbox (`args`, used by spawn.rs).
+//! command into the `sbx` call that runs it inside the sandbox (`args`, used by shared/spawn.rs).
 //! An ssh Environment's projects use the sbx installed on that host: every command here takes the
 //! project's host and runs there over ssh, in its login shell, where its PATH has sbx.
 
@@ -182,7 +182,7 @@ pub async fn sbx_cli(host: Option<String>, args: Vec<String>, input: Option<Stri
 }
 
 /// Write the agent launchers on an ssh host, where its Sandboxed Worktrees' shells find them first
-/// on PATH (spawn.rs). sbx there is found on the login shell's PATH.
+/// on PATH (shared/spawn.rs). sbx there is found on the login shell's PATH.
 #[tauri::command]
 pub async fn sbx_remote_shims(host: String) -> Result<(), String> {
     blocking(move || {

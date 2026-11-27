@@ -319,10 +319,10 @@ function dedupeAltSpace(e: KeyboardEvent) {
   } else altSpaceAt.real = Date.now();
 }
 
-/** A chord as browser_keys.rs matches it against a key pressed in a page. */
+/** A chord as browser/keys.rs matches it against a key pressed in a page. */
 type PageChord = { code: string; ctrl: boolean; alt: boolean; shift: boolean; meta: boolean };
 
-/** Every chord a browser page hands over (browser_keys.rs): the window hotkeys, the Commands' and
+/** Every chord a browser page hands over (browser/keys.rs): the window hotkeys, the Commands' and
  *  the Browser keys. Anything else stays the page's. */
 function pageChords(): PageChord[] {
   const meta = app.settings.modKey === "meta";

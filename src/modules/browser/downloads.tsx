@@ -1,4 +1,4 @@
-// Downloads in browser windows (downloads.rs saves them to the Downloads folder). A button in the
+// Downloads in browser windows (browser/downloads.rs saves them to the Downloads folder). A button in the
 // nav row shows progress and opens the window's list; a strip under the nav shows the newest one.
 // Both are part of the window, not floating, since the native webview paints over HTML.
 

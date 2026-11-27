@@ -1,4 +1,4 @@
-// Select element and Screenshot: injected into every browser page by src-tauri/src/browser.rs and
+// Select element and Screenshot: injected into every browser page by src-tauri/src/browser/mod.rs and
 // dormant until tri-code calls window.__tricodePick(opts). It draws over the page itself, since
 // tri-code's own HTML cannot paint above a native webview.
 //
@@ -13,8 +13,8 @@
 // box, numbered pins (each with a note in the composer) and text. Sending captures the frozen
 // image with the marks on it.
 //
-// It reports by navigating to https://tricode.invalid/pick, which browser.rs cancels and
-// forwards; with screenshots it sends the rects to capture, and browser_shot.rs takes the snapshot
+// It reports by navigating to https://tricode.invalid/pick, which browser/mod.rs cancels and
+// forwards; with screenshots it sends the rects to capture, and shot.rs takes the snapshot
 // before the overlay comes down (window.__tricodeDone). A snapshot to show in the page is asked
 // for at /capture and comes back through window.__tricodeImage. Both carry the session's token.
 (() => {
@@ -37,7 +37,7 @@
     session?.end();
     session = opts ? start(opts) : null;
   });
-  // Replies from browser_shot.rs: a snapshot (base64 PNG, or "" and the error), and "captured".
+  // Replies from shot.rs: a snapshot (base64 PNG, or "" and the error), and "captured".
   define("__tricodeImage", (b64, err) => session?.image(b64, err));
   define("__tricodeDone", () => session?.end());
 
@@ -295,7 +295,7 @@
     const go = (path) => (location.href = `https://tricode.invalid/${path}`);
     const typing = () => /^(INPUT|TEXTAREA)$/.test(root.activeElement?.tagName ?? "");
 
-    // ---- snapshots (browser_shot.rs) ----
+    // ---- snapshots (shot.rs) ----
 
     let waiting = null;
     let refocus = null;
@@ -343,7 +343,7 @@
       if (copy) q.set("copy", "1");
       if (shotPref !== undefined) q.set("shot", shotPref ? "1" : "0");
       requestAnimationFrame(() => requestAnimationFrame(() => go(`pick?${q}`)));
-      // browser_shot.rs ends the session once the snapshot is taken; if it never answers, say so.
+      // shot.rs ends the session once the snapshot is taken; if it never answers, say so.
       clearTimeout(sendTimer);
       sendTimer = setTimeout(() => {
         show();

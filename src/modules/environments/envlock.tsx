@@ -1,5 +1,5 @@
 // Environment ssh options and PIN locks, on the frontend side. state.json keeps them
-// (envSsh, envLocks); envssh.rs in Rust applies them to every ssh call. An environment
+// (envSsh, envLocks); shared/envssh.rs in Rust applies them to every ssh call. An environment
 // with a PIN starts locked. While it is locked its projects show the PIN pad instead
 // of the canvas and its terminals don't start. An unlock lasts `minutes`, then it
 // locks again.

@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    // The same executable is also the terminal host, started by the app (ptyd.rs).
+    // The same executable is also the terminal host, started by the app (terminal/ptyd.rs).
     let mut args = std::env::args_os().skip(1);
     if args.next().as_deref() == Some(std::ffi::OsStr::new("--pty-daemon")) {
         if let Some(info_file) = args.next() {

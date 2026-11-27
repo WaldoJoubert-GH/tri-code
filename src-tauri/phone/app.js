@@ -1,7 +1,7 @@
 // The phone page of Remote Control: pair once, then tri-code as the sidebar shows it (pins, each
 // Environment's projects and their Worktrees), a project's workspaces with its windows as tiles,
 // and a terminal window live with quick keys and a line to type into. On a tablet the sidebar
-// stays on the left. phone.rs serves it and speaks the socket protocol; sw.js shows pushed signals.
+// stays on the left. phone/mod.rs serves it and speaks the socket protocol; sw.js shows pushed signals.
 // Chosen from design/remote-view.html (variant B).
 "use strict";
 

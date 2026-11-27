@@ -1,5 +1,5 @@
 // Site icons for browser page tabs. A page's icon is the one it declares (reported by the webview:
-// WebView2's FaviconChanged, or browser.rs's FAVICON_SCRIPT elsewhere), else its origin's
+// WebView2's FaviconChanged, or browser/mod.rs's FAVICON_SCRIPT elsewhere), else its origin's
 // /favicon.ico, else a letter on a colour taken from the host (TabIcon in Canvas.tsx).
 
 /** The origin of an http(s) address, or "" for anything else (about:blank, a typo). */
