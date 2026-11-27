@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 
 use super::sqlite::{self, Lite};
 use super::{Column, Group, Limit, Page, ResultSet, RowsReq, Structure, qi, text_cell};
-use crate::fs::{CHANGED, read_bytes, stamp_of, write_checked};
+use crate::shared::fs::{CHANGED, read_bytes, stamp_of, write_checked};
 
 /// Largest file opened as a table.
 const LIMIT: u64 = 50_000_000;

@@ -13,7 +13,6 @@
 #![cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo", feature = "db-mysql")), allow(unused, unreachable_code))]
 
 mod target;
-pub(crate) mod tunnel;
 #[cfg(feature = "db-mongo")]
 mod mongo;
 #[cfg(feature = "db-mysql")]
@@ -34,6 +33,8 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+
+use crate::shared::tunnel;
 
 /// Rows in a Data page (one more is fetched to know there are more), and in each piece of a
 /// query's result sent to the window.

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use super::{Connection, Target};
-use crate::devfs;
+use crate::shared::devfs;
 
 /// Passwords of URL Connections, on the project's host and out of `.dev/` (which other Dev
 /// Clients read). Keyed by `<project path>#<connection id>`.
@@ -116,12 +116,12 @@ pub fn set_secret(host: &str, root: &str, id: &str, secret: Option<&str>) -> Res
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let path = crate::spawn::expand_home(SECRETS);
+                let path = crate::shared::spawn::expand_home(SECRETS);
                 let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
             }
             Ok(())
         }
-        _ => crate::remote::run(host, "chmod 600 ~/.tri-code/secrets/databases.json").map(|_| ()),
+        _ => crate::shared::remote::run(host, "chmod 600 ~/.tri-code/secrets/databases.json").map(|_| ()),
     }
 }
 

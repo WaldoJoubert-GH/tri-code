@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use crate::remote;
-use crate::spawn::{expand_home, remote_path, sq};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path, sq};
 
 /// Folders a copy skips wherever they are: dependencies and build output, rebuilt in the copy.
 pub(crate) const HEAVY: &[&str] = &["node_modules", "target", ".venv", "venv", "__pycache__", ".next", ".turbo", ".gradle", ".git"];

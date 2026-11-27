@@ -7,7 +7,7 @@
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
-use crate::envssh;
+use crate::shared::envssh;
 
 /// `ssh` Command that runs `script` on `host` with no TTY and no prompts. Callers
 /// check `envssh::check` first: `run*` here do, and so does git.rs.

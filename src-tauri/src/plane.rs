@@ -13,7 +13,7 @@ use std::time::Duration;
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 
-use crate::devfs;
+use crate::shared::devfs;
 
 const API_BASE: &str = "https://api.plane.so";
 const APP_BASE: &str = "https://app.plane.so";

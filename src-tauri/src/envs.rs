@@ -6,8 +6,8 @@ use std::collections::HashSet;
 use base64::Engine;
 use serde::Serialize;
 
-use crate::remote;
-use crate::spawn::{expand_home, remote_path, sq};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path, sq};
 
 /// Concrete `Host` aliases from `~/.ssh/config`, in file order. Patterns with
 /// wildcards or negation are skipped, and so are `Include`d files.

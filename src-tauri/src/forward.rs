@@ -14,9 +14,9 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-use crate::db::tunnel::{self, Tunnel};
-use crate::spawn::sq;
-use crate::{envssh, remote};
+use crate::shared::tunnel::{self, Tunnel};
+use crate::shared::spawn::sq;
+use crate::shared::{envssh, remote};
 
 /// A remote static server: the ssh running it, held so that ending it (dropping this) ends the server.
 struct Server {

@@ -22,8 +22,8 @@ use sysinfo::{Disks, Networks, Pid, Process, ProcessRefreshKind, ProcessesToUpda
 use tauri::ipc::Channel;
 
 use crate::leftovers::{end_tree, is_host, norm, place_of, under};
-use crate::remote;
-use crate::spawn::{expand_home, sq};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, sq};
 
 fn is_local(host: &str) -> bool {
     matches!(host, "" | "local")
@@ -622,7 +622,7 @@ fn start_local(stop: Arc<AtomicBool>, every: Duration, dirs: Vec<String>, on_sam
 fn void<T>(_: T) {}
 
 fn start_remote(host: &str, stop: Arc<AtomicBool>, every: u32, dirs: Vec<String>, on_sample: Channel<Snapshot>, on_exit: Channel<String>) -> Result<Running, String> {
-    crate::envssh::check(host)?;
+    crate::shared::envssh::check(host)?;
     let mut cmd = remote::command(host, &remote_script(every));
     cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| format!("ssh: {e}"))?;

@@ -97,7 +97,7 @@ fn with_note(cmd: String, windows: bool) -> Launch {
     if windows {
         Launch { cmd: format!("{cmd} %{NOTE_VAR}%"), env: vec![(NOTE_VAR.into(), format!("\"{FORK_NOTE}\""))] }
     } else {
-        Launch { cmd: format!("{cmd} {}", crate::spawn::sq(FORK_NOTE)), env: Vec::new() }
+        Launch { cmd: format!("{cmd} {}", crate::shared::spawn::sq(FORK_NOTE)), env: Vec::new() }
     }
 }
 
@@ -117,7 +117,7 @@ pub fn launch(app: &AppHandle, cmd: &str, resume: Option<&Resume>) -> Launch {
         let reference = format!("%{SETTINGS_VAR}%");
         Launch { cmd: build(cmd, resume, Some(&reference)), env: vec![(SETTINGS_VAR.into(), format!("\"{path}\""))] }
     } else {
-        Launch { cmd: build(cmd, resume, Some(&crate::spawn::sq(&path))), env: Vec::new() }
+        Launch { cmd: build(cmd, resume, Some(&crate::shared::spawn::sq(&path))), env: Vec::new() }
     }
 }
 

@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::git::blocking;
-use crate::remote;
-use crate::spawn::{remote_path, sq};
+use crate::shared::remote;
+use crate::shared::spawn::{remote_path, sq};
 
 fn is_local(host: Option<&str>) -> bool {
     matches!(host, None | Some("") | Some("local"))

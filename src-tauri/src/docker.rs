@@ -12,10 +12,11 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::ipc::Channel;
 
-use crate::db::tunnel::{self, Tunnel};
-use crate::remote;
-use crate::spawn::{expand_home, remote_path, sq};
-use crate::{envssh, git::blocking};
+use crate::shared::tunnel::{self, Tunnel};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path, sq};
+use crate::git::blocking;
+use crate::shared::envssh;
 
 /// One log line longer than this is cut, so a runaway line can't stall the window.
 const LINE_MAX: usize = 16 * 1024;
@@ -64,7 +65,7 @@ fn local_command(args: &[&str]) -> Command {
 /// sandbox is on.
 fn sandbox_command(host: &str, sandbox: &str, args: &[&str]) -> Result<Command, String> {
     if !is_local(host) {
-        crate::envssh::check(host)?;
+        crate::shared::envssh::check(host)?;
         let words: Vec<String> = ["exec", sandbox, "docker"].iter().chain(args).map(|a| sq(a)).collect();
         let script = format!("exec \"${{SHELL:-/bin/sh}}\" -lc {}", sq(&format!("exec sbx {}", words.join(" "))));
         return Ok(remote::command(host, &script));

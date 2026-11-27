@@ -5,8 +5,8 @@ use std::io::Read;
 
 use serde::Serialize;
 
-use crate::remote;
-use crate::spawn::{expand_home, remote_path, sq};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path, sq};
 
 /// Largest file read into a pane. Bigger files are truncated.
 const LIMIT: u64 = 1_000_000;

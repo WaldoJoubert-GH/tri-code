@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::folders::HEAVY;
-use crate::remote;
-use crate::spawn::{expand_home, remote_path, sq};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path, sq};
 
 /// What is offered, as git pathspecs from the repo's root.
 const WANTED: &[&str] = &[

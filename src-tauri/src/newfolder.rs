@@ -14,8 +14,8 @@ use serde::Serialize;
 use tauri::ipc::Channel;
 
 use crate::git::blocking;
-use crate::spawn::{expand_home, remote_path, sq};
-use crate::{envssh, remote};
+use crate::shared::spawn::{expand_home, remote_path, sq};
+use crate::shared::{envssh, remote};
 
 fn is_local(host: &str) -> bool {
     matches!(host, "" | "local")

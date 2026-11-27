@@ -2,8 +2,8 @@
 
 use serde::Serialize;
 
-use crate::remote;
-use crate::spawn::{expand_home, remote_path, sq};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path, sq};
 
 #[derive(Debug, Serialize)]
 pub struct DirList {

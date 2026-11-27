@@ -5,8 +5,8 @@
 //! visible to pi-todos or dev-hub. This is the third client of the shared
 //! `.dev/` contract (see the project CONTEXT/ADR).
 
-use crate::remote;
-use crate::spawn::{expand_home, remote_path};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path};
 
 /// A one-byte marker is printed before the body so an empty file is not
 /// confused with a missing one (ssh cannot tell us that from the exit code).

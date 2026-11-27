@@ -1,4 +1,4 @@
-﻿//! SQLite through rusqlite (bundled), local files only. Calls run on a blocking thread; a
+//! SQLite through rusqlite (bundled), local files only. Calls run on a blocking thread; a
 //! running one is stopped with `sqlite3_interrupt`.
 
 use std::path::{Path, PathBuf};
@@ -22,7 +22,7 @@ pub struct Lite {
 fn path_of(target: &str, root: &str) -> PathBuf {
     let p = ["sqlite://", "sqlite:", "file://", "file:"].iter().find_map(|pre| target.strip_prefix(pre)).unwrap_or(target);
     let p = p.split('?').next().unwrap_or(p);
-    let p = crate::spawn::expand_home(p);
+    let p = crate::shared::spawn::expand_home(p);
     let p = Path::new(&p);
     if p.is_absolute() { p.to_path_buf() } else { Path::new(root).join(p) }
 }

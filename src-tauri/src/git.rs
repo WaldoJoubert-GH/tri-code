@@ -7,8 +7,8 @@ use std::process::{Command, Stdio};
 
 use serde::Serialize;
 
-use crate::remote;
-use crate::spawn::{expand_home, remote_path, sq};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path, sq};
 
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Change {
@@ -108,7 +108,7 @@ fn line(program: &str, args: &[&str]) -> String {
 /// `program args` in `path` on `host`. Err while the host is locked.
 fn command(host: &str, path: &str, program: &str, args: &[&str]) -> Result<Command, String> {
     if !matches!(host, "" | "local") {
-        crate::envssh::check(host)?;
+        crate::shared::envssh::check(host)?;
         let inner = format!("cd {} && {}", remote_path(path), line(program, args));
         let script = if needs_login(program) { format!("exec \"${{SHELL:-/bin/sh}}\" -lc {}", sq(&inner)) } else { inner };
         return Ok(remote::command(host, &script));
@@ -407,7 +407,7 @@ const INDEX_LIMIT: usize = 50_000;
 /// `fs::SKIP`: `node_modules`, `.venv`, `target`…). A folder that is not a repo is walked.
 #[tauri::command]
 pub async fn project_files(host: String, path: String, skip: Option<Vec<String>>) -> Result<FileIndex, String> {
-    let skip = skip.unwrap_or_else(|| crate::fs::SKIP.iter().map(|s| s.to_string()).collect());
+    let skip = skip.unwrap_or_else(|| crate::shared::fs::SKIP.iter().map(|s| s.to_string()).collect());
     const CMDS: &[&[&str]] = &[
         &["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         // --directory folds a wholly ignored folder into one "dir/" entry, walked below
@@ -416,7 +416,7 @@ pub async fn project_files(host: String, path: String, skip: Option<Vec<String>>
     blocking(move || match multi(&host, &path, CMDS).ok().and_then(|r| r.into_iter().map(Result::ok).collect::<Option<Vec<_>>>()) {
         Some(outs) => {
             // git lists tracked and untracked files one by one, so the skip list applies to each
-            let kept = |f: &&str| !f.is_empty() && !crate::fs::under_skipped(&skip, f);
+            let kept = |f: &&str| !f.is_empty() && !crate::shared::fs::under_skipped(&skip, f);
             let mut files: Vec<String> = outs[0].split('\0').filter(kept).map(String::from).collect();
             // a conflicted file is listed once per merge stage
             files.dedup();
@@ -427,7 +427,7 @@ pub async fn project_files(host: String, path: String, skip: Option<Vec<String>>
             if !walk.is_empty() && files.len() <= INDEX_LIMIT {
                 // Git for Windows can list a folded folder's files as well, so drop repeats
                 let seen: std::collections::HashSet<String> = files.iter().cloned().collect();
-                let (more, _) = crate::fs::walk_under(&host, &path, &walk, &skip, INDEX_LIMIT + 1 - files.len()).unwrap_or_default();
+                let (more, _) = crate::shared::fs::walk_under(&host, &path, &walk, &skip, INDEX_LIMIT + 1 - files.len()).unwrap_or_default();
                 files.extend(more.into_iter().filter(|f| !seen.contains(f)));
             }
             let truncated = files.len() > INDEX_LIMIT;
@@ -435,7 +435,7 @@ pub async fn project_files(host: String, path: String, skip: Option<Vec<String>>
             Ok(FileIndex { files, git: true, truncated })
         }
         None => {
-            let (files, truncated) = crate::fs::walk(&host, &path, &skip, INDEX_LIMIT)?;
+            let (files, truncated) = crate::shared::fs::walk(&host, &path, &skip, INDEX_LIMIT)?;
             Ok(FileIndex { files, git: false, truncated })
         }
     })
@@ -1143,7 +1143,7 @@ pub async fn git_draft(host: String, path: String, command: String, prompt: Stri
 /// else the login shell; over ssh, the same login shell on the remote.
 fn shell_line(host: &str, path: &str, line: &str) -> Result<Command, String> {
     if !matches!(host, "" | "local") {
-        crate::envssh::check(host)?;
+        crate::shared::envssh::check(host)?;
         return Ok(remote::command(host, &remote_draft_script(path, line)));
     }
     #[cfg(windows)]

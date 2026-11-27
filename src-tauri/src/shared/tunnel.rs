@@ -6,7 +6,7 @@ use std::net::{TcpListener, TcpStream};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use crate::envssh;
+use crate::shared::envssh;
 
 pub struct Tunnel {
     child: Child,

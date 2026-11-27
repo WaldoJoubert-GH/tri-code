@@ -12,7 +12,7 @@ use std::sync::{LazyLock, RwLock};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::spawn::expand_home;
+use crate::shared::spawn::expand_home;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]

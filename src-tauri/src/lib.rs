@@ -11,7 +11,6 @@ mod browser_shot;
 mod browser_gtk;
 mod cli;
 mod db;
-mod devfs;
 mod downloads;
 mod dirs;
 mod docker;
@@ -19,11 +18,9 @@ mod monitor;
 mod newfolder;
 mod news;
 mod envs;
-mod envssh;
 mod folders;
 mod fonts;
 mod forward;
-mod fs;
 mod git;
 mod grammars;
 mod ignored;
@@ -37,11 +34,9 @@ mod plane;
 mod pty;
 pub mod ptyd;
 mod push;
-mod remote;
 mod resume;
 mod sbx;
-mod spawn;
-mod store;
+mod shared;
 mod syssounds;
 mod tour;
 mod usage;
@@ -264,20 +259,20 @@ pub fn run() {
             folders::worktree_dir_delete,
             envs::ssh_hosts,
             envs::scan_logos,
-            envssh::env_ssh_set,
-            envssh::env_pin_hash,
-            envssh::env_lock,
-            envssh::env_unlock,
-            envssh::env_forget_lock,
-            fs::list_files,
-            fs::read_file,
-            fs::read_image,
-            fs::read_media,
-            fs::write_file,
-            fs::create_file,
-            fs::delete_path,
-            fs::rename_path,
-            fs::stamps,
+            shared::envssh::env_ssh_set,
+            shared::envssh::env_pin_hash,
+            shared::envssh::env_lock,
+            shared::envssh::env_unlock,
+            shared::envssh::env_forget_lock,
+            shared::fs::list_files,
+            shared::fs::read_file,
+            shared::fs::read_image,
+            shared::fs::read_media,
+            shared::fs::write_file,
+            shared::fs::create_file,
+            shared::fs::delete_path,
+            shared::fs::rename_path,
+            shared::fs::stamps,
             git::git_status,
             git::folder_status,
             git::git_diff,
@@ -353,9 +348,9 @@ pub fn run() {
             forward::forward_dir,
             forward::forward_close,
             forward::remote_listening,
-            devfs::dev_read,
-            devfs::dev_write,
-            devfs::save_pasted_image,
+            shared::devfs::dev_read,
+            shared::devfs::dev_write,
+            shared::devfs::save_pasted_image,
             plane::plane_sync,
             plane::plane_set_state,
             plane::plane_set_labels,
@@ -376,10 +371,10 @@ pub fn run() {
             github::gh_issue_comments,
             github::gh_issue_comment,
             github::gh_feedback,
-            store::state_load,
-            store::state_save,
-            store::config_write,
-            store::config_read,
+            shared::store::state_load,
+            shared::store::state_save,
+            shared::store::config_write,
+            shared::store::config_read,
             tour::tour_folder,
             browser::browser_open,
             browser::browser_bounds,

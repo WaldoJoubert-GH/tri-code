@@ -19,8 +19,8 @@ use serde::Serialize;
 use sysinfo::{Pid, Process, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
 use crate::pty::Ptys;
-use crate::remote;
-use crate::spawn::{expand_home, remote_path};
+use crate::shared::remote;
+use crate::shared::spawn::{expand_home, remote_path};
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?

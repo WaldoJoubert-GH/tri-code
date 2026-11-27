@@ -7,7 +7,7 @@
 
 use serde::Deserialize;
 
-use crate::envssh;
+use crate::shared::envssh;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
