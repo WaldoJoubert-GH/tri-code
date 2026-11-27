@@ -1,4 +1,4 @@
-//! Postgres through tokio-postgres. Rows come over the simple-query protocol, so every value
+﻿//! Postgres through tokio-postgres. Rows come over the simple-query protocol, so every value
 //! is the text Postgres itself prints (numerics keep their digits, timestamps their zone) and
 //! a script of several statements gives one result set each.
 
@@ -11,7 +11,7 @@ use tokio_postgres::config::SslMode;
 use tokio_postgres::{CancelToken, Client, SimpleQueryMessage};
 
 use super::tls::{self, Mode, Tls};
-use super::{ColInfo, Column, Dialect, Group, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure, page_sql, qi, text_cell};
+use super::{ColInfo, Column, Dialect, Fill, Group, Limit, Named, Obj, PAGE, PAGE_READ, Page, ResultSet, RowsReq, Structure, page_sql, qi, text};
 
 pub struct Pg {
     client: Client,
@@ -198,7 +198,7 @@ impl Pg {
             req
         };
         let sql = page_sql(Dialect::Std, &from, req, false)?;
-        let mut set = self.simple(&sql, PAGE + 1).await?.into_iter().next().unwrap_or_default();
+        let mut set = self.simple(&sql, PAGE_READ).await?.into_iter().next().unwrap_or_default();
         let more = set.rows.len() > PAGE;
         set.rows.truncate(PAGE);
         let total = if req.filter.trim().is_empty() {
@@ -227,10 +227,10 @@ impl Pg {
         Some(r.get::<_, i64>(0) as u64)
     }
 
-    pub async fn run(&self, text: &str, _scope: Option<&str>, _read_only: bool) -> Result<Vec<ResultSet>, String> {
+    pub async fn run(&self, sql: &str, _scope: Option<&str>, _read_only: bool, limit: Limit) -> Result<Vec<ResultSet>, String> {
         // One statement can be described first, which gives its columns' types.
-        let types = self.client.prepare(text).await.ok().map(|st| st.columns().iter().map(|c| c.type_().name().to_string()).collect::<Vec<_>>());
-        let mut sets = self.simple(text, PAGE).await?;
+        let types = self.client.prepare(sql).await.ok().map(|st| st.columns().iter().map(|c| c.type_().name().to_string()).collect::<Vec<_>>());
+        let mut sets = self.simple(sql, limit).await?;
         if let (Some(types), Some(set)) = (types, sets.first_mut())
             && types.len() == set.columns.len()
         {
@@ -241,13 +241,14 @@ impl Pg {
         Ok(sets)
     }
 
-    /// Run `sql` and keep at most `max` rows a set. Past that the statement is cancelled, so a
+    /// Run `sql` and keep what fits in `limit`. Past that the statement is cancelled, so a
     /// `SELECT *` on a huge table doesn't stream all of it; the set says `more`.
-    async fn simple(&self, sql: &str, max: usize) -> Result<Vec<ResultSet>, String> {
+    async fn simple(&self, sql: &str, limit: Limit) -> Result<Vec<ResultSet>, String> {
         let stream = self.client.simple_query_raw(sql).await.map_err(err)?;
         pin_mut!(stream);
         let mut sets = Vec::new();
         let mut cur: Option<ResultSet> = None;
+        let mut fill = Fill::new(limit);
         let mut capped = false;
         while let Some(msg) = stream.next().await {
             let msg = match msg {
@@ -264,7 +265,7 @@ impl Pg {
                         columns: row.columns().iter().map(|c| Column { name: c.name().to_string(), ty: String::new() }).collect(),
                         ..Default::default()
                     });
-                    if set.rows.len() >= max {
+                    if fill.full() {
                         if !set.more {
                             set.more = true;
                             capped = true;
@@ -272,7 +273,9 @@ impl Pg {
                         }
                         continue;
                     }
-                    set.rows.push((0..row.len()).map(|i| row.get(i).map_or(Value::Null, text_cell)).collect());
+                    let cells: Vec<Value> = (0..row.len()).map(|i| row.get(i).map_or(Value::Null, text)).collect();
+                    fill.add(&cells);
+                    set.rows.push(cells);
                 }
                 SimpleQueryMessage::CommandComplete(n) => match cur.take() {
                     Some(set) => sets.push(set),
@@ -309,12 +312,14 @@ impl Pg {
     }
 }
 
-/// Against a real server: `TRI_DB_PG_URL=postgres://… cargo test --lib db::pg -- --ignored`, on a
+/// Against a real server: `TRI_DB_PG_URL=postgres://â€¦ cargo test --lib db::pg -- --ignored`, on a
 /// database with the tables of `design/` (users, orders, billing.invoices, active_users, nokey).
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    const ALL: Limit = Limit::Bytes(super::super::HOLD);
 
     async fn db(read_only: bool) -> Pg {
         let url = std::env::var("TRI_DB_PG_URL").expect("TRI_DB_PG_URL");
@@ -358,22 +363,25 @@ mod tests {
         // The same update again: the old values no longer match, and the insert after it is rolled back.
         let again = pg.apply(vec![json!({ "sql": ins.replace("new@", "new2@"), "expect": 1 }), json!({ "sql": upd, "expect": 1 })]).await.unwrap_err();
         assert!(again.contains("changed since"), "{again}");
-        let n = pg.run("SELECT count(*) FROM users WHERE email LIKE 'new%'", None, false).await.unwrap();
+        let n = pg.run("SELECT count(*) FROM users WHERE email LIKE 'new%'", None, false, ALL).await.unwrap();
         assert_eq!(n[0].rows[0][0], "1");
         assert_eq!(n[0].columns[0].ty, "int8");
 
-        let sets = pg.run("SELECT 1 AS a; UPDATE users SET plan = plan WHERE id < 4; SELECT 'x' AS b", None, false).await.unwrap();
+        let sets = pg.run("SELECT 1 AS a; UPDATE users SET plan = plan WHERE id < 4; SELECT 'x' AS b", None, false, ALL).await.unwrap();
         assert_eq!((sets.len(), sets[1].affected), (3, Some(3)));
-        let big = pg.run("SELECT * FROM generate_series(1, 100000)", None, false).await.unwrap();
-        assert_eq!((big[0].rows.len(), big[0].more), (PAGE, true));
+        // Every row of a query is read; past the limit the statement is cancelled.
+        let all = pg.run("SELECT * FROM generate_series(1, 100000)", None, false, ALL).await.unwrap();
+        assert_eq!((all[0].rows.len(), all[0].more), (100_000, false));
+        let big = pg.run("SELECT * FROM generate_series(1, 100000)", None, false, Limit::Bytes(1 << 20)).await.unwrap();
+        assert!(big[0].more && big[0].rows.len() < 100_000);
         // The connection is still usable after the cancel.
-        assert_eq!(pg.run("SELECT 2", None, false).await.unwrap()[0].rows[0][0], "2");
-        let bad = pg.run("SELECT nope FROM users", None, false).await.unwrap_err();
+        assert_eq!(pg.run("SELECT 2", None, false, ALL).await.unwrap()[0].rows[0][0], "2");
+        let bad = pg.run("SELECT nope FROM users", None, false, ALL).await.unwrap_err();
         assert!(bad.starts_with("ERROR: column \"nope\" does not exist"), "{bad}");
-        pg.run("DELETE FROM users WHERE email LIKE 'new%'; UPDATE users SET plan = 'pro', active = true, meta = '{\"n\": 7}' WHERE id = 7", None, false).await.unwrap();
+        pg.run("DELETE FROM users WHERE email LIKE 'new%'; UPDATE users SET plan = 'pro', active = true, meta = '{\"n\": 7}' WHERE id = 7", None, false, ALL).await.unwrap();
 
         let ro = db(true).await;
-        let e = ro.run("UPDATE users SET plan = 'x' WHERE id = 1", None, true).await.unwrap_err();
+        let e = ro.run("UPDATE users SET plan = 'x' WHERE id = 1", None, true, ALL).await.unwrap_err();
         assert!(e.contains("read-only transaction"), "{e}");
     }
 
@@ -383,7 +391,7 @@ mod tests {
     async fn tls_modes() {
         let url = std::env::var("TRI_DB_PG_URL").expect("TRI_DB_PG_URL");
         let pg = connect(&format!("{url}?sslmode=require"), false, None).await.unwrap().0;
-        let ssl = pg.run("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()", None, false).await.unwrap();
+        let ssl = pg.run("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()", None, false, ALL).await.unwrap();
         assert_eq!(ssl[0].rows[0][0], "t");
         let e = connect(&format!("{url}?sslmode=verify-full"), false, None).await.err().unwrap();
         assert!(e.to_lowercase().contains("certificate"), "{e}");

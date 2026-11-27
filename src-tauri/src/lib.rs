@@ -323,6 +323,8 @@ pub fn run() {
             db::db_structure,
             db::db_rows,
             db::db_run,
+            db::db_result_rows,
+            db::db_csv,
             db::db_cancel,
             db::db_apply,
             db::db_env_vars,

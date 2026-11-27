@@ -2,10 +2,12 @@
 //! one set of commands, so the window never branches on the driver for anything but syntax.
 //!
 //! A Session is an open Connection: its client, and for an ssh project with `via: "host"` the
-//! tunnel it talks through. Results are columns plus rows of JSON cells, at most `PAGE` rows a
-//! set and `CELL` bytes a cell. Pending Edits arrive as ready statements (built and shown by the
-//! window, see `db.ts`) and are applied in one transaction, each checked against the rows it
-//! expects to change.
+//! tunnel it talks through. Results are columns plus rows of JSON cells. A Data page is `PAGE`
+//! rows. A query's result is read whole (up to `HOLD`) and held by the Session: the window is
+//! sent `PAGE` rows at a time, and Export CSV writes the held rows, so nothing runs twice. A cell
+//! is cut at `CELL` bytes on its way to the window, never in what is held or exported. Pending
+//! Edits arrive as ready statements (built and shown by the window, see `db.ts`) and are applied
+//! in one transaction, each checked against the rows it expects to change.
 
 // With every driver left out the commands still exist, but nothing past the match runs.
 #![cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mongo", feature = "db-mysql")), allow(unused, unreachable_code))]
@@ -33,10 +35,66 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-/// Rows in one result set or page. One more is fetched to know there are more.
+/// Rows in a Data page (one more is fetched to know there are more), and in each piece of a
+/// query's result sent to the window.
 pub const PAGE: usize = 500;
-/// Bytes in one cell; a longer value comes back as `{ "__cut": prefix, "len": n }`.
+/// Bytes in one cell sent to the window; a longer value goes as `{ "__cut": prefix, "len": n }`.
 const CELL: usize = 64 * 1024;
+/// Bytes of cells a query's results may hold (roughly: see `Fill`). Past it the statement is
+/// cancelled and its set says `more`.
+pub const HOLD: usize = 256 << 20;
+
+/// A Data page's read: `PAGE` rows and one more, to know there are more.
+pub(crate) const PAGE_READ: Limit = Limit::Rows(PAGE + 1);
+
+/// How much a call may read: rows (a Data page) or bytes across every set (a query).
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Limit {
+    Rows(usize),
+    Bytes(usize),
+}
+
+/// What a call has read so far, against its `Limit`.
+pub(crate) struct Fill {
+    limit: Limit,
+    rows: usize,
+    bytes: usize,
+}
+
+impl Fill {
+    pub(crate) fn new(limit: Limit) -> Fill {
+        Fill { limit, rows: 0, bytes: 0 }
+    }
+
+    /// No more rows fit.
+    pub(crate) fn full(&self) -> bool {
+        match self.limit {
+            Limit::Rows(n) => self.rows >= n,
+            Limit::Bytes(n) => self.bytes >= n,
+        }
+    }
+
+    pub(crate) fn add(&mut self, row: &[Value]) {
+        let n = if let Limit::Bytes(_) = self.limit { row.iter().map(size).sum() } else { 0 };
+        self.add_bytes(n);
+    }
+
+    /// A row that costs about `n` bytes.
+    pub(crate) fn add_bytes(&mut self, n: usize) {
+        self.rows += 1;
+        self.bytes += n;
+    }
+}
+
+/// About what a cell costs in memory: its text plus the Value around it.
+fn size(v: &Value) -> usize {
+    32 + match v {
+        Value::String(s) => s.len(),
+        Value::Array(a) => a.iter().map(size).sum(),
+        Value::Object(o) => o.iter().map(|(k, v)| k.len() + size(v)).sum(),
+        _ => 0,
+    }
+}
 
 /// A saved Connection, as the window keeps it in `.dev/databases.json`.
 #[derive(Deserialize, Clone)]
@@ -88,15 +146,32 @@ pub struct Column {
 }
 
 /// One statement's result: rows, or the count it changed.
-#[derive(Serialize, Default, Debug)]
+#[derive(Serialize, Default, Debug, Clone)]
 pub struct ResultSet {
     pub columns: Vec<Column>,
+    /// Every row read; sent to the window, the first `PAGE`.
     pub rows: Vec<Vec<Value>>,
-    /// More rows than `PAGE` were left behind.
+    /// The statement had more rows than fit in `HOLD`: they were left behind.
     pub more: bool,
+    /// Rows read, of which `rows` are sent.
+    pub total: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub affected: Option<u64>,
     pub ms: u64,
+}
+
+/// A query's results as the window gets them: `run` names them for the pages that follow.
+#[derive(Serialize)]
+pub struct Ran {
+    run: u64,
+    sets: Vec<ResultSet>,
+}
+
+/// The latest query's full results, by Session.
+#[derive(Default)]
+struct Held {
+    run: u64,
+    sets: Vec<ResultSet>,
 }
 
 /// A page of a table or collection for the Data view.
@@ -221,6 +296,7 @@ struct Session {
     /// One call at a time, so a page load can't land inside an apply's transaction.
     /// Cancel doesn't take it.
     busy: tokio::sync::Mutex<()>,
+    held: Mutex<Held>,
     _tunnel: Option<tunnel::Tunnel>,
 }
 
@@ -244,7 +320,7 @@ pub async fn db_open(host: String, root: String, conn: Connection) -> Result<Ope
         {
             let (d, version, book) = sheet::open(&host, path).await?;
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
-            let s = Session { driver: Driver::Sheet(d), read_only: conn.read_only || book, busy: Default::default(), _tunnel: None };
+            let s = Session { driver: Driver::Sheet(d), read_only: conn.read_only || book, busy: Default::default(), held: Default::default(), _tunnel: None };
             SESSIONS.lock().unwrap().insert(id, Arc::new(s));
             return Ok(Opened { session: id, version, tunnel: None });
         }
@@ -304,7 +380,7 @@ pub async fn db_open(host: String, root: String, conn: Connection) -> Result<Ope
         _ => return Err("this build of tri-code leaves that database out".into()),
     };
     let id = NEXT.fetch_add(1, Ordering::Relaxed);
-    let s = Session { driver, read_only: conn.read_only, busy: Default::default(), _tunnel: tunnel };
+    let s = Session { driver, read_only: conn.read_only, busy: Default::default(), held: Default::default(), _tunnel: tunnel };
     SESSIONS.lock().unwrap().insert(id, Arc::new(s));
     Ok(Opened { session: id, version, tunnel: port })
 }
@@ -342,22 +418,128 @@ pub async fn db_structure(session: u64, group: String, name: String, kind: Strin
 pub async fn db_rows(session: u64, req: RowsReq) -> Result<Page, String> {
     let s = self::session(session)?;
     let _busy = s.busy.lock().await;
-    each!(&s.driver, d => d.rows(&req).await)
+    let mut page: Page = each!(&s.driver, d => d.rows(&req).await)?;
+    page.rows = cut(&page.rows);
+    Ok(page)
 }
 
-/// Run what the Query view holds. `scope` is the database a Mongo command runs in.
+static NEXT_RUN: AtomicU64 = AtomicU64::new(1);
+
+/// Run what the Query view holds. `scope` is the database a Mongo command runs in. Every row
+/// is read and held; the window gets the first `PAGE` of each set and asks `db_result_rows` for more.
 #[tauri::command]
-pub async fn db_run(session: u64, text: String, scope: Option<String>) -> Result<Vec<ResultSet>, String> {
+pub async fn db_run(session: u64, text: String, scope: Option<String>) -> Result<Ran, String> {
     let s = self::session(session)?;
     let _busy = s.busy.lock().await;
+    // The last results go first, so two never sit in memory together.
+    *s.held.lock().unwrap() = Held::default();
     let t0 = Instant::now();
-    let res: Result<Vec<ResultSet>, String> = each!(&s.driver, d => d.run(&text, scope.as_deref(), s.read_only).await);
+    let res: Result<Vec<ResultSet>, String> = each!(&s.driver, d => d.run(&text, scope.as_deref(), s.read_only, Limit::Bytes(HOLD)).await);
     let mut sets = res?;
     let ms = t0.elapsed().as_millis() as u64;
     for set in &mut sets {
         set.ms = ms;
+        set.total = set.rows.len();
     }
-    Ok(sets)
+    let sent = sets.iter().map(|set| ResultSet { rows: cut(&set.rows[..set.total.min(PAGE)]), columns: set.columns.clone(), ..*set }).collect();
+    let run = NEXT_RUN.fetch_add(1, Ordering::Relaxed);
+    *s.held.lock().unwrap() = Held { run, sets };
+    Ok(Ran { run, sets: sent })
+}
+
+fn held_set<'a>(held: &'a Held, run: u64, set: usize) -> Result<&'a ResultSet, String> {
+    if held.run != run {
+        return Err("a newer run replaced these results: run the query again".into());
+    }
+    held.sets.get(set).ok_or_else(|| "no such result set".into())
+}
+
+/// The next `PAGE` rows of a held set, from `offset`.
+#[tauri::command]
+pub fn db_result_rows(session: u64, run: u64, set: usize, offset: usize) -> Result<Vec<Vec<Value>>, String> {
+    let s = self::session(session)?;
+    let held = s.held.lock().unwrap();
+    let set = held_set(&held, run, set)?;
+    let from = offset.min(set.rows.len());
+    Ok(cut(&set.rows[from..(from + PAGE).min(set.rows.len())]))
+}
+
+/// A held set as CSV: its first `rows` rows, or all of them. Written to `path` (on this
+/// machine, from a save dialog) with the count returned, or without one returned as text.
+#[tauri::command]
+pub async fn db_csv(session: u64, run: u64, set: usize, rows: Option<usize>, path: Option<String>) -> Result<CsvOut, String> {
+    let s = self::session(session)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let held = s.held.lock().unwrap();
+        let set = held_set(&held, run, set)?;
+        let n = rows.unwrap_or(usize::MAX).min(set.rows.len());
+        match path {
+            Some(p) => {
+                let f = std::fs::File::create(&p).map_err(|e| format!("can't write {p}: {e}"))?;
+                let mut w = std::io::BufWriter::new(f);
+                write_csv(&mut w, &set.columns, &set.rows[..n]).map_err(|e| format!("can't write {p}: {e}"))?;
+                Ok(CsvOut { rows: n, text: None })
+            }
+            None => {
+                let mut buf = Vec::new();
+                write_csv(&mut buf, &set.columns, &set.rows[..n]).map_err(|e| e.to_string())?;
+                Ok(CsvOut { rows: n, text: Some(String::from_utf8_lossy(&buf).into_owned()) })
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[derive(Serialize)]
+pub struct CsvOut {
+    rows: usize,
+    text: Option<String>,
+}
+
+/// RFC 4180: a header row of the column names, CRLF line ends, a field quoted when it holds a
+/// comma, quote or line break, or starts or ends with a space.
+fn write_csv(w: &mut impl std::io::Write, columns: &[Column], rows: &[Vec<Value>]) -> std::io::Result<()> {
+    let line = |w: &mut dyn std::io::Write, fields: &mut dyn Iterator<Item = String>| -> std::io::Result<()> {
+        for (i, f) in fields.enumerate() {
+            if i > 0 {
+                w.write_all(b",")?;
+            }
+            let quote = f.contains([',', '"', '\n', '\r']) || f.starts_with(' ') || f.ends_with(' ');
+            if quote {
+                write!(w, "\"{}\"", f.replace('"', "\"\""))?;
+            } else {
+                w.write_all(f.as_bytes())?;
+            }
+        }
+        w.write_all(b"\r\n")
+    };
+    line(w, &mut columns.iter().map(|c| c.name.clone()))?;
+    for r in rows {
+        line(w, &mut r.iter().map(csv_field))?;
+    }
+    w.flush()
+}
+
+/// A cell as CSV text: NULL is empty; a Mongo ObjectId, date or long is its value; other nested
+/// values are JSON.
+fn csv_field(v: &Value) -> String {
+    match v {
+        Value::Null => String::new(),
+        Value::String(s) => s.clone(),
+        Value::Object(o) if o.len() == 1 => match o.iter().next() {
+            Some((k, Value::String(s))) if matches!(k.as_str(), "$oid" | "$date" | "$numberLong" | "$numberDecimal") => s.clone(),
+            Some((k, Value::Number(n))) if k == "__blob" => format!("<blob {n} bytes>"),
+            _ => v.to_string(),
+        },
+        Value::Object(_) | Value::Array(_) => v.to_string(),
+        v => v.to_string(),
+    }
+}
+
+/// Rows as the window gets them: each cell cut at `CELL`.
+fn cut(rows: &[Vec<Value>]) -> Vec<Vec<Value>> {
+    rows.iter().map(|r| r.iter().cloned().map(cap).collect()).collect()
 }
 
 #[tauri::command]
@@ -402,7 +584,13 @@ pub async fn db_secret_set(host: String, root: String, id: String, secret: Optio
         .map_err(|e| e.to_string())?
 }
 
-/// A text cell, cut at `CELL` bytes.
+/// A text cell, whole: `cut` shortens it for the window.
+#[cfg_attr(not(any(feature = "db-pg", feature = "db-sqlite", feature = "db-mysql")), allow(dead_code))]
+pub(crate) fn text(s: &str) -> Value {
+    Value::String(s.to_string())
+}
+
+/// A text cell, cut at `CELL` bytes: for what goes to the window without `cut`.
 pub(crate) fn text_cell(s: &str) -> Value {
     if s.len() <= CELL {
         return Value::String(s.to_string());
@@ -415,8 +603,7 @@ pub(crate) fn text_cell(s: &str) -> Value {
 }
 
 /// Any cell, cut when its JSON is longer than `CELL` bytes.
-#[cfg_attr(not(feature = "db-mongo"), allow(dead_code))]
-pub(crate) fn cap(v: Value) -> Value {
+fn cap(v: Value) -> Value {
     match v {
         Value::String(s) => text_cell(&s),
         Value::Object(_) | Value::Array(_) => {
@@ -544,5 +731,50 @@ mod tests {
         let v = text_cell(&"é".repeat(CELL));
         assert_eq!(v["len"], CELL * 2);
         assert!(v["__cut"].as_str().unwrap().len() <= CELL);
+        // Held whole, cut on the way to the window.
+        let rows = vec![vec![text(&"x".repeat(CELL + 10)), json!(1)]];
+        let sent = cut(&rows);
+        assert_eq!(sent[0][0]["len"], CELL + 10);
+        assert_eq!(sent[0][1], json!(1));
+    }
+
+    #[test]
+    fn csv_quotes_and_flattens_cells() {
+        let columns = [Column { name: "id".into(), ty: String::new() }, Column { name: "note, with comma".into(), ty: String::new() }];
+        let rows = vec![
+            vec![json!(1), json!("plain")],
+            vec![json!(2), json!("say \"hi\"\nbye")],
+            vec![Value::Null, json!(" padded")],
+            vec![json!({ "$oid": "64b4a2cc0e3d826827b02582" }), json!({ "a": [1, 2] })],
+            vec![json!({ "__blob": 12 }), json!(true)],
+            vec![json!("x".repeat(CELL + 1)), json!(1.5)],
+        ];
+        let mut out = Vec::new();
+        write_csv(&mut out, &columns, &rows).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.split("\r\n").collect();
+        assert_eq!(lines[0], "id,\"note, with comma\"");
+        assert_eq!(lines[1], "1,plain");
+        assert_eq!(lines[2], "2,\"say \"\"hi\"\"\nbye\"");
+        assert_eq!(lines[3], ",\" padded\"");
+        assert_eq!(lines[4], "64b4a2cc0e3d826827b02582,\"{\"\"a\"\":[1,2]}\"");
+        assert_eq!(lines[5], "<blob 12 bytes>,true");
+        // A long cell is written whole, not cut.
+        assert_eq!(lines[6].len(), CELL + 1 + 4);
+        assert_eq!(lines[7], "");
+    }
+
+    #[test]
+    fn fill_counts_rows_or_bytes() {
+        let mut f = Fill::new(Limit::Rows(2));
+        f.add(&[json!(1)]);
+        assert!(!f.full());
+        f.add(&[json!(1)]);
+        assert!(f.full());
+        let mut f = Fill::new(Limit::Bytes(100));
+        f.add(&[json!("x".repeat(60))]);
+        assert!(!f.full());
+        f.add(&[json!("x".repeat(10))]);
+        assert!(f.full());
     }
 }

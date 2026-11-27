@@ -1,4 +1,4 @@
-//! SQLite through rusqlite (bundled), local files only. Calls run on a blocking thread; a
+﻿//! SQLite through rusqlite (bundled), local files only. Calls run on a blocking thread; a
 //! running one is stopped with `sqlite3_interrupt`.
 
 use std::path::{Path, PathBuf};
@@ -11,7 +11,7 @@ use rusqlite::{Batch, Connection, InterruptHandle, OpenFlags};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::{ColInfo, Column, Dialect, Group, Named, Obj, PAGE, Page, ResultSet, RowsReq, Structure, page_sql, qi, text_cell};
+use super::{ColInfo, Column, Dialect, Fill, Group, Limit, Named, Obj, PAGE, PAGE_READ, Page, ResultSet, RowsReq, Structure, page_sql, qi, text};
 
 pub struct Lite {
     conn: Arc<Mutex<Connection>>,
@@ -54,22 +54,25 @@ fn cell(v: ValueRef) -> Value {
         ValueRef::Integer(i) if i.unsigned_abs() > (1 << 53) => Value::String(i.to_string()),
         ValueRef::Integer(i) => json!(i),
         ValueRef::Real(f) => serde_json::Number::from_f64(f).map_or(Value::Null, Value::Number),
-        ValueRef::Text(t) => text_cell(&String::from_utf8_lossy(t)),
+        ValueRef::Text(t) => text(&String::from_utf8_lossy(t)),
         ValueRef::Blob(b) => json!({ "__blob": b.len() }),
     }
 }
 
-fn read_set(stmt: &mut rusqlite::Statement, max: usize) -> rusqlite::Result<ResultSet> {
+/// A statement's rows, while they fit in `fill`.
+fn read_set(stmt: &mut rusqlite::Statement, fill: &mut Fill) -> rusqlite::Result<ResultSet> {
     let columns: Vec<Column> = stmt.columns().map(|c| Column { name: c.name().to_string(), ty: c.decl_type().unwrap_or("").to_string() }).collect();
     let n = columns.len();
     let mut set = ResultSet { columns, ..Default::default() };
     let mut rows = stmt.raw_query();
     while let Some(row) = rows.next()? {
-        if set.rows.len() >= max {
+        if fill.full() {
             set.more = true;
             break;
         }
-        set.rows.push((0..n).map(|i| row.get_ref(i).map_or(Value::Null, cell)).collect());
+        let cells: Vec<Value> = (0..n).map(|i| row.get_ref(i).map_or(Value::Null, cell)).collect();
+        fill.add(&cells);
+        set.rows.push(cells);
     }
     Ok(set)
 }
@@ -178,7 +181,7 @@ impl Lite {
         let count = if req.filter.trim().is_empty() { format!("SELECT count(*) FROM {from}") } else { format!("SELECT count(*) FROM {from} WHERE {}", req.filter.trim()) };
         self.on(move |c| {
             let mut stmt = c.prepare(&sql).map_err(|e| e.to_string())?;
-            let mut set = read_set(&mut stmt, PAGE + 1).map_err(|e| e.to_string())?;
+            let mut set = read_set(&mut stmt, &mut Fill::new(PAGE_READ)).map_err(|e| e.to_string())?;
             let more = set.rows.len() > PAGE;
             set.rows.truncate(PAGE);
             let total = c.query_row(&count, [], |r| r.get::<_, i64>(0)).ok().map(|n| n as u64);
@@ -187,17 +190,24 @@ impl Lite {
         .await
     }
 
-    pub async fn run(&self, text: &str, _scope: Option<&str>, _read_only: bool) -> Result<Vec<ResultSet>, String> {
-        let text = text.to_string();
+    pub async fn run(&self, sql: &str, _scope: Option<&str>, _read_only: bool, limit: Limit) -> Result<Vec<ResultSet>, String> {
+        let sql = sql.to_string();
         self.on(move |c| {
             let mut sets = Vec::new();
-            let mut batch = Batch::new(c, &text);
+            let mut fill = Fill::new(limit);
+            let mut batch = Batch::new(c, &sql);
             while let Some(mut stmt) = batch.next().map_err(|e| e.to_string())? {
                 if stmt.column_count() == 0 {
                     let n = stmt.raw_execute().map_err(|e| e.to_string())?;
                     sets.push(ResultSet { affected: Some(n as u64), ..Default::default() });
                 } else {
-                    sets.push(read_set(&mut stmt, PAGE).map_err(|e| e.to_string())?);
+                    let set = read_set(&mut stmt, &mut fill).map_err(|e| e.to_string())?;
+                    let stop = set.more;
+                    sets.push(set);
+                    // Out of room: the statements after it don't run, as on Postgres and MySQL.
+                    if stop {
+                        break;
+                    }
                 }
             }
             Ok(sets)
@@ -223,6 +233,8 @@ impl Lite {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ALL: Limit = Limit::Bytes(super::super::HOLD);
 
     fn temp_db() -> (PathBuf, Lite) {
         let path = std::env::temp_dir().join(format!("tri-db-test-{}-{}.db", std::process::id(), rand_suffix()));
@@ -267,9 +279,25 @@ mod tests {
         ];
         assert_eq!(db.apply(ok).await.unwrap(), 2);
 
-        let sets = db.run("SELECT plan FROM users ORDER BY id; UPDATE users SET plan = plan", None, false).await.unwrap();
+        let sets = db.run("SELECT plan FROM users ORDER BY id; UPDATE users SET plan = plan", None, false, ALL).await.unwrap();
         assert_eq!(sets[0].rows, [[json!("team")], [json!("pro")]]);
         assert_eq!(sets[1].affected, Some(2));
+        drop(db);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn queries_read_every_row_until_the_limit() {
+        let (path, db) = temp_db();
+        let series = "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 5000) SELECT i, 'row ' || i FROM n";
+        let all = db.run(series, None, false, ALL).await.unwrap();
+        assert_eq!((all[0].rows.len(), all[0].more), (5000, false));
+        assert_eq!(all[0].rows[4999], [json!(5000), json!("row 5000")]);
+        // Past the limit the set stops and says so, and the statements after it don't run.
+        let cut = db.run(&format!("{series}; UPDATE users SET plan = 'x'"), None, false, Limit::Bytes(64 * 1024)).await.unwrap();
+        assert_eq!(cut.len(), 1);
+        assert!(cut[0].more && cut[0].rows.len() < 5000);
+        assert_eq!(db.run("SELECT count(*) FROM users WHERE plan = 'x'", None, false, ALL).await.unwrap()[0].rows[0][0], json!(0));
         drop(db);
         let _ = std::fs::remove_file(path);
     }

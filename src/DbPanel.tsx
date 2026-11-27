@@ -13,10 +13,12 @@ import { MariaSQL, MySQL, PostgreSQL, SQLite, sql } from "@codemirror/lang-sql";
 import { json } from "@codemirror/lang-json";
 import { type Project, type Tab, isRemote, newId, setTabDb } from "./state";
 import {
-  type DbConn, type DbTarget, type EnvVar, type Obj, type ResultSet, type Win, addRow, apply, cancelQuery, closeReview, connOf, connsOf, discard,
-  envVars, isBookConn, isMaria, isSheet, loadConns, loadPage, loadSchema, openObj, openSession, pendingOf, removeConn, review, rowObj, runQuery, saveConn, setCell, setDoc, sheetPathOf,
-  setFilter, setQuery, setResTab, setSelCell, setView, structOf, testConn, toggleDelete, toggleGroup, toggleSort, turnPage, undo, wins,
+  type DbConn, type DbTarget, type EnvVar, type Obj, type ResultSet, type SavedQuery, type Win, addRow, apply, cancelQuery, closeReview, connOf, connsOf, copyCsv, discard,
+  envVars, exportCsv, isBookConn, isMaria, isSheet, loadConns, loadPage, loadSchema, moreRows, openObj, openQueryText, openSession, pendingOf, queryDirty, removeConn,
+  removeQuery, renameQuery, review, rowObj, runQuery, saveConn, saveQuery, savedById, savedOf, setCell, setDoc, setStarter, sheetPathOf,
+  setFilter, setQuery, setResTab, setSelCell, setView, showResult, showTable, structOf, testConn, toggleDelete, toggleGroup, toggleSort, turnPage, undo, wins,
 } from "./db";
+import { openCtxMenu } from "./ctxmenu";
 import { type Cell, type DbKind, cellText, editText, isNested, isOpaque, parseInput, pendingCount, rowKey, writes } from "./dbsql";
 import { Icon } from "./lucide";
 import { highlight, theme } from "./cm";
@@ -317,10 +319,18 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
     return (w()?.groups ?? []).map((g) => ({ ...g, objects: g.objects.filter((o) => o.name.toLowerCase().includes(f)) })).filter((g) => g.objects.length);
   });
   const onKey = (e: KeyboardEvent) => {
-    if (props.focused && dbViewKey(id, e)) e.preventDefault();
+    if (!props.focused) return;
+    if (dbViewKey(id, e)) e.preventDefault();
+    // Esc cancels a running query from the Data view too (the editor has its own binding).
+    else if (e.key === "Escape" && w()?.running && w()?.view === "data" && !e.defaultPrevented) {
+      e.preventDefault();
+      cancelQuery(id);
+    }
   };
   onMount(() => window.addEventListener("keydown", onKey));
   onCleanup(() => window.removeEventListener("keydown", onKey));
+  /** The Data view shows the Query Result, not the table's rows. */
+  const resultShown = () => w()?.view === "data" && w()?.source === "query";
   const objLabel = () => (w()?.obj ? (homeGroup(props.conn, w()) !== undefined && w()!.obj!.group !== homeGroup(props.conn, w()) ? `${w()!.obj!.group}.` : "") + w()!.obj!.name : "");
 
   return (
@@ -345,6 +355,7 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
           </div>
           <div class="db-tree-b">
             <Show when={w()?.status === "opening"}><div class="db-dim"><Icon name="loader" size={13} class="spin" /> connecting{props.conn.via === "host" && isRemote(props.project) ? ` through ${props.project.host}` : ""}…</div></Show>
+            <SavedTree project={props.project} tabId={id} conn={props.conn} win={w()} filter={q()} />
             <For each={groups()}>
               {(g) => (
                 <>
@@ -385,21 +396,101 @@ function Main(props: { project: Project; tab: Tab; conn: DbConn; win: Win | unde
         <div class="db-pane">
           <div class="db-ph">
             <span class={`db-kind ${kindChip(props.conn).cls}`} title={isSheet(props.conn) ? sheetPathOf(props.conn) : undefined}>{kindChip(props.conn).label}</span>
-            <span class="db-obname">{objLabel()}</span>
+            <span class="db-obname">{resultShown() ? savedById(props.project, w()?.savedId)?.name ?? "Query result" : objLabel()}</span>
             <div class="db-views">
               <For each={[["data", "Data", "1"], ["query", "Query", "2"], ["structure", "Structure", "3"]] as const}>
                 {([v, label, k]) => <button classList={{ on: w()?.view === v }} onClick={() => setView(id, v)}>{label} <Key k={k} /></button>}
               </For>
             </div>
             <span class="db-grow" />
-            <Show when={w()?.view === "data"}><DataTools tabId={id} conn={props.conn} win={w()} /></Show>
+            <Show when={w()?.view === "data" && !resultShown()}><DataTools tabId={id} conn={props.conn} win={w()} /></Show>
           </div>
-          <Show when={w()?.view === "data"}><DataView project={props.project} tab={props.tab} conn={props.conn} win={w()} focused={props.focused} /></Show>
-          <Show when={w()?.view === "query"}><QueryView tabId={id} conn={props.conn} win={w()} focused={props.focused} /></Show>
+          <Show when={w()?.view === "data" && !resultShown()}><DataView project={props.project} tab={props.tab} conn={props.conn} win={w()} focused={props.focused} /></Show>
+          <Show when={resultShown()}><ResultPane project={props.project} tabId={id} win={w()} inData tableLabel={objLabel()} /></Show>
+          <Show when={w()?.view === "query"}><QueryView project={props.project} tabId={id} conn={props.conn} win={w()} focused={props.focused} /></Show>
           <Show when={w()?.view === "structure"}><StructureView conn={props.conn} win={w()} /></Show>
         </div>
         <Show when={w()?.review}>{(r) => <Review project={props.project} tabId={id} conn={props.conn} review={r()} />}</Show>
       </div>
+    </Show>
+  );
+}
+
+const SAVED_GROUP = "\u0000saved";
+
+/** Run `text`, asking first when it writes to a Connection tagged prod. */
+async function runChecked(tabId: string, conn: DbConn, text: string) {
+  if (conn.tag === "prod" && writes(conn.kind, text) && !(await ask(`${conn.name} is tagged prod, and this changes data.\n\nRun it?`))) return;
+  await runQuery(tabId, text);
+}
+
+/** The Connection's Saved Queries, above its tables. A click opens one in the Query view (asking
+ *  first if the editor has unsaved text); right-click renames or deletes. */
+function SavedTree(props: { project: Project; tabId: string; conn: DbConn; win: Win | undefined; filter: string }): JSX.Element {
+  const all = () => savedOf(props.project, props.conn.id);
+  const list = () => all().filter((s) => s.name.toLowerCase().includes(props.filter.toLowerCase()));
+  const shut = () => !!props.win?.shut.includes(SAVED_GROUP);
+  const [renaming, setRenaming] = createSignal<string | null>(null);
+
+  /** Put `text` in the editor, unless it holds unsaved text the user keeps. */
+  const replace = async (text: string, savedId?: string): Promise<boolean> => {
+    const w = props.win;
+    if (queryDirty(w)) {
+      const cur = savedById(props.project, w?.savedId);
+      if (!(await ask(cur ? `Your changes to ${cur.name} aren't saved. Drop them?` : "The query in the editor isn't saved. Drop it?"))) return false;
+    }
+    openQueryText(props.tabId, text, savedId);
+    return true;
+  };
+  /** Open a Saved Query and run it, landing on its rows in Data. The open one shows its rows again. */
+  const open = async (s: SavedQuery) => {
+    const w = props.win;
+    if (w?.savedId === s.id && (w.results || w.running)) return showResult(props.tabId);
+    if (w?.savedId === s.id || (await replace(s.text, s.id))) await runChecked(props.tabId, props.conn, s.text);
+  };
+  const newQuery = () => {
+    const o = props.win?.obj;
+    void replace(STARTER[props.conn.kind](o ? (props.conn.kind === "mongo" ? o.name : sqlName(o.name, props.conn.kind)) : undefined));
+  };
+  const menu = (e: MouseEvent, s: SavedQuery) =>
+    openCtxMenu(e, [
+      { label: "Run", run: () => void open(s) },
+      { label: "Edit", run: () => void (props.win?.savedId === s.id ? setView(props.tabId, "query") : replace(s.text, s.id)) },
+      { label: "Rename", run: () => setRenaming(s.id) },
+      "sep",
+      { label: "Delete", run: async () => { if (await ask(`Delete the Saved Query ${s.name}?`)) await removeQuery(props.project, s.id); } },
+    ]);
+
+  return (
+    <Show when={!props.filter || list().length}>
+      <div class="db-grp" classList={{ shut: shut() }} onClick={() => toggleGroup(props.tabId, SAVED_GROUP)}>
+        <Icon name="chevron-down" size={12} class="chev" />
+        Saved queries
+        <span class="db-grow" /><span class="db-c">{all().length || ""}</span>
+        <button class="db-ib db-grp-add" title="New query" onClick={(e) => { e.stopPropagation(); newQuery(); }}><Icon name="plus" size={12} /></button>
+      </div>
+      <Show when={!shut()}>
+        <Show when={all().length} fallback={<div class="db-obj-hint">{ctrlName}+S in Query saves one here</div>}>
+          <For each={list()}>
+            {(s) => (
+              <div
+                class="db-obj db-saved"
+                classList={{ on: props.win?.savedId === s.id && (props.win?.view === "query" || props.win?.source === "query") }}
+                title={s.text}
+                onClick={() => renaming() !== s.id && void open(s)}
+                onDblClick={() => setRenaming(s.id)}
+                onContextMenu={(e) => menu(e, s)}
+              >
+                <Icon name="file-code" size={13} />
+                <Show when={renaming() === s.id} fallback={<span class="n">{s.name}</span>}>
+                  <NameBox initial={s.name} placeholder="Name, then Enter" onDone={(name) => { setRenaming(null); if (name && name !== s.name) void renameQuery(props.project, s.id, name); }} />
+                </Show>
+                <Show when={props.win?.savedId === s.id && queryDirty(props.win)}><span class="db-dirty" title="Unsaved changes" /></Show>
+              </div>
+            )}
+          </For>
+        </Show>
+      </Show>
     </Show>
   );
 }
@@ -769,11 +860,18 @@ const STARTER: Record<DbKind, (obj?: string) => string> = {
   mongo: (o) => `{\n  "find": "${o ?? "collection"}",\n  "filter": {},\n  "limit": 50\n}\n`,
 };
 
-function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; focused: boolean }): JSX.Element {
+function QueryView(props: { project: Project; tabId: string; conn: DbConn; win: Win | undefined; focused: boolean }): JSX.Element {
   const id = props.tabId;
   const w = () => props.win;
   let host!: HTMLDivElement;
   let view: EditorView | undefined;
+  /** Asking a name: for the first save of a new query, or Save as. */
+  const [naming, setNaming] = createSignal(false);
+  const saved = () => savedById(props.project, w()?.savedId);
+  const save = () => {
+    if (saved()) void saveQuery(props.project, id, props.conn.id);
+    else setNaming(true);
+  };
   const lang = new Compartment();
   const kind = props.conn.kind;
   const home = () => homeGroup(props.conn, w());
@@ -800,8 +898,7 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
     if (!view) return;
     const sel = view.state.selection.main;
     const text = sel.empty ? view.state.doc.toString() : view.state.sliceDoc(sel.from, sel.to);
-    if (props.conn.tag === "prod" && writes(props.conn.kind, text) && !(await ask(`${props.conn.name} is tagged prod, and this changes data.\n\nRun it?`))) return;
-    runQuery(id, text);
+    await runChecked(id, props.conn, text);
   };
 
   onMount(() => {
@@ -815,6 +912,7 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
           syntaxHighlighting(highlight), theme, lang.of(language()),
           keymap.of([
             { key: "Mod-Enter", run: () => (run(), true), preventDefault: true },
+            { key: "Mod-s", run: () => (save(), true), preventDefault: true },
             { key: "Escape", run: () => (w()?.running ? (cancelQuery(id), true) : false) },
             ...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap,
           ]),
@@ -822,26 +920,73 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
         ],
       }),
     });
-    if (!w()?.query) setQuery(id, doc);
+    if (!w()?.query) setStarter(id, doc);
     if (props.focused) view.focus();
   });
   onCleanup(() => view?.destroy());
+  // A Saved Query opened from the tree replaces the text.
+  createEffect(on(() => w()?.queryRev, () => {
+    const text = w()?.query ?? "";
+    if (!view || view.state.doc.toString() === text) return;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: 0 } });
+    view.focus();
+  }, { defer: true }));
   createEffect(on(() => [w()?.groups, Object.keys(w()?.structs ?? {}).length, isMaria(props.conn)], () => view?.dispatch({ effects: lang.reconfigure(language()) }), { defer: true }));
   createEffect(() => { if (props.focused) requestAnimationFrame(() => view?.focus()); });
 
-  const sets = () => w()?.results ?? [];
-  const cur = () => sets()[w()?.resTab ?? 0];
   return (
     <div class="db-qv">
       <div class="db-ed" ref={host} />
       <div class="db-qbar">
         <button class="db-btn db-pri" disabled={w()?.running} onClick={run}><Icon name="play" size={12} />Run <KeyText text="Mod+Enter" /></button>
+        <Show when={naming()} fallback={
+          <>
+            <button class="db-btn" title={saved() ? `Save over ${saved()!.name}` : "Save as a new Saved Query"} onClick={save}><Icon name="save" size={12} />Save <KeyText text="Mod+S" /></button>
+            <Show when={saved()}><button class="db-btn db-ghost" onClick={() => setNaming(true)}>Save as…</button></Show>
+          </>
+        }>
+          <NameBox
+            initial={saved() ? `${saved()!.name} copy` : ""}
+            onDone={(name) => {
+              setNaming(false);
+              if (name) void saveQuery(props.project, id, props.conn.id, name);
+              view?.focus();
+            }}
+          />
+        </Show>
+        <span class="db-grow" />
+        <span class="muted small" title={isSheet(props.conn) ? `Queries run on a copy of ${props.conn.name} in memory: what they change isn't saved. Edit cells in Data to change the file.` : undefined}>
+          {isSheet(props.conn) ? "SQLite · in-memory copy, not saved" : props.conn.kind === "mongo" ? "a runCommand document · EJSON" : kind === "postgres" ? "PostgreSQL · timeout 30 s" : kind === "mysql" ? `${isMaria(props.conn) ? "MariaDB" : "MySQL"} · timeout 30 s` : "SQLite"}
+        </span>
+      </div>
+      <ResultPane project={props.project} tabId={id} win={w()} />
+    </div>
+  );
+}
+
+/** The Query Result: its status, sets and Export over the grid. The Query view shows it under the
+ *  editor; the Data view shows it after Run (`source: "query"`), with a way back to the table. */
+function ResultPane(props: { project: Project; tabId: string; win: Win | undefined; inData?: boolean; tableLabel?: string }): JSX.Element {
+  const id = props.tabId;
+  const w = () => props.win;
+  const sets = () => w()?.results ?? [];
+  const cur = () => sets()[w()?.resTab ?? 0];
+  const saved = () => savedById(props.project, w()?.savedId);
+  const rowsText = (s: ResultSet) =>
+    s.rows.length < s.total ? `${s.rows.length.toLocaleString()} of ${s.total.toLocaleString()}${s.more ? "+" : ""} rows` : `${s.total.toLocaleString()}${s.more ? "+" : ""} rows`;
+  return (
+    <div class="db-res">
+      <div class="db-resbar">
+        <Show when={props.inData}>
+          <span class="db-pill ro"><Icon name="file-code" size={11} />{saved()?.name ?? "Query result"}</span>
+          <button class="db-btn db-ghost" onClick={() => setView(id, "query")}><Icon name="pencil" size={12} />Edit query</button>
+        </Show>
         <Show when={w()?.running}>
           <button class="db-btn" onClick={() => cancelQuery(id)}>Cancel <Key k="Esc" /></button>
           <span class="muted"><Icon name="loader" size={12} class="spin" /> running…</span>
         </Show>
         <Show when={!w()?.running && cur()}>
-          {(s) => <span class="muted">{s().affected != null && !s().columns.length ? `${s().affected} affected` : `${s().rows.length}${s().more ? "+" : ""} rows`} · {s().ms} ms</span>}
+          {(s) => <span class="muted">{s().affected != null && !s().columns.length ? `${s().affected} affected` : rowsText(s())} · {s().ms} ms</span>}
         </Show>
         <span class="db-grow" />
         <Show when={sets().length > 1}>
@@ -849,24 +994,156 @@ function QueryView(props: { tabId: string; conn: DbConn; win: Win | undefined; f
             <For each={sets()}>{(_, i) => <button classList={{ on: (w()?.resTab ?? 0) === i() }} onClick={() => setResTab(id, i())}>{i() + 1}</button>}</For>
           </div>
         </Show>
-        <span class="muted small" title={isSheet(props.conn) ? `Queries run on a copy of ${props.conn.name} in memory: what they change isn't saved. Edit cells in Data to change the file.` : undefined}>
-          {isSheet(props.conn) ? "SQLite · in-memory copy, not saved" : props.conn.kind === "mongo" ? "a runCommand document · EJSON" : kind === "postgres" ? "PostgreSQL · timeout 30 s" : kind === "mysql" ? `${isMaria(props.conn) ? "MariaDB" : "MySQL"} · timeout 30 s` : "SQLite"} · max 500 rows
-        </span>
-      </div>
-      <div class="db-res">
-        <Show when={w()?.runError}>{(e) => <pre class="db-err">{e()}</pre>}</Show>
-        <Show when={!w()?.runError && cur()} fallback={<Show when={!w()?.runError}><div class="db-dim center">Results show here. Run part of the text by selecting it.</div></Show>}>
-          {(s) => <ResultGrid set={s()} />}
+        <Show when={cur()}>
+          {(s) => <ExportMenu tabId={id} set={s()} name={saved()?.name ?? w()?.obj?.name ?? "query"} disabled={!!w()?.running || !s().columns.length} />}
+        </Show>
+        <Show when={props.inData && props.tableLabel}>
+          <button class="db-btn" onClick={() => showTable(id)}><Icon name="table-2" size={12} />Back to {props.tableLabel}</button>
         </Show>
       </div>
+      <Show when={w()?.runError}>{(e) => <pre class="db-err">{e()}</pre>}</Show>
+      <Show when={!w()?.runError && cur()} fallback={<Show when={!w()?.runError && !w()?.running}><div class="db-dim center">Results show here. Run part of the text by selecting it.</div></Show>}>
+        {(s) => <ResultGrid set={s()} paging={!!w()?.paging} onMore={() => moreRows(id)} />}
+      </Show>
     </div>
   );
 }
 
-function ResultGrid(props: { set: ResultSet }): JSX.Element {
+let menuSeq = 0;
+/** Native focusgroup gives a menu its arrow keys and roles; elsewhere they're added here. */
+const nativeFocusgroup = "focusGroup" in HTMLElement.prototype;
+const anchored = typeof CSS !== "undefined" && CSS.supports("position-area: block-end");
+
+/** Export CSV: a popover menu under its button (design/query-save-export.html, variant A). The
+ *  button opens it with `popovertarget`, so the browser toggles it, light-dismisses it and puts
+ *  focus back; CSS anchor positioning places it, or script where that's missing. */
+function ExportMenu(props: { tabId: string; set: ResultSet; name: string; disabled: boolean }): JSX.Element {
+  const menuId = `db-export-${++menuSeq}`;
+  let trigger!: HTMLButtonElement;
+  let menu!: HTMLDivElement;
+  /** Opened from the keyboard: focus goes to the first item. */
+  let enter = false;
+  const items = () => [...menu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+  const loaded = () => props.set.rows.length;
+
+  /** Below the button, its right edges lined up; flipped up or clamped when it would run off. */
+  const place = () => {
+    const r = trigger.getBoundingClientRect();
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+    const top = r.bottom + 4 + h > window.innerHeight - 8 ? Math.max(8, r.top - 4 - h) : r.bottom + 4;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  };
+  const onToggle = (e: ToggleEvent) => {
+    const open = e.newState === "open";
+    trigger.setAttribute("aria-expanded", String(open));
+    if (!open) return;
+    if (!anchored) place();
+    if (enter) items()[0]?.focus();
+    enter = false;
+  };
+  const act = (run: () => void) => {
+    menu.hidePopover();
+    trigger.focus();
+    run();
+  };
+  const onMenuKey = (e: KeyboardEvent) => {
+    if (nativeFocusgroup || !["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+    const list = items();
+    const i = list.indexOf(document.activeElement as HTMLButtonElement);
+    const next = e.key === "Home" ? 0 : e.key === "End" ? list.length - 1 : (i + (e.key === "ArrowUp" ? -1 : 1) + list.length) % list.length;
+    e.preventDefault();
+    list[next]?.focus({ preventScroll: true });
+  };
+  const fg = { focusgroup: "menu nomemory" } as Record<string, string>;
+  const item = { role: nativeFocusgroup ? undefined : ("menuitem" as const) };
+  return (
+    <>
+      <button
+        ref={trigger}
+        class="db-btn"
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        disabled={props.disabled}
+        {...({ popovertarget: menuId } as Record<string, string>)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") enter = true;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (menu.matches(":popover-open")) items()[0]?.focus();
+            else { enter = true; trigger.click(); }
+          }
+        }}
+      >
+        <Icon name="download" size={12} />Export CSV<Icon name="chevron-down" size={12} />
+      </button>
+      <div ref={menu} id={menuId} class="db-menu" {...({ popover: "auto" } as Record<string, string>)} onToggle={onToggle}>
+        <div {...fg} role={nativeFocusgroup ? undefined : "menu"} aria-label="Export CSV" onKeyDown={onMenuKey}>
+          <button type="button" {...item} onClick={() => act(() => void exportCsv(props.tabId, "all", props.name))}>
+            <Icon name="file-down" size={13} />
+            <span>All {props.set.total.toLocaleString()} rows{props.set.more ? " kept" : ""}…<span class="d">Every row the query returned, to a .csv you pick.</span></span>
+          </button>
+          <button type="button" {...item} disabled={loaded() >= props.set.total} onClick={() => act(() => void exportCsv(props.tabId, "loaded", props.name))}>
+            <Icon name="file-down" size={13} />
+            <span>The {loaded().toLocaleString()} loaded rows…<span class="d">Exactly what the grid holds now.</span></span>
+          </button>
+          <hr />
+          <button type="button" {...item} onClick={() => act(() => void copyCsv(props.tabId))}>
+            <Icon name="copy" size={13} />
+            <span>Copy loaded rows as CSV<span class="d">With a header row, for pasting.</span></span>
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** A name field (in place of the Save buttons, or of a Saved Query's name in the tree): Enter
+ *  takes it, Escape or leaving it cancels. */
+function NameBox(props: { initial: string; placeholder?: string; onDone: (name: string | null) => void }): JSX.Element {
+  let done = false;
+  const finish = (name: string | null) => {
+    if (done) return;
+    done = true;
+    props.onDone(name?.trim() || null);
+  };
+  return (
+    <input
+      class="db-name"
+      value={props.initial}
+      placeholder={props.placeholder ?? "Name this query, then Enter"}
+      ref={(el) => requestAnimationFrame(() => { el.focus(); el.select(); })}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (isEnter(e)) { e.preventDefault(); finish(e.currentTarget.value); }
+        if (e.key === "Escape") { e.preventDefault(); finish(null); }
+      }}
+      onBlur={() => finish(null)}
+    />
+  );
+}
+
+/** Rows a page at a time: when the end of the grid comes near, the Session is asked for the next ones. */
+function ResultGrid(props: { set: ResultSet; paging: boolean; onMore: () => void }): JSX.Element {
+  const left = () => props.set.total - props.set.rows.length;
+  let grid!: HTMLDivElement;
+  /** Watches the row under the grid: in view (or 240px from it) means load more. */
+  const watchEnd = (end: HTMLElement) => {
+    const io = new IntersectionObserver((seen) => { if (seen.some((s) => s.isIntersecting)) props.onMore(); }, { root: grid, rootMargin: "0px 0px 240px 0px" });
+    io.observe(end);
+    onCleanup(() => io.disconnect());
+  };
+  // A page that arrives with the end still in view asks for the next one.
+  createEffect(on(() => props.set.rows.length, () => {
+    const end = grid?.querySelector<HTMLElement>(".db-more");
+    if (end && !props.paging && left() > 0 && end.getBoundingClientRect().top < grid.getBoundingClientRect().bottom + 240) props.onMore();
+  }, { defer: true }));
   return (
     <Show when={props.set.columns.length} fallback={<div class="db-msg ok mono">{props.set.affected ?? 0} rows affected</div>}>
-      <div class="db-grid">
+      <div class="db-grid" ref={grid}>
         <table>
           <thead><tr><th class="rn">#</th><For each={props.set.columns}>{(c) => <th><div class="h">{c.name} <span class="t">{c.type}</span></div></th>}</For></tr></thead>
           <tbody>
@@ -880,7 +1157,16 @@ function ResultGrid(props: { set: ResultSet }): JSX.Element {
             </For>
           </tbody>
         </table>
-        <Show when={props.set.more}><div class="db-dim center">Stopped at 500 rows.</div></Show>
+        <Show when={left() > 0}>
+          <div class="db-dim center db-more" ref={watchEnd}>
+            <Show when={!props.paging} fallback={<><Icon name="loader" size={12} class="spin" /> loading…</>}>
+              {left().toLocaleString()} more <button class="db-btn db-ghost" onClick={props.onMore}>Load the next {Math.min(500, left()).toLocaleString()}</button>
+            </Show>
+          </div>
+        </Show>
+        <Show when={left() <= 0 && props.set.more}>
+          <div class="db-dim center">Stopped at {props.set.total.toLocaleString()} rows: a query keeps at most 256 MB of results. Narrow it with WHERE or LIMIT to see the rest.</div>
+        </Show>
       </div>
     </Show>
   );
