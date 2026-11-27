@@ -2,11 +2,12 @@
 // form serves the status line's bell (app-wide, project = undefined) and Appearance › Signals
 // (one project, where every field can also follow the app-wide default).
 
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { AlertMode, Project, SoundEvent, app, setNotify, setProjectNotify } from "../../shared/state/state";
 import { EVENTS, addMySound, desktopFor, playFor, playSound, removeMySound, soundName } from "./signals";
 import { SoundSelect } from "./SoundSelect";
 import { Icon } from "../../shared/ui/lucide";
+import { Popover } from "../../shared/ui/Popover";
 
 export function SignalsForm(props: { project?: Project }) {
   const p = () => props.project;
@@ -135,26 +136,13 @@ export function toggleSignals(a?: HTMLElement | null) {
 
 /** The status line's bell. Mount once (in App); Escape is handled in hotkeys.ts. */
 export function SignalsPopover() {
-  const onDown = (e: PointerEvent) => {
-    if (anchor() && !(e.target as Element).closest(".pop, #bellBtn")) closeSignals();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
-  /** Above the bell, kept inside the window. */
-  const place = (el: HTMLElement, a: HTMLElement) => {
-    const r = a.getBoundingClientRect();
-    el.style.left = Math.max(8, Math.min(r.right - el.offsetWidth, window.innerWidth - el.offsetWidth - 8)) + "px";
-    el.style.top = Math.max(8, r.top - el.offsetHeight - 6) + "px";
-  };
-
   return (
     <Show when={anchor()} keyed>
       {(a) => (
-        <div class="pop" role="dialog" aria-label="Signals and sounds" ref={(el) => requestAnimationFrame(() => place(el, a))}>
+        <Popover class="pop" role="dialog" label="Signals and sounds" anchor={a} side="above-end" keep=".pop, #bellBtn" onClose={closeSignals}>
           <div class="ttl">Signals <span>every project</span></div>
           <SignalsForm />
-        </div>
+        </Popover>
       )}
     </Show>
   );

@@ -24,6 +24,7 @@ import { Icon } from "../../shared/ui/lucide";
 import { highlight, theme } from "../../shared/codemirror/cm";
 import { ask, flash } from "../../shared/ui/ui";
 import { useWindowModal } from "../../shared/ui/windowModal";
+import { placeNear } from "../../shared/ui/Popover";
 import "./db.css";
 import { Key, KeyText } from "../../shared/keys/Keys";
 import { ctrlName } from "../../shared/keys/modkey";
@@ -1031,20 +1032,12 @@ function ExportMenu(props: { tabId: string; set: ResultSet; name: string; disabl
   const items = () => [...menu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
   const loaded = () => props.set.rows.length;
 
-  /** Below the button, its right edges lined up; flipped up or clamped when it would run off. */
-  const place = () => {
-    const r = trigger.getBoundingClientRect();
-    const w = menu.offsetWidth, h = menu.offsetHeight;
-    const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
-    const top = r.bottom + 4 + h > window.innerHeight - 8 ? Math.max(8, r.top - 4 - h) : r.bottom + 4;
-    menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
-  };
   const onToggle = (e: ToggleEvent) => {
     const open = e.newState === "open";
     trigger.setAttribute("aria-expanded", String(open));
     if (!open) return;
-    if (!anchored) place();
+    // Below the button, right edges lined up, by script where CSS anchor positioning is missing.
+    if (!anchored) placeNear(menu, trigger, "below-end", 4);
     if (enter) items()[0]?.focus();
     enter = false;
   };

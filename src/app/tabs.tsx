@@ -4,7 +4,7 @@
 // took about 330px of the 34px toolbar — the widest thing in it — and said nothing about what
 // was already open.
 
-import { For, Show, createMemo, onCleanup, onMount } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
 import { Project, Tab, TabKind, activePage, activeProject, addTab, agentOf, focusTab, lastMinimised, live, projectById, space, tabName, tabProfile, visibleTabs } from "../shared/state/state";
 import { profileColor, profilesInUse, nativeBrowsers } from "../modules/browser";
 import { openEditor } from "../modules/editor";
@@ -19,6 +19,7 @@ import { hotkeyKeys, hotkeyProblem, launchAgent, offeredIn, openAgentsPanel } fr
 import { Icon } from "../shared/ui/lucide";
 import { SIG_TEXT, sigOf } from "../modules/signals";
 import { flash } from "../shared/ui/ui";
+import { Popover } from "../shared/ui/Popover";
 import { groupKeys, heldKeys } from "../shared/keys/keymap";
 import { Caps, HoldFace, KeyList } from "../shared/keys/Keys";
 import { hintsShown, holdMenuShown } from "../shared/keys/hints";
@@ -78,21 +79,8 @@ function newPanel(p: Project, kind: (typeof PANELS)[number]["kind"]) {
   flash(`new ${kind}`);
 }
 
-/** Put the menu under its button, kept inside the window (the toolbar is 34px tall). */
-function placeMenu(el: HTMLElement, a: HTMLElement) {
-  const r = a.getBoundingClientRect();
-  el.style.left = Math.min(Math.max(8, r.left - 4), window.innerWidth - el.offsetWidth - 8) + "px";
-  el.style.top = Math.min(r.bottom + 5, window.innerHeight - el.offsetHeight - 8) + "px";
-}
-
-/** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
+/** Mount once (in App). Under its `+`; closes on an outside pointerdown, and Escape is handled in hotkeys.ts. */
 export function TabMenu() {
-  const onDown = (e: PointerEvent) => {
-    if (tabMenu() && !(e.target as Element).closest(".tabmenu, .tab-add")) closeTabMenu();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
   /** The menu a click opened, or the one holding the modifier opens under the `+`. */
   const shown = createMemo((): TabMenuAt | null => {
     const open = tabMenu();
@@ -107,7 +95,7 @@ export function TabMenu() {
       {(m) => (
         <Show when={projectById(m.projectId)} keyed>
           {(p) => (
-            <div class="tabmenu" classList={{ held: hintsShown() }} role="menu" aria-label="New window" ref={(el) => requestAnimationFrame(() => placeMenu(el, m.anchor))}>
+            <Popover class={`tabmenu${hintsShown() ? " held" : ""}`} role="menu" label="New window" anchor={m.anchor} side="below" gap={5} keep=".tab-add" onClose={closeTabMenu}>
               <div class="mt">New window</div>
               <For each={offeredIn(p)}>
                 {(a) => (
@@ -140,7 +128,7 @@ export function TabMenu() {
                   </button>
                 )}
               </For>
-            </div>
+            </Popover>
           )}
         </Show>
       )}

@@ -3,7 +3,7 @@
 // throttling, site data, remote debugging) needs the DevTools protocol, which only WebView2 has, and
 // is left out elsewhere. Chosen from design/browser-debug-profile.html.
 
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { DEFAULT_PROFILE, activePage, app, pageProfile, projectById, updateProfile } from "../../shared/state/state";
 import {
   THROTTLE_NAMES, type Throttle, browserInfo, clearSiteData, consoleErrors, debugPortOf, debugSupport, hardReload, openDevtools,
@@ -15,6 +15,7 @@ import { Icon } from "../../shared/ui/lucide";
 import { openSettings } from "../../shared/nav";
 import { copyText } from "../../shared/ui/clipboard";
 import { flash } from "../../shared/ui/ui";
+import { Popover } from "../../shared/ui/Popover";
 
 type Menu = { projectId: string; tabId: string; anchor: HTMLElement };
 const [menu, setMenu] = createSignal<Menu | null>(null);
@@ -67,23 +68,10 @@ export function DebugButton(props: { projectId: string; tabId: string; pageId: s
   );
 }
 
-function place(el: HTMLElement, a: HTMLElement) {
-  const r = a.getBoundingClientRect();
-  el.style.left = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, r.right - el.offsetWidth)) + "px";
-  el.style.top = Math.min(window.innerHeight - el.offsetHeight - 8, r.bottom + 4) + "px";
-}
-
 const THROTTLES: Throttle[] = ["fast4g", "slow3g", "offline"];
 
 /** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
 export function DebugMenu() {
-  const onDown = (e: PointerEvent) => {
-    const m = menu();
-    if (m && !(e.target as Element).closest(".dbgmenu") && !m.anchor.contains(e.target as Node)) closeDebugMenu();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
   return (
     <Show when={menu()} keyed>
       {(m) => (
@@ -107,7 +95,7 @@ export function DebugMenu() {
                   f();
                 };
                 return (
-                  <div class="dbgmenu" role="menu" aria-label="Debug" ref={(el) => requestAnimationFrame(() => place(el, m.anchor))}>
+                  <Popover class="dbgmenu" role="menu" label="Debug" anchor={m.anchor} side="below-end" gap={4} onClose={closeDebugMenu}>
                     <div class="pm-cur">
                       <ProfileAvatar profile={prof()} size={24} />
                       <div>
@@ -187,7 +175,7 @@ export function DebugMenu() {
                         </Show>
                       </Show>
                     </Show>
-                  </div>
+                  </Popover>
                 );
               }}
             </Show>

@@ -21,6 +21,7 @@ import { sendText } from "../terminal";
 import { Icon } from "../../shared/ui/lucide";
 import { clock, flash } from "../../shared/ui/ui";
 import { useWindowModal } from "../../shared/ui/windowModal";
+import { Popover } from "../../shared/ui/Popover";
 import { type Grip, type Span, daysLate, dragged, isoOf, rangeOf, spanOf, todayDay } from "./timeline";
 import { Key } from "../../shared/keys/Keys";
 import { isEnter } from "../../shared/ui/enterkey";
@@ -64,43 +65,10 @@ function LabelChip(props: { label?: PlaneLabel }): JSX.Element {
   return <span class="lb" style={{ "--lc": props.label?.color ?? "#888" }}><i />{props.label?.name ?? "?"}</span>;
 }
 
-/** An absolutely-positioned popup anchored under (or above) another element. A press
- *  anywhere outside it (other than on its anchor, which reopens it) closes it. */
+/** A popup under (or above) another element. A press anywhere outside it (other than on its
+ *  anchor, which reopens it) closes it. */
 function Dropdown(props: { anchor: () => Element | null | undefined; onClose: () => void; children: JSX.Element }): JSX.Element {
-  let el!: HTMLDivElement;
-  const place = () => {
-    const anchor = props.anchor();
-    const root = el?.closest<HTMLElement>(".iss");
-    if (!anchor || !root || !el) return;
-    const rr = root.getBoundingClientRect();
-    const ar = anchor.getBoundingClientRect();
-    const dw = el.offsetWidth, dh = el.offsetHeight;
-    let top = ar.bottom - rr.top + 4;
-    if (top + dh > rr.height - 4) top = ar.top - rr.top - dh - 4;
-    top = Math.max(4, Math.min(top, rr.height - dh - 4));
-    const left = Math.max(4, Math.min(ar.left - rr.left - 6, rr.width - dw - 4));
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-  };
-  onMount(() => {
-    place();
-    const root = el.closest<HTMLElement>(".iss");
-    const outside = (e: PointerEvent) => {
-      const t = e.target as Node | null;
-      if (t && (el.contains(t) || props.anchor()?.contains(t))) return;
-      props.onClose();
-    };
-    root?.addEventListener("scroll", place, true);
-    window.addEventListener("resize", place);
-    document.addEventListener("pointerdown", outside, true);
-    onCleanup(() => {
-      root?.removeEventListener("scroll", place, true);
-      window.removeEventListener("resize", place);
-      document.removeEventListener("pointerdown", outside, true);
-    });
-  });
-  createEffect(() => place());
-  return <div class="idrop" ref={el}>{props.children}</div>;
+  return <Popover class="idrop" anchor={props.anchor} side="below" gap={4} onClose={props.onClose}>{props.children}</Popover>;
 }
 
 // ── the panel ───────────────────────────────────────────────────────

@@ -2,8 +2,8 @@
 // can be shown in now (built in and installed grammars), then the grammars that can be installed.
 // Picking one shows the file in it until tri-code restarts; an uninstalled one installs first.
 
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import { Portal } from "solid-js/web";
+import { For, Show, createMemo, createSignal, onMount } from "solid-js";
+import { Popover } from "../ui/Popover";
 import { BUILTIN, type LangKey, autoKey, languageKey, offerFor } from "./cm";
 import { LANGS, downloadSize, kb } from "./grammars";
 import { installLang, installedGrammars, installing, installError, isInstalled, setOverride } from "./langs";
@@ -58,17 +58,7 @@ export default function LangPicker(props: { path: string; anchor: HTMLElement; o
     el.querySelector(".lp-row.sel")?.scrollIntoView({ block: "nearest" });
   };
 
-  const onDown = (e: PointerEvent) => {
-    if (!el.contains(e.target as Node) && !props.anchor.contains(e.target as Node)) props.onClose();
-  };
-  onMount(() => {
-    document.addEventListener("pointerdown", onDown, true);
-    const r = props.anchor.getBoundingClientRect();
-    el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8)) + "px";
-    el.style.top = Math.max(8, r.top - el.offsetHeight - 4) + "px";
-    input.focus();
-  });
-  onCleanup(() => document.removeEventListener("pointerdown", onDown, true));
+  onMount(() => input.focus());
 
   const row = (i: Item, at: () => number) => (
     <button
@@ -91,8 +81,7 @@ export default function LangPicker(props: { path: string; anchor: HTMLElement; o
   );
 
   return (
-    <Portal>
-    <div class="lang-picker" role="dialog" aria-label="Select language" ref={el} onKeyDown={onKey}>
+    <Popover class="lang-picker" role="dialog" label="Select language" anchor={props.anchor} side="above" gap={4} onClose={props.onClose} ref={(e) => (el = e)} onKeyDown={onKey}>
       <input
         ref={input}
         placeholder="Select a language, or install one"
@@ -116,7 +105,6 @@ export default function LangPicker(props: { path: string; anchor: HTMLElement; o
       <Show when={installError()}>
         {(f) => <div class="lp-note bad">Couldn't install {f().id}: {f().msg.split("\n")[0]}</div>}
       </Show>
-    </div>
-    </Portal>
+    </Popover>
   );
 }

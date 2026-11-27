@@ -1,11 +1,12 @@
 // The Leftovers popover: one row's leftovers (its count in the sidebar) or every one (the status
 // line's chip), each with its own end button and End all. See leftovers.ts.
 
-import { For, Show, onCleanup, onMount } from "solid-js";
+import { For, Show } from "solid-js";
 import { type Leftover, closeLeftovers, endAll, endLeftover, leftovers, leftoversAt, leftoversPop, toggleLeftovers } from "./leftovers";
 import { envName, projectById } from "../../shared/state/state";
 import { labelOf } from "../worktrees";
 import { Icon } from "../../shared/ui/lucide";
+import { Popover } from "../../shared/ui/Popover";
 
 const KIND: Record<Leftover["kind"], { icon: string; name: string; verb: string }> = {
   ghost: { icon: "ghost", name: "Terminal with no window", verb: "End" },
@@ -63,12 +64,6 @@ export function LeftoverCount(props: { place: string }) {
 
 /** Mount once (in App); Escape is handled in hotkeys.ts. */
 export function LeftoversPopover() {
-  const onDown = (e: PointerEvent) => {
-    if (leftoversPop() && !(e.target as Element).closest(".pop.leftovers, #leftoversBtn, .left-count")) closeLeftovers();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
   const list = () => {
     const at = leftoversPop()?.place;
     return at === "*" ? leftovers() : at ? leftoversAt(at) : [];
@@ -79,22 +74,19 @@ export function LeftoversPopover() {
     return `${p ? `${p.parent ? labelOf(p).text : p.name}: ` : ""}${list().length} left behind`;
   };
 
-  /** Above a status line button, beside a sidebar one; kept inside the window. */
-  const place = (el: HTMLElement, a: HTMLElement) => {
-    const r = a.getBoundingClientRect();
-    if (a.id === "leftoversBtn") {
-      el.style.left = Math.max(8, Math.min(r.right - el.offsetWidth, window.innerWidth - el.offsetWidth - 8)) + "px";
-      el.style.top = Math.max(8, r.top - el.offsetHeight - 6) + "px";
-    } else {
-      el.style.left = Math.min(r.right + 8, window.innerWidth - el.offsetWidth - 8) + "px";
-      el.style.top = Math.max(8, Math.min(r.top - 10, window.innerHeight - el.offsetHeight - 8)) + "px";
-    }
-  };
-
   return (
     <Show when={leftoversPop()} keyed>
       {(at) => (
-        <div class="pop leftovers" role="dialog" aria-label="Left behind" ref={(el) => requestAnimationFrame(() => place(el, at.anchor))}>
+        <Popover
+          class="pop leftovers"
+          role="dialog"
+          label="Left behind"
+          anchor={at.anchor}
+          side={at.anchor.id === "leftoversBtn" ? "above-end" : "beside"}
+          gap={at.anchor.id === "leftoversBtn" ? 6 : 8}
+          keep="#leftoversBtn, .left-count"
+          onClose={closeLeftovers}
+        >
           <div class="ttl">
             {title()}
             <Show when={list().some((l) => l.kind !== "folder")}>
@@ -121,7 +113,7 @@ export function LeftoversPopover() {
             </div>
           </Show>
           <div class="snote">Only what tri-code started, or what is in a project's folder with nothing left that started it.</div>
-        </div>
+        </Popover>
       )}
     </Show>
   );

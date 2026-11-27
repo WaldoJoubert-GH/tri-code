@@ -7,7 +7,6 @@
 // Chosen from design/commands.html (variant A), after design/agents.html and design/webapps.html.
 
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import { Portal } from "solid-js/web";
 import {
   type Agent, type Fav, type Project, type Scope, type SoundEvent, addAgent, app, envName, isWebApp, moveAgent, profileById,
   removeAgent, restoreAgent, updateAgent,
@@ -21,6 +20,7 @@ import { normalizeUrl } from "../../shared/urls";
 import { EVENTS, playFor, playSound, soundFor, soundName, SoundSelect } from "../signals";
 import { Icon, toggleIconPicker } from "../../shared/ui/lucide";
 import { flash, showToast } from "../../shared/ui/ui";
+import { Popover } from "../../shared/ui/Popover";
 import { ctrlName, modDown, modLabel } from "../../shared/keys/modkey";
 import "./agents.css";
 import { KeyList } from "../../shared/keys/Keys";
@@ -255,7 +255,6 @@ export default function AgentsPanel(props: { project: Project }) {
   const [q, setQ] = createSignal("");
   let listEl!: HTMLDivElement;
   let searchEl!: HTMLInputElement;
-  let popEl: HTMLDivElement | undefined;
 
   /** Move the caret into a row's name. Synchronous (the row renders with the store update), so
    *  fast typing in the add row carries on in the new name instead of making another command. */
@@ -269,36 +268,14 @@ export default function AgentsPanel(props: { project: Project }) {
   const toggle = (kind: Pop["kind"], id: string, anchor: HTMLElement) =>
     setPop((p) => (p?.kind === kind && p.id === id ? null : { kind, id, anchor }));
   const popAgent = () => app.agents.find((a) => a.id === pop()?.id);
-  /** Under its button, or above it when there's no room below. */
-  const place = (el: HTMLDivElement) => {
-    popEl = el;
-    requestAnimationFrame(() => {
-      const p = pop();
-      if (!p) return;
-      const r = p.anchor.getBoundingClientRect();
-      const below = r.bottom + 4 + el.offsetHeight <= innerHeight - 8;
-      el.style.left = `${Math.max(8, Math.min(r.left, innerWidth - el.offsetWidth - 8))}px`;
-      el.style.top = `${below ? r.bottom + 4 : Math.max(8, r.top - el.offsetHeight - 4)}px`;
-    });
-  };
-  const onDown = (e: PointerEvent) => {
-    const t = e.target as Node;
-    if (pop() && !popEl?.contains(t) && !pop()!.anchor.contains(t)) setPop(null);
-  };
   const onEsc = (e: KeyboardEvent) => {
     if (e.key === "Escape" && pop()) {
       e.stopPropagation();
       setPop(null);
     }
   };
-  onMount(() => {
-    document.addEventListener("pointerdown", onDown);
-    document.addEventListener("keydown", onEsc);
-  });
-  onCleanup(() => {
-    document.removeEventListener("pointerdown", onDown);
-    document.removeEventListener("keydown", onEsc);
-  });
+  onMount(() => document.addEventListener("keydown", onEsc));
+  onCleanup(() => document.removeEventListener("keydown", onEsc));
 
   function remove(a: Agent) {
     const index = app.agents.findIndex((x) => x.id === a.id);
@@ -547,19 +524,17 @@ export default function AgentsPanel(props: { project: Project }) {
         {(p) => (
           <Show when={popAgent()}>
             {(a) => (
-              <Portal>
-                <div class={`ag-pop ${p.kind === "scope" ? "scopepick" : "soundpick"}`} ref={place}>
-                  <Show when={p.kind === "scope"} fallback={<SoundPicker agent={a()} project={props.project} />}>
-                    <ScopePicker
-                      agent={a()}
-                      onPick={(s) => {
-                        updateAgent(a().id, { scope: s });
-                        setPop(null);
-                      }}
-                    />
-                  </Show>
-                </div>
-              </Portal>
+              <Popover class={`ag-pop ${p.kind === "scope" ? "scopepick" : "soundpick"}`} anchor={p.anchor} side="below" gap={4} onClose={() => setPop(null)}>
+                <Show when={p.kind === "scope"} fallback={<SoundPicker agent={a()} project={props.project} />}>
+                  <ScopePicker
+                    agent={a()}
+                    onPick={(s) => {
+                      updateAgent(a().id, { scope: s });
+                      setPop(null);
+                    }}
+                  />
+                </Show>
+              </Popover>
             )}
           </Show>
         )}

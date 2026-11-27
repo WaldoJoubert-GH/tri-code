@@ -2,13 +2,14 @@
 // the nav, the tiles on a new tab, and the popover that names or removes one. Favourites belong
 // to the project, so every browser window in it shows the same list. Chosen from design/canvas.html.
 
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { Fav, addFav, moveFav, projectById, removeFav, renameFav } from "../../shared/state/state";
 import { browserInfo } from "./browsers";
 import { flash } from "../../shared/ui/ui";
 import { guessIcon } from "../../shared/ui/favicons";
 import { Key, KeyText } from "../../shared/keys/Keys";
 import { isEnter } from "../../shared/ui/enterkey";
+import { Popover } from "../../shared/ui/Popover";
 
 const ICON_COLOURS = ["#7aa2f7", "#f7768e", "#9ece6a", "#bb9af7", "#2ac3de", "#ff9e64", "#e0af68", "#73daca"];
 
@@ -159,18 +160,6 @@ export function StartPage(props: { favs: Fav[]; onOpen: (url: string) => void })
 
 /** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
 export function FavPopover() {
-  const onDown = (e: PointerEvent) => {
-    if (editing() && !(e.target as Element).closest(".favpop, .star")) closeFavEdit();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
-  const place = (el: HTMLElement, a: HTMLElement) => {
-    const r = a.getBoundingClientRect();
-    el.style.left = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, r.right - el.offsetWidth)) + "px";
-    el.style.top = Math.min(window.innerHeight - el.offsetHeight - 8, r.bottom + 6) + "px";
-  };
-
   return (
     <Show when={editing()} keyed>
       {(s) => (
@@ -178,12 +167,7 @@ export function FavPopover() {
           {(p) => (
             <Show when={p.favs.find((f) => f.url === s.url)} keyed>
               {(f) => (
-                <div
-                  class="pop favpop"
-                  role="dialog"
-                  aria-label="Favourite"
-                  ref={(el) => requestAnimationFrame(() => place(el, s.anchor))}
-                >
+                <Popover class="pop favpop" role="dialog" label="Favourite" anchor={s.anchor} side="below-end" keep=".star" onClose={closeFavEdit}>
                   <div class="ttl">{s.added ? "Favourite added" : "Edit favourite"} <span>{p.name}</span></div>
                   <h4>Name</h4>
                   <input
@@ -212,7 +196,7 @@ export function FavPopover() {
                     </button>
                     <button class="primary" onClick={closeFavEdit}>Done</button>
                   </div>
-                </div>
+                </Popover>
               )}
             </Show>
           )}

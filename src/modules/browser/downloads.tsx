@@ -4,12 +4,13 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { pageOfLabel, redownload } from "./browsers";
 import { Icon } from "../../shared/ui/lucide";
 import { flash } from "../../shared/ui/ui";
 import { ago } from "../../shared/text/ago";
+import { Popover } from "../../shared/ui/Popover";
 
 export type Download = {
   id: number;
@@ -216,28 +217,15 @@ export function toggleDownloadMenu(tabId: string, anchor: HTMLElement) {
   setMenu((m) => (m?.anchor === anchor ? null : { tabId, anchor }));
 }
 
-function place(el: HTMLElement, a: HTMLElement) {
-  const r = a.getBoundingClientRect();
-  el.style.left = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, r.right - el.offsetWidth)) + "px";
-  el.style.top = Math.min(window.innerHeight - el.offsetHeight - 8, r.bottom + 4) + "px";
-}
-
 /** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
 export function DownloadMenu() {
-  const onDown = (e: PointerEvent) => {
-    const m = menu();
-    if (m && !(e.target as Element).closest(".dlmenu") && !m.anchor.contains(e.target as Node)) closeDownloadMenu();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
   const clear = (tabId: string) => setDownloads(tabId, (l) => (l ?? []).filter((d) => d.state === "running"));
   const folder = () => invoke("downloads_folder").catch(fail("open the Downloads folder"));
 
   return (
     <Show when={menu()} keyed>
       {(m) => (
-        <div class="dlmenu" role="menu" aria-label="Downloads" ref={(el) => requestAnimationFrame(() => place(el, m.anchor))}>
+        <Popover class="dlmenu" role="menu" label="Downloads" anchor={m.anchor} side="below-end" gap={4} onClose={closeDownloadMenu}>
           <header>
             <b>Downloads</b>
             <button onClick={() => clear(m.tabId)}>Clear list</button>
@@ -279,7 +267,7 @@ export function DownloadMenu() {
             <span>Saved to your Downloads folder</span>
             <button onClick={folder}>Open folder</button>
           </footer>
-        </div>
+        </Popover>
       )}
     </Show>
   );

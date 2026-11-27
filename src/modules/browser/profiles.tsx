@@ -3,7 +3,7 @@
 // data (cookies, logins, history, saved passwords, autofill). Chosen from design/browser-profiles.html.
 
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createResource, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createResource, createSignal, onCleanup } from "solid-js";
 import {
   DEFAULT_PROFILE, PROFILE_COLORS, Profile, activePage, addProfile, app, pageProfile, projectById, projectProfile, removeProfile,
   setDefaultProfile, setPageProfile, setProfileScope, setProjectProfile, setSettings, setTabProfile, tabName, tabProfile, updateProfile,
@@ -15,6 +15,7 @@ import { Icon, toggleIconPicker } from "../../shared/ui/lucide";
 import { openSettings } from "../../shared/nav";
 import { flash } from "../../shared/ui/ui";
 import { isEnter } from "../../shared/ui/enterkey";
+import { Popover } from "../../shared/ui/Popover";
 
 /** A profile's colour as a CSS value; the --p-* tokens are tuned for light and dark. */
 export const profileColor = (p: Profile) => `var(--p-${p.color})`;
@@ -75,21 +76,8 @@ export function toggleProfileMenu(projectId: string, tabId: string, anchor: HTML
   setMenu((m) => (m?.anchor === anchor ? null : { projectId, tabId, anchor }));
 }
 
-function place(el: HTMLElement, a: HTMLElement) {
-  const r = a.getBoundingClientRect();
-  el.style.left = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, r.right - el.offsetWidth)) + "px";
-  el.style.top = Math.min(window.innerHeight - el.offsetHeight - 8, r.bottom + 4) + "px";
-}
-
 /** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
 export function ProfileMenu() {
-  const onDown = (e: PointerEvent) => {
-    const m = menu();
-    if (m && !(e.target as Element).closest(".profmenu") && !m.anchor.contains(e.target as Node)) closeProfileMenu();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
   return (
     <Show when={menu()} keyed>
       {(m) => (
@@ -136,7 +124,7 @@ export function ProfileMenu() {
                     ? cur().id === win().id ? "this page · same as the window" : `this page · the window uses ${win().name}`
                     : cur().id === def().id ? `${project.name}'s profile` : `this window · ${project.name} uses ${def().name}`;
                 return (
-                  <div class="profmenu" role="menu" aria-label="Browser profile" ref={(el) => requestAnimationFrame(() => place(el, m.anchor))}>
+                  <Popover class="profmenu" role="menu" label="Browser profile" anchor={m.anchor} side="below-end" gap={4} onClose={closeProfileMenu}>
                     <div class="pm-scope">
                       <span>Profile for</span>
                       <span class="pm-seg" role="radiogroup" aria-label="Profile applies to">
@@ -217,7 +205,7 @@ export function ProfileMenu() {
                     <button role="menuitem" onClick={manage}>
                       <Icon name="settings-2" size={13} /> Manage profiles…
                     </button>
-                  </div>
+                  </Popover>
                 );
               }}
             </Show>

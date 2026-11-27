@@ -16,6 +16,7 @@ import { SignalsForm } from "../signals";
 import { flash } from "../../shared/ui/ui";
 import { keyOf } from "../../shared/keys/keymap";
 import { isEnter } from "../../shared/ui/enterkey";
+import { Popover } from "../../shared/ui/Popover";
 
 const tint = (a: string, p: number) => `color-mix(in srgb, ${a} ${p}%, transparent)`;
 
@@ -155,31 +156,9 @@ export function toggleAppearance(anchor?: HTMLElement | null) {
   else openAppearance(anchor);
 }
 
-/** Put the popover beside the anchor: under it in the toolbar, right of the sidebar when it is a sidebar gear. */
-function placePop(el: HTMLElement, a: HTMLElement) {
-  const r = a.getBoundingClientRect(), pw = 300, h = el.offsetHeight;
-  const aside = a.closest("aside");
-  let left: number, top: number;
-  if (aside) {
-    // the gear sits inside the sidebar, so measure from the sidebar's edge or the panel covers it
-    left = Math.min(aside.getBoundingClientRect().right + 8, window.innerWidth - pw - 8);
-    top = Math.max(8, Math.min(r.top - 10, window.innerHeight - h - 8));
-  } else {
-    left = Math.min(Math.max(8, r.left), window.innerWidth - pw - 8);
-    top = Math.min(r.bottom + 6, window.innerHeight - h - 8);
-  }
-  el.style.left = left + "px";
-  el.style.top = top + "px";
-}
-
-/** Mount once (in App). Renders the popover; closes it on an outside pointerdown (Escape is handled in hotkeys.ts). */
+/** Mount once (in App). Under the toolbar button, or right of the sidebar from a sidebar gear; a
+ *  press outside closes it, but not one in the icon picker it opens (Escape is handled in hotkeys.ts). */
 export function AppearancePopover() {
-  const onDown = (e: PointerEvent) => {
-    if (pop() && !(e.target as Element).closest(".pop, .iconpick, #themeBtn, .gear")) closeAppearance();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
   let fileEl: HTMLInputElement | undefined;
 
   return (
@@ -208,16 +187,15 @@ export function AppearancePopover() {
             };
 
             return (
-              <div
+              <Popover
                 class="pop"
                 role="dialog"
-                aria-label="Project appearance"
-                ref={(el) => {
-                  // place again whenever it changes size (logos arrive, the tab changes), so it stays on screen
-                  const ro = new ResizeObserver(() => placePop(el, s.anchor));
-                  ro.observe(el);
-                  onCleanup(() => ro.disconnect());
-                }}
+                label="Project appearance"
+                anchor={s.anchor}
+                side={s.anchor.closest("aside") ? "beside" : "below"}
+                gap={s.anchor.closest("aside") ? 8 : 6}
+                keep=".pop, .iconpick, #themeBtn, .gear"
+                onClose={closeAppearance}
               >
                 <div class="ttl">
                   <input
@@ -310,7 +288,7 @@ export function AppearancePopover() {
                     </span>
                   </label>
                 </Show>
-              </div>
+              </Popover>
             );
           }}
         </Show>

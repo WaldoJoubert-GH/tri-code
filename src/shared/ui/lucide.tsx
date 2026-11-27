@@ -5,6 +5,7 @@
 import { For, Show, createMemo, createSignal } from "solid-js";
 import { isEnter } from "./enterkey";
 import { Modal } from "./Modal";
+import { placeNear } from "./Popover";
 
 type IconNode = [tag: string, attrs: Record<string, string>][];
 
@@ -81,12 +82,6 @@ export function toggleIconPicker(anchor: HTMLElement, value: string, onPick: (na
   setPicker((p) => (p?.anchor === anchor ? null : { anchor, value, onPick }));
 }
 
-function place(el: HTMLElement, a: HTMLElement) {
-  const r = a.getBoundingClientRect();
-  el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8)) + "px";
-  const below = r.bottom + 5;
-  el.style.top = (below + el.offsetHeight > window.innerHeight - 8 ? Math.max(8, r.top - el.offsetHeight - 5) : below) + "px";
-}
 
 const SHOWN = 144;
 
@@ -109,7 +104,7 @@ export function IconPicker() {
         };
         return (
           <Modal class="clear" label="Choose an icon" onClose={closeIconPicker}>
-          <div class="iconpick" ref={(el) => requestAnimationFrame(() => place(el, p.anchor))}>
+          <div class="iconpick" ref={(el) => requestAnimationFrame(() => placeNear(el, p.anchor, "below", 5))}>
             <input
               class="q"
               placeholder={`Search ${names().length || ""} lucide icons…`}

@@ -3,8 +3,9 @@
 // ring. The ring is its own hover zone so a click plays or pauses without peeking the list. Clicking
 // the title, or the ring's badge, opens the popover beside the sidebar.
 
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show } from "solid-js";
 import { Icon } from "../../shared/ui/lucide";
+import { Popover } from "../../shared/ui/Popover";
 import { KeyList } from "../../shared/keys/Keys";
 import {
   type MediaSession, clock, closeMediaPop, currentMedia, dismissMedia, mediaControl, mediaPopAnchor, mediaPopOpen, mediaSessions,
@@ -115,47 +116,22 @@ export function MediaDock(props: { onRing: (inside: boolean) => void }) {
 
 /** Mount once (in App): the popover beside the sidebar. */
 export function MediaPopover() {
-  let el: HTMLDivElement | undefined;
-  const [pos, setPos] = createSignal({ left: 0, top: 0 });
-  const place = () => {
-    const a = mediaPopAnchor();
-    if (!a || !el) return;
-    const aside = a.closest("aside")?.getBoundingClientRect();
-    const r = a.getBoundingClientRect(), h = el.offsetHeight, w = el.offsetWidth;
-    const left = Math.min((aside?.right ?? r.right) + 8, window.innerWidth - w - 8);
-    const top = Math.max(8, Math.min(r.bottom - h, window.innerHeight - h - 8));
-    setPos({ left, top });
-  };
-  const onDown = (e: PointerEvent) => {
-    if (mediaPopOpen() && !(e.target as Element).closest(".media-pop, .media-dock .row, .media-ring .more")) closeMediaPop();
-  };
-  onMount(() => {
-    document.addEventListener("pointerdown", onDown);
-    addEventListener("resize", place);
-  });
-  onCleanup(() => {
-    document.removeEventListener("pointerdown", onDown);
-    removeEventListener("resize", place);
-  });
-
   const others = () => mediaSessions().filter((x) => x.id !== currentMedia()?.id);
 
   return (
     <Show when={mediaPopOpen() && currentMedia()}>
       {(s) => (
-        <div
+        <Popover
           class="pop media-pop"
           role="dialog"
-          aria-label="Now playing"
-          tabindex="-1"
-          style={{ left: `${pos().left}px`, top: `${pos().top}px` }}
-          ref={(e) => {
-            el = e;
-            const ro = new ResizeObserver(place);
-            ro.observe(e);
-            onCleanup(() => ro.disconnect());
-            requestAnimationFrame(() => (place(), e.focus()));
-          }}
+          label="Now playing"
+          tabindex={-1}
+          anchor={mediaPopAnchor}
+          side="beside-up"
+          gap={8}
+          keep=".media-dock .row, .media-ring .more"
+          onClose={closeMediaPop}
+          ref={(e) => requestAnimationFrame(() => e.focus())}
           onKeyDown={(e) => {
             if (e.target instanceof HTMLButtonElement && (e.key === " " || e.key === "Enter")) return;
             if (e.key === " ") (e.preventDefault(), void mediaControl("toggle"));
@@ -198,7 +174,7 @@ export function MediaPopover() {
             </div>
           </Show>
           <div class="pf"><KeyList keys={["Space"]} /> play / pause <KeyList keys={["←", "→"]} /> skip</div>
-        </div>
+        </Popover>
       )}
     </Show>
   );

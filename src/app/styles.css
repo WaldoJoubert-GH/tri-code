@@ -481,6 +481,10 @@ canvas.bg { display: block; width: 100%; height: 100%; }
 .app.see-chrome > aside, .app.see-chrome > .top, .app.see-chrome > .status { --panel: color-mix(in srgb, var(--panel-solid) var(--see-panels), transparent); }
 .stage .empty { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center; color: var(--muted); }
 
+/* Popover.tsx: every popup is a manual popover in the top layer. The browser's own popover box
+   (centred, padded, in Canvas colours) is dropped; each popup's class styles it, and script places it. */
+:where(.tc-pop[popover]) { margin: 0; inset: auto; padding: 0; border: 0; color: inherit; background: none; overflow: visible; }
+
 /* Project appearance panel */
 .pop {
   /* minmax(0, 1fr): an auto column grows to fit nowrap text (a long logo path), which pushed

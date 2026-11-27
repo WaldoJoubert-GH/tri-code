@@ -5,12 +5,13 @@
 // design/support-widget.html (variant A).
 
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { openExternal } from "../modules/browser";
 import { appVersion } from "./updater";
 import { flash, showToast } from "../shared/ui/ui";
 import { KeyText } from "../shared/keys/Keys";
+import { Popover } from "../shared/ui/Popover";
 
 const REPO = "WaldoJoubert-GH/tri-code";
 const KINDS = { bug: { name: "Bug", label: "bug", ask: "What went wrong?" }, idea: { name: "Idea", label: "enhancement", ask: "What would you like?" } };
@@ -69,19 +70,6 @@ async function send() {
 
 /** The status line's Feedback popover. Mount once (in App); Escape is handled in hotkeys.ts. */
 export function FeedbackPopover() {
-  const onDown = (e: PointerEvent) => {
-    if (anchor() && !(e.target as Element).closest(".pop, #feedbackBtn")) closeFeedback();
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
-  /** Above the button, kept inside the window. */
-  const place = (el: HTMLElement, a: HTMLElement) => {
-    const r = a.getBoundingClientRect();
-    el.style.left = Math.max(8, Math.min(r.right - el.offsetWidth, window.innerWidth - el.offsetWidth - 8)) + "px";
-    el.style.top = Math.max(8, r.top - el.offsetHeight - 6) + "px";
-    el.querySelector<HTMLInputElement>("input")?.focus();
-  };
   const onKey = (e: KeyboardEvent) => {
     if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || e.altKey || e.isComposing) return;
     e.preventDefault();
@@ -94,7 +82,17 @@ export function FeedbackPopover() {
   return (
     <Show when={anchor()} keyed>
       {(a) => (
-        <div class="pop feedback" role="dialog" aria-label="Feedback" onKeyDown={onKey} ref={(el) => requestAnimationFrame(() => place(el, a))}>
+        <Popover
+          class="pop feedback"
+          role="dialog"
+          label="Feedback"
+          anchor={a}
+          side="above-end"
+          keep=".pop, #feedbackBtn"
+          onClose={closeFeedback}
+          onKeyDown={onKey}
+          ref={(el) => requestAnimationFrame(() => el.querySelector<HTMLInputElement>("input")?.focus())}
+        >
           <div class="ttl">
             Tell us about tri-code
             <div class="seg" role="group" aria-label="Kind">
@@ -120,7 +118,7 @@ export function FeedbackPopover() {
               {sending() ? "Sending…" : "Send"} <KeyText text="Mod+⏎" />
             </button>
           </div>
-        </div>
+        </Popover>
       )}
     </Show>
   );

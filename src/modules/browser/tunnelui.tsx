@@ -4,7 +4,7 @@
 // Chosen from design/remote-tunnels.html.
 
 import { invoke } from "@tauri-apps/api/core";
-import { For, Show, createResource, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createResource, createSignal } from "solid-js";
 import { type Project, envName, isRemote, skipFolders } from "../../shared/state/state";
 import { type Fwd, fwdOfPage, fwds, reconnect, remoteLabel } from "./tunnels";
 import { type Listener, fileUrlOf, parseListening } from "./tunnelmap";
@@ -12,6 +12,7 @@ import { copyText } from "../../shared/ui/clipboard";
 import { Icon } from "../../shared/ui/lucide";
 import { KeyText } from "../../shared/keys/Keys";
 import { flash } from "../../shared/ui/ui";
+import { Popover } from "../../shared/ui/Popover";
 
 const STATE_TEXT: Record<Fwd["state"], string> = { opening: "Opening", open: "Open", reconnecting: "Reconnecting", failed: "Failed" };
 
@@ -59,18 +60,6 @@ export function TunnelChip(props: { project: Project; pageId: string; here: bool
 
 /** Mount once (in App). Closes on an outside pointerdown; Escape is handled in hotkeys.ts. */
 export function TunnelPopover() {
-  const onDown = (e: PointerEvent) => {
-    if (pop() && !(e.target as Element).closest(".tunpop, .tunchip")) setPop(null);
-  };
-  onMount(() => document.addEventListener("pointerdown", onDown));
-  onCleanup(() => document.removeEventListener("pointerdown", onDown));
-
-  const place = (el: HTMLElement, a: HTMLElement) => {
-    const r = a.getBoundingClientRect();
-    el.style.left = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, r.left)) + "px";
-    el.style.top = Math.min(window.innerHeight - el.offsetHeight - 8, r.bottom + 6) + "px";
-  };
-
   return (
     <Show when={pop()} keyed>
       {(s) => {
@@ -78,7 +67,7 @@ export function TunnelPopover() {
         const env = envName(s.project.host);
         const localAddr = (x: Fwd) => `http://${x.target.kind === "dir" ? "127.0.0.1" : "localhost"}:${x.local}`;
         return (
-          <div class="pop tunpop" role="dialog" aria-label={`Tunnel to ${env}`} ref={(el) => requestAnimationFrame(() => place(el, s.anchor))}>
+          <Popover class="pop tunpop" role="dialog" label={`Tunnel to ${env}`} anchor={s.anchor} side="below" keep=".tunchip" onClose={closeTunnelPop}>
             <Show
               when={f()}
               fallback={
@@ -129,7 +118,7 @@ export function TunnelPopover() {
                 </>
               )}
             </Show>
-          </div>
+          </Popover>
         );
       }}
     </Show>
